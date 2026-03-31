@@ -3,7 +3,7 @@
  * Platform-agnostic. Base URL is injected by the consuming app.
  */
 
-let _baseUrl = 'http://localhost:3001'
+let _baseUrl = 'http://localhost:3002'
 
 /** Call once at app startup to set the API base URL */
 export function setApiBaseUrl(url: string) {
@@ -62,6 +62,23 @@ export interface AirportRef {
   isActive: boolean
   isHomeBase: boolean
   isCrewBase: boolean
+  utcOffsetHours: number | null
+  elevationFt: number | null
+  crewReportingTimeMinutes: number | null
+  crewDebriefTimeMinutes: number | null
+  numberOfRunways: number | null
+  longestRunwayFt: number | null
+  hasFuelAvailable: boolean
+  hasCrewFacilities: boolean
+  fireCategory: number | null
+  hasCurfew: boolean
+  curfewStart: string | null
+  curfewEnd: string | null
+  isSlotControlled: boolean
+  weatherMonitored: boolean
+  weatherStation: string | null
+  numberOfGates: number | null
+  ianaTimezone: string | null
 }
 
 export interface AircraftTypeRef {
@@ -197,6 +214,8 @@ export const api = {
     if (params?.country) path += `&country=${encodeURIComponent(params.country)}`
     return request<AirportRef[]>(path)
   },
+
+  getAirport: (id: string) => request<AirportRef>(`/airports/${id}`),
 
   getAircraftTypes: (operatorId = 'horizon') =>
     request<AircraftTypeRef[]>(`/aircraft-types?operatorId=${operatorId}`),

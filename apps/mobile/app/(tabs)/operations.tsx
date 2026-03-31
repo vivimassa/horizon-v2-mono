@@ -3,7 +3,7 @@ import { Text, View, FlatList, RefreshControl } from 'react-native'
 import { api, setApiBaseUrl, type Flight } from '@skyhub/api'
 import { BreadcrumbHeader } from '../components/breadcrumb-header'
 
-setApiBaseUrl('http://192.168.1.101:3001')
+setApiBaseUrl('http://192.168.1.101:3002')
 
 /* ── Status config ───────────────────────── */
 

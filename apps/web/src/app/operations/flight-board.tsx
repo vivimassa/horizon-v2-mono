@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, setApiBaseUrl, type Flight } from "@skyhub/api";
 
-setApiBaseUrl("http://localhost:3001");
+setApiBaseUrl("http://localhost:3002");
 
 /* ── Status config ─────────────────────────────────── */
 

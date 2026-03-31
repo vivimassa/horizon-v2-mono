@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { api, setApiBaseUrl, type OperatorRef } from "@skyhub/api";
 import { DataTable, type Column } from "@/components/admin/data-table";
 
-setApiBaseUrl("http://localhost:3001");
+setApiBaseUrl("http://localhost:3002");
 
 const columns: Column<OperatorRef>[] = [
   {

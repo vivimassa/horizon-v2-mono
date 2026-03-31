@@ -15,7 +15,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-setApiBaseUrl("http://localhost:3001");
+setApiBaseUrl("http://localhost:3002");
 
 const CATEGORIES: {
   key: keyof ReferenceStats;

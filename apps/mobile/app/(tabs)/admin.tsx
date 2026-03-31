@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import { api, setApiBaseUrl, type ReferenceStats } from '@skyhub/api'
 import { BreadcrumbHeader } from '../components/breadcrumb-header'
 
-setApiBaseUrl('http://192.168.1.101:3001')
+setApiBaseUrl('http://192.168.1.101:3002')
 
 const CATEGORIES: {
   key: keyof ReferenceStats

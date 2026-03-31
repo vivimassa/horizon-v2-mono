@@ -3,7 +3,7 @@ import { Text, View, FlatList, TextInput, Pressable } from 'react-native'
 import { useRouter } from 'expo-router'
 import { api, setApiBaseUrl, type AirportRef } from '@skyhub/api'
 
-setApiBaseUrl('http://192.168.1.101:3001')
+setApiBaseUrl('http://192.168.1.101:3002')
 
 export default function AirportsList() {
   const [airports, setAirports] = useState<AirportRef[]>([])

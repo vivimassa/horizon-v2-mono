@@ -1,0 +1,50 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "description": "Block git commits that bypass hooks (--no-verify)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"$TOOL_INPUT\" | grep -q '\\-\\-no-verify' && echo '[BLOCKED] Do not bypass git hooks with --no-verify' >&2 && exit 2 || exit 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "description": "Check written .tsx files for Horizon convention violations",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/post-write-check.js"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "description": "Check edited .tsx files for Horizon convention violations",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/post-write-check.js"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "description": "Extract learnings from session at end",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/evaluate-session.js"
+          }
+        ]
+      }
+    ]
+  }
+}

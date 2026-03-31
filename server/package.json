@@ -1,0 +1,27 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo 'no linter configured yet'",
+    "start": "node dist/index.js",
+    "seed": "tsx src/seed.ts",
+    "migrate": "tsx src/migrate-from-supabase.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.0",
+    "@fastify/jwt": "^9.0.0",
+    "@supabase/supabase-js": "^2.101.0",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.2.0",
+    "mongoose": "^8.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "paths": {
+      "@horizon/ui": ["../../packages/ui/src/index"],
+      "@horizon/ui/*": ["../../packages/ui/*"],
+      "@horizon/api": ["../../packages/api/src/index"],
+      "@horizon/types": ["../../packages/types/src/index"],
+      "@horizon/logic": ["../../packages/logic/src/index"],
+      "@horizon/constants": ["../../packages/constants/src/index"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
+}

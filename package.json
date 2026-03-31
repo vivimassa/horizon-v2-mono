@@ -1,0 +1,23 @@
+{
+  "name": "horizon-v2-mono",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "server"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "dev:server": "turbo dev --filter=server",
+    "dev:web": "turbo dev --filter=@horizon/web",
+    "dev:mobile": "turbo dev --filter=@horizon/mobile"
+  },
+  "devDependencies": {
+    "expo-router": "~6.0.23",
+    "turbo": "^2.5.0"
+  },
+  "packageManager": "npm@10.8.2"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@horizon/web",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'Next.js not configured yet'",
+    "build": "echo 'Next.js not configured yet'",
+    "typecheck": "echo 'Next.js not configured yet'",
+    "lint": "echo 'Next.js not configured yet'"
+  },
+  "dependencies": {
+    "@horizon/ui": "*",
+    "@horizon/logic": "*",
+    "@horizon/api": "*",
+    "@horizon/types": "*",
+    "@horizon/constants": "*"
+  }
+}

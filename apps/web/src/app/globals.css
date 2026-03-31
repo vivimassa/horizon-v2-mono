@@ -21,6 +21,11 @@
   --color-hz-diverted-bg: #f3e8ff;
   --color-hz-scheduled: #6b7280;
   --color-hz-scheduled-bg: #f3f4f6;
+
+  /* Dynamic module theming — set via JS in theme-provider.tsx */
+  --color-module-accent: var(--module-accent, #1e40af);
+  --color-module-bg: var(--module-bg, #dbeafe);
+  --color-module-bg-subtle: var(--module-bg-subtle, #eff6ff);
 }
 
 /* Dark mode overrides */
@@ -42,6 +47,9 @@
 
 html {
   height: 100%;
+  --module-accent: #1e40af;
+  --module-bg: #dbeafe;
+  --module-bg-subtle: #eff6ff;
 }
 
 body {

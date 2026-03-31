@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/sidebar";
+import { Dock } from "@/components/dock";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import { ThemeProvider } from "@/components/theme-provider";
 
 const geist = Geist({ subsets: ["latin"] });
@@ -18,10 +19,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={geist.className} suppressHydrationWarning>
-      <body className="flex h-screen bg-hz-bg text-hz-text">
+      <body className="flex flex-col h-screen bg-hz-bg text-hz-text">
         <ThemeProvider>
-          <Sidebar />
-          <main className="flex-1 overflow-y-auto">{children}</main>
+          <Breadcrumbs />
+          <main className="flex-1 overflow-y-auto pb-20">{children}</main>
+          <Dock />
         </ThemeProvider>
       </body>
     </html>

@@ -12,8 +12,8 @@
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "dev:server": "turbo dev --filter=server",
-    "dev:web": "turbo dev --filter=@horizon/web",
-    "dev:mobile": "turbo dev --filter=@horizon/mobile"
+    "dev:web": "turbo dev --filter=@skyhub/web",
+    "dev:mobile": "turbo dev --filter=@skyhub/mobile"
   },
   "devDependencies": {
     "turbo": "^2.5.0"

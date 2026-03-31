@@ -1,5 +1,5 @@
 {
-  "name": "@horizon/mobile",
+  "name": "@skyhub/mobile",
   "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
@@ -9,7 +9,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "@horizon/api": "*",
+    "@skyhub/api": "*",
     "expo": "~54.0.33",
     "expo-constants": "~18.0.13",
     "expo-linking": "~8.0.11",

@@ -1,5 +1,5 @@
 {
-  "name": "@horizon/api",
+  "name": "@skyhub/api",
   "version": "0.0.1",
   "private": true,
   "main": "./src/index.ts",
@@ -10,7 +10,7 @@
     "lint": "echo 'no linter configured yet'"
   },
   "dependencies": {
-    "@horizon/types": "*"
+    "@skyhub/types": "*"
   },
   "devDependencies": {
     "typescript": "~5.7.0"

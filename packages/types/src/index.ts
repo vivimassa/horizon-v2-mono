@@ -1,4 +1,4 @@
-// @horizon/types — barrel export
+// @skyhub/types — barrel export
 // database.ts is the primary source of truth; gcs.ts has GCS-specific types
 // that conflict (AircraftType, CrewMember, CrewPosition), so we namespace them.
 

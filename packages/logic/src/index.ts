@@ -1,4 +1,4 @@
-// @horizon/logic — barrel export
+// @skyhub/logic — barrel export
 
 // FDTL
 export * from './fdtl/engine'

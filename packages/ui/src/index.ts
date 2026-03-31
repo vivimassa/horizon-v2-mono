@@ -1,4 +1,4 @@
-// @horizon/ui — shared React Native components
+// @skyhub/ui — shared React Native components
 export { Card } from './Card'
 export { Badge, type StatusKey } from './Badge'
 export { Button } from './Button'

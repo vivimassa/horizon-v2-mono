@@ -1,1 +1,53 @@
 @import 'tailwindcss';
+
+@theme {
+  --color-hz-bg: #ffffff;
+  --color-hz-card: #f5f5f5;
+  --color-hz-border: #e8e8e8;
+  --color-hz-text: #111111;
+  --color-hz-text-secondary: #6b7280;
+  --color-hz-accent: #1e40af;
+  --color-hz-accent-light: #dbeafe;
+
+  --color-hz-on-time: #16a34a;
+  --color-hz-on-time-bg: #dcfce7;
+  --color-hz-delayed: #d97706;
+  --color-hz-delayed-bg: #fef3c7;
+  --color-hz-cancelled: #dc2626;
+  --color-hz-cancelled-bg: #fee2e2;
+  --color-hz-departed: #2563eb;
+  --color-hz-departed-bg: #dbeafe;
+  --color-hz-diverted: #7c3aed;
+  --color-hz-diverted-bg: #f3e8ff;
+  --color-hz-scheduled: #6b7280;
+  --color-hz-scheduled-bg: #f3f4f6;
+}
+
+/* Dark mode overrides */
+.dark {
+  --color-hz-bg: #1a1a1a;
+  --color-hz-card: #252525;
+  --color-hz-border: rgba(255, 255, 255, 0.10);
+  --color-hz-text: #f5f5f5;
+  --color-hz-text-secondary: #9ca3af;
+  --color-hz-accent-light: rgba(30, 64, 175, 0.20);
+
+  --color-hz-on-time-bg: rgba(22, 163, 74, 0.15);
+  --color-hz-delayed-bg: rgba(217, 119, 6, 0.15);
+  --color-hz-cancelled-bg: rgba(220, 38, 38, 0.15);
+  --color-hz-departed-bg: rgba(37, 99, 235, 0.15);
+  --color-hz-diverted-bg: rgba(124, 58, 237, 0.15);
+  --color-hz-scheduled-bg: rgba(107, 114, 128, 0.12);
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+  background: var(--color-hz-bg);
+  color: var(--color-hz-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

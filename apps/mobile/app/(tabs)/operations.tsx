@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Text, View, FlatList } from 'react-native'
-import { api, setApiBaseUrl, type Flight } from '@horizon/api'
+import { api, setApiBaseUrl, type Flight } from '@skyhub/api'
 
 setApiBaseUrl('http://192.168.1.101:3001')
 

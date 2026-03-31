@@ -1,5 +1,5 @@
 {
-  "name": "@horizon/types",
+  "name": "@skyhub/types",
   "version": "0.0.1",
   "private": true,
   "main": "./src/index.ts",

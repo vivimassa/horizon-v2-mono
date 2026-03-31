@@ -1,24 +1,15 @@
 const { getDefaultConfig } = require('expo/metro-config')
+const { withNativeWind } = require('nativewind/metro')
 const path = require('path')
 
 const projectRoot = __dirname
 const monorepoRoot = path.resolve(projectRoot, '../..')
 
 const config = getDefaultConfig(projectRoot)
-
-// Watch all files in the monorepo
 config.watchFolders = [monorepoRoot]
-
-// Resolve modules from both the app and the monorepo root node_modules
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(monorepoRoot, 'node_modules'),
 ]
 
-// Ensure only one copy of react / react-native is used (the app's own)
-config.resolver.extraNodeModules = {
-  react: path.resolve(projectRoot, 'node_modules/react'),
-  'react-native': path.resolve(projectRoot, 'node_modules/react-native'),
-}
-
-module.exports = config
+module.exports = withNativeWind(config, { input: './global.css' })

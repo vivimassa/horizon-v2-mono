@@ -23,6 +23,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
+    "scheme": "horizon",
     "web": {
       "favicon": "./assets/favicon.png"
     },

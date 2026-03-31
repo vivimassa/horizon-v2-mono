@@ -17,6 +17,6 @@
     "outDir": "./dist",
     "rootDir": "."
   },
-  "include": ["src", "tamagui.config.ts"],
+  "include": ["src"],
   "references": [{ "path": "../types" }]
 }

@@ -1,37 +1,65 @@
-import { styled, YStack } from 'tamagui'
+import React from 'react'
+import {
+  Pressable,
+  View,
+  StyleSheet,
+  type ViewStyle,
+  type ViewProps,
+} from 'react-native'
 
-export const Card = styled(YStack, {
-  name: 'Card',
-  padding: '$md',
-  borderRadius: '$card',
-  borderWidth: 0.5,
-  backgroundColor: '$cardBackground',
-  borderColor: '$cardBorderColor',
-  gap: '$sm',
+interface CardProps extends ViewProps {
+  pressable?: boolean
+  elevated?: boolean
+  padded?: boolean
+  style?: ViewStyle
+}
 
-  variants: {
-    pressable: {
-      true: {
-        pressStyle: {
-          opacity: 0.7,
-          scale: 0.98,
-        },
-        cursor: 'pointer',
-      },
-    },
-    elevated: {
-      true: {
-        shadowColor: '$color',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 3,
-      },
-    },
-    padded: {
-      true: {
-        padding: '$lg',
-      },
-    },
-  } as const,
+export function Card({ pressable, elevated, padded, style, children, ...rest }: CardProps) {
+  const combined: ViewStyle[] = [
+    styles.card,
+    elevated && styles.elevated,
+    padded && styles.padded,
+    style,
+  ].filter(Boolean) as ViewStyle[]
+
+  if (pressable) {
+    return (
+      <Pressable
+        style={({ pressed }) => [...combined, pressed && styles.pressed]}
+        {...rest}
+      >
+        {children}
+      </Pressable>
+    )
+  }
+
+  return (
+    <View style={combined} {...rest}>
+      {children}
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  card: {
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 0.5,
+    backgroundColor: '#fafafa',
+    borderColor: '#e0e0e0',
+    gap: 8,
+  },
+  elevated: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  padded: {
+    padding: 16,
+  },
+  pressed: {
+    opacity: 0.7,
+  },
 })

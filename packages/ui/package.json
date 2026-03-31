@@ -5,8 +5,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./tamagui.config": "./tamagui.config.ts"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "build": "tsc",
@@ -15,11 +14,8 @@
   },
   "dependencies": {
     "@horizon/types": "*",
-    "@tamagui/config": "^2.0.0-rc.34",
-    "@tamagui/core": "^2.0.0-rc.34",
     "react": "^19.2.4",
-    "react-native": "^0.84.1",
-    "tamagui": "^2.0.0-rc.34"
+    "react-native": "^0.84.1"
   },
   "devDependencies": {
     "@types/react": "^19.2.14",

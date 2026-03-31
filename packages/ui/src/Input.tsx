@@ -1,18 +1,25 @@
-import { styled, Input as TamaguiInput } from 'tamagui'
+import React from 'react'
+import { TextInput, StyleSheet, type TextInputProps } from 'react-native'
 
-export const Input = styled(TamaguiInput, {
-  name: 'Input',
-  fontSize: 14,
-  minHeight: 44,
-  paddingHorizontal: '$md',
-  borderRadius: '$input',
-  borderWidth: 0.5,
-  backgroundColor: '$cardBackground',
-  borderColor: '$borderColor',
-  color: '$color',
-  placeholderTextColor: '$colorTertiary',
-  focusStyle: {
-    borderColor: '$accentColor',
-    borderWidth: 1.5,
+export function Input(props: TextInputProps) {
+  return (
+    <TextInput
+      placeholderTextColor="#999"
+      {...props}
+      style={[styles.input, props.style]}
+    />
+  )
+}
+
+const styles = StyleSheet.create({
+  input: {
+    fontSize: 14,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 0.5,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#fafafa',
+    color: '#111',
   },
 })

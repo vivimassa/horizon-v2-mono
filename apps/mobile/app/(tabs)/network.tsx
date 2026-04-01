@@ -1,6 +1,6 @@
 import { Text, View, Pressable } from 'react-native'
 import { useRouter } from 'expo-router'
-import { BreadcrumbHeader } from '../components/breadcrumb-header'
+import { BreadcrumbHeader } from '../../components/breadcrumb-header'
 
 export default function Network() {
   const router = useRouter()

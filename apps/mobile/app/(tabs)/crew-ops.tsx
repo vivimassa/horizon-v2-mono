@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native'
-import { BreadcrumbHeader } from '../components/breadcrumb-header'
+import { BreadcrumbHeader } from '../../components/breadcrumb-header'
 
 export default function CrewOps() {
   return (

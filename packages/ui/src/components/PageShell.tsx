@@ -5,7 +5,12 @@ import { View, Text, ScrollView, Platform } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTheme } from '../hooks/useTheme'
 import type { BackgroundPreset } from '../stores/useThemeStore'
-import { AnimatedBackground } from './AnimatedBackground'
+
+// Lazy-load AnimatedBackground to avoid crashing when reanimated native modules
+// aren't available (e.g. in Expo Go without dev client)
+const AnimatedBackground = React.lazy(() =>
+  import('./AnimatedBackground').then((m) => ({ default: m.AnimatedBackground }))
+)
 
 interface PageShellProps {
   title: string
@@ -83,13 +88,28 @@ export function PageShell({
 
   // Native: use Reanimated + LinearGradient for animated backgrounds
   if (preset !== 'none') {
+    const staticFallback = (
+      <SafeAreaView
+        className="flex-1"
+        style={{ backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }}
+        edges={['top']}
+      >
+        {header}
+        {content}
+      </SafeAreaView>
+    )
+
     return (
-      <AnimatedBackground preset={preset} isDark={isDark}>
-        <SafeAreaView className="flex-1" edges={['top']}>
-          {header}
-          {content}
-        </SafeAreaView>
-      </AnimatedBackground>
+      <ReanimatedErrorBoundary fallback={staticFallback}>
+        <React.Suspense fallback={staticFallback}>
+          <AnimatedBackground preset={preset} isDark={isDark}>
+            <SafeAreaView className="flex-1" edges={['top']}>
+              {header}
+              {content}
+            </SafeAreaView>
+          </AnimatedBackground>
+        </React.Suspense>
+      </ReanimatedErrorBoundary>
     )
   }
 
@@ -104,4 +124,16 @@ export function PageShell({
       {content}
     </SafeAreaView>
   )
+}
+
+// Catches reanimated/worklets native module errors gracefully
+class ReanimatedErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false }
+  static getDerivedStateFromError() { return { hasError: true } }
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children
+  }
 }

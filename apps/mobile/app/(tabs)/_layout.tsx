@@ -7,7 +7,7 @@ import {
   Users,
   Settings,
 } from 'lucide-react-native'
-import { SpotlightDock } from '@skyhub/ui/src/components/SpotlightDock'
+import { SpotlightDock } from '@skyhub/ui'
 
 const TAB_CONFIG = [
   { key: 'index',      name: 'index',      label: 'Home',       icon: Home },
@@ -26,7 +26,7 @@ export default function TabLayout() {
         <SpotlightDock
           tabs={TAB_CONFIG}
           activeIndex={state.index}
-          onTabChange={(index) => {
+          onTabChange={(index: number) => {
             const route = state.routes[index]
             navigation.navigate(route.name)
           }}

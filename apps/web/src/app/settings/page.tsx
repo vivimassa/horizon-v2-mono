@@ -13,8 +13,6 @@ import {
   Building2,
   FileText,
   ChevronRight,
-  Sun,
-  Moon,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { colors, accentTint, type Palette as PaletteType } from "@skyhub/ui/theme";
@@ -28,23 +26,22 @@ interface SettingsItem {
   title: string;
   subtitle: string;
   href?: string;
-  action?: "toggle-theme";
 }
 
 const ACCOUNT_ITEMS: SettingsItem[] = [
-  { icon: UserCircle,       title: "Profile",             subtitle: "Name, email, crew ID" },
-  { icon: Palette,           title: "Appearance",          subtitle: "Theme, dark mode, accent color", action: "toggle-theme" },
-  { icon: Bell,              title: "Notifications",       subtitle: "Push, email, alert preferences" },
-  { icon: Lock,              title: "Password & Security", subtitle: "Change password, biometrics" },
-  { icon: SlidersHorizontal, title: "Preferences",         subtitle: "Language, timezone, units" },
+  { icon: UserCircle,       title: "Profile",             subtitle: "Manage your personal information, contact details, and employee profile", href: "/settings/account/profile" },
+  { icon: Palette,           title: "Appearance",          subtitle: "Customize theme, dark mode, accent color, and interface preferences", href: "/settings/account/appearance" },
+  { icon: Bell,              title: "Notifications",       subtitle: "Configure push notifications, email alerts, and in-app notification preferences" },
+  { icon: Lock,              title: "Password & Security", subtitle: "Update your password, enable biometric authentication, and manage security settings" },
+  { icon: SlidersHorizontal, title: "Preferences",         subtitle: "Set your preferred language, timezone, date format, and display units" },
 ];
 
 const ADMIN_ITEMS: SettingsItem[] = [
-  { icon: Database,       title: "Master Data",     subtitle: "Airports, aircraft, airlines",   href: "/admin" },
-  { icon: ShieldCheck,    title: "Users & Roles",   subtitle: "Manage user accounts and RBAC" },
-  { icon: ArrowLeftRight, title: "Interface",        subtitle: "AMOS, SSIM, MVT, message hub" },
-  { icon: Building2,      title: "Operator Config",  subtitle: "Airline settings, base airports" },
-  { icon: FileText,       title: "Reports",          subtitle: "Operational reports & exports" },
+  { icon: Database,       title: "Master Data",     subtitle: "Manage airports, aircraft types, airlines, and core reference data",   href: "/admin" },
+  { icon: ShieldCheck,    title: "Users & Roles",   subtitle: "Create and manage user accounts, assign roles, and configure RBAC permissions" },
+  { icon: ArrowLeftRight, title: "Interface",        subtitle: "Configure AMOS, SSIM, MVT integrations, and external message hub connections" },
+  { icon: Building2,      title: "Operator Config",  subtitle: "Manage airline operator settings, base airports, and fleet configuration" },
+  { icon: FileText,       title: "Reports",          subtitle: "Access operational reports, analytics dashboards, and data exports" },
 ];
 
 function SectionHeader({ title, palette }: { title: string; palette: PaletteType }) {
@@ -62,64 +59,48 @@ function SettingsListItem({
   item,
   isLast,
   palette,
-  isDark,
-  onToggleTheme,
 }: {
   item: SettingsItem;
   isLast: boolean;
   palette: PaletteType;
   isDark: boolean;
-  onToggleTheme?: () => void;
 }) {
   const Icon = item.icon;
-  const isThemeToggle = item.action === "toggle-theme";
-
-  const handleClick = () => {
-    if (isThemeToggle && onToggleTheme) {
-      onToggleTheme();
-    }
-  };
 
   const content = (
-    <div>
+    <div
+      className="flex items-start px-5 py-5 cursor-pointer transition-all rounded-2xl"
+      style={{
+        backgroundColor: palette.card,
+        border: `1px solid ${palette.cardBorder}`,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = palette.backgroundHover;
+        e.currentTarget.style.borderColor = accentTint(ACCENT, 0.2);
+        e.currentTarget.style.boxShadow = `0 2px 8px ${accentTint(ACCENT, 0.08)}`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = palette.card;
+        e.currentTarget.style.borderColor = palette.cardBorder;
+        e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.04)";
+      }}
+    >
       <div
-        className="flex items-center px-3 py-2.5 cursor-pointer transition-colors min-h-[44px]"
-        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = palette.backgroundHover)}
-        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-        onClick={isThemeToggle ? handleClick : undefined}
+        className="w-12 h-12 rounded-xl flex items-center justify-center mr-4 shrink-0 mt-0.5"
+        style={{ backgroundColor: accentTint(ACCENT, 0.08) }}
       >
-        <div
-          className="w-9 h-9 rounded-[10px] flex items-center justify-center mr-3 shrink-0"
-          style={{ backgroundColor: accentTint(ACCENT, 0.08) }}
-        >
-          <Icon className="h-5 w-5" style={{ color: ACCENT }} strokeWidth={1.75} />
-        </div>
-        <div className="flex-1 min-w-0 mr-2">
-          <div className="text-[13px] font-medium" style={{ color: palette.text }}>
-            {item.title}
-          </div>
-          <div className="text-[11px] mt-0.5" style={{ color: palette.textSecondary }}>
-            {item.subtitle}
-          </div>
-        </div>
-        {isThemeToggle ? (
-          <div className="flex items-center gap-1.5 mr-1">
-            {isDark ? (
-              <Moon className="h-3.5 w-3.5" style={{ color: ACCENT }} />
-            ) : (
-              <Sun className="h-3.5 w-3.5" style={{ color: ACCENT }} />
-            )}
-            <span className="text-[11px] font-medium" style={{ color: ACCENT }}>
-              {isDark ? "Dark" : "Light"}
-            </span>
-          </div>
-        ) : (
-          <ChevronRight className="h-4 w-4 shrink-0" style={{ color: palette.textTertiary }} />
-        )}
+        <Icon className="h-6 w-6" style={{ color: ACCENT }} strokeWidth={1.6} />
       </div>
-      {!isLast && (
-        <div className="ml-[52px] mr-3" style={{ height: 0.5, backgroundColor: palette.border }} />
-      )}
+      <div className="flex-1 min-w-0 mr-2">
+        <div className="text-[16px] font-semibold mb-1" style={{ color: palette.text }}>
+          {item.title}
+        </div>
+        <div className="text-[13px] leading-relaxed" style={{ color: palette.textSecondary }}>
+          {item.subtitle}
+        </div>
+      </div>
+      <ChevronRight className="h-5 w-5 shrink-0 mt-1" style={{ color: palette.textTertiary }} />
     </div>
   );
 
@@ -131,55 +112,47 @@ function SettingsListItem({
 }
 
 export default function SettingsPage() {
-  const { theme, toggle } = useTheme();
+  const { theme } = useTheme();
   const isDark = theme === "dark";
   const palette: PaletteType = isDark ? colors.dark : colors.light;
 
   return (
-    <div className="min-h-full p-6">
-      <h1 className="text-xl font-semibold mb-0.5" style={{ color: palette.text }}>
-        Settings
-      </h1>
-      <p className="text-sm mb-2" style={{ color: palette.textSecondary }}>
-        {isAdmin ? "Administrator" : "User"} &mdash; Nguyen Van A
-      </p>
-
-      <SectionHeader title="Account" palette={palette} />
-      <div
-        className="rounded-xl border shadow-sm overflow-hidden"
-        style={{ backgroundColor: palette.card, borderColor: palette.cardBorder }}
-      >
-        {ACCOUNT_ITEMS.map((item, i) => (
-          <SettingsListItem
-            key={item.title}
-            item={item}
-            isLast={i === ACCOUNT_ITEMS.length - 1}
-            palette={palette}
-            isDark={isDark}
-            onToggleTheme={toggle}
-          />
-        ))}
-      </div>
-
-      {isAdmin && (
-        <>
-          <SectionHeader title="Administration" palette={palette} />
-          <div
-            className="rounded-xl border shadow-sm overflow-hidden"
-            style={{ backgroundColor: palette.card, borderColor: palette.cardBorder }}
-          >
-            {ADMIN_ITEMS.map((item, i) => (
+    <div className="min-h-full p-6 pt-2">
+      <div className={`flex gap-6 ${isAdmin ? "flex-row items-start" : "flex-col"}`}>
+        {/* User Account */}
+        <div className="flex-1 min-w-0">
+          <SectionHeader title="User Account" palette={palette} />
+          <div className="flex flex-col gap-3">
+            {ACCOUNT_ITEMS.map((item, i) => (
               <SettingsListItem
                 key={item.title}
                 item={item}
-                isLast={i === ADMIN_ITEMS.length - 1}
+                isLast={i === ACCOUNT_ITEMS.length - 1}
                 palette={palette}
                 isDark={isDark}
               />
             ))}
           </div>
-        </>
-      )}
+        </div>
+
+        {/* System Configuration */}
+        {isAdmin && (
+          <div className="flex-1 min-w-0">
+            <SectionHeader title="System Configuration" palette={palette} />
+            <div className="flex flex-col gap-3">
+              {ADMIN_ITEMS.map((item, i) => (
+                <SettingsListItem
+                  key={item.title}
+                  item={item}
+                  isLast={i === ADMIN_ITEMS.length - 1}
+                  palette={palette}
+                  isDark={isDark}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

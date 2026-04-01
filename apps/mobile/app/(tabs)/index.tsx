@@ -2,7 +2,7 @@ import React, { memo } from 'react'
 import { View, Text, FlatList, useColorScheme } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react-native'
-import { colors, getStatusColors, type StatusKey } from '@skyhub/ui/theme'
+import { colors, getStatusColors, type StatusKey, type Palette } from '@skyhub/ui/theme'
 
 const ACCENT = '#1e40af'
 
@@ -35,7 +35,7 @@ const KpiCard = memo(function KpiCard({
   palette,
 }: {
   item: typeof MOCK_KPIS[number]
-  palette: typeof colors.light
+  palette: Palette
 }) {
   return (
     <View
@@ -60,7 +60,7 @@ const FlightRow = memo(function FlightRow({
   isDark,
 }: {
   item: typeof MOCK_FLIGHTS[number]
-  palette: typeof colors.light
+  palette: Palette
   isDark: boolean
 }) {
   const s = getStatusColors(item.status, isDark)
@@ -98,7 +98,7 @@ export default function HomeScreen() {
       <View className="px-4 pt-3 pb-2">
         <Text className="text-[20px] font-semibold" style={{ color: palette.text }}>Home</Text>
         <Text className="text-[12px]" style={{ color: palette.textSecondary }}>
-          {today} {'\u2022'} VietJet Air
+          {today} {'\u2022'} Sky Hub
         </Text>
       </View>
 

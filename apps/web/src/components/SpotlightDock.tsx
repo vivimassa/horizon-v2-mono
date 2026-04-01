@@ -63,7 +63,7 @@ export function SpotlightDock() {
   const pathname = usePathname();
   const { theme, moduleTheme } = useTheme();
   const isDark = theme === "dark";
-  const accent = moduleTheme?.accent ?? ACCENT_DEFAULT;
+  const accent = ACCENT_DEFAULT; // Global user accent — ignores per-module theme
   const activeIndex = getActiveIndex(pathname);
   const isDesktop = useIsDesktop();
 

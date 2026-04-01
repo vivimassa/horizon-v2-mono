@@ -1,0 +1,364 @@
+import React, { useState, useCallback } from 'react'
+import {
+  View, Text, ScrollView, Pressable, TextInput,
+  useColorScheme, useWindowDimensions, Alert,
+} from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { useRouter } from 'expo-router'
+import {
+  ArrowLeft, Camera, Mail, Phone, MapPin,
+  Hash, Briefcase, Shield, Edit3, Save, X, Check,
+  Users, Globe,
+} from 'lucide-react-native'
+import type { LucideIcon } from 'lucide-react-native'
+import { colors, accentTint, type Palette } from '@skyhub/ui/theme'
+
+const ACCENT = '#1e40af'
+const TABLET_WIDTH = 768
+
+interface ProfileData {
+  firstName: string
+  lastName: string
+  email: string
+  jobTitle: string
+  department: string
+  employeeId: string
+  phone: string
+  officePhone: string
+  dateOfBirth: string
+  gender: string
+  role: string
+  status: string
+  lastLogin: string
+  location: string
+}
+
+const INITIAL: ProfileData = {
+  firstName: 'Nguyen',
+  lastName: 'Van A',
+  email: 'nguyen.vana@skyhub.aero',
+  jobTitle: 'Operations Manager',
+  department: 'Flight Operations',
+  employeeId: 'EMP-20198',
+  phone: '+84 912 345 678',
+  officePhone: '+84 28 3847 1234 ext. 402',
+  dateOfBirth: '1985-03-15',
+  gender: 'Male',
+  role: 'Administrator',
+  status: 'Active',
+  lastLogin: '2026-03-31T14:22:00Z',
+  location: 'SGN — Tan Son Nhat International',
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric',
+  })
+}
+
+function formatDateTime(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleDateString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric',
+  }) + ' ' + d.toLocaleTimeString('en-GB', {
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
+export default function ProfileScreen() {
+  const router = useRouter()
+  const colorScheme = useColorScheme()
+  const isDark = colorScheme === 'dark'
+  const palette = isDark ? colors.dark : colors.light
+  const { width } = useWindowDimensions()
+  const isTablet = width >= TABLET_WIDTH
+
+  const [data, setData] = useState<ProfileData>(INITIAL)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<ProfileData>(INITIAL)
+
+  const startEdit = useCallback(() => {
+    setDraft({ ...data })
+    setEditing(true)
+  }, [data])
+
+  const cancelEdit = useCallback(() => setEditing(false), [])
+
+  const saveEdit = useCallback(() => {
+    setData({ ...draft })
+    setEditing(false)
+    Alert.alert('Saved', 'Profile updated successfully.')
+  }, [draft])
+
+  const update = useCallback((key: keyof ProfileData, val: string) => {
+    setDraft((p) => ({ ...p, [key]: val }))
+  }, [])
+
+  const current = editing ? draft : data
+
+  return (
+    <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
+      {/* Header */}
+      <View className="flex-row items-center justify-between px-4 py-3">
+        <Pressable
+          onPress={() => router.navigate('/(tabs)/settings' as any)}
+          className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-xl active:opacity-70"
+          style={{
+            backgroundColor: accentTint(ACCENT, isDark ? 0.1 : 0.06),
+            borderWidth: 1,
+            borderColor: accentTint(ACCENT, 0.12),
+          }}
+        >
+          <ArrowLeft size={15} color={palette.text} strokeWidth={2} />
+          <Text className="text-[13px] font-semibold" style={{ color: palette.text }}>Settings</Text>
+        </Pressable>
+
+        {editing ? (
+          <View className="flex-row gap-2">
+            <Pressable
+              onPress={cancelEdit}
+              className="flex-row items-center gap-1 px-3 py-1.5 rounded-xl active:opacity-70"
+              style={{ borderWidth: 1, borderColor: palette.border }}
+            >
+              <X size={14} color={palette.text} strokeWidth={2} />
+              <Text className="text-[12px] font-semibold" style={{ color: palette.text }}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              onPress={saveEdit}
+              className="flex-row items-center gap-1 px-3 py-1.5 rounded-xl active:opacity-70"
+              style={{ backgroundColor: ACCENT }}
+            >
+              <Save size={14} color="#fff" strokeWidth={2} />
+              <Text className="text-[12px] font-semibold" style={{ color: '#fff' }}>Save</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            onPress={startEdit}
+            className="flex-row items-center gap-1 px-3 py-1.5 rounded-xl active:opacity-70"
+            style={{ backgroundColor: ACCENT }}
+          >
+            <Edit3 size={14} color="#fff" strokeWidth={2} />
+            <Text className="text-[12px] font-semibold" style={{ color: '#fff' }}>Edit</Text>
+          </Pressable>
+        )}
+      </View>
+
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="pb-24"
+        showsVerticalScrollIndicator={false}
+      >
+        {isTablet ? (
+          <View className="flex-row px-4 gap-4">
+            <View style={{ width: 320 }}>
+              <AvatarPanel current={current} palette={palette} isDark={isDark} isTablet />
+            </View>
+            <View className="flex-1">
+              <FieldSections current={current} editing={editing} palette={palette} isDark={isDark} update={update} isTablet />
+            </View>
+          </View>
+        ) : (
+          <View className="px-4">
+            <AvatarPanel current={current} palette={palette} isDark={isDark} />
+            <FieldSections current={current} editing={editing} palette={palette} isDark={isDark} update={update} />
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  )
+}
+
+// ── Avatar panel ──
+function AvatarPanel({ current, palette, isDark, isTablet }: { current: ProfileData; palette: Palette; isDark: boolean; isTablet?: boolean }) {
+  const t = isTablet
+  return (
+    <View
+      className="rounded-2xl border items-center mb-4"
+      style={{ backgroundColor: palette.card, borderColor: palette.cardBorder, paddingVertical: t ? 32 : 24, paddingHorizontal: t ? 20 : 16 }}
+    >
+      <View className="relative" style={{ marginBottom: t ? 16 : 12 }}>
+        <View
+          className="rounded-full items-center justify-center"
+          style={{
+            width: t ? 100 : 80,
+            height: t ? 100 : 80,
+            backgroundColor: accentTint(ACCENT, isDark ? 0.15 : 0.08),
+          }}
+        >
+          <Text style={{ fontSize: t ? 32 : 24, fontWeight: '700', color: ACCENT }}>
+            {current.firstName[0]}{current.lastName[0]}
+          </Text>
+        </View>
+        <View
+          className="absolute bottom-0 right-0 rounded-full items-center justify-center"
+          style={{ width: t ? 32 : 28, height: t ? 32 : 28, backgroundColor: ACCENT }}
+        >
+          <Camera size={t ? 15 : 13} color="#fff" strokeWidth={2} />
+        </View>
+      </View>
+      <Text style={{ fontSize: t ? 20 : 16, fontWeight: '700', color: palette.text }}>
+        {current.firstName} {current.lastName}
+      </Text>
+      <Text style={{ fontSize: t ? 14 : 12, color: palette.textSecondary, marginTop: 2 }}>
+        {current.role}
+      </Text>
+      <View className="mt-2 px-3 py-1 rounded-full" style={{ backgroundColor: '#dcfce7' }}>
+        <Text style={{ fontSize: t ? 12 : 10, fontWeight: '600', color: '#166534' }}>{current.status}</Text>
+      </View>
+
+      <View className="w-full" style={{ marginTop: t ? 20 : 16, paddingTop: t ? 20 : 16, borderTopWidth: 0.5, borderTopColor: palette.border }}>
+        <QuickRow icon={Briefcase} label="Department" value={current.department} palette={palette} isTablet={isTablet} />
+        <QuickRow icon={Shield} label="Role" value={current.role} palette={palette} isTablet={isTablet} />
+        <QuickRow icon={Hash} label="Employee ID" value={current.employeeId} palette={palette} isTablet={isTablet} />
+        <QuickRow icon={Mail} label="Email" value={current.email} palette={palette} isTablet={isTablet} />
+        <QuickRow icon={Phone} label="Phone" value={current.phone} palette={palette} isTablet={isTablet} />
+        <QuickRow icon={MapPin} label="Location" value={current.location} palette={palette} isTablet={isTablet} />
+      </View>
+
+      <View className="w-full" style={{ marginTop: t ? 16 : 12, paddingTop: t ? 16 : 12, borderTopWidth: 0.5, borderTopColor: palette.border }}>
+        <Text style={{ fontSize: t ? 13 : 11, color: palette.textSecondary }}>
+          Last login: {formatDateTime(current.lastLogin)}
+        </Text>
+      </View>
+    </View>
+  )
+}
+
+function QuickRow({ icon: Icon, label, value, palette, isTablet }: { icon: LucideIcon; label: string; value: string; palette: Palette; isTablet?: boolean }) {
+  const t = isTablet
+  return (
+    <View className="flex-row items-center" style={{ gap: 10, marginBottom: t ? 16 : 12 }}>
+      <Icon size={t ? 16 : 14} color={palette.textTertiary} strokeWidth={1.6} />
+      <View className="flex-1">
+        <Text className="uppercase" style={{ fontSize: t ? 11 : 10, color: palette.textTertiary, letterSpacing: 0.5 }}>{label}</Text>
+        <Text className="font-medium" style={{ fontSize: t ? 14 : 12, color: palette.text }} numberOfLines={1}>{value}</Text>
+      </View>
+    </View>
+  )
+}
+
+// ── Field sections ──
+function FieldSections({
+  current, editing, palette, isDark, update, isTablet,
+}: {
+  current: ProfileData; editing: boolean; palette: Palette; isDark: boolean;
+  update: (key: keyof ProfileData, val: string) => void; isTablet?: boolean;
+}) {
+  const cols = isTablet ? 2 : 1
+
+  return (
+    <>
+      <SectionCard title="Personal Information" icon={Users} palette={palette} isDark={isDark} isTablet={isTablet}>
+        <FieldGrid cols={cols}>
+          <EditField label="First Name" field="firstName" value={current.firstName} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} />
+          <EditField label="Last Name" field="lastName" value={current.lastName} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} />
+          <EditField label="Date of Birth" field="dateOfBirth" value={formatDate(current.dateOfBirth)} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} />
+          <EditField label="Gender" field="gender" value={current.gender} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} />
+          <EditField label="Department" field="department" value={current.department} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} />
+          <EditField label="Employee ID" field="employeeId" value={current.employeeId} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} />
+        </FieldGrid>
+      </SectionCard>
+
+      <SectionCard title="Contact Information" icon={Mail} palette={palette} isDark={isDark} isTablet={isTablet}>
+        <FieldGrid cols={cols}>
+          <EditField label="Email Address" field="email" value={current.email} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} />
+          <EditField label="Mobile Phone" field="phone" value={current.phone} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} />
+          <EditField label="Office Phone" field="officePhone" value={current.officePhone} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} />
+        </FieldGrid>
+      </SectionCard>
+
+      <SectionCard title="System & Preferences" icon={Globe} palette={palette} isDark={isDark} isTablet={isTablet}>
+        <FieldGrid cols={cols}>
+          <EditField label="System Role" field="role" value={current.role} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} />
+          <EditField label="Last Login" field="lastLogin" value={formatDateTime(current.lastLogin)} editing={false} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} />
+        </FieldGrid>
+      </SectionCard>
+    </>
+  )
+}
+
+function SectionCard({
+  title, icon: Icon, palette, isDark, children, isTablet,
+}: {
+  title: string; icon: LucideIcon; palette: Palette; isDark: boolean; children: React.ReactNode; isTablet?: boolean;
+}) {
+  const t = isTablet
+  return (
+    <View
+      className="rounded-2xl border mb-4 overflow-hidden"
+      style={{ backgroundColor: palette.card, borderColor: palette.cardBorder }}
+    >
+      <View
+        className="flex-row items-center"
+        style={{ gap: 10, paddingHorizontal: t ? 20 : 16, paddingVertical: t ? 14 : 12, borderBottomWidth: 1, borderBottomColor: palette.border }}
+      >
+        <View
+          className="rounded-lg items-center justify-center"
+          style={{ width: t ? 32 : 28, height: t ? 32 : 28, backgroundColor: accentTint(ACCENT, isDark ? 0.15 : 0.08) }}
+        >
+          <Icon size={t ? 16 : 14} color={ACCENT} strokeWidth={1.8} />
+        </View>
+        <Text style={{ fontSize: t ? 16 : 14, fontWeight: '700', color: palette.text, letterSpacing: -0.2 }}>
+          {title}
+        </Text>
+      </View>
+      <View style={{ paddingHorizontal: t ? 20 : 16, paddingVertical: t ? 16 : 12 }}>{children}</View>
+    </View>
+  )
+}
+
+function FieldGrid({ cols, children }: { cols: number; children: React.ReactNode }) {
+  if (cols === 1) return <View>{children}</View>
+  // For tablet: wrap children in rows of 2
+  const items = React.Children.toArray(children)
+  const rows: React.ReactNode[][] = []
+  for (let i = 0; i < items.length; i += cols) {
+    rows.push(items.slice(i, i + cols))
+  }
+  return (
+    <View>
+      {rows.map((row, i) => (
+        <View key={i} className="flex-row gap-4">
+          {row.map((child, j) => (
+            <View key={j} className="flex-1">{child}</View>
+          ))}
+          {row.length < cols && <View className="flex-1" />}
+        </View>
+      ))}
+    </View>
+  )
+}
+
+function EditField({
+  label, field, value, editing, palette, isDark, onChange, isTablet,
+}: {
+  label: string; field: keyof ProfileData; value: string; editing: boolean;
+  palette: Palette; isDark: boolean; onChange: (key: keyof ProfileData, val: string) => void; isTablet?: boolean;
+}) {
+  const t = isTablet
+  return (
+    <View style={{ paddingVertical: t ? 12 : 10, borderBottomWidth: 0.5, borderBottomColor: palette.border }}>
+      <Text style={{ fontSize: t ? 13 : 11, color: palette.textTertiary, marginBottom: t ? 4 : 2 }}>{label}</Text>
+      {editing ? (
+        <TextInput
+          value={value}
+          onChangeText={(v) => onChange(field, v)}
+          className="font-medium rounded-lg"
+          style={{
+            fontSize: t ? 15 : 13,
+            color: palette.text,
+            backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+            borderWidth: 1,
+            borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
+            paddingHorizontal: 12,
+            paddingVertical: t ? 10 : 8,
+          }}
+          placeholderTextColor={palette.textTertiary}
+        />
+      ) : (
+        <Text className="font-medium" style={{ fontSize: t ? 15 : 13, color: palette.text }}>{value}</Text>
+      )}
+    </View>
+  )
+}

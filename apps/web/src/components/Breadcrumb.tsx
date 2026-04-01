@@ -1,31 +1,57 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   resolveNavPath,
   buildBreadcrumbs,
   type BreadcrumbSegment,
 } from "@skyhub/ui/navigation";
-// Note: "@skyhub/ui/navigation" points to web-safe.ts (no RN deps)
 import { useTheme } from "./theme-provider";
 import { colors, accentTint, type Palette as PaletteType } from "@skyhub/ui/theme";
+import {
+  Home, Globe, Plane, Truck, Users, Settings,
+  Calendar, Clock, Handshake, Send,
+  Radar, Wrench, ShieldCheck,
+  CalendarDays, BarChart3, Database,
+  UserCircle,
+  FileText, GanttChart, Repeat, CalendarRange,
+  Info, MessageSquare, Map, AlertTriangle,
+  DoorOpen, LayoutGrid,
+  PlaneTakeoff, Lock, Bell, Palette,
+  ArrowLeftRight, Building2,
+  ChevronRight, ChevronDown,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-function ChevronDown({ color }: { color: string }) {
-  return (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ marginLeft: 3 }}>
-      <path d="M2.5 3.75L5 6.25L7.5 3.75" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+// ── Icon resolver ──
+const ICON_MAP: Record<string, LucideIcon> = {
+  Home, Globe, Plane, Truck, Users, Settings,
+  Calendar, Clock, Handshake, Send,
+  Radar, Wrench, ShieldCheck,
+  CalendarDays, BarChart3, Database,
+  UserCircle,
+  FileText, GanttChart, Repeat, CalendarRange,
+  Info, MessageSquare, Map, AlertTriangle,
+  DoorOpen, LayoutGrid,
+  PlaneTakeoff, Lock, Bell, Palette,
+  ArrowLeftRight, Building2,
+};
+
+function NavIcon({ name, size = 15, color, className }: { name: string; size?: number; color?: string; className?: string }) {
+  const Icon = ICON_MAP[name];
+  if (!Icon) return null;
+  return <Icon size={size} color={color} className={className} strokeWidth={1.8} />;
 }
 
+// ── Main Breadcrumb ──
 export function Breadcrumb() {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, moduleTheme } = useTheme();
   const isDark = theme === "dark";
   const palette: PaletteType = isDark ? colors.dark : colors.light;
-  const accent = moduleTheme?.accent ?? "#1e40af";
+  const accent = "#1e40af"; // Global user accent — consistent across all modules
 
   const navPath = resolveNavPath(pathname);
   const segments = navPath ? buildBreadcrumbs(navPath) : [];
@@ -33,7 +59,6 @@ export function Breadcrumb() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Close on click outside
   useEffect(() => {
     if (openIndex === null) return;
     const handler = (e: MouseEvent) => {
@@ -45,7 +70,6 @@ export function Breadcrumb() {
     return () => document.removeEventListener("mousedown", handler);
   }, [openIndex]);
 
-  // Close on Escape
   useEffect(() => {
     if (openIndex === null) return;
     const handler = (e: KeyboardEvent) => {
@@ -55,128 +79,160 @@ export function Breadcrumb() {
     return () => document.removeEventListener("keydown", handler);
   }, [openIndex]);
 
-  const handleSegmentClick = useCallback(
-    (idx: number) => {
-      setOpenIndex((prev) => (prev === idx ? null : idx));
-    },
-    [],
-  );
+  const handleSegmentClick = useCallback((idx: number) => {
+    setOpenIndex((prev) => (prev === idx ? null : idx));
+  }, []);
 
-  const handleItemClick = useCallback(
-    (route: string) => {
-      setOpenIndex(null);
-      router.push(route);
-    },
-    [router],
-  );
+  const handleNavigate = useCallback((route: string) => {
+    setOpenIndex(null);
+    router.push(route);
+  }, [router]);
+
+  // Close dropdown on route change
+  useEffect(() => { setOpenIndex(null); }, [pathname]);
 
   if (segments.length === 0) return null;
 
   const today = new Date().toLocaleDateString("en-GB", {
+    weekday: "short",
     day: "2-digit",
     month: "short",
     year: "numeric",
   });
 
-  const separatorColor = isDark ? "#444444" : "#cccccc";
-
   return (
-    <div
+    <nav
       ref={containerRef}
-      className="flex items-center justify-between px-6 min-h-[44px]"
+      aria-label="Breadcrumb"
+      className="relative z-10 flex items-center justify-between px-5 pt-0 pb-1 select-none"
     >
-      {/* Left: breadcrumb segments */}
-      <div className="flex items-center gap-0">
+      {/* Left: breadcrumb trail in glass pill */}
+      <ol
+        className="flex items-center gap-1 list-none m-0 px-2 h-[40px] rounded-xl"
+        style={{
+          background: isDark
+            ? "rgba(255,255,255,0.04)"
+            : "rgba(255,255,255,0.55)",
+          backdropFilter: "blur(12px) saturate(150%)",
+          WebkitBackdropFilter: "blur(12px) saturate(150%)",
+          border: `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)"}`,
+          boxShadow: isDark
+            ? "0 1px 3px rgba(0,0,0,0.2)"
+            : "0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)",
+        }}
+      >
         {segments.map((seg, i) => {
           const isLast = i === segments.length - 1;
           const isOpen = openIndex === i;
           const hasSiblings = seg.siblings.length > 1;
 
           return (
-            <div key={seg.num} className="flex items-center">
+            <li key={seg.num} className="flex items-center">
+              {/* Chevron separator */}
               {i > 0 && (
-                <span
-                  className="mx-1.5 select-none"
-                  style={{ color: separatorColor, fontSize: 13 }}
-                >
-                  ›
-                </span>
+                <ChevronRight
+                  size={14}
+                  strokeWidth={1.5}
+                  className="mx-1 flex-shrink-0"
+                  style={{ color: isDark ? "#444" : "#ccc" }}
+                />
               )}
 
-              {/* Segment button */}
+              {/* Segment pill */}
               <div className="relative">
                 <button
-                  onClick={() => hasSiblings && handleSegmentClick(i)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all duration-100 cursor-pointer"
+                  onClick={() => hasSiblings ? handleSegmentClick(i) : handleNavigate(seg.route)}
+                  aria-expanded={isOpen}
+                  aria-haspopup={hasSiblings ? "listbox" : undefined}
+                  className="breadcrumb-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all duration-150 cursor-pointer"
                   style={{
-                    border: isOpen
-                      ? `1px solid ${accentTint(accent, 0.3)}`
-                      : "1px solid transparent",
                     background: isOpen
-                      ? accentTint(accent, 0.06)
-                      : "transparent",
-                    fontSize: 13,
-                    fontWeight: 500,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isOpen) e.currentTarget.style.background = accentTint(accent, 0.04);
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isOpen) e.currentTarget.style.background = "transparent";
+                      ? accentTint(accent, isDark ? 0.15 : 0.1)
+                      : isLast
+                        ? accentTint(accent, isDark ? 0.1 : 0.06)
+                        : "transparent",
+                    border: isOpen
+                      ? `1px solid ${accentTint(accent, isDark ? 0.3 : 0.2)}`
+                      : `1px solid transparent`,
+                    boxShadow: isOpen
+                      ? `0 2px 8px ${accentTint(accent, 0.12)}`
+                      : "none",
                   }}
                 >
+                  {/* Icon */}
+                  <NavIcon
+                    name={seg.iconName}
+                    size={isLast ? 15 : 14}
+                    color={isLast ? accent : (isDark ? "#888" : "#999")}
+                  />
+
+                  {/* Label */}
                   <span
+                    className="text-[13px] whitespace-nowrap"
                     style={{
-                      fontFamily: "monospace",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      opacity: 0.5,
-                      color: palette.text,
-                    }}
-                  >
-                    {seg.num}
-                  </span>
-                  <span
-                    style={{
+                      fontWeight: isLast ? 600 : 450,
                       color: isLast ? palette.text : palette.textSecondary,
                     }}
                   >
                     {seg.label}
                   </span>
+
+                  {/* Dropdown arrow */}
                   {hasSiblings && (
-                    <ChevronDown color={palette.textSecondary} />
+                    <ChevronDown
+                      size={12}
+                      strokeWidth={2}
+                      className="transition-transform duration-150 ml-0.5"
+                      style={{
+                        color: isOpen ? accent : palette.textTertiary,
+                        transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                      }}
+                    />
                   )}
                 </button>
 
                 {/* Dropdown */}
                 {isOpen && (
-                  <Dropdown
+                  <SegmentDropdown
                     segment={seg}
                     palette={palette}
                     accent={accent}
                     isDark={isDark}
                     currentRoute={pathname}
-                    onItemClick={handleItemClick}
+                    onItemClick={handleNavigate}
                   />
                 )}
               </div>
-            </div>
+            </li>
           );
         })}
-      </div>
+      </ol>
 
-      {/* Right: date + operator */}
-      <span
-        className="text-xs whitespace-nowrap ml-4"
-        style={{ color: palette.textTertiary }}
-      >
-        {today} — VietJet Air
-      </span>
-    </div>
+      {/* Right: SkyHub logo */}
+      <img
+        src="/skyhub-logo.png"
+        alt="Sky Hub"
+        className="ml-4 h-[80px] w-auto object-contain select-none"
+        draggable={false}
+        style={{
+          opacity: isDark ? 0.85 : 1,
+          filter: isDark ? "brightness(1.8)" : "none",
+        }}
+      />
+
+      {/* Hover styles */}
+      <style>{`
+        .breadcrumb-pill:hover {
+          background: ${accentTint(accent, isDark ? 0.1 : 0.06)} !important;
+          box-shadow: 0 1px 4px ${accentTint(accent, 0.08)};
+        }
+      `}</style>
+    </nav>
   );
 }
 
-function Dropdown({
+// ── Dropdown panel ──
+function SegmentDropdown({
   segment,
   palette,
   accent,
@@ -193,89 +249,112 @@ function Dropdown({
 }) {
   return (
     <div
-      className="absolute top-full left-0 mt-1"
+      role="listbox"
+      className="absolute top-full left-0 mt-1.5"
       style={{
-        minWidth: 240,
-        borderRadius: 12,
-        border: `1px solid ${palette.cardBorder}`,
-        background: isDark ? "#1a1a1a" : "#ffffff",
-        boxShadow:
-          "0 8px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)",
-        padding: 5,
+        minWidth: 260,
+        borderRadius: 14,
+        border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
+        background: isDark
+          ? "rgba(24,24,27,0.95)"
+          : "rgba(255,255,255,0.97)",
+        backdropFilter: "blur(20px) saturate(180%)",
+        WebkitBackdropFilter: "blur(20px) saturate(180%)",
+        boxShadow: isDark
+          ? "0 12px 40px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.2)"
+          : "0 12px 40px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.05)",
+        padding: 6,
         zIndex: 200,
-        animation: "breadcrumb-dropdown 120ms ease-out",
+        animation: "bc-dropdown-in 150ms cubic-bezier(0.16, 1, 0.3, 1)",
       }}
     >
-      {/* Header */}
+      {/* Section header with accent bar */}
       {segment.parentLabel && (
-        <div
-          className="px-2.5 py-1.5"
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: palette.textTertiary,
-            textTransform: "uppercase",
-            letterSpacing: 0.5,
-          }}
-        >
-          {segment.parentLabel}
+        <div className="flex items-center gap-2 px-2.5 pt-1.5 pb-2 mb-0.5">
+          <div
+            className="w-0.5 h-3.5 rounded-full"
+            style={{ background: accent }}
+          />
+          <span
+            className="text-[11px] font-semibold uppercase tracking-wider"
+            style={{ color: palette.textTertiary }}
+          >
+            {segment.parentLabel}
+          </span>
         </div>
       )}
 
       {/* Items */}
       {segment.siblings.map((item) => {
-        const isActive = item.route === currentRoute ||
-          (segment.level === 'module' && currentRoute.startsWith(item.route === '/' ? '/$' : item.route)) ||
-          (segment.level === 'section' && currentRoute.startsWith(item.route));
         const isCurrent = item.num === segment.num;
 
         return (
           <button
             key={item.key}
-            className="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg transition-colors cursor-pointer"
+            role="option"
+            aria-selected={isCurrent}
+            className="flex items-center gap-2.5 w-full px-2.5 py-[9px] rounded-[10px] transition-all duration-100 cursor-pointer group"
             style={{
               background: isCurrent
-                ? accentTint(accent, 0.08)
+                ? accentTint(accent, isDark ? 0.12 : 0.08)
                 : "transparent",
             }}
             onClick={() => onItemClick(item.route)}
             onMouseEnter={(e) => {
               if (!isCurrent)
-                e.currentTarget.style.background = palette.backgroundHover;
+                e.currentTarget.style.background = isDark
+                  ? "rgba(255,255,255,0.06)"
+                  : "rgba(0,0,0,0.04)";
             }}
             onMouseLeave={(e) => {
               if (!isCurrent)
                 e.currentTarget.style.background = "transparent";
             }}
           >
-            <span
+            {/* Icon with accent bg for current */}
+            <div
+              className="flex items-center justify-center w-7 h-7 rounded-lg flex-shrink-0 transition-colors duration-100"
               style={{
-                fontFamily: "monospace",
-                fontSize: 11,
-                fontWeight: 600,
-                color: isCurrent ? accent : palette.textTertiary,
-                minWidth: 28,
+                background: isCurrent
+                  ? accentTint(accent, isDark ? 0.2 : 0.12)
+                  : isDark
+                    ? "rgba(255,255,255,0.05)"
+                    : "rgba(0,0,0,0.04)",
               }}
             >
-              {item.num}
-            </span>
+              <NavIcon
+                name={item.iconName}
+                size={14}
+                color={isCurrent ? accent : palette.textSecondary}
+              />
+            </div>
+
+            {/* Label */}
             <span
+              className="text-[13px] flex-1 text-left"
               style={{
-                fontSize: 13,
                 fontWeight: isCurrent ? 600 : 400,
                 color: isCurrent ? accent : palette.text,
               }}
             >
               {item.label}
             </span>
+
+            {/* Active indicator dot */}
+            {isCurrent && (
+              <div
+                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                style={{ background: accent }}
+              />
+            )}
           </button>
         );
       })}
 
       <style>{`
-        @keyframes breadcrumb-dropdown {
-          from { opacity: 0; transform: translateY(-4px); }
-          to { opacity: 1; transform: translateY(0); }
+        @keyframes bc-dropdown-in {
+          from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
       `}</style>
     </div>

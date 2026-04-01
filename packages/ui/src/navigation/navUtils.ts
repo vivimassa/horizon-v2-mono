@@ -15,7 +15,8 @@ export interface BreadcrumbSegment {
   num: string
   label: string
   route: string
-  siblings: Array<{ key: string; label: string; num: string; route: string }>
+  iconName: string
+  siblings: Array<{ key: string; label: string; num: string; route: string; iconName: string }>
   parentLabel?: string
 }
 
@@ -97,8 +98,9 @@ export function buildBreadcrumbs(path: NavPath): BreadcrumbSegment[] {
     num: path.module.num,
     label: path.module.label,
     route: firstRoute(path.module),
+    iconName: path.module.iconName,
     siblings: NAV_TREE.map((m) => ({
-      key: m.key, label: m.label, num: m.num, route: firstRoute(m),
+      key: m.key, label: m.label, num: m.num, route: firstRoute(m), iconName: m.iconName,
     })),
   })
 
@@ -108,9 +110,10 @@ export function buildBreadcrumbs(path: NavPath): BreadcrumbSegment[] {
       num: path.section.num,
       label: path.section.label,
       route: firstSectionRoute(path.section),
+      iconName: path.section.iconName,
       parentLabel: path.module.label,
       siblings: path.module.sections.map((s) => ({
-        key: s.key, label: s.label, num: s.num, route: firstSectionRoute(s),
+        key: s.key, label: s.label, num: s.num, route: firstSectionRoute(s), iconName: s.iconName,
       })),
     })
   }
@@ -121,9 +124,10 @@ export function buildBreadcrumbs(path: NavPath): BreadcrumbSegment[] {
       num: path.page.num,
       label: path.page.label,
       route: path.page.route,
+      iconName: path.page.iconName,
       parentLabel: path.section.label,
       siblings: path.section.pages.map((p) => ({
-        key: p.key, label: p.label, num: p.num, route: p.route,
+        key: p.key, label: p.label, num: p.num, route: p.route, iconName: p.iconName,
       })),
     })
   }
@@ -133,18 +137,18 @@ export function buildBreadcrumbs(path: NavPath): BreadcrumbSegment[] {
 
 export function getSiblings(
   path: NavPath,
-): Array<{ key: string; label: string; num: string; route: string }> {
+): Array<{ key: string; label: string; num: string; route: string; iconName: string }> {
   if (path.page && path.section) {
     return path.section.pages.map((p) => ({
-      key: p.key, label: p.label, num: p.num, route: p.route,
+      key: p.key, label: p.label, num: p.num, route: p.route, iconName: p.iconName,
     }))
   }
   if (path.section) {
     return path.module.sections.map((s) => ({
-      key: s.key, label: s.label, num: s.num, route: firstSectionRoute(s),
+      key: s.key, label: s.label, num: s.num, route: firstSectionRoute(s), iconName: s.iconName,
     }))
   }
   return NAV_TREE.map((m) => ({
-    key: m.key, label: m.label, num: m.num, route: firstRoute(m),
+    key: m.key, label: m.label, num: m.num, route: firstRoute(m), iconName: m.iconName,
   }))
 }

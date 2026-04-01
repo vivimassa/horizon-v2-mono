@@ -50,7 +50,7 @@ export default function HomePage() {
         Home
       </h1>
       <p className="text-sm mb-6" style={{ color: palette.textSecondary }}>
-        {today} &bull; VietJet Air
+        {today} &bull; Sky Hub
       </p>
 
       {/* KPI Grid */}

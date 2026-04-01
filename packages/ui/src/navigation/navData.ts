@@ -21,13 +21,14 @@ export interface NavModuleData {
   key: string
   label: string
   num: string
+  iconName: string
   sections: NavSectionData[]
 }
 
 export const NAV_TREE: NavModuleData[] = [
   // ── 1. Home ──
   {
-    key: 'home', label: 'Home', num: '1',
+    key: 'home', label: 'Home', num: '1', iconName: 'Home',
     sections: [{
       key: 'dashboard', label: 'Dashboard', num: '1.1', iconName: 'Home',
       pages: [
@@ -38,7 +39,7 @@ export const NAV_TREE: NavModuleData[] = [
 
   // ── 2. Network ──
   {
-    key: 'network', label: 'Network', num: '2',
+    key: 'network', label: 'Network', num: '2', iconName: 'Globe',
     sections: [
       {
         key: 'schedule', label: 'Schedule', num: '2.1', iconName: 'Calendar',
@@ -76,7 +77,7 @@ export const NAV_TREE: NavModuleData[] = [
 
   // ── 3. Flight Ops ──
   {
-    key: 'flightops', label: 'Flight Ops', num: '3',
+    key: 'flightops', label: 'Flight Ops', num: '3', iconName: 'Plane',
     sections: [
       {
         key: 'control', label: 'Ops Control', num: '3.1', iconName: 'Radar',
@@ -107,7 +108,7 @@ export const NAV_TREE: NavModuleData[] = [
 
   // ── 4. Ground Ops ──
   {
-    key: 'groundops', label: 'Ground Ops', num: '4',
+    key: 'groundops', label: 'Ground Ops', num: '4', iconName: 'Truck',
     sections: [{
       key: 'handling', label: 'Handling', num: '4.1', iconName: 'Truck',
       pages: [
@@ -120,7 +121,7 @@ export const NAV_TREE: NavModuleData[] = [
 
   // ── 5. Crew Ops ──
   {
-    key: 'crewops', label: 'Crew Ops', num: '5',
+    key: 'crewops', label: 'Crew Ops', num: '5', iconName: 'Users',
     sections: [
       {
         key: 'planning', label: 'Planning', num: '5.1', iconName: 'CalendarDays',
@@ -149,7 +150,7 @@ export const NAV_TREE: NavModuleData[] = [
 
   // ── 6. Settings ──
   {
-    key: 'settings', label: 'Settings', num: '6',
+    key: 'settings', label: 'Settings', num: '6', iconName: 'Settings',
     sections: [
       {
         key: 'account', label: 'Account', num: '6.1', iconName: 'UserCircle',

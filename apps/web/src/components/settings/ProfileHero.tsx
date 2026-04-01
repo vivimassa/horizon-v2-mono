@@ -2,7 +2,7 @@
 
 import { Camera, Mail } from "lucide-react";
 import { accentTint, type Palette as PaletteType } from "@skyhub/ui/theme";
-import { WEB_FONTS as F } from "@/lib/fonts";
+import { useDisplay } from "@/components/display-provider";
 
 interface ProfileHeroProps {
   palette: PaletteType;
@@ -20,6 +20,7 @@ interface ProfileHeroProps {
 }
 
 export function ProfileHero({ palette, isDark, accent, user }: ProfileHeroProps) {
+  const { fonts: F } = useDisplay();
   const heroGradient = isDark
     ? "linear-gradient(135deg, rgba(30,64,175,0.12), rgba(124,58,237,0.08))"
     : "linear-gradient(135deg, rgba(30,64,175,0.07), rgba(124,58,237,0.05))";
@@ -115,6 +116,7 @@ export function ProfileHero({ palette, isDark, accent, user }: ProfileHeroProps)
 }
 
 function StatItem({ label, value, accent, palette }: { label: string; value: string; accent: string; palette: PaletteType }) {
+  const { fonts: F } = useDisplay();
   return (
     <div className="text-center">
       <div style={{ fontSize: F.xl, fontWeight: 700, color: accent }}>{value}</div>

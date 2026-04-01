@@ -15,7 +15,10 @@ import {
 } from "lucide-react";
 import { colors, accentTint, type Palette as PaletteType } from "@skyhub/ui/theme";
 import { useTheme } from "@/components/theme-provider";
-import { WEB_FONTS as F, WEB_LAYOUT } from "@/lib/fonts";
+import { useUser } from "@/components/user-provider";
+import { userApi } from "@/lib/api";
+import { WEB_LAYOUT } from "@/lib/fonts";
+import { useDisplay } from "@/components/display-provider";
 
 const ACCENT = "#1e40af";
 
@@ -104,22 +107,48 @@ export default function PreferencesPage() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const palette: PaletteType = isDark ? colors.dark : colors.light;
+  const { fonts: F } = useDisplay();
   const glass = isDark ? GLASS.dark : GLASS.light;
+  const { user, refetch } = useUser();
 
   const [prefs, setPrefs] = useState<Prefs>(INITIAL);
+  const [savedPrefs, setSavedPrefs] = useState<Prefs>(INITIAL);
   const [saved, setSaved] = useState(false);
+
+  // Sync from API
+  React.useEffect(() => {
+    if (user?.preferences) {
+      const fromApi: Prefs = {
+        language: user.preferences.language,
+        timezone: user.preferences.timezone,
+        dateFormat: user.preferences.dateFormat,
+        timeFormat: user.preferences.timeFormat,
+        units: user.preferences.units,
+        numberFormat: user.preferences.numberFormat,
+      };
+      setPrefs(fromApi);
+      setSavedPrefs(fromApi);
+    }
+  }, [user]);
 
   const update = (key: keyof Prefs, value: string) => {
     setPrefs((p) => ({ ...p, [key]: value }));
     setSaved(false);
   };
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    try {
+      await userApi.updatePreferences(prefs);
+      setSavedPrefs({ ...prefs });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      refetch();
+    } catch (err) {
+      console.error("Save preferences failed:", err);
+    }
   };
 
-  const hasChanges = JSON.stringify(prefs) !== JSON.stringify(INITIAL);
+  const hasChanges = JSON.stringify(prefs) !== JSON.stringify(savedPrefs);
 
   // Current selections for preview
   const currentLang = LANGUAGES.find((l) => l.value === prefs.language)?.label ?? prefs.language;
@@ -316,6 +345,7 @@ function PreviewRow({
 }: {
   icon: typeof Clock; label: string; value: string; palette: PaletteType;
 }) {
+  const { fonts: F } = useDisplay();
   return (
     <div className="flex items-start gap-3 mb-4">
       <Icon size={15} style={{ color: palette.textTertiary, marginTop: 2 }} strokeWidth={1.8} />
@@ -333,6 +363,7 @@ function GlassCard({
   title: string; icon: typeof Clock; palette: PaletteType; isDark: boolean;
   glass: typeof GLASS.light; children: React.ReactNode;
 }) {
+  const { fonts: F } = useDisplay();
   return (
     <div
       className="rounded-2xl border overflow-hidden"
@@ -365,6 +396,7 @@ function SelectField({
   onChange: (v: string) => void;
   palette: PaletteType; isDark: boolean;
 }) {
+  const { fonts: F } = useDisplay();
   return (
     <div className="py-3" style={{ borderBottom: `0.5px solid ${palette.border}` }}>
       <label className="block mb-2" style={{ fontSize: F.min, color: palette.textTertiary }}>{label}</label>
@@ -410,6 +442,7 @@ function ToggleGroup({
   onChange: (v: string) => void;
   palette: PaletteType; isDark: boolean; accent: string;
 }) {
+  const { fonts: F } = useDisplay();
   return (
     <div className="py-3" style={{ borderBottom: `0.5px solid ${palette.border}` }}>
       <label className="block mb-2" style={{ fontSize: F.min, color: palette.textTertiary }}>{label}</label>

@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { UserCircle, Lock, SlidersHorizontal, ChevronRight, Check } from "lucide-react";
+import { UserCircle, Lock, SlidersHorizontal, Bell, ChevronRight, Check } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { accentTint, type Palette as PaletteType } from "@skyhub/ui/theme";
-import { WEB_FONTS as F } from "@/lib/fonts";
+import { useDisplay } from "@/components/display-provider";
 
 interface AccountSectionProps {
   palette: PaletteType;
@@ -24,6 +24,7 @@ interface AccountItem {
 }
 
 export function AccountSection({ palette, isDark, accent, profileComplete, twoFactorEnabled }: AccountSectionProps) {
+  const { fonts: F } = useDisplay();
   const items: AccountItem[] = [
     {
       icon: UserCircle, iconColor: accent,
@@ -40,6 +41,10 @@ export function AccountSection({ palette, isDark, accent, profileComplete, twoFa
         : { label: "2FA off", color: isDark ? "#fbbf24" : "#b45309" },
     },
     {
+      icon: Bell, iconColor: "#b45309",
+      title: "Notifications", subtitle: "Push notifications, email alerts, in-app",
+    },
+    {
       icon: SlidersHorizontal, iconColor: "#0f766e",
       title: "Preferences", subtitle: "Language, timezone, date format, units",
       href: "/settings/account/preferences",
@@ -47,19 +52,18 @@ export function AccountSection({ palette, isDark, accent, profileComplete, twoFa
   ];
 
   return (
-    <div>
-      <div className="flex items-center mb-3">
+    <div
+      className="rounded-2xl border overflow-hidden"
+      style={{
+        backgroundColor: palette.card,
+        borderColor: palette.cardBorder,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+      }}
+    >
+      <div className="flex items-center" style={{ padding: "clamp(14px, 1.2vw, 20px) clamp(18px, 1.5vw, 28px)" }}>
         <div className="w-[3px] h-5 rounded-full mr-2.5" style={{ backgroundColor: accent }} />
-        <h2 style={{ fontSize: F.md, fontWeight: 700, color: palette.text }}>Account</h2>
+        <h2 style={{ fontSize: "clamp(15px, 1.2vw, 20px)", fontWeight: 700, color: palette.text }}>Account</h2>
       </div>
-      <div
-        className="rounded-2xl border overflow-hidden"
-        style={{
-          backgroundColor: palette.card,
-          borderColor: palette.cardBorder,
-          boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
-        }}
-      >
         {items.map((item, i) => (
           <AccountListItem
             key={item.title}
@@ -69,7 +73,6 @@ export function AccountSection({ palette, isDark, accent, profileComplete, twoFa
             isDark={isDark}
           />
         ))}
-      </div>
     </div>
   );
 }
@@ -79,27 +82,28 @@ function AccountListItem({
 }: {
   item: AccountItem; isLast: boolean; palette: PaletteType; isDark: boolean;
 }) {
+  const { fonts: F } = useDisplay();
   const Icon = item.icon;
 
   const content = (
     <div
       className="flex items-center cursor-pointer transition-colors"
-      style={{ padding: "18px 20px", minHeight: 64 }}
+      style={{ padding: "clamp(12px, 1vw, 18px) clamp(16px, 1.2vw, 24px)", minHeight: "clamp(48px, 4vw, 64px)" }}
       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = palette.backgroundHover)}
       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
     >
       <div
         className="flex items-center justify-center shrink-0"
         style={{
-          width: 48, height: 48, borderRadius: 14, marginRight: 16,
+          width: "clamp(38px, 2.8vw, 48px)", height: "clamp(38px, 2.8vw, 48px)", borderRadius: 12, marginRight: "clamp(12px, 1vw, 16px)",
           backgroundColor: accentTint(item.iconColor, isDark ? 0.12 : 0.06),
         }}
       >
-        <Icon style={{ width: 24, height: 24, color: item.iconColor }} strokeWidth={1.6} />
+        <Icon style={{ width: "clamp(18px, 1.5vw, 24px)", height: "clamp(18px, 1.5vw, 24px)", color: item.iconColor }} strokeWidth={1.6} />
       </div>
       <div className="flex-1 min-w-0" style={{ marginRight: 12 }}>
-        <div style={{ fontSize: F.md, fontWeight: 500, color: palette.text }}>{item.title}</div>
-        <div style={{ fontSize: F.sm, color: palette.textSecondary, marginTop: 3 }}>{item.subtitle}</div>
+        <div style={{ fontSize: "clamp(14px, 1vw, 16px)", fontWeight: 500, color: palette.text }}>{item.title}</div>
+        <div style={{ fontSize: "clamp(12px, 0.85vw, 14px)", color: palette.textSecondary, marginTop: 2 }}>{item.subtitle}</div>
       </div>
       <div className="flex items-center shrink-0" style={{ gap: 8 }}>
         {item.badge && (

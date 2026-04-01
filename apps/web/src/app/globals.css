@@ -45,6 +45,113 @@
   --color-hz-scheduled-bg: rgba(107, 114, 128, 0.12);
 }
 
+/*
+ * Dark mode universal desaturation — reduces color vibrancy by 20%.
+ * Applied to the main content area so ALL colored elements (buttons, cards,
+ * toggles, icons, accent dots, badges) are desaturated uniformly.
+ * Images opt out to keep photos/logos looking correct.
+ */
+/* Dark mode saturation is now handled by DisplayProvider via JS filter */
+html.dark main img {
+  filter: saturate(1.25); /* compensate so images stay vivid */
+}
+
+/* ═══ VISIONOS-STYLE SCROLLBARS ═══ */
+/* Thin, rounded, translucent — appears on hover, fades when idle */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,0,0,0.15) transparent;
+}
+.dark * {
+  scrollbar-color: rgba(255,255,255,0.12) transparent;
+}
+
+/* WebKit (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.12);
+  border-radius: 100px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background 0.2s;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.25);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.2);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ═══ SMOOTH RANGE SLIDERS ═══ */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 100px;
+  background: rgba(0,0,0,0.1);
+  transition: background 0.15s;
+}
+.dark input[type="range"]::-webkit-slider-runnable-track {
+  background: rgba(255,255,255,0.1);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--module-accent, #1e40af);
+  border: 3px solid white;
+  margin-top: -6px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+input[type="range"]::-webkit-slider-thumb:active {
+  transform: scale(1.1);
+}
+/* Firefox */
+input[type="range"]::-moz-range-track {
+  height: 6px;
+  border-radius: 100px;
+  background: rgba(0,0,0,0.1);
+}
+.dark input[type="range"]::-moz-range-track {
+  background: rgba(255,255,255,0.1);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--module-accent, #1e40af);
+  border: 3px solid white;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+
 /* ═══ STATIC FALLBACK BACKGROUNDS ═══ */
 /* When dynamic theme is off, body has no .anim-bg class — these provide a clean base */
 body:not(.anim-bg) {

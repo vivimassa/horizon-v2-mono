@@ -1,9 +1,9 @@
 // SkyHub — SpotlightDock for React Native
-// Full-width bottom dock with spotlight glow on active tab
-import React, { memo } from 'react'
-import { View, Text, Pressable, Platform, useColorScheme } from 'react-native'
+// Full-width bottom dock with animated spotlight crossfade on tab switch
+import React, { memo, useEffect, useRef } from 'react'
+import { View, Text, Pressable, Animated, useColorScheme, useWindowDimensions } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import { colors, accentTint } from '../theme/colors'
+import { accentTint } from '../theme/colors'
 import type { LucideIcon } from '../theme/icons'
 
 interface TabDef {
@@ -16,6 +16,7 @@ interface SpotlightDockProps {
   tabs: TabDef[]
   activeIndex: number
   onTabChange: (index: number) => void
+  isDark?: boolean
 }
 
 const ACCENT_DEFAULT = '#1e40af'
@@ -25,12 +26,14 @@ const TabButton = memo(function TabButton({
   active,
   isDark,
   accent,
+  isTablet,
   onPress,
 }: {
   tab: TabDef
   active: boolean
   isDark: boolean
   accent: string
+  isTablet: boolean
   onPress: () => void
 }) {
   const Icon = tab.icon
@@ -41,6 +44,26 @@ const TabButton = memo(function TabButton({
   const inactiveLabelColor = isDark ? 'rgba(255,255,255,0.26)' : 'rgba(0,0,0,0.30)'
   const glowColor = isDark ? 'rgba(255,255,255,0.25)' : accentTint(accent, 0.20)
 
+  // Animate spotlight opacity and icon scale
+  const spotlightAnim = useRef(new Animated.Value(active ? 1 : 0)).current
+  const scaleAnim = useRef(new Animated.Value(active ? 1.08 : 1)).current
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(spotlightAnim, {
+        toValue: active ? 1 : 0,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: active ? 1.08 : 1,
+        friction: 8,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+    ]).start()
+  }, [active])
+
   return (
     <Pressable
       onPress={onPress}
@@ -49,78 +72,50 @@ const TabButton = memo(function TabButton({
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
     >
-      {/* Indicator + glow overlay — fully out of flow */}
-      {active && (
+      {/* Indicator bar + glow — animated fade */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          opacity: spotlightAnim,
+        }}
+      >
         <View
-          pointerEvents="none"
           style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            alignItems: 'center',
+            height: 2.5,
+            backgroundColor: indicatorColor,
+            borderBottomLeftRadius: 3,
+            borderBottomRightRadius: 3,
           }}
-        >
-          <View
-            style={{
-              width: 28,
-              height: 2.5,
-              borderBottomLeftRadius: 3,
-              borderBottomRightRadius: 3,
-              backgroundColor: indicatorColor,
-            }}
-          />
-          {/* Glow fanning from bar edges: narrow top (28px) → wide bottom (60px) */}
-          {/* Left fan */}
-          <LinearGradient
-            colors={[glowColor, 'transparent']}
-            style={{
-              position: 'absolute',
-              top: 2.5,
-              left: (60 - 28) / 2 - 16,
-              width: 16,
-              height: 38,
-            }}
-            start={{ x: 1, y: 0 }}
-            end={{ x: 0, y: 1 }}
-          />
-          {/* Center column */}
-          <LinearGradient
-            colors={[glowColor, 'transparent']}
-            style={{
-              position: 'absolute',
-              top: 2.5,
-              width: 28,
-              height: 38,
-            }}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-          />
-          {/* Right fan */}
-          <LinearGradient
-            colors={[glowColor, 'transparent']}
-            style={{
-              position: 'absolute',
-              top: 2.5,
-              right: (60 - 28) / 2 - 16,
-              width: 16,
-              height: 38,
-            }}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          />
-        </View>
-      )}
+        />
+        <LinearGradient
+          colors={[glowColor, accentTint(isDark ? '#ffffff' : accent, 0.06), 'transparent']}
+          locations={[0, 0.4, 1]}
+          style={{
+            height: 40,
+            borderBottomLeftRadius: 12,
+            borderBottomRightRadius: 12,
+          }}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+        />
+      </Animated.View>
 
-      <Icon
-        size={20}
-        color={active ? activeIconColor : inactiveIconColor}
-        strokeWidth={1.75}
-      />
+      {/* Icon with scale animation */}
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <Icon
+          size={isTablet ? 24 : 20}
+          color={active ? activeIconColor : inactiveIconColor}
+          strokeWidth={1.75}
+        />
+      </Animated.View>
 
       <Text
         style={{
-          fontSize: 9.5,
+          fontSize: isTablet ? 12 : 9.5,
           fontWeight: active ? '700' : '500',
           letterSpacing: 0.1,
           color: active ? activeLabelColor : inactiveLabelColor,
@@ -132,9 +127,11 @@ const TabButton = memo(function TabButton({
   )
 })
 
-export function SpotlightDock({ tabs, activeIndex, onTabChange }: SpotlightDockProps) {
+export function SpotlightDock({ tabs, activeIndex, onTabChange, isDark: isDarkProp }: SpotlightDockProps) {
   const colorScheme = useColorScheme()
-  const isDark = colorScheme === 'dark'
+  const isDark = isDarkProp ?? colorScheme === 'dark'
+  const { width } = useWindowDimensions()
+  const isTablet = width >= 768
 
   return (
     <View
@@ -156,6 +153,7 @@ export function SpotlightDock({ tabs, activeIndex, onTabChange }: SpotlightDockP
             active={i === activeIndex}
             isDark={isDark}
             accent={ACCENT_DEFAULT}
+            isTablet={isTablet}
             onPress={() => onTabChange(i)}
           />
         ))}

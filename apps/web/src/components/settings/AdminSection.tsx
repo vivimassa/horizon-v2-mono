@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Database, ShieldCheck, ArrowLeftRight, Building2, ChevronRight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { accentTint, type Palette as PaletteType } from "@skyhub/ui/theme";
-import { WEB_FONTS as F } from "@/lib/fonts";
+import { useDisplay } from "@/components/display-provider";
 
 interface AdminCard {
   icon: LucideIcon;
@@ -21,6 +21,7 @@ interface AdminSectionProps {
 }
 
 export function AdminSection({ palette, isDark, accent }: AdminSectionProps) {
+  const { fonts: F } = useDisplay();
   const cards: AdminCard[] = [
     { icon: Database, iconColor: accent, title: "Master Database", subtitle: "Airports, aircraft types, airlines, reference data", href: "/admin" },
     { icon: ShieldCheck, iconColor: "#7c3aed", title: "Users & Roles", subtitle: "User accounts, role assignment, RBAC permissions" },
@@ -29,12 +30,19 @@ export function AdminSection({ palette, isDark, accent }: AdminSectionProps) {
   ];
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center mb-3">
+    <div
+      className="flex flex-col h-full rounded-2xl border"
+      style={{
+        backgroundColor: palette.card,
+        borderColor: palette.cardBorder,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+      }}
+    >
+      <div className="flex items-center" style={{ padding: "clamp(14px, 1.2vw, 20px) clamp(18px, 1.5vw, 28px)" }}>
         <div className="w-[3px] h-5 rounded-full mr-2.5" style={{ backgroundColor: "#7c3aed" }} />
-        <h2 style={{ fontSize: F.md, fontWeight: 700, color: palette.text }}>Administration</h2>
+        <h2 style={{ fontSize: "clamp(15px, 1.2vw, 20px)", fontWeight: 700, color: palette.text }}>Administration</h2>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1" style={{ gridAutoRows: "1fr" }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 flex-1" style={{ gap: "clamp(10px, 1vw, 16px)", gridAutoRows: "1fr", padding: "0 clamp(14px, 1.2vw, 20px) clamp(14px, 1.2vw, 20px)" }}>
         {cards.map((card) => (
           <AdminCardItem key={card.title} card={card} palette={palette} isDark={isDark} />
         ))}
@@ -44,15 +52,16 @@ export function AdminSection({ palette, isDark, accent }: AdminSectionProps) {
 }
 
 function AdminCardItem({ card, palette, isDark }: { card: AdminCard; palette: PaletteType; isDark: boolean }) {
+  const { fonts: F } = useDisplay();
   const Icon = card.icon;
 
   const content = (
     <div
       className="flex items-center cursor-pointer transition-all h-full"
       style={{
-        padding: "20px 20px",
-        borderRadius: 16,
-        minHeight: 90,
+        padding: "clamp(14px, 1.2vw, 22px) clamp(16px, 1.2vw, 24px)",
+        borderRadius: 14,
+        minHeight: "clamp(64px, 5vw, 88px)",
         backgroundColor: palette.card,
         border: `1px solid ${palette.cardBorder}`,
         boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
@@ -71,17 +80,17 @@ function AdminCardItem({ card, palette, isDark }: { card: AdminCard; palette: Pa
       <div
         className="flex items-center justify-center shrink-0"
         style={{
-          width: 48, height: 48, borderRadius: 24, marginRight: 16,
+          width: "clamp(38px, 2.8vw, 48px)", height: "clamp(38px, 2.8vw, 48px)", borderRadius: 24, marginRight: "clamp(12px, 1vw, 16px)",
           backgroundColor: accentTint(card.iconColor, isDark ? 0.12 : 0.06),
         }}
       >
-        <Icon style={{ width: 24, height: 24, color: card.iconColor }} strokeWidth={1.6} />
+        <Icon style={{ width: "clamp(18px, 1.5vw, 24px)", height: "clamp(18px, 1.5vw, 24px)", color: card.iconColor }} strokeWidth={1.6} />
       </div>
       <div className="flex-1 min-w-0" style={{ marginRight: 8 }}>
-        <div style={{ fontSize: F.md, fontWeight: 600, color: palette.text }}>{card.title}</div>
-        <div style={{ fontSize: F.sm, color: palette.textSecondary, marginTop: 3 }}>{card.subtitle}</div>
+        <div style={{ fontSize: "clamp(14px, 1vw, 16px)", fontWeight: 600, color: palette.text }}>{card.title}</div>
+        <div style={{ fontSize: "clamp(12px, 0.85vw, 14px)", color: palette.textSecondary, marginTop: 2 }}>{card.subtitle}</div>
       </div>
-      <ChevronRight style={{ width: 20, height: 20, color: palette.textTertiary, flexShrink: 0 }} />
+      <ChevronRight style={{ width: "clamp(18px, 1.4vw, 24px)", height: "clamp(18px, 1.4vw, 24px)", color: palette.textTertiary, flexShrink: 0 }} />
     </div>
   );
 

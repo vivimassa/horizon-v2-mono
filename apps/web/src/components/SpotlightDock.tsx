@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -45,10 +46,9 @@ function hexToRgba(hex: string, a: number): string {
 }
 
 function useIsDesktop() {
-  if (typeof window === "undefined") return true;
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const [desktop, setDesktop] = __useState(window.innerWidth >= 1024);
-  __useEffect(() => {
+  const [desktop, setDesktop] = useState(true);
+  useEffect(() => {
+    setDesktop(window.innerWidth >= 1024);
     const onResize = () => setDesktop(window.innerWidth >= 1024);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -56,18 +56,14 @@ function useIsDesktop() {
   return desktop;
 }
 
-// Avoid import collision with React hooks
-import { useState as __useState, useEffect as __useEffect } from "react";
-
 export function SpotlightDock() {
   const pathname = usePathname();
-  const { theme, moduleTheme } = useTheme();
+  const { theme } = useTheme();
   const isDark = theme === "dark";
-  const accent = ACCENT_DEFAULT; // Global user accent — ignores per-module theme
+  const accent = ACCENT_DEFAULT;
   const activeIndex = getActiveIndex(pathname);
   const isDesktop = useIsDesktop();
 
-  // Glow + indicator colors
   const indicatorColor = isDark ? "#ffffff" : accent;
   const glowColor = isDark ? "rgba(255,255,255,0.25)" : hexToRgba(accent, 0.20);
   const activeIconColor = isDark ? "#ffffff" : accent;
@@ -126,31 +122,32 @@ export function SpotlightDock() {
               gap: 3,
             }}
           >
-            {/* Indicator line — active only */}
-            {active && (
-              <div
-                className="absolute top-0 left-1/2 -translate-x-1/2"
-                style={{
-                  width: 28,
-                  height: 2.5,
-                  borderRadius: "0 0 3px 3px",
-                  backgroundColor: indicatorColor,
-                }}
-              />
-            )}
+            {/* Indicator line — crossfade */}
+            <div
+              className="absolute top-0 left-1/2 -translate-x-1/2"
+              style={{
+                width: 28,
+                height: 2.5,
+                borderRadius: "0 0 3px 3px",
+                backgroundColor: indicatorColor,
+                opacity: active ? 1 : 0,
+                transform: active ? "scaleX(1)" : "scaleX(0)",
+                transition: "opacity 0.35s ease, transform 0.35s ease",
+              }}
+            />
 
-            {/* Spotlight glow — active only */}
-            {active && (
-              <div
-                className="absolute top-0 left-1/2 -translate-x-1/2 pointer-events-none"
-                style={{
-                  width: 56,
-                  height: 48,
-                  background: `radial-gradient(ellipse 100% 90% at 50% 0%, ${glowColor} 0%, transparent 65%)`,
-                  filter: "blur(4px)",
-                }}
-              />
-            )}
+            {/* Spotlight glow — crossfade */}
+            <div
+              className="absolute top-0 left-1/2 -translate-x-1/2 pointer-events-none"
+              style={{
+                width: 56,
+                height: 48,
+                background: `radial-gradient(ellipse 100% 90% at 50% 0%, ${glowColor} 0%, transparent 65%)`,
+                filter: "blur(4px)",
+                opacity: active ? 1 : 0,
+                transition: "opacity 0.4s ease",
+              }}
+            />
 
             {/* Icon */}
             <Icon
@@ -159,6 +156,8 @@ export function SpotlightDock() {
                 height: 24,
                 color: active ? activeIconColor : inactiveIconColor,
                 position: "relative",
+                transform: active ? "scale(1.08)" : "scale(1)",
+                transition: "color 0.3s ease, transform 0.3s ease",
               }}
               strokeWidth={1.75}
             />
@@ -173,6 +172,7 @@ export function SpotlightDock() {
                 lineHeight: 1,
                 position: "relative",
                 whiteSpace: "nowrap",
+                transition: "color 0.3s ease",
               }}
             >
               {tab.label}

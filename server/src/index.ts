@@ -5,6 +5,7 @@ import jwt from '@fastify/jwt'
 import { connectDB } from './db/connection.js'
 import { flightRoutes } from './routes/flights.js'
 import { referenceRoutes } from './routes/reference.js'
+import { userRoutes } from './routes/users.js'
 
 const port = Number(process.env.PORT) || 3001
 
@@ -26,6 +27,7 @@ async function main(): Promise<void> {
   // Routes
   await app.register(flightRoutes)
   await app.register(referenceRoutes)
+  await app.register(userRoutes)
 
   // Start
   await app.listen({ port, host: '0.0.0.0' })

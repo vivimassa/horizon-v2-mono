@@ -8,6 +8,7 @@ import {
   type BreadcrumbSegment,
 } from "@skyhub/ui/navigation";
 import { useTheme } from "./theme-provider";
+import { useUser } from "./user-provider";
 import { colors, accentTint, type Palette as PaletteType } from "@skyhub/ui/theme";
 import {
   Home, Globe, Plane, Truck, Users, Settings,
@@ -51,7 +52,11 @@ export function Breadcrumb() {
   const { theme, moduleTheme } = useTheme();
   const isDark = theme === "dark";
   const palette: PaletteType = isDark ? colors.dark : colors.light;
-  const accent = "#1e40af"; // Global user accent — consistent across all modules
+  const accent = "#1e40af";
+  const { user } = useUser();
+  const initials = user ? `${user.profile.firstName[0]}${user.profile.lastName[0]}` : "";
+  const fullName = user ? `${user.profile.firstName} ${user.profile.lastName}` : "";
+  const userRole = user?.role ?? "";
 
   const navPath = resolveNavPath(pathname);
   const segments = navPath ? buildBreadcrumbs(navPath) : [];
@@ -104,20 +109,48 @@ export function Breadcrumb() {
     <nav
       ref={containerRef}
       aria-label="Breadcrumb"
-      className="relative z-10 flex items-center justify-between px-5 pt-0 pb-1 select-none"
+      className="relative z-10 px-5 pt-1 pb-0 select-none"
     >
+      {/* Top row: logo left, avatar right */}
+      <div className="flex items-center justify-between mb-1">
+        <img
+          src="/skyhub-logo.png"
+          alt="Sky Hub"
+          className="h-[55px] w-auto object-contain select-none"
+          draggable={false}
+          style={{
+            opacity: isDark ? 1 : 1,
+            filter: isDark ? "brightness(0) invert(1)" : "none",
+          }}
+        />
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="text-right">
+            <div className="text-[16px] font-bold leading-tight uppercase tracking-wide" style={{ color: palette.text }}>{fullName}</div>
+            <div className="text-[13px] leading-tight" style={{ color: palette.textSecondary, textTransform: "capitalize" }}>{userRole}</div>
+          </div>
+          <div
+            className="w-11 h-11 rounded-full flex items-center justify-center cursor-pointer"
+            style={{ backgroundColor: accent }}
+          >
+            <span className="text-[15px] font-bold text-white">{initials}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom row: breadcrumb */}
+      <div className="flex items-center">
       {/* Left: breadcrumb trail in glass pill */}
       <ol
-        className="flex items-center gap-1 list-none m-0 px-2 h-[40px] rounded-xl"
+        className="flex items-center gap-1 list-none m-0 px-1.5 h-[40px] rounded-2xl"
         style={{
           background: isDark
             ? "rgba(255,255,255,0.04)"
             : "rgba(255,255,255,0.55)",
           backdropFilter: "blur(12px) saturate(150%)",
           WebkitBackdropFilter: "blur(12px) saturate(150%)",
-          border: `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)"}`,
+          border: `1px solid ${isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.06)"}`,
           boxShadow: isDark
-            ? "0 1px 3px rgba(0,0,0,0.2)"
+            ? "0 1px 4px rgba(0,0,0,0.3)"
             : "0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)",
         }}
       >
@@ -144,19 +177,12 @@ export function Breadcrumb() {
                   onClick={() => hasSiblings ? handleSegmentClick(i) : handleNavigate(seg.route)}
                   aria-expanded={isOpen}
                   aria-haspopup={hasSiblings ? "listbox" : undefined}
-                  className="breadcrumb-pill flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all duration-150 cursor-pointer"
+                  className="breadcrumb-pill flex items-center gap-1.5 px-2.5 py-1.5 transition-all duration-150 cursor-pointer rounded-lg"
                   style={{
                     background: isOpen
                       ? accentTint(accent, isDark ? 0.15 : 0.1)
-                      : isLast
-                        ? accentTint(accent, isDark ? 0.1 : 0.06)
-                        : "transparent",
-                    border: isOpen
-                      ? `1px solid ${accentTint(accent, isDark ? 0.3 : 0.2)}`
-                      : `1px solid transparent`,
-                    boxShadow: isOpen
-                      ? `0 2px 8px ${accentTint(accent, 0.12)}`
-                      : "none",
+                      : "transparent",
+                    border: "1px solid transparent",
                   }}
                 >
                   {/* Icon */}
@@ -208,17 +234,7 @@ export function Breadcrumb() {
         })}
       </ol>
 
-      {/* Right: SkyHub logo */}
-      <img
-        src="/skyhub-logo.png"
-        alt="Sky Hub"
-        className="ml-4 h-[80px] w-auto object-contain select-none"
-        draggable={false}
-        style={{
-          opacity: isDark ? 0.85 : 1,
-          filter: isDark ? "brightness(1.8)" : "none",
-        }}
-      />
+      </div>
 
       {/* Hover styles */}
       <style>{`

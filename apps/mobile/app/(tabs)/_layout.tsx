@@ -8,6 +8,7 @@ import {
   Settings,
 } from 'lucide-react-native'
 import { SpotlightDock } from '@skyhub/ui'
+import { useAppTheme } from '../../providers/ThemeProvider'
 
 const TAB_CONFIG = [
   { key: 'index',      name: 'index',      label: 'Home',       icon: Home },
@@ -19,6 +20,8 @@ const TAB_CONFIG = [
 ]
 
 export default function TabLayout() {
+  const { isDark } = useAppTheme()
+
   return (
     <Tabs
       screenOptions={{ headerShown: false }}
@@ -26,6 +29,7 @@ export default function TabLayout() {
         <SpotlightDock
           tabs={TAB_CONFIG}
           activeIndex={state.index}
+          isDark={isDark}
           onTabChange={(index: number) => {
             const route = state.routes[index]
             navigation.navigate(route.name)

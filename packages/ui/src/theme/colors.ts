@@ -120,6 +120,30 @@ export function accentTint(hexColor: string, opacity: number): string {
   return `rgba(${r},${g},${b},${opacity})`
 }
 
+/**
+ * Desaturate a hex color by a given amount (0-1).
+ * Default 0.2 = 20% desaturation. Used in dark mode to reduce eye strain.
+ */
+export function desaturate(hex: string, amount = 0.2): string {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b
+  const nr = Math.round(r + (gray - r) * amount)
+  const ng = Math.round(g + (gray - g) * amount)
+  const nb = Math.round(b + (gray - b) * amount)
+  const toHex = (v: number) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')
+  return `#${toHex(nr)}${toHex(ng)}${toHex(nb)}`
+}
+
+/**
+ * Return the color adjusted for the current mode.
+ * In dark mode, desaturates by 20% to reduce vibrancy on dark backgrounds.
+ */
+export function modeColor(hex: string, isDark: boolean): string {
+  return isDark ? desaturate(hex, 0.2) : hex
+}
+
 export function getStatusColors(
   statusKey: StatusKey,
   isDark: boolean,

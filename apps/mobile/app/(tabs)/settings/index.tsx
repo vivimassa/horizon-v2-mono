@@ -77,7 +77,7 @@ export default function SettingsScreen() {
         >
           <View className="flex-row items-center">
             {/* Avatar */}
-            <View className="relative mr-4">
+            <Pressable className="relative mr-4 active:opacity-70" onPress={() => console.log('TODO: avatar picker')}>
               <View
                 className="w-14 h-14 rounded-2xl items-center justify-center"
                 style={{ backgroundColor: accent }}
@@ -90,7 +90,7 @@ export default function SettingsScreen() {
               >
                 <Camera size={10} color={accent} strokeWidth={2.5} />
               </View>
-            </View>
+            </Pressable>
 
             {/* Info */}
             <View className="flex-1">
@@ -140,17 +140,10 @@ export default function SettingsScreen() {
               <Text style={{ fontSize: 12, color: palette.textSecondary, marginTop: 2 }}>Aurora theme</Text>
               <View className="flex-row items-end mt-3">
                 <Pressable
-                  onPress={() => setPickerOpen(!pickerOpen)}
+                  onPress={() => setPickerOpen(true)}
                   style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: accent, borderWidth: 2, borderColor: '#fff' }}
                 />
               </View>
-              {pickerOpen && (
-                <View className="flex-row flex-wrap rounded-xl mt-2 p-2" style={{ gap: 6, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', borderWidth: 1, borderColor: palette.border }}>
-                  {ACCENT_PRESETS.map((p) => (
-                    <Pressable key={p.hex} onPress={() => { setAccent(p.hex); setPickerOpen(false) }} style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: p.hex, borderWidth: p.hex === accent ? 2 : 0, borderColor: '#fff' }} />
-                  ))}
-                </View>
-              )}
             </BentoTile>
 
             <BentoTile palette={palette} isDark={isDark} blobColor="#b45309">
@@ -182,9 +175,6 @@ export default function SettingsScreen() {
             <BentoTile palette={palette} isDark={isDark} blobColor="#7c3aed">
               <IconCircle color="#7c3aed"><PaletteIcon size={20} color="#7c3aed" strokeWidth={1.8} /></IconCircle>
               <Text style={{ fontSize: 15, fontWeight: '600', color: palette.text }}>Appearance</Text>
-              <Text style={{ fontSize: 12, color: palette.textSecondary, marginTop: 2 }}>
-                {isDark ? 'Dark' : 'Light'} mode
-              </Text>
 
               {/* Accent dot + Dark mode toggle on same row */}
               <View className="flex-row items-center justify-between mt-3">
@@ -194,7 +184,7 @@ export default function SettingsScreen() {
                 />
                 <View className="flex-row items-center" style={{ gap: 6 }}>
                   <Text style={{ fontSize: 10, color: palette.textTertiary, fontWeight: '500' }}>
-                    {isDark ? 'Dark' : 'Light'}
+                    {isDark ? 'Dark Mode' : 'Light Mode'}
                   </Text>
                   <ToggleSwitch on={isDark} onToggle={toggleDark} accent={accent} isDark={isDark} small />
                 </View>
@@ -268,7 +258,7 @@ export default function SettingsScreen() {
       <Modal
         visible={pickerOpen}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setPickerOpen(false)}
       >
         <Pressable

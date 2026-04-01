@@ -20,7 +20,10 @@ import {
 } from "lucide-react";
 import { colors, accentTint, type Palette as PaletteType } from "@skyhub/ui/theme";
 import { useTheme } from "@/components/theme-provider";
-import { WEB_FONTS as F, WEB_LAYOUT } from "@/lib/fonts";
+import { useUser } from "@/components/user-provider";
+import { userApi } from "@/lib/api";
+import { WEB_LAYOUT } from "@/lib/fonts";
+import { useDisplay } from "@/components/display-provider";
 
 const ACCENT = "#1e40af";
 
@@ -116,7 +119,32 @@ export default function ProfilePage() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const palette: PaletteType = isDark ? colors.dark : colors.light;
+  const { fonts: F } = useDisplay();
   const glass = isDark ? GLASS.dark : GLASS.light;
+  const { user, loading, refetch } = useUser();
+
+  // Map API user to local ProfileData shape
+  const apiToLocal = useCallback((u: typeof user): ProfileData => {
+    if (!u) return INITIAL_DATA;
+    return {
+      firstName: u.profile.firstName,
+      lastName: u.profile.lastName,
+      email: u.profile.email,
+      jobTitle: u.role,
+      department: u.profile.department,
+      employeeId: u.profile.employeeId,
+      phone: u.profile.phone,
+      officePhone: u.profile.officePhone,
+      dateOfBirth: u.profile.dateOfBirth,
+      gender: u.profile.gender,
+      address: u.profile.location,
+      location: u.profile.location,
+      joinDate: u.createdAt,
+      role: u.role,
+      status: u.isActive ? "Active" : "Inactive",
+      lastLogin: u.lastLoginUtc,
+    };
+  }, []);
 
   const [data, setData] = useState<ProfileData>(INITIAL_DATA);
   const [editing, setEditing] = useState(false);
@@ -124,6 +152,16 @@ export default function ProfilePage() {
   const [saved, setSaved] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Sync from API on load
+  React.useEffect(() => {
+    if (user) {
+      const mapped = apiToLocal(user);
+      setData(mapped);
+      setDraft(mapped);
+      if (user.profile.avatarUrl) setAvatarUrl(user.profile.avatarUrl);
+    }
+  }, [user, apiToLocal]);
 
   const handleAvatarClick = useCallback(() => {
     fileInputRef.current?.click();
@@ -158,12 +196,29 @@ export default function ProfilePage() {
     setEditing(false);
   }, []);
 
-  const saveEdit = useCallback(() => {
-    setData({ ...draft });
-    setEditing(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  }, [draft]);
+  const saveEdit = useCallback(async () => {
+    try {
+      await userApi.updateProfile({
+        firstName: draft.firstName,
+        lastName: draft.lastName,
+        email: draft.email,
+        phone: draft.phone,
+        officePhone: draft.officePhone,
+        dateOfBirth: draft.dateOfBirth,
+        gender: draft.gender,
+        department: draft.department,
+        employeeId: draft.employeeId,
+        location: draft.location,
+      });
+      setData({ ...draft });
+      setEditing(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      refetch(); // Sync global user context
+    } catch (err) {
+      console.error("Save failed:", err);
+    }
+  }, [draft, refetch]);
 
   const updateField = useCallback((key: keyof ProfileData, value: string) => {
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -271,7 +326,7 @@ export default function ProfilePage() {
             <h2 className="font-bold mt-3" style={{ fontSize: F.xl, color: palette.text }}>
               {current.firstName} {current.lastName}
             </h2>
-            <p style={{ fontSize: F.sm, color: palette.textSecondary, marginTop: 2 }}>{current.role}</p>
+            <p style={{ fontSize: F.sm, color: palette.textSecondary, marginTop: 2, textTransform: "capitalize" }}>{current.role}</p>
             <div className="flex items-center gap-1.5 mt-2">
               <span className="px-2.5 py-0.5 rounded-full font-semibold"
                 style={{ fontSize: 11, backgroundColor: "#dcfce7", color: "#166534" }}>
@@ -426,6 +481,7 @@ export default function ProfilePage() {
               <div className="grid grid-cols-2 gap-x-8">
                 <EditableField
                   label="System Role" fieldKey="role" value={current.role}
+                  displayValue={current.role.charAt(0).toUpperCase() + current.role.slice(1)}
                   editing={editing} palette={palette} glass={glass} isDark={isDark}
                   onChange={updateField} type="select" options={ROLE_OPTIONS}
                 />
@@ -525,6 +581,7 @@ function ActivityItem({
 }: {
   icon: typeof Mail; text: string; detail: string; palette: PaletteType; color?: string;
 }) {
+  const { fonts: F } = useDisplay();
   return (
     <div className="flex items-start gap-2.5">
       <div
@@ -547,6 +604,7 @@ function GlassCard({
   title: string; icon: typeof Mail; palette: PaletteType; isDark: boolean;
   glass: typeof GLASS.light; children: React.ReactNode;
 }) {
+  const { fonts: F } = useDisplay();
   return (
     <div
       className="rounded-2xl border overflow-hidden"
@@ -602,6 +660,7 @@ function EditableField({
   type?: "text" | "email" | "tel" | "date" | "select";
   options?: string[];
 }) {
+  const { fonts: F } = useDisplay();
   const inputStyle: React.CSSProperties = {
     width: "100%",
     fontSize: F.md,

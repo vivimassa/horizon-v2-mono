@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -20,7 +20,10 @@ import {
 } from "lucide-react";
 import { colors, accentTint, type Palette as PaletteType } from "@skyhub/ui/theme";
 import { useTheme } from "@/components/theme-provider";
-import { WEB_FONTS as F, WEB_LAYOUT } from "@/lib/fonts";
+import { useUser } from "@/components/user-provider";
+import { userApi } from "@/lib/api";
+import { WEB_LAYOUT } from "@/lib/fonts";
+import { useDisplay } from "@/components/display-provider";
 
 const ACCENT = "#1e40af";
 
@@ -52,12 +55,24 @@ const MOCK_ACTIVITY = [
   { text: "New login from MacBook Pro", detail: "31 Mar 2026, 08:15", icon: Monitor },
 ];
 
+function formatTimeAgo(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hours ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} days ago`;
+}
+
 export default function SecurityPage() {
   const router = useRouter();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const palette: PaletteType = isDark ? colors.dark : colors.light;
+  const { fonts: F } = useDisplay();
   const glass = isDark ? GLASS.dark : GLASS.light;
+  const { user, refetch } = useUser();
 
   const [biometric, setBiometric] = useState(false);
   const [showCurrent, setShowCurrent] = useState(false);
@@ -67,6 +82,25 @@ export default function SecurityPage() {
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
+  const [sessions, setSessions] = useState(MOCK_SESSIONS);
+
+  // Sync from API
+  React.useEffect(() => {
+    if (user) {
+      setTwoFactor(user.security.twoFactorEnabled);
+      setBiometric(user.security.biometricEnabled);
+      if (user.security.sessions?.length) {
+        setSessions(user.security.sessions.map((s) => ({
+          device: s.device,
+          browser: s.browser,
+          location: s.location,
+          time: s.isCurrent ? "Active now" : formatTimeAgo(s.lastActive),
+          icon: s.device.includes("iPhone") || s.device.includes("Android") ? Smartphone : Monitor,
+          current: s.isCurrent,
+        })));
+      }
+    }
+  }, [user]);
 
   const passwordMatch = newPw.length > 0 && newPw === confirmPw;
   const canSubmit = currentPw.length > 0 && newPw.length >= 8 && passwordMatch;
@@ -196,7 +230,7 @@ export default function SecurityPage() {
                 </div>
               </div>
               <button
-                onClick={() => setTwoFactor(!twoFactor)}
+                onClick={async () => { const next = !twoFactor; setTwoFactor(next); await userApi.updateSecurity({ twoFactorEnabled: next }); refetch(); }}
                 className="relative rounded-full cursor-pointer transition-colors shrink-0"
                 style={{
                   width: 44, height: 24,
@@ -251,7 +285,7 @@ export default function SecurityPage() {
                 </div>
               </div>
               <button
-                onClick={() => setBiometric(!biometric)}
+                onClick={async () => { const next = !biometric; setBiometric(next); await userApi.updateSecurity({ biometricEnabled: next }); refetch(); }}
                 className="relative rounded-full cursor-pointer transition-colors shrink-0"
                 style={{
                   width: 44, height: 24,
@@ -378,6 +412,7 @@ function PasswordField({
   palette: PaletteType; isDark: boolean;
   hint?: string; error?: string; success?: string;
 }) {
+  const { fonts: F } = useDisplay();
   return (
     <div className="mb-3">
       <label className="block mb-1.5" style={{ fontSize: F.min, color: palette.textTertiary }}>{label}</label>
@@ -431,6 +466,7 @@ function GlassCard({
   title: string; icon: typeof Lock; palette: PaletteType; isDark: boolean;
   glass: typeof GLASS.light; children: React.ReactNode; fillHeight?: boolean;
 }) {
+  const { fonts: F } = useDisplay();
   return (
     <div
       className={`rounded-2xl border overflow-hidden ${fillHeight ? "flex flex-col h-full" : ""}`}

@@ -12,10 +12,14 @@ import {
   Monitor,
   Eye,
   Layers,
+  Type,
+  ALargeSmall,
 } from "lucide-react";
 import { colors, accentTint, type Palette as PaletteType } from "@skyhub/ui/theme";
 import { useTheme } from "@/components/theme-provider";
+import { useDisplay } from "@/components/display-provider";
 import { ToggleTheme } from "@/components/ui/toggle-theme";
+import { TEXT_SCALE_OPTIONS, type TextScale } from "@/lib/fonts";
 
 const ACCENT = "#1e40af";
 
@@ -52,6 +56,7 @@ export default function AppearancePage() {
   const palette: PaletteType = isDark ? colors.dark : colors.light;
   const glass = isDark ? GLASS.dark : GLASS.light;
 
+  const { textScale, setTextScale, fonts: F } = useDisplay();
   const [selectedAccent, setSelectedAccent] = useState(ACCENT);
   const [compactMode, setCompactMode] = useState(false);
   const [animatedBg, setAnimatedBg] = useState(true);
@@ -326,6 +331,76 @@ export default function AppearancePage() {
                 isDark={isDark}
                 accent={selectedAccent}
               />
+            </GlassCard>
+
+            {/* Display & Readability */}
+            <GlassCard title="Display & Readability" icon={ALargeSmall} palette={palette} isDark={isDark} glass={glass} accent={selectedAccent}>
+              <p className="text-[13px] mb-4" style={{ color: palette.textSecondary }}>
+                Adjust text size across the entire application.
+              </p>
+
+              {/* Text scale selector */}
+              <div className="flex gap-2 mb-5">
+                {TEXT_SCALE_OPTIONS.map((opt) => {
+                  const active = opt.value === textScale;
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => setTextScale(opt.value)}
+                      className="flex-1 flex flex-col items-center py-3 rounded-xl cursor-pointer transition-all"
+                      style={{
+                        backgroundColor: active
+                          ? accentTint(selectedAccent, isDark ? 0.12 : 0.06)
+                          : isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)",
+                        border: `1.5px solid ${active ? selectedAccent : palette.border}`,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!active) e.currentTarget.style.borderColor = palette.textTertiary;
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!active) e.currentTarget.style.borderColor = palette.border;
+                      }}
+                    >
+                      <Type
+                        size={opt.value === "small" ? 16 : opt.value === "default" ? 20 : opt.value === "large" ? 24 : 28}
+                        style={{ color: active ? selectedAccent : palette.textSecondary, marginBottom: 4 }}
+                        strokeWidth={1.8}
+                      />
+                      <span
+                        className="font-semibold"
+                        style={{ fontSize: 13, color: active ? selectedAccent : palette.text }}
+                      >
+                        {opt.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Live preview */}
+              <div
+                className="rounded-xl p-4"
+                style={{
+                  backgroundColor: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)",
+                  border: `1px solid ${palette.border}`,
+                }}
+              >
+                <p className="uppercase tracking-wider mb-2" style={{ fontSize: 11, fontWeight: 600, color: palette.textTertiary }}>
+                  Preview
+                </p>
+                <p className="font-bold mb-1" style={{ fontSize: F.lg, color: palette.text }}>
+                  Section Header
+                </p>
+                <p className="font-medium mb-1" style={{ fontSize: F.md, color: palette.text }}>
+                  This is body text at the current scale. All pages update instantly.
+                </p>
+                <p style={{ fontSize: F.sm, color: palette.textSecondary }}>
+                  Secondary text for descriptions and subtitles.
+                </p>
+                <p style={{ fontSize: F.min, color: palette.textTertiary, marginTop: 4 }}>
+                  Minimum text size — labels, badges, and timestamps.
+                </p>
+              </div>
             </GlassCard>
           </div>
 

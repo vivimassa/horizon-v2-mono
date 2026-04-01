@@ -1,13 +1,14 @@
 "use client";
 
 import { type ReactNode } from "react";
+import { WEB_LAYOUT } from "@/lib/fonts";
 
 interface MasterDetailLayoutProps {
-  /** Left panel content (list, search, filters) — always 300px */
+  /** Left panel content (list, search, filters) */
   left: ReactNode;
   /** Center panel content — flex-1, always present */
   center: ReactNode;
-  /** Optional right panel content (info, inspector) — 300px when present */
+  /** Optional right panel content (info, inspector) */
   right?: ReactNode;
 }
 
@@ -15,8 +16,8 @@ interface MasterDetailLayoutProps {
  * Shared master-detail layout shell used across all admin and data screens.
  *
  * Variants:
- *   - 2-panel: left (300px) + center (flex-1)
- *   - 3-panel: left (300px) + center (flex-1) + right (300px)
+ *   - 2-panel: left (320px) + center (flex-1)
+ *   - 3-panel: left (320px) + center (flex-1) + right (320px)
  */
 export function MasterDetailLayout({
   left,
@@ -25,8 +26,11 @@ export function MasterDetailLayout({
 }: MasterDetailLayoutProps) {
   return (
     <div className="flex h-full overflow-hidden gap-3 p-3">
-      {/* Left panel — 300px */}
-      <aside className="w-[300px] shrink-0 flex flex-col rounded-2xl border border-hz-border bg-hz-card overflow-hidden">
+      {/* Left panel */}
+      <aside
+        className="shrink-0 flex flex-col rounded-2xl border border-hz-border bg-hz-card overflow-hidden"
+        style={{ width: WEB_LAYOUT.sidebarWidth }}
+      >
         {left}
       </aside>
 
@@ -35,9 +39,12 @@ export function MasterDetailLayout({
         {center}
       </section>
 
-      {/* Right panel — 300px, optional */}
+      {/* Right panel — optional */}
       {right && (
-        <aside className="w-[300px] shrink-0 flex flex-col rounded-2xl border border-hz-border bg-hz-card overflow-hidden">
+        <aside
+          className="shrink-0 flex flex-col rounded-2xl border border-hz-border bg-hz-card overflow-hidden"
+          style={{ width: WEB_LAYOUT.inspectorWidth }}
+        >
           {right}
         </aside>
       )}

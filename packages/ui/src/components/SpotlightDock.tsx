@@ -1,8 +1,7 @@
 // SkyHub — SpotlightDock for React Native
 // Full-width bottom dock with spotlight glow on active tab
 import React, { memo } from 'react'
-import { View, Text, Pressable, useColorScheme } from 'react-native'
-import { BlurView } from 'expo-blur'
+import { View, Text, Pressable, Platform, useColorScheme } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { colors, accentTint } from '../theme/colors'
 import type { LucideIcon } from '../theme/icons'
@@ -50,33 +49,67 @@ const TabButton = memo(function TabButton({
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
     >
+      {/* Indicator + glow overlay — fully out of flow */}
       {active && (
         <View
-          className="absolute top-0 left-1/2"
+          pointerEvents="none"
           style={{
-            width: 28,
-            height: 2.5,
-            borderBottomLeftRadius: 3,
-            borderBottomRightRadius: 3,
-            backgroundColor: indicatorColor,
-            transform: [{ translateX: -14 }],
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            alignItems: 'center',
           }}
-        />
-      )}
-
-      {active && (
-        <LinearGradient
-          colors={[glowColor, 'transparent']}
-          className="absolute top-0 left-1/2 pointer-events-none"
-          style={{
-            width: 44,
-            height: 38,
-            transform: [{ translateX: -22 }],
-            borderRadius: 22,
-          }}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-        />
+        >
+          <View
+            style={{
+              width: 28,
+              height: 2.5,
+              borderBottomLeftRadius: 3,
+              borderBottomRightRadius: 3,
+              backgroundColor: indicatorColor,
+            }}
+          />
+          {/* Glow fanning from bar edges: narrow top (28px) → wide bottom (60px) */}
+          {/* Left fan */}
+          <LinearGradient
+            colors={[glowColor, 'transparent']}
+            style={{
+              position: 'absolute',
+              top: 2.5,
+              left: (60 - 28) / 2 - 16,
+              width: 16,
+              height: 38,
+            }}
+            start={{ x: 1, y: 0 }}
+            end={{ x: 0, y: 1 }}
+          />
+          {/* Center column */}
+          <LinearGradient
+            colors={[glowColor, 'transparent']}
+            style={{
+              position: 'absolute',
+              top: 2.5,
+              width: 28,
+              height: 38,
+            }}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+          />
+          {/* Right fan */}
+          <LinearGradient
+            colors={[glowColor, 'transparent']}
+            style={{
+              position: 'absolute',
+              top: 2.5,
+              right: (60 - 28) / 2 - 16,
+              width: 16,
+              height: 38,
+            }}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          />
+        </View>
       )}
 
       <Icon
@@ -108,31 +141,25 @@ export function SpotlightDock({ tabs, activeIndex, onTabChange }: SpotlightDockP
       className="absolute bottom-0 left-0 right-0"
       style={{ height: 56, zIndex: 50 }}
     >
-      <BlurView
-        intensity={isDark ? 80 : 60}
-        tint={isDark ? 'dark' : 'light'}
-        className="flex-1"
+      <View
+        className="flex-1 flex-row"
+        style={{
+          backgroundColor: isDark ? 'rgba(18,18,22,0.85)' : 'rgba(255,255,255,0.88)',
+          borderTopWidth: 0.5,
+          borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+        }}
       >
-        <View
-          className="flex-1 flex-row"
-          style={{
-            backgroundColor: isDark ? 'rgba(18,18,22,0.50)' : 'rgba(255,255,255,0.30)',
-            borderTopWidth: 0.5,
-            borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-          }}
-        >
-          {tabs.map((tab, i) => (
-            <TabButton
-              key={tab.key}
-              tab={tab}
-              active={i === activeIndex}
-              isDark={isDark}
-              accent={ACCENT_DEFAULT}
-              onPress={() => onTabChange(i)}
-            />
-          ))}
-        </View>
-      </BlurView>
+        {tabs.map((tab, i) => (
+          <TabButton
+            key={tab.key}
+            tab={tab}
+            active={i === activeIndex}
+            isDark={isDark}
+            accent={ACCENT_DEFAULT}
+            onPress={() => onTabChange(i)}
+          />
+        ))}
+      </View>
     </View>
   )
 }

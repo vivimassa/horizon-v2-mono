@@ -107,7 +107,7 @@ export default function AppearancePage() {
               </div>
               <div>
                 <p className="text-[13px] font-bold" style={{ color: palette.text }}>Live Preview</p>
-                <p className="text-[10px]" style={{ color: palette.textTertiary }}>Changes apply instantly</p>
+                <p className="text-[13px]" style={{ color: palette.textTertiary }}>Changes apply instantly</p>
               </div>
             </div>
           </div>
@@ -128,7 +128,7 @@ export default function AppearancePage() {
             </div>
 
             {/* Accent preview */}
-            <p className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: palette.textTertiary }}>
+            <p className="text-[13px] font-semibold uppercase tracking-wider mb-3" style={{ color: palette.textTertiary }}>
               Active Accent
             </p>
             <div
@@ -146,7 +146,7 @@ export default function AppearancePage() {
                   <p className="text-[13px] font-bold" style={{ color: palette.text }}>
                     {ACCENT_PRESETS.find((p) => p.hex === selectedAccent)?.name ?? "Custom"}
                   </p>
-                  <p className="text-[11px] font-mono" style={{ color: palette.textSecondary }}>
+                  <p className="text-[13px] font-mono" style={{ color: palette.textSecondary }}>
                     {selectedAccent}
                   </p>
                 </div>
@@ -154,13 +154,13 @@ export default function AppearancePage() {
               {/* Sample elements */}
               <div className="flex items-center gap-2">
                 <div
-                  className="px-3 py-1.5 rounded-lg text-[11px] font-semibold text-white"
+                  className="px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white"
                   style={{ backgroundColor: selectedAccent }}
                 >
                   Button
                 </div>
                 <div
-                  className="px-3 py-1.5 rounded-lg text-[11px] font-semibold"
+                  className="px-3 py-1.5 rounded-lg text-[13px] font-semibold"
                   style={{
                     color: selectedAccent,
                     backgroundColor: accentTint(selectedAccent, isDark ? 0.15 : 0.1),
@@ -177,7 +177,7 @@ export default function AppearancePage() {
             </div>
 
             {/* Interface toggles summary */}
-            <p className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: palette.textTertiary }}>
+            <p className="text-[13px] font-semibold uppercase tracking-wider mb-3" style={{ color: palette.textTertiary }}>
               Interface
             </p>
             <div className="flex flex-col gap-2">
@@ -193,7 +193,7 @@ export default function AppearancePage() {
           <div className="flex flex-col gap-4">
             {/* Theme Mode */}
             <GlassCard title="Theme Mode" icon={isDark ? Moon : Sun} palette={palette} isDark={isDark} glass={glass} accent={selectedAccent}>
-              <p className="text-[12px] mb-4" style={{ color: palette.textSecondary }}>
+              <p className="text-[13px] mb-4" style={{ color: palette.textSecondary }}>
                 Choose between light and dark mode for the interface.
               </p>
               <div className="grid grid-cols-2 gap-3">
@@ -244,7 +244,7 @@ export default function AppearancePage() {
 
             {/* Accent Color */}
             <GlassCard title="Accent Color" icon={Palette} palette={palette} isDark={isDark} glass={glass} accent={selectedAccent}>
-              <p className="text-[12px] mb-4" style={{ color: palette.textSecondary }}>
+              <p className="text-[13px] mb-4" style={{ color: palette.textSecondary }}>
                 Used for buttons, active states, highlights, and navigation accents.
               </p>
               <div className="grid grid-cols-4 gap-2.5">
@@ -284,7 +284,7 @@ export default function AppearancePage() {
                         {isSelected && <Check size={14} color="#fff" strokeWidth={2.5} />}
                       </div>
                       <span
-                        className="text-[11px] font-semibold"
+                        className="text-[13px] font-semibold"
                         style={{ color: isSelected ? preset.hex : palette.textSecondary }}
                       >
                         {preset.name}
@@ -427,7 +427,7 @@ function SettingToggle({
     <div className="flex items-center justify-between py-3.5">
       <div className="flex-1 mr-4">
         <div className="text-[13px] font-medium" style={{ color: palette.text }}>{label}</div>
-        <div className="text-[11px] mt-0.5" style={{ color: palette.textSecondary }}>{description}</div>
+        <div className="text-[13px] mt-0.5" style={{ color: palette.textSecondary }}>{description}</div>
       </div>
       <button
         onClick={onToggle}
@@ -461,7 +461,7 @@ function PreviewPill({
         border: `1px solid ${on ? accentTint(accent, 0.2) : palette.border}`,
       }}
     >
-      <span className="text-[11px] font-medium" style={{ color: on ? palette.text : palette.textSecondary }}>
+      <span className="text-[13px] font-medium" style={{ color: on ? palette.text : palette.textSecondary }}>
         {label}
       </span>
       <div

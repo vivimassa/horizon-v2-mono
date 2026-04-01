@@ -1,11 +1,13 @@
 import { Text, View, Pressable } from 'react-native'
 import { useRouter } from 'expo-router'
-import { BreadcrumbHeader } from '../../components/breadcrumb-header'
+import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
+import { useAppTheme } from '../../../providers/ThemeProvider'
 
 export default function Network() {
   const router = useRouter()
+  const { palette, fonts } = useAppTheme()
   return (
-    <View className="flex-1 bg-white">
+    <View className="flex-1" style={{ backgroundColor: palette.background }}>
       <BreadcrumbHeader moduleCode="1" />
       <View className="flex-1 justify-center items-center gap-4">
         <Text className="text-xl font-semibold text-[#111111]">Network</Text>

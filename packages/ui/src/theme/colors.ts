@@ -17,7 +17,7 @@ interface StatusColor {
 
 export const colors = {
   light: {
-    background: 'transparent',
+    background: '#f0f2f5',
     backgroundSecondary: 'rgba(245,245,245,0.80)',
     backgroundHover: 'rgba(235,235,235,0.85)',
     text: '#111111',
@@ -32,19 +32,19 @@ export const colors = {
     tabInactive: '#888888',
   },
   dark: {
-    background: 'transparent',
-    backgroundSecondary: 'rgba(37,37,37,0.80)',
-    backgroundHover: 'rgba(48,48,48,0.85)',
-    text: '#f0f0f0',
-    textSecondary: '#777777',
-    textTertiary: '#555555',
-    border: 'rgba(255,255,255,0.08)',
-    borderSecondary: 'rgba(255,255,255,0.12)',
-    card: 'rgba(37,37,37,0.75)',
-    cardBorder: 'rgba(255,255,255,0.08)',
-    tabBar: 'rgba(26,26,26,0.90)',
-    tabBarBorder: 'rgba(255,255,255,0.08)',
-    tabInactive: '#777777',
+    background: '#111118',
+    backgroundSecondary: 'rgba(40,40,44,0.85)',
+    backgroundHover: 'rgba(55,55,60,0.90)',
+    text: '#f5f5f5',
+    textSecondary: '#a1a1aa',
+    textTertiary: '#71717a',
+    border: 'rgba(255,255,255,0.10)',
+    borderSecondary: 'rgba(255,255,255,0.14)',
+    card: 'rgba(30,30,34,0.80)',
+    cardBorder: 'rgba(255,255,255,0.10)',
+    tabBar: 'rgba(22,22,26,0.92)',
+    tabBarBorder: 'rgba(255,255,255,0.10)',
+    tabInactive: '#a1a1aa',
   },
   status: {
     onTime: {

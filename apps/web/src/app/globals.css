@@ -31,10 +31,10 @@
 /* Dark mode overrides */
 .dark {
   --color-hz-bg: transparent;
-  --color-hz-card: rgba(37,37,37,0.75);
-  --color-hz-border: rgba(255, 255, 255, 0.08);
+  --color-hz-card: rgba(30,30,34,0.80);
+  --color-hz-border: rgba(255, 255, 255, 0.10);
   --color-hz-text: #f5f5f5;
-  --color-hz-text-secondary: #9ca3af;
+  --color-hz-text-secondary: #a1a1aa;
   --color-hz-accent-light: rgba(30, 64, 175, 0.20);
 
   --color-hz-on-time-bg: rgba(22, 163, 74, 0.15);
@@ -43,6 +43,15 @@
   --color-hz-departed-bg: rgba(37, 99, 235, 0.15);
   --color-hz-diverted-bg: rgba(124, 58, 237, 0.15);
   --color-hz-scheduled-bg: rgba(107, 114, 128, 0.12);
+}
+
+/* ═══ STATIC FALLBACK BACKGROUNDS ═══ */
+/* When dynamic theme is off, body has no .anim-bg class — these provide a clean base */
+body:not(.anim-bg) {
+  background: linear-gradient(160deg, #f0f2f5 0%, #e8eaef 50%, #f5f3f0 100%);
+}
+html.dark body:not(.anim-bg) {
+  background: linear-gradient(160deg, #111118 0%, #16161e 50%, #111118 100%);
 }
 
 /* ═══ ANIMATED BACKGROUND — oklch hue rotation ═══ */

@@ -6,20 +6,21 @@ import {
   ArrowLeft,
   Camera,
   Mail,
-  Phone,
-  MapPin,
   Globe,
-  Hash,
-  Briefcase,
   Edit3,
   Users,
-  Shield,
   Save,
   X,
   Check,
+  Download,
+  Clock,
+  ShieldCheck,
+  KeyRound,
+  UserCheck,
 } from "lucide-react";
 import { colors, accentTint, type Palette as PaletteType } from "@skyhub/ui/theme";
 import { useTheme } from "@/components/theme-provider";
+import { WEB_FONTS as F, WEB_LAYOUT } from "@/lib/fonts";
 
 const ACCENT = "#1e40af";
 
@@ -94,6 +95,22 @@ const GLASS = {
   },
 };
 
+// ── Completeness checklist ──
+const COMPLETENESS_ITEMS: { label: string; check: (d: ProfileData, avatar: string | null) => boolean }[] = [
+  { label: "Add profile photo", check: (_d, a) => a !== null },
+  { label: "Add first and last name", check: (d) => d.firstName.length > 0 && d.lastName.length > 0 },
+  { label: "Add email address", check: (d) => d.email.length > 0 },
+  { label: "Add phone number", check: (d) => d.phone.length > 0 },
+  { label: "Set department", check: (d) => d.department.length > 0 },
+  { label: "Set employee ID", check: (d) => d.employeeId.length > 0 },
+  { label: "Add date of birth", check: (d) => d.dateOfBirth.length > 0 },
+];
+
+function computeCompleteness(data: ProfileData, avatarUrl: string | null): number {
+  const done = COMPLETENESS_ITEMS.filter((item) => item.check(data, avatarUrl)).length;
+  return Math.round((done / COMPLETENESS_ITEMS.length) * 100);
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const { theme } = useTheme();
@@ -128,6 +145,9 @@ export default function ProfilePage() {
     setAvatarUrl(url);
   }, []);
 
+  const current = editing ? draft : data;
+  const profilePercent = computeCompleteness(current, avatarUrl);
+
   const startEdit = useCallback(() => {
     setDraft({ ...data });
     setEditing(true);
@@ -149,43 +169,35 @@ export default function ProfilePage() {
     setDraft((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const current = editing ? draft : data;
-
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Top bar */}
       <div className="shrink-0 px-5 py-3 flex items-center justify-between">
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-xl cursor-pointer group transition-all duration-150"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl cursor-pointer group transition-all duration-150"
           style={{
             color: palette.text,
-            background: isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.55)",
+            background: isDark ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.6)",
             backdropFilter: "blur(12px)",
             WebkitBackdropFilter: "blur(12px)",
-            border: `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)"}`,
+            border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)"}`,
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.75)";
-            e.currentTarget.style.borderColor = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)";
+            e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.8)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.55)";
-            e.currentTarget.style.borderColor = isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)";
+            e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.6)";
           }}
         >
-          <ArrowLeft
-            size={15}
-            strokeWidth={2}
-            className="transition-transform group-hover:-translate-x-0.5"
-          />
-          <span className="text-[13px] font-semibold">Settings</span>
+          <ArrowLeft size={15} strokeWidth={2} className="transition-transform group-hover:-translate-x-0.5" />
+          <span style={{ fontSize: F.min, fontWeight: 600 }}>Settings</span>
         </button>
 
         <div className="flex items-center gap-2">
           {saved && (
             <span
-              className="flex items-center gap-1 text-[12px] font-medium px-3 py-1.5 rounded-lg"
+              className="flex items-center gap-1 font-medium px-3 py-1.5 rounded-lg" style={{ fontSize: 13 }}
               style={{ color: "#166534", backgroundColor: "#dcfce7" }}
             >
               <Check size={13} strokeWidth={2.5} />
@@ -218,8 +230,8 @@ export default function ProfilePage() {
           ) : (
             <button
               onClick={startEdit}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-semibold text-white cursor-pointer transition-opacity hover:opacity-90"
-              style={{ backgroundColor: ACCENT }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl font-semibold text-white cursor-pointer transition-opacity hover:opacity-90"
+              style={{ fontSize: F.min, backgroundColor: ACCENT }}
             >
               <Edit3 size={14} strokeWidth={2} />
               Edit Profile
@@ -230,10 +242,11 @@ export default function ProfilePage() {
 
       {/* Main: left + right */}
       <div className="flex flex-1 overflow-hidden gap-4 px-4 pb-4">
-        {/* ── Left Panel ── */}
+        {/* ── Left Panel: Identity + Navigation + Activity ── */}
         <aside
-          className="w-[300px] shrink-0 flex flex-col rounded-2xl border overflow-y-auto"
+          className="shrink-0 flex flex-col rounded-2xl border overflow-y-auto"
           style={{
+            width: WEB_LAYOUT.sidebarWidth,
             background: glass.card,
             borderColor: glass.cardBorder,
             backdropFilter: glass.blur,
@@ -241,82 +254,110 @@ export default function ProfilePage() {
             boxShadow: glass.shadow,
           }}
         >
-          <div className="flex flex-col items-center pt-4 pb-5 px-4">
-            <div className="relative mb-4">
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt="Avatar"
-                  className="w-24 h-24 rounded-full object-cover"
-                />
-              ) : (
-                <div
-                  className="w-24 h-24 rounded-full flex items-center justify-center text-[28px] font-bold"
-                  style={{
-                    backgroundColor: accentTint(ACCENT, isDark ? 0.15 : 0.08),
-                    color: ACCENT,
-                  }}
-                >
-                  {current.firstName[0]}{current.lastName[0]}
-                </div>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleAvatarChange}
-              />
-              <button
-                onClick={handleAvatarClick}
-                className="absolute bottom-0 right-0 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer"
-                style={{
-                  backgroundColor: ACCENT,
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-                }}
-              >
-                <Camera size={14} color="#fff" strokeWidth={2} />
-              </button>
-            </div>
+          {/* Avatar with progress ring */}
+          <div className="flex flex-col items-center pt-6 pb-4 px-4">
+            <ProfileRing
+              percent={profilePercent}
+              accent={ACCENT}
+              isDark={isDark}
+              avatarUrl={avatarUrl}
+              initials={`${current.firstName[0]}${current.lastName[0]}`}
+              onCameraClick={handleAvatarClick}
+            />
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
             {avatarError && (
-              <p className="text-[11px] font-medium mb-1" style={{ color: "#991b1b" }}>
-                {avatarError}
-              </p>
+              <p className="font-medium mb-1" style={{ fontSize: F.min, color: "#991b1b" }}>{avatarError}</p>
             )}
-            <h2 className="text-[17px] font-bold" style={{ color: palette.text }}>
+            <h2 className="font-bold mt-3" style={{ fontSize: F.xl, color: palette.text }}>
               {current.firstName} {current.lastName}
             </h2>
-            <p className="text-[12px] mt-0.5" style={{ color: palette.textSecondary }}>
-              {current.role}
-            </p>
-            <div
-              className="mt-3 px-3 py-1 rounded-full text-[11px] font-semibold"
-              style={{ backgroundColor: "#dcfce7", color: "#166534" }}
-            >
-              {current.status}
+            <p style={{ fontSize: F.sm, color: palette.textSecondary, marginTop: 2 }}>{current.role}</p>
+            <div className="flex items-center gap-1.5 mt-2">
+              <span className="px-2.5 py-0.5 rounded-full font-semibold"
+                style={{ fontSize: 11, backgroundColor: "#dcfce7", color: "#166534" }}>
+                {current.status}
+              </span>
             </div>
           </div>
 
           <div className="mx-4" style={{ height: 0.5, backgroundColor: palette.border }} />
 
-          <div className="px-4 py-5 flex flex-col gap-4">
-            <QuickInfoRow icon={Briefcase} label="Department" value={current.department} palette={palette} />
-            <QuickInfoRow icon={Shield} label="Role" value={current.role} palette={palette} />
-            <QuickInfoRow icon={Hash} label="Employee ID" value={current.employeeId} palette={palette} />
-            <QuickInfoRow icon={Mail} label="Email" value={current.email} palette={palette} isSmall />
-            <QuickInfoRow icon={Phone} label="Phone" value={current.phone} palette={palette} />
-            <QuickInfoRow icon={MapPin} label="Location" value={current.location} palette={palette} isSmall />
+          {/* Profile completeness checklist */}
+          <div className="px-4 py-3">
+            <div className="flex items-center justify-between mb-3">
+              <p className="uppercase tracking-wider"
+                style={{ fontSize: 11, fontWeight: 600, color: palette.textTertiary }}>
+                Profile Completeness
+              </p>
+              <span style={{ fontSize: F.min, fontWeight: 700, color: ACCENT }}>
+                {profilePercent}%
+              </span>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {COMPLETENESS_ITEMS.map((item) => {
+                const done = item.check(current, avatarUrl);
+                return (
+                  <div key={item.label} className="flex items-center gap-2.5 py-1">
+                    <div
+                      className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
+                      style={{
+                        backgroundColor: done
+                          ? (isDark ? "rgba(22,163,74,0.15)" : "#dcfce7")
+                          : (isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)"),
+                      }}
+                    >
+                      {done
+                        ? <Check size={11} style={{ color: isDark ? "#4ade80" : "#16a34a" }} strokeWidth={2.5} />
+                        : <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: palette.textTertiary }} />
+                      }
+                    </div>
+                    <span style={{
+                      fontSize: F.min,
+                      fontWeight: done ? 500 : 400,
+                      color: done ? palette.text : palette.textSecondary,
+                      textDecoration: done ? "none" : "none",
+                    }}>
+                      {item.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <div className="mx-4" style={{ height: 0.5, backgroundColor: palette.border }} />
 
-          <div className="px-4 py-4 flex flex-col gap-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: palette.textTertiary }}>
-              Account
+          {/* Recent activity */}
+          <div className="px-4 py-3 flex-1">
+            <p className="uppercase tracking-wider mb-3"
+              style={{ fontSize: 11, fontWeight: 600, color: palette.textTertiary }}>
+              Recent Activity
             </p>
-            <p className="text-[12px]" style={{ color: palette.textSecondary }}>
-              Last login: {formatDateTime(current.lastLogin)}
-            </p>
+            <div className="flex flex-col gap-2.5">
+              <ActivityItem icon={Clock} text="Last login" detail="31 Mar 2026, 21:22" palette={palette} />
+              <ActivityItem icon={UserCheck} text="Profile updated" detail="28 Mar 2026" palette={palette} />
+              <ActivityItem icon={KeyRound} text="Password changed" detail="15 Mar 2026" palette={palette} />
+              <ActivityItem icon={ShieldCheck} text="2FA disabled" detail="10 Feb 2026" palette={palette} color="#b45309" />
+            </div>
+          </div>
+
+          <div className="mx-4" style={{ height: 0.5, backgroundColor: palette.border }} />
+
+          {/* Quick actions */}
+          <div className="px-4 py-3">
+            <button
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl cursor-pointer transition-colors"
+              style={{
+                fontSize: F.min, fontWeight: 600, color: palette.text,
+                backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+                border: `1px solid ${palette.border}`,
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = palette.backgroundHover}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)"}
+            >
+              <Download size={14} style={{ color: palette.textSecondary }} strokeWidth={2} />
+              Export Data
+            </button>
           </div>
         </aside>
 
@@ -423,19 +464,78 @@ function formatDateTime(iso: string): string {
 
 // ── Sub-components ──
 
-function QuickInfoRow({
-  icon: Icon, label, value, palette, isSmall,
+function ProfileRing({
+  percent, accent, isDark, avatarUrl, initials, onCameraClick,
 }: {
-  icon: typeof Mail; label: string; value: string; palette: PaletteType; isSmall?: boolean;
+  percent: number; accent: string; isDark: boolean;
+  avatarUrl: string | null; initials: string; onCameraClick: () => void;
+}) {
+  const size = 120;
+  const stroke = 4;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (percent / 100) * circumference;
+  const trackColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      {/* SVG ring */}
+      <svg width={size} height={size} className="absolute top-0 left-0" style={{ transform: "rotate(-90deg)" }}>
+        <circle cx={size / 2} cy={size / 2} r={radius}
+          fill="none" stroke={trackColor} strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={radius}
+          fill="none" stroke={accent} strokeWidth={stroke}
+          strokeDasharray={circumference} strokeDashoffset={offset}
+          strokeLinecap="round"
+          style={{ transition: "stroke-dashoffset 0.5s ease" }}
+        />
+      </svg>
+      {/* Avatar centered inside ring */}
+      <div className="absolute flex items-center justify-center"
+        style={{ top: stroke + 4, left: stroke + 4, right: stroke + 4, bottom: stroke + 4 }}
+      >
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="Avatar" className="w-full h-full rounded-full object-cover" />
+        ) : (
+          <div
+            className="w-full h-full rounded-full flex items-center justify-center"
+            style={{ backgroundColor: accentTint(accent, isDark ? 0.15 : 0.08) }}
+          >
+            <span style={{ fontSize: 32, fontWeight: 700, color: accent }}>{initials}</span>
+          </div>
+        )}
+      </div>
+      {/* Camera button */}
+      <button
+        onClick={onCameraClick}
+        className="absolute flex items-center justify-center cursor-pointer"
+        style={{
+          bottom: 2, right: 2, width: 30, height: 30, borderRadius: 15,
+          backgroundColor: accent, boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+        }}
+      >
+        <Camera size={13} color="#fff" strokeWidth={2} />
+      </button>
+    </div>
+  );
+}
+
+function ActivityItem({
+  icon: Icon, text, detail, palette, color,
+}: {
+  icon: typeof Mail; text: string; detail: string; palette: PaletteType; color?: string;
 }) {
   return (
-    <div className="flex items-center gap-2.5">
-      <Icon size={15} strokeWidth={1.6} style={{ color: palette.textTertiary }} className="shrink-0" />
-      <div className="min-w-0">
-        <p className="text-[11px] uppercase tracking-wider" style={{ color: palette.textTertiary }}>{label}</p>
-        <p className={`${isSmall ? "text-[12px]" : "text-[13px]"} font-medium truncate`} style={{ color: palette.text }}>
-          {value}
-        </p>
+    <div className="flex items-start gap-2.5">
+      <div
+        className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+        style={{ backgroundColor: accentTint(color ?? palette.textTertiary, 0.1) }}
+      >
+        <Icon size={12} style={{ color: color ?? palette.textTertiary }} strokeWidth={2} />
+      </div>
+      <div>
+        <p style={{ fontSize: F.min, fontWeight: 500, color: palette.text }}>{text}</p>
+        <p style={{ fontSize: 12, color: palette.textTertiary }}>{detail}</p>
       </div>
     </div>
   );
@@ -468,7 +568,7 @@ function GlassCard({
         >
           <Icon size={14} style={{ color: ACCENT }} strokeWidth={1.8} />
         </div>
-        <h3 className="text-[14px] font-bold" style={{ color: palette.text, letterSpacing: -0.2 }}>
+        <h3 className="font-bold" style={{ fontSize: F.lg, color: palette.text, letterSpacing: -0.2 }}>
           {title}
         </h3>
       </div>
@@ -504,7 +604,7 @@ function EditableField({
 }) {
   const inputStyle: React.CSSProperties = {
     width: "100%",
-    fontSize: 13,
+    fontSize: F.md,
     fontWeight: 500,
     color: palette.text,
     backgroundColor: glass.input,
@@ -518,8 +618,8 @@ function EditableField({
   if (!editing) {
     return (
       <div className="py-2.5" style={{ borderBottom: `0.5px solid ${palette.border}` }}>
-        <p className="text-[11px] mb-0.5" style={{ color: palette.textTertiary }}>{label}</p>
-        <p className="text-[13px] font-medium" style={{ color: palette.text }}>
+        <p style={{ fontSize: F.min, color: palette.textTertiary, marginBottom: 4 }}>{label}</p>
+        <p className="font-medium" style={{ fontSize: F.md, color: palette.text }}>
           {displayValue ?? value}
         </p>
       </div>
@@ -529,7 +629,7 @@ function EditableField({
   if (type === "select" && options) {
     return (
       <div className="py-2.5" style={{ borderBottom: `0.5px solid ${palette.border}` }}>
-        <label className="text-[11px] mb-1.5 block" style={{ color: palette.textTertiary }}>{label}</label>
+        <label className="block" style={{ fontSize: F.min, color: palette.textTertiary, marginBottom: 6 }}>{label}</label>
         <select
           value={value}
           onChange={(e) => onChange(fieldKey, e.target.value)}
@@ -561,7 +661,7 @@ function EditableField({
 
   return (
     <div className="py-2.5" style={{ borderBottom: `0.5px solid ${palette.border}` }}>
-      <label className="text-[11px] mb-1.5 block" style={{ color: palette.textTertiary }}>{label}</label>
+      <label className="block" style={{ fontSize: F.min, color: palette.textTertiary, marginBottom: 6 }}>{label}</label>
       <input
         type={type}
         value={type === "date" ? value : value}

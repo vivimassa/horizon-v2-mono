@@ -1,8 +1,9 @@
 import React, { memo } from 'react'
-import { View, Text, FlatList, useColorScheme } from 'react-native'
+import { View, Text, FlatList, Image } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react-native'
-import { colors, getStatusColors, type StatusKey, type Palette } from '@skyhub/ui/theme'
+import { getStatusColors, type StatusKey, type Palette } from '@skyhub/ui/theme'
+import { useAppTheme } from '../../providers/ThemeProvider'
 
 const ACCENT = '#1e40af'
 
@@ -85,9 +86,7 @@ const FlightRow = memo(function FlightRow({
 })
 
 export default function HomeScreen() {
-  const colorScheme = useColorScheme()
-  const isDark = colorScheme === 'dark'
-  const palette = isDark ? colors.dark : colors.light
+  const { isDark, palette } = useAppTheme()
 
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
@@ -95,11 +94,18 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
-      <View className="px-4 pt-3 pb-2">
-        <Text className="text-[20px] font-semibold" style={{ color: palette.text }}>Home</Text>
-        <Text className="text-[12px]" style={{ color: palette.textSecondary }}>
-          {today} {'\u2022'} Sky Hub
-        </Text>
+      <View className="flex-row items-center justify-between px-4 pt-3 pb-2">
+        <View>
+          <Text className="text-[20px] font-semibold" style={{ color: palette.text }}>Home</Text>
+          <Text className="text-[12px]" style={{ color: palette.textSecondary }}>
+            {today} {'\u2022'} Sky Hub
+          </Text>
+        </View>
+        <Image
+          source={require('../../assets/skyhub-logo.png')}
+          style={{ width: 150, height: 40, opacity: isDark ? 0.85 : 0.9, marginRight: -30, tintColor: isDark ? '#ffffff' : undefined }}
+          resizeMode="contain"
+        />
       </View>
 
       <FlatList

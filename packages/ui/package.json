@@ -5,7 +5,10 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./theme": "./src/theme/web-safe.ts",
+    "./demo": "./src/demo/DesignSystemDemo.tsx",
+    "./navigation": "./src/navigation/web-safe.ts"
   },
   "scripts": {
     "build": "tsc",
@@ -13,12 +16,17 @@
     "lint": "echo 'no linter configured yet'"
   },
   "dependencies": {
+    "@gluestack-ui/nativewind-utils": "^1.0.28",
     "@skyhub/types": "*",
+    "lucide-react-native": "^1.7.0",
     "react": "19.1.0",
-    "react-native": "0.81.5"
+    "react-native": "0.81.5",
+    "react-native-svg": "^15.15.4",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@types/react": "^19.2.14",
+    "nativewind": "^4.2.3",
     "typescript": "~5.7.0"
   }
 }

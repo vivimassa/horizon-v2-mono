@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
-import { Dock } from "@/components/dock";
-import { Breadcrumbs } from "@/components/breadcrumbs";
+import { SpotlightDock } from "@/components/SpotlightDock";
+import { Breadcrumb } from "@/components/Breadcrumb";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AnimatedBodyBg } from "@/components/AnimatedBodyBg";
 
-const geist = Geist({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Sky Hub",
@@ -18,12 +19,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={geist.className} suppressHydrationWarning>
+    <html lang="en" className={inter.className} suppressHydrationWarning>
       <body className="flex flex-col h-screen bg-hz-bg text-hz-text">
         <ThemeProvider>
-          <Breadcrumbs />
-          <main className="flex-1 overflow-y-auto pb-20">{children}</main>
-          <Dock />
+          <AnimatedBodyBg />
+          <Breadcrumb />
+          <main className="flex-1 overflow-y-auto pb-22">{children}</main>
+          <SpotlightDock />
         </ThemeProvider>
       </body>
     </html>

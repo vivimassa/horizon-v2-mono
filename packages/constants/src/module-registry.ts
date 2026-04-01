@@ -6,7 +6,7 @@ export interface ModuleEntry {
   route: string
   parent_code: string | null
   /** Top-level module key for theming */
-  module: 'network' | 'operations' | 'ground' | 'workforce' | 'integration' | 'admin'
+  module: 'home' | 'network' | 'operations' | 'ground' | 'workforce' | 'integration' | 'admin' | 'settings'
   level: number
 }
 
@@ -18,6 +18,11 @@ export interface ModuleEntry {
  *   x.y.z Leaf items
  */
 export const MODULE_REGISTRY: ModuleEntry[] = [
+  // ──────────────────────────────────────────────
+  // 0. HOME
+  // ──────────────────────────────────────────────
+  { code: '0', name: 'Home', description: 'Dashboard with KPIs and daily overview', icon: 'Home', route: '/', parent_code: null, module: 'home', level: 0 },
+
   // ──────────────────────────────────────────────
   // 1. NETWORK
   // ──────────────────────────────────────────────
@@ -56,41 +61,41 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
   // ──────────────────────────────────────────────
   // 2. OPERATIONS
   // ──────────────────────────────────────────────
-  { code: '2', name: 'Operations', description: 'Flight operations, scheduling, and dispatch', icon: 'Plane', route: '/operations', parent_code: null, module: 'operations', level: 0 },
+  { code: '2', name: 'Flight Ops', description: 'Flight operations, scheduling, and dispatch', icon: 'Plane', route: '/flight-ops', parent_code: null, module: 'operations', level: 0 },
 
   // 2.1 Control
-  { code: '2.1', name: 'Control', description: 'Operations control panel', icon: 'Settings', route: '/operations/control', parent_code: '2', module: 'operations', level: 1 },
-  { code: '2.1.1', name: 'Movement Control', description: 'Real-time aircraft movement tracking and operational decision support', icon: 'Radar', route: '/operations/control/movement-control', parent_code: '2.1', module: 'operations', level: 2 },
-  { code: '2.1.2', name: 'Aircraft Maintenance', description: 'Aircraft maintenance tracking and scheduling', icon: 'Wrench', route: '/operations/control/aircraft-maintenance', parent_code: '2.1', module: 'operations', level: 2 },
-  { code: '2.1.3', name: 'World Map', description: 'Global flight tracking on an interactive world map', icon: 'Globe', route: '/operations/control/world-map', parent_code: '2.1', module: 'operations', level: 2 },
-  { code: '2.1.4', name: 'Movement Messages', description: 'Monitor and reprocess incoming ACARS events and MVT/LDM messages', icon: 'Radio', route: '/operations/control/movement-messages', parent_code: '2.1', module: 'operations', level: 2 },
-  { code: '2.1.5', name: 'Disruption Center', description: 'Predictive disruption management with live IROPS alerts', icon: 'ShieldAlert', route: '/operations/control/disruption-center', parent_code: '2.1', module: 'operations', level: 2 },
-  { code: '2.1.6', name: 'OCC Dashboard', description: 'Operations control centre overview', icon: 'LayoutDashboard', route: '/operations/control/occ-dashboard', parent_code: '2.1', module: 'operations', level: 2 },
+  { code: '2.1', name: 'Control', description: 'Operations control panel', icon: 'Settings', route: '/flight-ops/control', parent_code: '2', module: 'operations', level: 1 },
+  { code: '2.1.1', name: 'Movement Control', description: 'Real-time aircraft movement tracking and operational decision support', icon: 'Radar', route: '/flight-ops/control/movement-control', parent_code: '2.1', module: 'operations', level: 2 },
+  { code: '2.1.2', name: 'Aircraft Maintenance', description: 'Aircraft maintenance tracking and scheduling', icon: 'Wrench', route: '/flight-ops/control/aircraft-maintenance', parent_code: '2.1', module: 'operations', level: 2 },
+  { code: '2.1.3', name: 'World Map', description: 'Global flight tracking on an interactive world map', icon: 'Globe', route: '/flight-ops/control/world-map', parent_code: '2.1', module: 'operations', level: 2 },
+  { code: '2.1.4', name: 'Movement Messages', description: 'Monitor and reprocess incoming ACARS events and MVT/LDM messages', icon: 'Radio', route: '/flight-ops/control/movement-messages', parent_code: '2.1', module: 'operations', level: 2 },
+  { code: '2.1.5', name: 'Disruption Center', description: 'Predictive disruption management with live IROPS alerts', icon: 'ShieldAlert', route: '/flight-ops/control/disruption-center', parent_code: '2.1', module: 'operations', level: 2 },
+  { code: '2.1.6', name: 'OCC Dashboard', description: 'Operations control centre overview', icon: 'LayoutDashboard', route: '/flight-ops/control/occ-dashboard', parent_code: '2.1', module: 'operations', level: 2 },
 
   // 2.3 Reports
-  { code: '2.3', name: 'Reports', description: 'Operations reports and analytics', icon: 'FileText', route: '/operations/reports', parent_code: '2', module: 'operations', level: 1 },
-  { code: '2.3.1', name: 'OTP Report', description: 'On-time performance analysis', icon: 'Clock', route: '/operations/reports/otp-report', parent_code: '2.3', module: 'operations', level: 2 },
-  { code: '2.3.2', name: 'Delay Analysis', description: 'Delay statistics and trends', icon: 'BarChart3', route: '/operations/reports/delay-analysis', parent_code: '2.3', module: 'operations', level: 2 },
+  { code: '2.3', name: 'Reports', description: 'Operations reports and analytics', icon: 'FileText', route: '/flight-ops/reports', parent_code: '2', module: 'operations', level: 1 },
+  { code: '2.3.1', name: 'OTP Report', description: 'On-time performance analysis', icon: 'Clock', route: '/flight-ops/reports/otp-report', parent_code: '2.3', module: 'operations', level: 2 },
+  { code: '2.3.2', name: 'Delay Analysis', description: 'Delay statistics and trends', icon: 'BarChart3', route: '/flight-ops/reports/delay-analysis', parent_code: '2.3', module: 'operations', level: 2 },
 
   // ──────────────────────────────────────────────
   // 3. WORKFORCE
   // ──────────────────────────────────────────────
-  { code: '3', name: 'Workforce', description: 'Crew management, rostering, and personnel', icon: 'Users', route: '/workforce', parent_code: null, module: 'workforce', level: 0 },
+  { code: '3', name: 'Crew Ops', description: 'Crew management, rostering, and personnel', icon: 'Users', route: '/crew-ops', parent_code: null, module: 'workforce', level: 0 },
 
   // 3.1 Control
-  { code: '3.1', name: 'Control', description: 'Workforce control panel', icon: 'Settings', route: '/workforce/control', parent_code: '3', module: 'workforce', level: 1 },
-  { code: '3.1.1', name: 'Crew Profile', description: 'Browse and manage crew member profiles and qualifications', icon: 'UserCircle', route: '/workforce/control/crew-profile', parent_code: '3.1', module: 'workforce', level: 2 },
-  { code: '3.1.2', name: 'Crew Documents', description: 'Crew compliance documents, licences, and certificates', icon: 'FileText', route: '/workforce/control/documents', parent_code: '3.1', module: 'workforce', level: 2 },
-  { code: '3.1.3', name: 'Crew Availability', description: 'Track crew availability, leave, and off-duty periods', icon: 'CalendarCheck', route: '/workforce/control/availability', parent_code: '3.1', module: 'workforce', level: 2 },
-  { code: '3.1.4', name: 'Manpower Planning', description: 'Forecast crew requirements against operational demand', icon: 'Users', route: '/workforce/control/manpower-planning', parent_code: '3.1', module: 'workforce', level: 2 },
-  { code: '3.1.5', name: 'Crew Pairing', description: 'Build and optimize crew pairings aligned with FDTL limits', icon: 'GitMerge', route: '/workforce/control/pairing', parent_code: '3.1', module: 'workforce', level: 2 },
-  { code: '3.1.6', name: 'Crew Schedule', description: 'Interactive Gantt-based crew schedule with drag-and-drop assignment', icon: 'CalendarDays', route: '/workforce/control/crew-schedule', parent_code: '3.1', module: 'workforce', level: 2 },
-  { code: '3.1.7', name: 'Crew Tracking', description: 'Real-time crew tracking with list, Gantt, and map views', icon: 'Activity', route: '/workforce/control/tracking', parent_code: '3.1', module: 'workforce', level: 2 },
+  { code: '3.1', name: 'Control', description: 'Workforce control panel', icon: 'Settings', route: '/crew-ops/control', parent_code: '3', module: 'workforce', level: 1 },
+  { code: '3.1.1', name: 'Crew Profile', description: 'Browse and manage crew member profiles and qualifications', icon: 'UserCircle', route: '/crew-ops/control/crew-profile', parent_code: '3.1', module: 'workforce', level: 2 },
+  { code: '3.1.2', name: 'Crew Documents', description: 'Crew compliance documents, licences, and certificates', icon: 'FileText', route: '/crew-ops/control/documents', parent_code: '3.1', module: 'workforce', level: 2 },
+  { code: '3.1.3', name: 'Crew Availability', description: 'Track crew availability, leave, and off-duty periods', icon: 'CalendarCheck', route: '/crew-ops/control/availability', parent_code: '3.1', module: 'workforce', level: 2 },
+  { code: '3.1.4', name: 'Manpower Planning', description: 'Forecast crew requirements against operational demand', icon: 'Users', route: '/crew-ops/control/manpower-planning', parent_code: '3.1', module: 'workforce', level: 2 },
+  { code: '3.1.5', name: 'Crew Pairing', description: 'Build and optimize crew pairings aligned with FDTL limits', icon: 'GitMerge', route: '/crew-ops/control/pairing', parent_code: '3.1', module: 'workforce', level: 2 },
+  { code: '3.1.6', name: 'Crew Schedule', description: 'Interactive Gantt-based crew schedule with drag-and-drop assignment', icon: 'CalendarDays', route: '/crew-ops/control/crew-schedule', parent_code: '3.1', module: 'workforce', level: 2 },
+  { code: '3.1.7', name: 'Crew Tracking', description: 'Real-time crew tracking with list, Gantt, and map views', icon: 'Activity', route: '/crew-ops/control/tracking', parent_code: '3.1', module: 'workforce', level: 2 },
 
   // 3.3 Reports
-  { code: '3.3', name: 'Reports', description: 'Workforce reports and analytics', icon: 'FileText', route: '/workforce/reports', parent_code: '3', module: 'workforce', level: 1 },
-  { code: '3.3.1', name: 'FDTL Report', description: 'Flight duty time analysis', icon: 'Clock', route: '/workforce/reports/fdtl-report', parent_code: '3.3', module: 'workforce', level: 2 },
-  { code: '3.3.2', name: 'Roster Summary', description: 'Roster coverage and statistics', icon: 'BarChart3', route: '/workforce/reports/roster-summary', parent_code: '3.3', module: 'workforce', level: 2 },
+  { code: '3.3', name: 'Reports', description: 'Workforce reports and analytics', icon: 'FileText', route: '/crew-ops/reports', parent_code: '3', module: 'workforce', level: 1 },
+  { code: '3.3.1', name: 'FDTL Report', description: 'Flight duty time analysis', icon: 'Clock', route: '/crew-ops/reports/fdtl-report', parent_code: '3.3', module: 'workforce', level: 2 },
+  { code: '3.3.2', name: 'Roster Summary', description: 'Roster coverage and statistics', icon: 'BarChart3', route: '/crew-ops/reports/roster-summary', parent_code: '3.3', module: 'workforce', level: 2 },
 
   // ──────────────────────────────────────────────
   // 4. ADMIN
@@ -121,12 +126,17 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
   // ──────────────────────────────────────────────
   // 5. GROUND
   // ──────────────────────────────────────────────
-  { code: '5', name: 'Ground', description: 'Ground handling and airport operations', icon: 'Warehouse', route: '/ground', parent_code: null, module: 'ground', level: 0 },
+  { code: '5', name: 'Ground Ops', description: 'Ground handling and airport operations', icon: 'Truck', route: '/ground-ops', parent_code: null, module: 'ground', level: 0 },
 
   // ──────────────────────────────────────────────
   // 6. INTEGRATION
   // ──────────────────────────────────────────────
   { code: '6', name: 'Integration', description: 'External system integrations and data exchange', icon: 'ArrowLeftRight', route: '/integration', parent_code: null, module: 'integration', level: 0 },
+
+  // ──────────────────────────────────────────────
+  // 7. SETTINGS
+  // ──────────────────────────────────────────────
+  { code: '7', name: 'Settings', description: 'User account and system administration', icon: 'Settings', route: '/settings', parent_code: null, module: 'settings', level: 0 },
 ]
 
 // ─── Index maps for fast lookup ────────────────
@@ -198,10 +208,12 @@ export function getTopLevelModules(): ModuleEntry[] {
 
 /** Module theme colors for dynamic theming */
 export const MODULE_THEMES: Record<string, { accent: string; bg: string; bgSubtle: string }> = {
+  home:        { accent: '#1e40af', bg: '#dbeafe', bgSubtle: '#eff6ff' },
   network:     { accent: '#2563eb', bg: '#dbeafe', bgSubtle: '#eff6ff' },
   operations:  { accent: '#4f46e5', bg: '#e0e7ff', bgSubtle: '#eef2ff' },
   ground:      { accent: '#059669', bg: '#d1fae5', bgSubtle: '#ecfdf5' },
   workforce:   { accent: '#7c3aed', bg: '#ede9fe', bgSubtle: '#f5f3ff' },
   integration: { accent: '#0891b2', bg: '#cffafe', bgSubtle: '#ecfeff' },
   admin:       { accent: '#64748b', bg: '#e2e8f0', bgSubtle: '#f8fafc' },
+  settings:    { accent: '#64748b', bg: '#e2e8f0', bgSubtle: '#f8fafc' },
 }

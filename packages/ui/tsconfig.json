@@ -17,6 +17,6 @@
     "outDir": "./dist",
     "rootDir": "."
   },
-  "include": ["src"],
+  "include": ["src", "nativewind-env.d.ts"],
   "references": [{ "path": "../types" }]
 }

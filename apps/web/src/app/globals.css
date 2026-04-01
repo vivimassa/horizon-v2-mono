@@ -1,9 +1,9 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-hz-bg: #ffffff;
-  --color-hz-card: #f5f5f5;
-  --color-hz-border: #e8e8e8;
+  --color-hz-bg: transparent;
+  --color-hz-card: rgba(245,245,245,0.75);
+  --color-hz-border: rgba(232,232,232,0.60);
   --color-hz-text: #111111;
   --color-hz-text-secondary: #6b7280;
   --color-hz-accent: #1e40af;
@@ -30,9 +30,9 @@
 
 /* Dark mode overrides */
 .dark {
-  --color-hz-bg: #1a1a1a;
-  --color-hz-card: #252525;
-  --color-hz-border: rgba(255, 255, 255, 0.10);
+  --color-hz-bg: transparent;
+  --color-hz-card: rgba(37,37,37,0.75);
+  --color-hz-border: rgba(255, 255, 255, 0.08);
   --color-hz-text: #f5f5f5;
   --color-hz-text-secondary: #9ca3af;
   --color-hz-accent-light: rgba(30, 64, 175, 0.20);
@@ -43,6 +43,73 @@
   --color-hz-departed-bg: rgba(37, 99, 235, 0.15);
   --color-hz-diverted-bg: rgba(124, 58, 237, 0.15);
   --color-hz-scheduled-bg: rgba(107, 114, 128, 0.12);
+}
+
+/* ═══ ANIMATED BACKGROUND — oklch hue rotation ═══ */
+
+@property --anim-hue1 {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@property --anim-hue2 {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.anim-bg {
+  --anim-l1: 0.970;
+  --anim-c1: 0.025;
+  --anim-l2: 0.960;
+  --anim-c2: 0.035;
+  background:
+    linear-gradient(
+      135deg,
+      oklch(var(--anim-l1) var(--anim-c1) var(--anim-hue1)),
+      oklch(var(--anim-l2) var(--anim-c2) var(--anim-hue2))
+    ),
+    linear-gradient(
+      315deg,
+      oklch(var(--anim-l2) var(--anim-c2) var(--anim-hue2) / 50%),
+      oklch(var(--anim-l1) var(--anim-c1) var(--anim-hue1) / 50%)
+    );
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.dark .anim-bg {
+  --anim-l1: 0.180;
+  --anim-c1: 0.045;
+  --anim-l2: 0.140;
+  --anim-c2: 0.055;
+}
+
+.anim-bg-aurora { animation-name: anim-aurora; animation-duration: 5s; }
+@keyframes anim-aurora {
+  0%   { --anim-hue1: 200deg; --anim-hue2: 260deg; }
+  50%  { --anim-hue1: 260deg; --anim-hue2: 320deg; }
+  100% { --anim-hue1: 200deg; --anim-hue2: 260deg; }
+}
+
+.anim-bg-ember { animation-name: anim-ember; animation-duration: 6s; }
+@keyframes anim-ember {
+  0%   { --anim-hue1: 10deg;  --anim-hue2: 40deg; }
+  50%  { --anim-hue1: 40deg;  --anim-hue2: 65deg; }
+  100% { --anim-hue1: 10deg;  --anim-hue2: 40deg; }
+}
+
+.anim-bg-lagoon { animation-name: anim-lagoon; animation-duration: 7s; }
+@keyframes anim-lagoon {
+  0%   { --anim-hue1: 170deg; --anim-hue2: 210deg; }
+  50%  { --anim-hue1: 210deg; --anim-hue2: 245deg; }
+  100% { --anim-hue1: 170deg; --anim-hue2: 210deg; }
+}
+
+.anim-bg-prism { animation-name: anim-prism; animation-duration: 6s; }
+@keyframes anim-prism {
+  0%   { --anim-hue1: 0deg;   --anim-hue2: 180deg; }
+  100% { --anim-hue1: 360deg; --anim-hue2: 540deg; }
 }
 
 html {

@@ -12,7 +12,7 @@ export function Breadcrumbs() {
   if (chain.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-1.5 px-6 py-3 text-[13px] bg-module-bg-subtle min-h-[44px]">
+    <div className="flex items-center gap-1.5 px-6 py-3 text-[13px] min-h-[44px]">
       {chain.map((entry, i) => {
         const isLast = i === chain.length - 1;
         return (

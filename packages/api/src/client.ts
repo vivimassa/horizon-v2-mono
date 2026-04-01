@@ -250,4 +250,122 @@ export const api = {
 
   // Health
   health: () => request<{ status: string }>('/health'),
+
+  // ─── User / Settings ─────────────────────────────────────
+  getMe: (userId = 'skyhub-admin-001') =>
+    request<UserData>(`/users/me?userId=${userId}`),
+
+  updateProfile: (data: Partial<UserProfile>, userId = 'skyhub-admin-001') =>
+    request<{ success: boolean; profile: UserProfile }>(`/users/me/profile?userId=${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  updateSecurity: (data: Record<string, any>, userId = 'skyhub-admin-001') =>
+    request<{ success: boolean; security: UserSecurity }>(`/users/me/security?userId=${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  updatePreferences: (data: Partial<UserPreferences>, userId = 'skyhub-admin-001') =>
+    request<{ success: boolean; preferences: UserPreferences }>(`/users/me/preferences?userId=${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  updateNotifications: (data: Record<string, any>, userId = 'skyhub-admin-001') =>
+    request<{ success: boolean; notifications: UserNotifications }>(`/users/me/notifications?userId=${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  updateDisplay: (data: Record<string, any>, userId = 'skyhub-admin-001') =>
+    request<{ success: boolean; display: UserDisplay }>(`/users/me/display?userId=${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  revokeSession: (index: number, userId = 'skyhub-admin-001') =>
+    request<{ success: boolean }>(`/users/me/sessions/${index}?userId=${userId}`, {
+      method: 'DELETE',
+    }),
+}
+
+// ─── User types ──────────────────────────────────────────
+
+export interface UserProfile {
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  officePhone: string
+  dateOfBirth: string
+  gender: string
+  department: string
+  employeeId: string
+  avatarUrl: string
+  location: string
+}
+
+export interface UserSecurity {
+  twoFactorEnabled: boolean
+  biometricEnabled: boolean
+  lastPasswordChange: string
+  sessions: Array<{
+    device: string
+    browser: string
+    location: string
+    lastActive: string
+    isCurrent: boolean
+  }>
+}
+
+export interface UserPreferences {
+  language: string
+  timezone: string
+  dateFormat: string
+  timeFormat: string
+  units: string
+  numberFormat: string
+}
+
+export interface UserNotifications {
+  pushEnabled: boolean
+  emailEnabled: boolean
+  inAppEnabled: boolean
+  emailDigest: string
+  quietHoursStart: string
+  quietHoursEnd: string
+  categories: {
+    flightUpdates: boolean
+    crewChanges: boolean
+    systemAlerts: boolean
+    maintenance: boolean
+    reports: boolean
+  }
+}
+
+export interface UserDisplay {
+  textScale: string
+  contrast: number
+  brightness: number
+  accentColor: string
+  dynamicBackground: boolean
+  backgroundPreset: string
+  colorMode: string
+}
+
+export interface UserData {
+  _id: string
+  operatorId: string
+  profile: UserProfile
+  security: UserSecurity
+  preferences: UserPreferences
+  notifications: UserNotifications
+  display: UserDisplay
+  role: string
+  isActive: boolean
+  lastLoginUtc: string
+  createdAt: string
+  updatedAt: string
 }

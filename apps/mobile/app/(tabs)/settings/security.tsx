@@ -11,7 +11,9 @@ import {
   type LucideIcon,
 } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
+import { api } from '@skyhub/api'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { useUser } from '../../../providers/UserProvider'
 
 const ACCENT = '#1e40af'
 
@@ -31,12 +33,21 @@ const MOCK_ACTIVITY = [
 export default function SecurityScreen() {
   const router = useRouter()
   const { isDark, palette, isTablet, fonts } = useAppTheme()
+  const { user, refetch } = useUser()
 
   const [showCurrent, setShowCurrent] = useState(false)
   const [showNew, setShowNew] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [twoFactor, setTwoFactor] = useState(false)
   const [biometric, setBiometric] = useState(false)
+
+  // Sync from API
+  React.useEffect(() => {
+    if (user) {
+      setTwoFactor(user.security.twoFactorEnabled)
+      setBiometric(user.security.biometricEnabled)
+    }
+  }, [user])
   const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
@@ -79,14 +90,14 @@ export default function SecurityScreen() {
       <AuthToggleCard icon={ShieldCheck}
         title={twoFactor ? '2FA Enabled' : '2FA Disabled'}
         subtitle={twoFactor ? 'Your account is protected' : 'Add an extra layer of security'}
-        on={twoFactor} onToggle={() => setTwoFactor(!twoFactor)}
+        on={twoFactor} onToggle={async () => { const next = !twoFactor; setTwoFactor(next); await api.updateSecurity({ twoFactorEnabled: next }); refetch() }}
         color={twoFactor ? (isDark ? '#4ade80' : '#16a34a') : (isDark ? '#fbbf24' : '#b45309')}
         palette={palette} isDark={isDark} fonts={fonts} />
 
       <AuthToggleCard icon={ScanFace}
         title={biometric ? 'Biometric Enabled' : 'Biometric Disabled'}
         subtitle={biometric ? 'Face ID or fingerprint active' : 'Use Face ID or fingerprint to sign in'}
-        on={biometric} onToggle={() => setBiometric(!biometric)}
+        on={biometric} onToggle={async () => { const next = !biometric; setBiometric(next); await api.updateSecurity({ biometricEnabled: next }); refetch() }}
         color={biometric ? ACCENT : palette.textSecondary}
         palette={palette} isDark={isDark} fonts={fonts} />
     </>

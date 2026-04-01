@@ -2,6 +2,7 @@ import '../global.css'
 import { Slot } from 'expo-router'
 import { View } from 'react-native'
 import { ThemeProvider, useAppTheme } from '../providers/ThemeProvider'
+import { UserProvider } from '../providers/UserProvider'
 
 function ThemedRoot() {
   const { isDark } = useAppTheme()
@@ -15,7 +16,9 @@ function ThemedRoot() {
 export default function Layout() {
   return (
     <ThemeProvider>
-      <ThemedRoot />
+      <UserProvider>
+        <ThemedRoot />
+      </UserProvider>
     </ThemeProvider>
   )
 }

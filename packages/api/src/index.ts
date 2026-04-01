@@ -11,4 +11,10 @@ export type {
   FlightServiceTypeRef,
   OperatorRef,
   ReferenceStats,
+  UserData,
+  UserProfile,
+  UserSecurity,
+  UserPreferences,
+  UserNotifications,
+  UserDisplay,
 } from './client'

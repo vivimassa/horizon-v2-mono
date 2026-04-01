@@ -10,7 +10,9 @@ import {
   type LucideIcon,
 } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
+import { api } from '@skyhub/api'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { useUser } from '../../../providers/UserProvider'
 
 const ACCENT = '#1e40af'
 
@@ -82,10 +84,28 @@ const INITIAL: Prefs = {
 export default function PreferencesScreen() {
   const router = useRouter()
   const { isDark, palette, isTablet, fonts } = useAppTheme()
+  const { user, refetch } = useUser()
 
   const [prefs, setPrefs] = useState<Prefs>(INITIAL)
+  const [savedPrefs, setSavedPrefs] = useState<Prefs>(INITIAL)
   const [saved, setSaved] = useState(false)
   const [expandedPicker, setExpandedPicker] = useState<string | null>(null)
+
+  // Sync from API
+  React.useEffect(() => {
+    if (user?.preferences) {
+      const fromApi: Prefs = {
+        language: user.preferences.language,
+        timezone: user.preferences.timezone,
+        dateFormat: user.preferences.dateFormat,
+        timeFormat: user.preferences.timeFormat,
+        units: user.preferences.units,
+        numberFormat: user.preferences.numberFormat,
+      }
+      setPrefs(fromApi)
+      setSavedPrefs(fromApi)
+    }
+  }, [user])
 
   const update = (key: keyof Prefs, value: string) => {
     setPrefs((p) => ({ ...p, [key]: value }))
@@ -93,13 +113,20 @@ export default function PreferencesScreen() {
     setExpandedPicker(null)
   }
 
-  const handleSave = useCallback(() => {
-    setSaved(true)
-    Alert.alert('Saved', 'Preferences updated successfully.')
-    setTimeout(() => setSaved(false), 2000)
-  }, [])
+  const handleSave = useCallback(async () => {
+    try {
+      await api.updatePreferences(prefs)
+      setSavedPrefs({ ...prefs })
+      setSaved(true)
+      Alert.alert('Saved', 'Preferences updated successfully.')
+      setTimeout(() => setSaved(false), 2000)
+      refetch()
+    } catch (err) {
+      Alert.alert('Error', 'Failed to save preferences.')
+    }
+  }, [prefs, refetch])
 
-  const hasChanges = JSON.stringify(prefs) !== JSON.stringify(INITIAL)
+  const hasChanges = JSON.stringify(prefs) !== JSON.stringify(savedPrefs)
 
   const currentLang = LANGUAGES.find((l) => l.value === prefs.language)?.label ?? prefs.language
   const currentTz = TIMEZONES.find((t) => t.value === prefs.timezone)?.label ?? prefs.timezone

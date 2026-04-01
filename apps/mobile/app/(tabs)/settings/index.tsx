@@ -1,11 +1,12 @@
 import React, { useState, memo, useRef, useCallback } from 'react'
 import {
-  View, Text, Pressable, ScrollView,
-  useWindowDimensions, Modal,
+  View, Text, Pressable, ScrollView, Image,
+  useWindowDimensions, Modal, Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
+import * as ImagePicker from 'expo-image-picker'
 import {
   Camera, Mail, Palette as PaletteIcon, Bell, Moon, Sun,
   UserCircle, Lock, SlidersHorizontal, Check,
@@ -15,42 +16,56 @@ import {
 } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { useUser } from '../../../providers/UserProvider'
 
 const ACCENT_DEFAULT = '#1e40af'
 const TABLET_WIDTH = 768
 
 const ACCENT_PRESETS = [
-  { name: 'Blue', hex: '#1e40af' },
-  { name: 'Teal', hex: '#0f766e' },
-  { name: 'Violet', hex: '#7c3aed' },
-  { name: 'Maroon', hex: '#991b1b' },
-  { name: 'Amber', hex: '#b45309' },
   { name: 'Green', hex: '#15803d' },
-  { name: 'Sky', hex: '#0369a1' },
-  { name: 'Pink', hex: '#be185d' },
+  { name: 'Blue', hex: '#1e40af' },
+  { name: 'Violet', hex: '#7c3aed' },
+  { name: 'Teal', hex: '#0f766e' },
+  { name: 'Amber', hex: '#b45309' },
 ]
-
-const mockUser = {
-  name: 'Nguyen Van A',
-  initials: 'NV',
-  email: 'nguyen.a@skyhub.aero',
-  isActive: true,
-  isAdmin: true,
-  department: 'OCC',
-  office: 'SGN',
-  profileComplete: true,
-  twoFactorEnabled: false,
-  unreadNotifications: 2,
-}
 
 export default function SettingsScreen() {
   const router = useRouter()
   const { isDark, palette, accent, toggleDark, setAccent } = useAppTheme()
+  const { user } = useUser()
   const { width } = useWindowDimensions()
+
+  // Computed from API user
+  const userName = user ? `${user.profile.firstName} ${user.profile.lastName}` : ''
+  const userInitials = user ? `${user.profile.firstName[0]}${user.profile.lastName[0]}` : ''
+  const userEmail = user?.profile.email ?? ''
+  const isActive = user?.isActive ?? true
+  const isAdmin = user?.role === 'administrator' || user?.role === 'manager'
+  const userDepartment = user?.profile.department ?? ''
+  const userOffice = user?.profile.location?.split('—')[0]?.trim() ?? ''
+  const unreadNotifications = 2 // hardcoded until notifications wired
   const isTablet = width >= TABLET_WIDTH
 
   const [dynamicBg, setDynamicBg] = useState(true)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [avatarUri, setAvatarUri] = useState<string | null>(null)
+
+  const pickAvatar = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please allow photo access to change your avatar.')
+      return
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    })
+    if (!result.canceled && result.assets[0]) {
+      setAvatarUri(result.assets[0].uri)
+    }
+  }, [])
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
@@ -77,13 +92,20 @@ export default function SettingsScreen() {
         >
           <View className="flex-row items-center">
             {/* Avatar */}
-            <Pressable className="relative mr-4 active:opacity-70" onPress={() => console.log('TODO: avatar picker')}>
-              <View
-                className="w-14 h-14 rounded-2xl items-center justify-center"
-                style={{ backgroundColor: accent }}
-              >
-                <Text style={{ color: '#fff', fontSize: 22, fontWeight: '700' }}>{mockUser.initials}</Text>
-              </View>
+            <Pressable className="relative mr-4 active:opacity-70" onPress={pickAvatar}>
+              {avatarUri ? (
+                <Image
+                  source={{ uri: avatarUri }}
+                  className="w-14 h-14 rounded-2xl"
+                />
+              ) : (
+                <View
+                  className="w-14 h-14 rounded-2xl items-center justify-center"
+                  style={{ backgroundColor: accent }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 22, fontWeight: '700' }}>{userInitials}</Text>
+                </View>
+              )}
               <View
                 className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full items-center justify-center"
                 style={{ backgroundColor: palette.card, borderWidth: 2, borderColor: isDark ? '#1a1a1a' : '#f5f5f5' }}
@@ -94,18 +116,18 @@ export default function SettingsScreen() {
 
             {/* Info */}
             <View className="flex-1">
-              <Text style={{ fontSize: 19, fontWeight: '600', color: palette.text }}>{mockUser.name}</Text>
+              <Text style={{ fontSize: 19, fontWeight: '600', color: palette.text }}>{userName}</Text>
               <View className="flex-row items-center mt-0.5" style={{ gap: 4 }}>
                 <Mail size={12} color={palette.textSecondary} strokeWidth={1.8} />
-                <Text style={{ fontSize: 13, color: palette.textSecondary }} numberOfLines={1}>{mockUser.email}</Text>
+                <Text style={{ fontSize: 13, color: palette.textSecondary }} numberOfLines={1}>{userEmail}</Text>
               </View>
               <View className="flex-row mt-1.5" style={{ gap: 6 }}>
-                {mockUser.isActive && (
+                {isActive && (
                   <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7' }}>
                     <Text style={{ fontSize: 11, fontWeight: '600', color: isDark ? '#4ade80' : '#166534' }}>Active</Text>
                   </View>
                 )}
-                {mockUser.isAdmin && (
+                {isAdmin && (
                   <View className="px-2 py-0.5 rounded-full" style={{ backgroundColor: accentTint(accent, isDark ? 0.15 : 0.08) }}>
                     <Text style={{ fontSize: 11, fontWeight: '600', color: isDark ? '#60a5fa' : accent }}>Administrator</Text>
                   </View>
@@ -117,12 +139,12 @@ export default function SettingsScreen() {
             {isTablet && (
               <View className="flex-row items-center" style={{ gap: 20 }}>
                 <View className="items-center">
-                  <Text style={{ fontSize: 16, fontWeight: '700', color: accent }}>{mockUser.department}</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: accent }}>{userDepartment}</Text>
                   <Text style={{ fontSize: 10, fontWeight: '500', color: palette.textSecondary }}>Dept</Text>
                 </View>
                 <View style={{ width: 1, height: 32, backgroundColor: palette.border }} />
                 <View className="items-center">
-                  <Text style={{ fontSize: 16, fontWeight: '700', color: accent }}>{mockUser.office}</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: accent }}>{userOffice}</Text>
                   <Text style={{ fontSize: 10, fontWeight: '500', color: palette.textSecondary }}>Office</Text>
                 </View>
               </View>
@@ -147,9 +169,9 @@ export default function SettingsScreen() {
             </BentoTile>
 
             <BentoTile palette={palette} isDark={isDark} blobColor="#b45309">
-              {mockUser.unreadNotifications > 0 && (
+              {unreadNotifications > 0 && (
                 <View className="absolute items-center justify-center" style={{ top: 12, right: 12, backgroundColor: '#dc2626', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff' }}>{mockUser.unreadNotifications}</Text>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff' }}>{unreadNotifications}</Text>
                 </View>
               )}
               <IconCircle color="#b45309"><Bell size={20} color="#b45309" strokeWidth={1.8} /></IconCircle>
@@ -193,9 +215,9 @@ export default function SettingsScreen() {
 
             {/* Notifications */}
             <BentoTile palette={palette} isDark={isDark} blobColor="#b45309">
-              {mockUser.unreadNotifications > 0 && (
+              {unreadNotifications > 0 && (
                 <View className="absolute items-center justify-center" style={{ top: 12, right: 12, backgroundColor: '#dc2626', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff' }}>{mockUser.unreadNotifications}</Text>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#fff' }}>{unreadNotifications}</Text>
                 </View>
               )}
               <IconCircle color="#b45309"><Bell size={20} color="#b45309" strokeWidth={1.8} /></IconCircle>
@@ -239,7 +261,7 @@ export default function SettingsScreen() {
             </View>
           </View>
 
-          {mockUser.isAdmin && (
+          {isAdmin && (
             <View style={isTablet ? { flex: 1 } : { marginTop: 20 }}>
               {/* Admin Section */}
               <SectionBar title="Administration" color="#7c3aed" palette={palette} />

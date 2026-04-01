@@ -12,7 +12,9 @@ import {
 } from 'lucide-react-native'
 import type { LucideIcon } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
+import { api } from '@skyhub/api'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { useUser } from '../../../providers/UserProvider'
 
 const ACCENT = '#1e40af'
 const TABLET_WIDTH = 768
@@ -69,11 +71,36 @@ function formatDateTime(iso: string): string {
 export default function ProfileScreen() {
   const router = useRouter()
   const { isDark, palette, isTablet, fonts, fs } = useAppTheme()
+  const { user, refetch } = useUser()
   const { width } = useWindowDimensions()
 
   const [data, setData] = useState<ProfileData>(INITIAL)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<ProfileData>(INITIAL)
+
+  // Sync from API
+  React.useEffect(() => {
+    if (user) {
+      const fromApi: ProfileData = {
+        firstName: user.profile.firstName,
+        lastName: user.profile.lastName,
+        email: user.profile.email,
+        jobTitle: user.role,
+        department: user.profile.department,
+        employeeId: user.profile.employeeId,
+        phone: user.profile.phone,
+        officePhone: user.profile.officePhone,
+        dateOfBirth: user.profile.dateOfBirth,
+        gender: user.profile.gender,
+        role: user.role,
+        status: user.isActive ? 'Active' : 'Inactive',
+        lastLogin: user.lastLoginUtc,
+        location: user.profile.location,
+      }
+      setData(fromApi)
+      setDraft(fromApi)
+    }
+  }, [user])
 
   const startEdit = useCallback(() => {
     setDraft({ ...data })
@@ -82,11 +109,28 @@ export default function ProfileScreen() {
 
   const cancelEdit = useCallback(() => setEditing(false), [])
 
-  const saveEdit = useCallback(() => {
-    setData({ ...draft })
-    setEditing(false)
-    Alert.alert('Saved', 'Profile updated successfully.')
-  }, [draft])
+  const saveEdit = useCallback(async () => {
+    try {
+      await api.updateProfile({
+        firstName: draft.firstName,
+        lastName: draft.lastName,
+        email: draft.email,
+        phone: draft.phone,
+        officePhone: draft.officePhone,
+        dateOfBirth: draft.dateOfBirth,
+        gender: draft.gender,
+        department: draft.department,
+        employeeId: draft.employeeId,
+        location: draft.location,
+      })
+      setData({ ...draft })
+      setEditing(false)
+      Alert.alert('Saved', 'Profile updated successfully.')
+      refetch()
+    } catch (err) {
+      Alert.alert('Error', 'Failed to save profile.')
+    }
+  }, [draft, refetch])
 
   const update = useCallback((key: keyof ProfileData, val: string) => {
     setDraft((p) => ({ ...p, [key]: val }))

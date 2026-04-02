@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
-import { Text, View, ScrollView, Pressable, TextInput, Alert } from 'react-native'
+import { Text, View, ScrollView, Pressable, TextInput, Alert, Platform } from 'react-native'
+import MapView, { Marker } from 'react-native-maps'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { api, setApiBaseUrl, type AirportRef } from '@skyhub/api'
@@ -162,6 +163,44 @@ export default function AirportDetailScreen() {
           </View>
         </View>
       </View>
+
+      {/* Map */}
+      {airport.latitude != null && airport.longitude != null && (
+        <View style={{ height: 200, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+          <MapView
+            style={{ flex: 1 }}
+            initialRegion={{
+              latitude: airport.latitude,
+              longitude: airport.longitude,
+              latitudeDelta: 0.04,
+              longitudeDelta: 0.04,
+            }}
+            userInterfaceStyle={isDark ? 'dark' : 'light'}
+            mapType="standard"
+            scrollEnabled={false}
+            zoomEnabled={false}
+            pitchEnabled={false}
+            rotateEnabled={false}
+          >
+            <Marker
+              coordinate={{ latitude: airport.latitude, longitude: airport.longitude }}
+              title={airport.name}
+              description={`${airport.iataCode ?? ''} / ${airport.icaoCode}`}
+              pinColor={accent}
+            />
+          </MapView>
+
+          {/* Code overlay on map */}
+          <View className="absolute top-3 left-3 flex-row" style={{ gap: 6 }}>
+            <View className="px-2 py-1 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.88)', ...Platform.select({ ios: { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }, android: { elevation: 3 } }) }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', fontFamily: 'monospace', color: '#111' }}>{airport.iataCode ?? '—'}</Text>
+            </View>
+            <View className="px-2 py-1 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.88)', ...Platform.select({ ios: { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }, android: { elevation: 3 } }) }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', fontFamily: 'monospace', color: '#111' }}>{airport.icaoCode}</Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* Tabs */}
       <View className="flex-row" style={{ borderBottomWidth: 1, borderBottomColor: palette.border, paddingHorizontal: 12, paddingVertical: 8, gap: 4 }}>

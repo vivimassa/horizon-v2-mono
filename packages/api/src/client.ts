@@ -11,12 +11,12 @@ export function setApiBaseUrl(url: string) {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { ...init?.headers as Record<string, string> }
+  if (init?.body) headers['Content-Type'] = 'application/json'
+
   const res = await fetch(`${_baseUrl}${path}`, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...init?.headers,
-    },
+    headers,
   })
 
   if (!res.ok) {
@@ -180,6 +180,22 @@ export interface OperatorRef {
   isActive: boolean
 }
 
+export interface AirportLookupResult {
+  source: string
+  icaoCode: string | null
+  iataCode: string | null
+  name: string | null
+  city: string | null
+  country: string | null
+  timezone: string | null
+  utcOffsetHours: number | null
+  latitude: number | null
+  longitude: number | null
+  elevationFt: number | null
+  numberOfRunways: number | null
+  longestRunwayFt: number | null
+}
+
 export interface ReferenceStats {
   operators: number
   airports: number
@@ -216,6 +232,26 @@ export const api = {
   },
 
   getAirport: (id: string) => request<AirportRef>(`/airports/${id}`),
+
+  createAirport: (data: Partial<AirportRef>) =>
+    request<AirportRef>('/airports', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateAirport: (id: string, data: Partial<AirportRef>) =>
+    request<AirportRef>(`/airports/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteAirport: (id: string) =>
+    request<{ success: boolean }>(`/airports/${id}`, {
+      method: 'DELETE',
+    }),
+
+  lookupAirport: (icao: string) =>
+    request<AirportLookupResult>(`/airports/lookup?icao=${encodeURIComponent(icao)}`),
 
   getAircraftTypes: (operatorId = 'horizon') =>
     request<AircraftTypeRef[]>(`/aircraft-types?operatorId=${operatorId}`),

@@ -2,6 +2,7 @@ export { api, setApiBaseUrl } from './client'
 export type {
   Flight,
   AirportRef,
+  AirportLookupResult,
   AircraftTypeRef,
   CountryRef,
   DelayCodeRef,

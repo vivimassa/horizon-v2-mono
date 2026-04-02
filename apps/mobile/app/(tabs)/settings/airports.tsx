@@ -75,17 +75,17 @@ export default function AirportsList() {
       <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
         <View className="flex-row items-center mb-3">
           <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
-            <ChevronLeft size={22} color={accent} strokeWidth={2} />
+            <ChevronLeft size={24} color={accent} strokeWidth={2} />
           </Pressable>
           <View
             className="items-center justify-center rounded-lg mr-3"
-            style={{ width: 32, height: 32, backgroundColor: accentTint(accent, isDark ? 0.15 : 0.1) }}
+            style={{ width: 36, height: 36, backgroundColor: accentTint(accent, isDark ? 0.15 : 0.1) }}
           >
-            <PlaneTakeoff size={16} color={accent} strokeWidth={1.8} />
+            <PlaneTakeoff size={18} color={accent} strokeWidth={1.8} />
           </View>
           <View className="flex-1">
-            <Text style={{ fontSize: 18, fontWeight: '700', color: palette.text }}>Airports Database</Text>
-            <Text style={{ fontSize: 12, color: palette.textSecondary }}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>Airports Database</Text>
+            <Text style={{ fontSize: 15, color: palette.textSecondary }}>
               {filteredCount === airports.length
                 ? `${airports.length} airports`
                 : `${filteredCount} / ${airports.length} airports`}
@@ -100,11 +100,11 @@ export default function AirportsList() {
           borderColor: palette.cardBorder,
           paddingHorizontal: 12,
         }}>
-          <Search size={14} color={palette.textTertiary} strokeWidth={1.8} />
+          <Search size={16} color={palette.textTertiary} strokeWidth={1.8} />
           <TextInput
             className="flex-1 py-2.5 ml-2"
-            style={{ fontSize: 13, color: palette.text }}
-            placeholder="Search IATA, ICAO, name, city\u2026"
+            style={{ fontSize: 15, color: palette.text }}
+            placeholder="Search IATA, ICAO, name, city…"
             placeholderTextColor={palette.textTertiary}
             value={search}
             onChangeText={setSearch}
@@ -116,7 +116,7 @@ export default function AirportsList() {
 
       {loading ? (
         <View className="flex-1 justify-center items-center">
-          <Text style={{ fontSize: 13, color: palette.textTertiary }}>Loading airports\u2026</Text>
+          <Text style={{ fontSize: 15, color: palette.textTertiary }}>Loading airports…</Text>
         </View>
       ) : (
         <SectionList
@@ -150,10 +150,10 @@ export default function AirportsList() {
                   strokeWidth={2}
                   style={{ transform: [{ rotate: isCollapsed ? '0deg' : '90deg' }], marginRight: 8 }}
                 />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                   {section.title}
                 </Text>
-                <Text style={{ fontSize: 12, color: palette.textTertiary, marginLeft: 6 }}>({count})</Text>
+                <Text style={{ fontSize: 15, color: palette.textTertiary, marginLeft: 6 }}>({count})</Text>
                 <View className="flex-1 ml-3" style={{ height: 1, backgroundColor: palette.border }} />
               </Pressable>
             )
@@ -190,8 +190,8 @@ const AirportRow = memo(function AirportRow({
     >
       <Text
         style={{
-          width: 40,
-          fontSize: 13,
+          width: 44,
+          fontSize: 15,
           fontWeight: '700',
           fontFamily: 'monospace',
           color: accent,
@@ -200,14 +200,14 @@ const AirportRow = memo(function AirportRow({
         {airport.iataCode ?? '\u2014'}
       </Text>
       <View className="flex-1 ml-2">
-        <Text style={{ fontSize: 13, fontWeight: '500', color: palette.text }} numberOfLines={1}>
+        <Text style={{ fontSize: 15, fontWeight: '500', color: palette.text }} numberOfLines={1}>
           {airport.name}
         </Text>
-        <Text style={{ fontSize: 12, color: palette.textSecondary, marginTop: 1 }}>
+        <Text style={{ fontSize: 15, color: palette.textSecondary, marginTop: 1 }}>
           {airport.city}
         </Text>
       </View>
-      <Text style={{ fontSize: 11, fontFamily: 'monospace', color: palette.textTertiary }}>
+      <Text style={{ fontSize: 15, fontFamily: 'monospace', color: palette.textTertiary }}>
         {airport.icaoCode}
       </Text>
     </View>

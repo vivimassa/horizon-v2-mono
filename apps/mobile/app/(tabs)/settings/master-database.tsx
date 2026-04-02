@@ -77,17 +77,17 @@ export default function MasterDatabaseScreen() {
       {/* Header */}
       <View className="flex-row items-center px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
         <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
-          <ChevronLeft size={22} color={accent} strokeWidth={2} />
+          <ChevronLeft size={24} color={accent} strokeWidth={2} />
         </Pressable>
         <View
           className="items-center justify-center rounded-lg mr-3"
-          style={{ width: 32, height: 32, backgroundColor: accentTint(accent, isDark ? 0.15 : 0.1) }}
+          style={{ width: 36, height: 36, backgroundColor: accentTint(accent, isDark ? 0.15 : 0.1) }}
         >
-          <Database size={16} color={accent} strokeWidth={1.8} />
+          <Database size={18} color={accent} strokeWidth={1.8} />
         </View>
         <View>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: palette.text }}>Master Database</Text>
-          <Text style={{ fontSize: 12, color: palette.textSecondary }}>Reference data across all domains</Text>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>Master Database</Text>
+          <Text style={{ fontSize: 15, color: palette.textSecondary }}>Reference data across all domains</Text>
         </View>
       </View>
 
@@ -131,19 +131,19 @@ const DomainSection = memo(function DomainSection({
     <View className="mb-5">
       {/* Section header */}
       <View className="flex-row items-center mb-2.5">
-        <View style={{ width: 3, height: 18, borderRadius: 2, backgroundColor: section.color, marginRight: 8 }} />
+        <View style={{ width: 3, height: 20, borderRadius: 2, backgroundColor: section.color, marginRight: 8 }} />
         <View
           className="items-center justify-center rounded-md mr-2"
-          style={{ width: 24, height: 24, backgroundColor: accentTint(section.color, isDark ? 0.15 : 0.1) }}
+          style={{ width: 28, height: 28, backgroundColor: accentTint(section.color, isDark ? 0.15 : 0.1) }}
         >
-          <SectionIcon size={13} color={section.color} strokeWidth={1.8} />
+          <SectionIcon size={15} color={section.color} strokeWidth={1.8} />
         </View>
-        <Text style={{ fontSize: 15, fontWeight: '600', color: palette.text }}>{section.label}</Text>
+        <Text style={{ fontSize: 17, fontWeight: '600', color: palette.text }}>{section.label}</Text>
       </View>
 
       {/* Cards or empty state */}
       {section.cards.length > 0 ? (
-        <View style={{ gap: 8 }}>
+        <View style={{ gap: 10 }}>
           {section.cards.map((card) => (
             <EntityCard
               key={card.code}
@@ -168,10 +168,10 @@ const DomainSection = memo(function DomainSection({
             gap: 12,
           }}
         >
-          <PackageOpen size={18} color={palette.textTertiary} strokeWidth={1.5} />
+          <PackageOpen size={20} color={palette.textTertiary} strokeWidth={1.5} />
           <View>
-            <Text style={{ fontSize: 13, fontWeight: '500', color: palette.textSecondary }}>Coming soon</Text>
-            <Text style={{ fontSize: 11, color: palette.textTertiary, marginTop: 2 }}>Gate config, handling agents, equipment</Text>
+            <Text style={{ fontSize: 15, fontWeight: '500', color: palette.textSecondary }}>Coming soon</Text>
+            <Text style={{ fontSize: 15, color: palette.textTertiary, marginTop: 2 }}>Gate config, handling agents, equipment</Text>
           </View>
         </View>
       )}
@@ -204,8 +204,8 @@ const EntityCard = memo(function EntityCard({
         backgroundColor: palette.card,
         borderWidth: 1,
         borderColor: palette.cardBorder,
-        paddingHorizontal: 14,
-        paddingVertical: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 16,
         opacity: disabled ? 0.5 : 1,
       }}
       onPress={onPress}
@@ -214,19 +214,19 @@ const EntityCard = memo(function EntityCard({
       {/* Icon */}
       <View
         className="items-center justify-center rounded-lg mr-3"
-        style={{ width: 32, height: 32, backgroundColor: accentTint(sectionColor, isDark ? 0.15 : 0.1) }}
+        style={{ width: 36, height: 36, backgroundColor: accentTint(sectionColor, isDark ? 0.15 : 0.1) }}
       >
-        <Icon size={16} color={sectionColor} strokeWidth={1.8} />
+        <Icon size={18} color={sectionColor} strokeWidth={1.8} />
       </View>
       {/* Label + desc */}
       <View className="flex-1 mr-2">
-        <Text style={{ fontSize: 13, fontWeight: '600', color: palette.text }}>{card.label}</Text>
-        <Text style={{ fontSize: 11, color: palette.textTertiary, marginTop: 1 }}>{card.desc}</Text>
+        <Text style={{ fontSize: 15, fontWeight: '600', color: palette.text }}>{card.label}</Text>
+        <Text style={{ fontSize: 15, color: palette.textTertiary, marginTop: 2 }}>{card.desc}</Text>
       </View>
       {/* Code + chevron */}
-      <View className="flex-row items-center" style={{ gap: 4 }}>
-        <Text style={{ fontSize: 10, fontWeight: '600', fontFamily: 'monospace', color: palette.textTertiary }}>{card.code}</Text>
-        <ChevronRight size={14} color={palette.textTertiary} strokeWidth={1.8} />
+      <View className="flex-row items-center" style={{ gap: 6 }}>
+        <Text style={{ fontSize: 15, fontWeight: '600', fontFamily: 'monospace', color: palette.textTertiary }}>{card.code}</Text>
+        <ChevronRight size={16} color={palette.textTertiary} strokeWidth={1.8} />
       </View>
     </Pressable>
   )

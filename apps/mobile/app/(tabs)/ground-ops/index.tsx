@@ -20,7 +20,7 @@ export default function GroundOps() {
           Ground handling &amp; cargo operations
         </Text>
 
-        {/* Cargo Loading card */}
+        {/* Cargo Manifest card */}
         <Pressable
           onPress={() => router.push('/(tabs)/ground-ops/cargo-loading')}
           className="rounded-xl overflow-hidden"
@@ -39,7 +39,7 @@ export default function GroundOps() {
             </View>
             <View className="flex-1">
               <Text style={{ fontSize: 15, fontWeight: '600', color: palette.text }}>
-                Cargo Loading
+                Cargo Manifest
               </Text>
               <Text style={{ fontSize: 12, color: palette.textSecondary, marginTop: 2 }}>
                 Aircraft loading &amp; cargo distribution

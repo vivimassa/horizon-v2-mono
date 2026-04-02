@@ -130,7 +130,7 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
 
   // 5.1 Cargo
   { code: '5.1', name: 'Cargo', description: 'Cargo operations and loading', icon: 'Package', route: '/ground-ops/cargo', parent_code: '5', module: 'ground', level: 1 },
-  { code: '5.1.1', name: 'Cargo Loading', description: 'Aircraft loading and cargo manifest management', icon: 'Package', route: '/ground-ops/cargo/cargo-manifest', parent_code: '5.1', module: 'ground', level: 2 },
+  { code: '5.1.1', name: 'Cargo Manifest', description: 'Aircraft loading and cargo manifest management', icon: 'Package', route: '/ground-ops/cargo/cargo-manifest', parent_code: '5.1', module: 'ground', level: 2 },
 
   // ──────────────────────────────────────────────
   // 6. INTEGRATION

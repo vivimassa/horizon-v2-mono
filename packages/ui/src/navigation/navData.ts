@@ -116,7 +116,7 @@ export const NAV_TREE: NavModuleData[] = [
       {
         key: 'cargo', label: 'Cargo', num: '4.1', iconName: 'Package',
         pages: [
-          { key: 'cargo-manifest', label: 'Cargo Loading', num: '4.1.1', route: '/ground-ops/cargo/cargo-manifest', iconName: 'Package', desc: 'Aircraft loading & manifest' },
+          { key: 'cargo-manifest', label: 'Cargo Manifest', num: '4.1.1', route: '/ground-ops/cargo/cargo-manifest', iconName: 'Package', desc: 'Aircraft loading & manifest' },
         ],
       },
       {

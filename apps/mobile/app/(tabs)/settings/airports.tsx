@@ -1,10 +1,11 @@
-import { useEffect, useState, useMemo, useCallback, memo } from 'react'
+import { useState, useMemo, useCallback, memo } from 'react'
+import { useFocusEffect } from '@react-navigation/native'
 import { Text, View, SectionList, TextInput, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { api, setApiBaseUrl, type AirportRef } from '@skyhub/api'
 import {
-  Search, ChevronLeft, ChevronRight, PlaneTakeoff,
+  Search, ChevronLeft, ChevronRight, PlaneTakeoff, Plus,
 } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
@@ -24,12 +25,16 @@ export default function AirportsList() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const router = useRouter()
 
-  useEffect(() => {
+  const fetchAirports = useCallback(() => {
+    setLoading(true)
     api.getAirports()
       .then(setAirports)
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
+
+  // Fetch airports on mount and when screen regains focus (after detail/add)
+  useFocusEffect(useCallback(() => { fetchAirports() }, [fetchAirports]))
 
   const toggleGroup = useCallback((title: string) => {
     setCollapsed((prev) => {
@@ -91,6 +96,15 @@ export default function AirportsList() {
                 : `${filteredCount} / ${airports.length} airports`}
             </Text>
           </View>
+          {/* + New button */}
+          <Pressable
+            onPress={() => router.push('/(tabs)/settings/airport-add' as any)}
+            className="flex-row items-center px-3 py-2 rounded-lg active:opacity-70"
+            style={{ backgroundColor: accent, gap: 4 }}
+          >
+            <Plus size={16} color="#fff" strokeWidth={2} />
+            <Text style={{ fontSize: 15, fontWeight: '600', color: '#fff' }}>New</Text>
+          </Pressable>
         </View>
 
         {/* Search */}
@@ -159,7 +173,8 @@ export default function AirportsList() {
             )
           }}
           renderItem={({ item }) => (
-            <AirportRow airport={item} palette={palette} accent={accent} isDark={isDark} />
+            <AirportRow airport={item} palette={palette} accent={accent} isDark={isDark}
+              onPress={() => router.push({ pathname: '/(tabs)/settings/airport-detail' as any, params: { id: item._id } })} />
           )}
         />
       )}
@@ -168,19 +183,14 @@ export default function AirportsList() {
 }
 
 const AirportRow = memo(function AirportRow({
-  airport,
-  palette,
-  accent,
-  isDark,
+  airport, palette, accent, isDark, onPress,
 }: {
-  airport: AirportRef
-  palette: Palette
-  accent: string
-  isDark: boolean
+  airport: AirportRef; palette: Palette; accent: string; isDark: boolean; onPress: () => void
 }) {
   return (
-    <View
-      className="flex-row items-center"
+    <Pressable
+      onPress={onPress}
+      className="flex-row items-center active:opacity-70"
       style={{
         paddingHorizontal: 16,
         paddingVertical: 12,
@@ -190,14 +200,11 @@ const AirportRow = memo(function AirportRow({
     >
       <Text
         style={{
-          width: 44,
-          fontSize: 15,
-          fontWeight: '700',
-          fontFamily: 'monospace',
-          color: accent,
+          width: 44, fontSize: 15, fontWeight: '700',
+          fontFamily: 'monospace', color: accent,
         }}
       >
-        {airport.iataCode ?? '\u2014'}
+        {airport.iataCode ?? '—'}
       </Text>
       <View className="flex-1 ml-2">
         <Text style={{ fontSize: 15, fontWeight: '500', color: palette.text }} numberOfLines={1}>
@@ -207,9 +214,12 @@ const AirportRow = memo(function AirportRow({
           {airport.city}
         </Text>
       </View>
-      <Text style={{ fontSize: 15, fontFamily: 'monospace', color: palette.textTertiary }}>
-        {airport.icaoCode}
-      </Text>
-    </View>
+      <View className="flex-row items-center" style={{ gap: 6 }}>
+        <Text style={{ fontSize: 15, fontFamily: 'monospace', color: palette.textTertiary }}>
+          {airport.icaoCode}
+        </Text>
+        <ChevronRight size={14} color={palette.textTertiary} strokeWidth={1.8} />
+      </View>
+    </Pressable>
   )
 })

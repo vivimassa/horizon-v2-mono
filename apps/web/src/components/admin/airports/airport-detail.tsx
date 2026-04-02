@@ -101,15 +101,30 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate }: AirportDe
     finally { setLookupLoading(false); }
   }, [lookupCode]);
 
+  const friendlyCreateError = useCallback((err: any) => {
+    const msg = err.message || "Create failed";
+    try {
+      const match = msg.match(/API (\d+): (.+)/);
+      if (match) {
+        const parsed = JSON.parse(match[2]);
+        if (Number(match[1]) === 409) {
+          return `This airport already exists in the database. You can find it using the search on the left panel.`;
+        }
+        return parsed.error || parsed.details?.join(", ") || msg;
+      }
+    } catch { /* use raw msg */ }
+    return msg;
+  }, []);
+
   const handleCreateFromLookup = useCallback(async () => {
     if (!onCreate || !lookupResult) return;
     setCreating(true);
     try {
       await onCreate({ icaoCode: lookupResult.icaoCode ?? undefined, iataCode: lookupResult.iataCode, name: lookupResult.name ?? "Unknown", city: lookupResult.city, timezone: lookupResult.timezone ?? "UTC", latitude: lookupResult.latitude, longitude: lookupResult.longitude, elevationFt: lookupResult.elevationFt, numberOfRunways: lookupResult.numberOfRunways, longestRunwayFt: lookupResult.longestRunwayFt, isActive: true } as Partial<AirportRef>);
       resetCreate();
-    } catch (err: any) { setCreateError(err.message || "Create failed"); }
+    } catch (err: any) { setCreateError(friendlyCreateError(err)); }
     finally { setCreating(false); }
-  }, [onCreate, lookupResult, resetCreate]);
+  }, [onCreate, lookupResult, resetCreate, friendlyCreateError]);
 
   const handleManualCreate = useCallback(async () => {
     if (!onCreate) return;
@@ -119,9 +134,9 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate }: AirportDe
       const country = countries.find(c => c._id === manualForm.countryId);
       await onCreate({ icaoCode: manualForm.icaoCode.toUpperCase(), iataCode: manualForm.iataCode ? manualForm.iataCode.toUpperCase() : null, name: manualForm.name, city: manualForm.city || null, countryId: manualForm.countryId || null, countryName: country?.name ?? null, countryIso2: country?.isoCode2 ?? null, countryFlag: country?.flagEmoji ?? null, timezone: manualForm.timezone, latitude: manualForm.latitude ? Number(manualForm.latitude) : null, longitude: manualForm.longitude ? Number(manualForm.longitude) : null, elevationFt: manualForm.elevationFt ? Number(manualForm.elevationFt) : null, isActive: true } as Partial<AirportRef>);
       resetCreate();
-    } catch (err: any) { setCreateError(err.message || "Create failed"); }
+    } catch (err: any) { setCreateError(friendlyCreateError(err)); }
     finally { setCreating(false); }
-  }, [onCreate, manualForm, countries, resetCreate]);
+  }, [onCreate, manualForm, countries, resetCreate, friendlyCreateError]);
 
   const hasCoords = airport.latitude != null && airport.longitude != null;
 

@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { useTheme } from "@/components/theme-provider";
 
 interface AirportMapProps {
   latitude: number;
@@ -17,23 +18,32 @@ export function AirportMap({ latitude, longitude, name }: AirportMapProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const [style, setStyle] = useState<"streets" | "satellite">("streets");
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
 
   useEffect(() => {
     if (!containerRef.current || !TOKEN) return;
 
+    const mapStyle =
+      style === "satellite"
+        ? "mapbox://styles/mapbox/satellite-streets-v12"
+        : isDark
+          ? "mapbox://styles/mapbox/dark-v11"
+          : "mapbox://styles/mapbox/light-v11";
+
     const map = new mapboxgl.Map({
       container: containerRef.current,
       accessToken: TOKEN,
-      style:
-        style === "satellite"
-          ? "mapbox://styles/mapbox/satellite-streets-v12"
-          : "mapbox://styles/mapbox/light-v11",
+      style: mapStyle,
       center: [longitude, latitude],
-      zoom: 12,
+      zoom: 13,
       attributionControl: false,
     });
 
     map.addControl(new mapboxgl.AttributionControl({ compact: true }));
+
+    // Ensure map fills container after tiles load
+    map.on("load", () => map.resize());
 
     const marker = new mapboxgl.Marker({ color: "#2563eb" })
       .setLngLat([longitude, latitude])
@@ -51,7 +61,7 @@ export function AirportMap({ latitude, longitude, name }: AirportMapProps) {
       marker.remove();
       map.remove();
     };
-  }, [latitude, longitude, name, style]);
+  }, [latitude, longitude, name, style, isDark]);
 
   if (!TOKEN) {
     return (
@@ -67,7 +77,12 @@ export function AirportMap({ latitude, longitude, name }: AirportMapProps) {
       {/* Style toggle */}
       <button
         onClick={() => setStyle((s) => (s === "streets" ? "satellite" : "streets"))}
-        className="absolute top-2 right-2 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white/90 dark:bg-hz-card/90 border border-hz-border shadow-sm hover:shadow-md transition-shadow backdrop-blur-sm"
+        className="absolute top-2 right-2 px-2.5 py-1 rounded-lg text-[13px] font-semibold shadow-sm hover:shadow-md transition-shadow backdrop-blur-md"
+        style={{
+          background: isDark ? "rgba(30,30,34,0.85)" : "rgba(255,255,255,0.9)",
+          color: isDark ? "#e4e4e7" : "#333",
+          border: `0.5px solid ${isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.08)"}`,
+        }}
       >
         {style === "streets" ? "Satellite" : "Streets"}
       </button>

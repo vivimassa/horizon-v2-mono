@@ -2,6 +2,7 @@
 
 import { type ReactNode } from "react";
 import { WEB_LAYOUT } from "@/lib/fonts";
+import { useTheme } from "@/components/theme-provider";
 
 interface MasterDetailLayoutProps {
   /** Left panel content (list, search, filters) */
@@ -24,18 +25,24 @@ export function MasterDetailLayout({
   center,
   right,
 }: MasterDetailLayoutProps) {
+  const { theme } = useTheme();
+  const panelBg = theme === "dark" ? "#1e1e22" : "#ffffff";
+
   return (
     <div className="flex h-full overflow-hidden gap-3 p-3">
       {/* Left panel */}
       <aside
-        className="shrink-0 flex flex-col rounded-2xl border border-hz-border bg-hz-card overflow-hidden"
-        style={{ width: WEB_LAYOUT.sidebarWidth }}
+        className="shrink-0 flex flex-col rounded-2xl border border-hz-border overflow-hidden"
+        style={{ width: WEB_LAYOUT.sidebarWidth, background: panelBg }}
       >
         {left}
       </aside>
 
       {/* Center panel — flex-1 */}
-      <section className="flex-1 flex flex-col rounded-2xl border border-hz-border bg-white dark:bg-hz-card overflow-hidden">
+      <section
+        className="flex-1 flex flex-col rounded-2xl border border-hz-border overflow-hidden"
+        style={{ background: panelBg }}
+      >
         {center}
       </section>
 

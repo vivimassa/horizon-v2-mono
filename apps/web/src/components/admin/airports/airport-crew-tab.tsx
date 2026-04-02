@@ -7,7 +7,7 @@ interface Props {
 
 export function AirportCrewTab({ airport }: Props) {
   return (
-    <div className="p-6">
+    <div className="px-6 pt-3 pb-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
         <FieldRow
           label="Crew Base"

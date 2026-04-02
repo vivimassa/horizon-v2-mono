@@ -1,5 +1,6 @@
 import type { AirportRef } from "@skyhub/api";
 import { FieldRow } from "./field-row";
+import { CountryFlag } from "@/components/ui/country-flag";
 
 interface Props {
   airport: AirportRef;
@@ -7,8 +8,8 @@ interface Props {
 
 export function AirportBasicTab({ airport }: Props) {
   return (
-    <div className="p-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
+    <div className="px-6 pt-3 pb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8">
         <FieldRow label="IATA Code" value={airport.iataCode} />
         <FieldRow label="ICAO Code" value={airport.icaoCode} />
         <FieldRow label="Airport Name" value={airport.name} />
@@ -16,19 +17,7 @@ export function AirportBasicTab({ airport }: Props) {
         <FieldRow
           label="Country"
           value={
-            airport.country ? (
-              <span>
-                {airport.countryFlag && (
-                  <span className="mr-1.5">{airport.countryFlag}</span>
-                )}
-                {airport.country}
-                {airport.countryIso2 && (
-                  <span className="text-hz-text-secondary ml-1.5 text-[11px]">
-                    {airport.countryIso2}
-                  </span>
-                )}
-              </span>
-            ) : null
+            airport.countryName ?? airport.country ?? null
           }
         />
         <FieldRow label="Timezone" value={airport.timezone} />

@@ -1,77 +1,301 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { api, setApiBaseUrl, type ReferenceStats } from "@skyhub/api";
+import { useTheme } from "@/components/theme-provider";
+import { colors, accentTint, type Palette as PaletteType } from "@skyhub/ui/theme";
 import {
-  PlaneTakeoff,
-  Plane,
+  Database,
   Globe,
+  Plane,
+  Truck,
+  Users,
+  PlaneTakeoff,
+  Building2,
   Timer,
+  Tag,
   UserRound,
   FileCheck,
-  Tag,
-  Building2,
   ChevronRight,
+  PackageOpen,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-setApiBaseUrl("http://localhost:3002");
+// ── Section & card definitions ──
 
-const CATEGORIES: {
-  key: keyof ReferenceStats;
+interface CardDef {
+  code: string;
   label: string;
-  icon: typeof Globe;
-  bg: string;
-  color: string;
+  desc: string;
+  icon: LucideIcon;
   href: string;
-}[] = [
-  { key: "airports",           label: "Airports",        icon: PlaneTakeoff, bg: "bg-blue-50",    color: "text-blue-600",   href: "/admin/airports" },
-  { key: "aircraftTypes",      label: "Aircraft Types",  icon: Plane,        bg: "bg-indigo-50",  color: "text-indigo-600", href: "/admin/aircraft-types" },
-  { key: "countries",          label: "Countries",       icon: Globe,        bg: "bg-green-50",   color: "text-green-600",  href: "/admin/countries" },
-  { key: "delayCodes",         label: "Delay Codes",     icon: Timer,        bg: "bg-amber-50",   color: "text-amber-600",  href: "/admin/delay-codes" },
-  { key: "crewPositions",      label: "Crew Positions",  icon: UserRound,    bg: "bg-purple-50",  color: "text-purple-600", href: "/admin/crew-positions" },
-  { key: "expiryCodes",        label: "Expiry Codes",    icon: FileCheck,    bg: "bg-red-50",     color: "text-red-600",    href: "/admin/expiry-codes" },
-  { key: "flightServiceTypes", label: "Service Types",   icon: Tag,          bg: "bg-teal-50",    color: "text-teal-600",   href: "/admin/service-types" },
-  { key: "operators",          label: "Operators",       icon: Building2,    bg: "bg-gray-100",   color: "text-gray-600",   href: "/admin/operators" },
+}
+
+interface SectionDef {
+  num: string;
+  code: string;
+  label: string;
+  icon: LucideIcon;
+  color: string;
+  cards: CardDef[];
+}
+
+const SECTIONS: SectionDef[] = [
+  {
+    num: "I",
+    code: "5.1",
+    label: "Network",
+    icon: Globe,
+    color: "#0f766e",
+    cards: [
+      { code: "5.1.1", label: "Airports Database", desc: "ICAO/IATA codes, coordinates, facilities", icon: PlaneTakeoff, href: "/admin/airports" },
+      { code: "5.1.2", label: "Countries Database", desc: "ISO codes, regions, currency", icon: Globe, href: "/admin/countries" },
+      { code: "5.1.3", label: "Operators Database", desc: "Airlines, codeshare partners", icon: Building2, href: "/admin/operators" },
+    ],
+  },
+  {
+    num: "II",
+    code: "5.2",
+    label: "Flight Ops",
+    icon: Plane,
+    color: "#1e40af",
+    cards: [
+      { code: "5.2.1", label: "Aircraft Types Database", desc: "Fleet types, capacity, performance", icon: Plane, href: "/admin/aircraft-types" },
+      { code: "5.2.2", label: "Delay Codes Database", desc: "IATA standard & custom codes", icon: Timer, href: "/admin/delay-codes" },
+      { code: "5.2.3", label: "Service Types Database", desc: "Flight service categories", icon: Tag, href: "/admin/service-types" },
+    ],
+  },
+  {
+    num: "III",
+    code: "5.3",
+    label: "Ground Ops",
+    icon: Truck,
+    color: "#b45309",
+    cards: [],
+  },
+  {
+    num: "IV",
+    code: "5.4",
+    label: "Crew Ops",
+    icon: Users,
+    color: "#7c3aed",
+    cards: [
+      { code: "5.4.1", label: "Crew Positions Database", desc: "Cockpit & cabin roles, rank order", icon: UserRound, href: "/admin/crew-positions" },
+      { code: "5.4.2", label: "Expiry Codes Database", desc: "Qualification validity & formulas", icon: FileCheck, href: "/admin/expiry-codes" },
+    ],
+  },
 ];
 
-export default function AdminPage() {
-  const [stats, setStats] = useState<ReferenceStats | null>(null);
+// ── Page ──
 
-  useEffect(() => {
-    api.getReferenceStats().then(setStats).catch(console.error);
-  }, []);
+export default function AdminPage() {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const palette: PaletteType = isDark ? colors.dark : colors.light;
+  const accent = "#1e40af";
 
   return (
-    <div className="p-6">
-      <h1 className="text-xl font-semibold mb-1">Master Data</h1>
-      <p className="text-sm text-hz-text-secondary mb-6">
-        {stats ? `${stats.total} total records` : "Loading…"}
-      </p>
+    <div className="px-6 py-5">
+      {/* Page header */}
+      <div className="flex items-center gap-3 mb-1">
+        <div
+          className="w-9 h-9 rounded-lg flex items-center justify-center"
+          style={{ background: accentTint(accent, isDark ? 0.15 : 0.1) }}
+        >
+          <Database size={18} color={accent} strokeWidth={1.8} />
+        </div>
+        <div>
+          <h1
+            className="text-[22px] font-bold leading-tight"
+            style={{ color: palette.text }}
+          >
+            Master Database
+          </h1>
+          <p
+            className="text-[13px] leading-tight"
+            style={{ color: palette.textSecondary }}
+          >
+            Reference data across all operational domains
+          </p>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {CATEGORIES.map((cat) => {
-          const Icon = cat.icon;
-          return (
-            <Link key={cat.key} href={cat.href}>
-              <div className="rounded-xl border border-hz-border bg-white p-5 transition-shadow hover:shadow-md cursor-pointer group">
-                <div className="flex items-start justify-between mb-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${cat.bg}`}>
-                    <Icon className={`h-5 w-5 ${cat.color}`} />
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-hz-text-secondary/40 group-hover:text-hz-text-secondary transition-colors" />
-                </div>
-                <div className="text-2xl font-bold mb-0.5">
-                  {stats ? stats[cat.key] : "—"}
-                </div>
-                <div className="text-[13px] text-hz-text-secondary font-medium">
-                  {cat.label}
-                </div>
-              </div>
-            </Link>
-          );
-        })}
+      {/* Sections — 4 columns */}
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+        {SECTIONS.map((section) => (
+          <DomainSection
+            key={section.num}
+            section={section}
+            palette={palette}
+            isDark={isDark}
+          />
+        ))}
       </div>
     </div>
+  );
+}
+
+// ── Domain section ──
+
+function DomainSection({
+  section,
+  palette,
+  isDark,
+}: {
+  section: SectionDef;
+  palette: PaletteType;
+  isDark: boolean;
+}) {
+  const SectionIcon = section.icon;
+
+  return (
+    <section>
+      {/* Section header */}
+      <div className="flex items-center gap-3 mb-3">
+        <div
+          className="w-1 h-7 rounded-full"
+          style={{ background: section.color }}
+        />
+        <div
+          className="w-7 h-7 rounded-md flex items-center justify-center"
+          style={{ background: accentTint(section.color, isDark ? 0.15 : 0.1) }}
+        >
+          <SectionIcon size={15} color={section.color} strokeWidth={1.8} />
+        </div>
+        <span
+          className="text-[15px] font-semibold"
+          style={{ color: palette.text }}
+        >
+          {section.label}
+        </span>
+      </div>
+
+      {/* Cards or empty state */}
+      {section.cards.length > 0 ? (
+        <div className="flex flex-col gap-3">
+          {section.cards.map((card) => (
+            <EntityCard
+              key={card.code}
+              card={card}
+              sectionColor={section.color}
+              palette={palette}
+              isDark={isDark}
+            />
+          ))}
+        </div>
+      ) : (
+        <div
+          className="rounded-xl border border-dashed py-6 px-5 flex items-center gap-3"
+          style={{
+            borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)",
+            background: isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.015)",
+          }}
+        >
+          <PackageOpen
+            size={20}
+            strokeWidth={1.5}
+            style={{ color: palette.textTertiary }}
+          />
+          <div>
+            <p
+              className="text-[13px] font-medium"
+              style={{ color: palette.textSecondary }}
+            >
+              Coming soon
+            </p>
+            <p
+              className="text-[11px] mt-0.5"
+              style={{ color: palette.textTertiary }}
+            >
+              Gate config, handling agents, equipment types
+            </p>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ── Entity card ──
+
+function EntityCard({
+  card,
+  sectionColor,
+  palette,
+  isDark,
+}: {
+  card: CardDef;
+  sectionColor: string;
+  palette: PaletteType;
+  isDark: boolean;
+}) {
+  const Icon = card.icon;
+
+  return (
+    <Link href={card.href}>
+      <div
+        className="group rounded-xl px-4 py-4 transition-all duration-150 cursor-pointer"
+        style={{
+          background: isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.7)",
+          border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
+          boxShadow: isDark
+            ? "0 1px 3px rgba(0,0,0,0.3)"
+            : "0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.boxShadow = isDark
+            ? "0 4px 12px rgba(0,0,0,0.4)"
+            : "0 4px 12px rgba(0,0,0,0.08)";
+          e.currentTarget.style.borderColor = accentTint(sectionColor, isDark ? 0.3 : 0.2);
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.boxShadow = isDark
+            ? "0 1px 3px rgba(0,0,0,0.3)"
+            : "0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)";
+          e.currentTarget.style.borderColor = isDark
+            ? "rgba(255,255,255,0.08)"
+            : "rgba(0,0,0,0.06)";
+        }}
+      >
+        <div className="flex items-center gap-3">
+          {/* Icon */}
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+            style={{ background: accentTint(sectionColor, isDark ? 0.15 : 0.1) }}
+          >
+            <Icon size={16} color={sectionColor} strokeWidth={1.8} />
+          </div>
+          {/* Label + desc */}
+          <div className="flex-1 min-w-0">
+            <div
+              className="text-[13px] font-semibold leading-tight"
+              style={{ color: palette.text }}
+            >
+              {card.label}
+            </div>
+            <div
+              className="text-[11px] leading-snug mt-0.5 truncate"
+              style={{ color: palette.textTertiary }}
+            >
+              {card.desc}
+            </div>
+          </div>
+          {/* Code + chevron */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span
+              className="font-mono text-[10px] font-semibold"
+              style={{ color: palette.textTertiary }}
+            >
+              {card.code}
+            </span>
+            <ChevronRight
+              size={13}
+              strokeWidth={1.8}
+              className="transition-transform duration-150 group-hover:translate-x-0.5"
+              style={{ color: palette.textTertiary }}
+            />
+          </div>
+        </div>
+      </div>
+    </Link>
   );
 }

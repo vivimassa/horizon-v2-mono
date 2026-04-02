@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, setApiBaseUrl, type CountryRef } from "@skyhub/api";
 import { DataTable, type Column } from "@/components/admin/data-table";
+import { CountryFlag } from "@/components/ui/country-flag";
 
 setApiBaseUrl("http://localhost:3002");
 
@@ -10,7 +11,7 @@ const columns: Column<CountryRef>[] = [
   {
     key: "flag",
     label: "",
-    render: (r) => <span className="text-lg">{r.flagEmoji ?? ""}</span>,
+    render: (r) => r.isoCode2 ? <CountryFlag iso2={r.isoCode2} size={20} /> : null,
   },
   {
     key: "name",

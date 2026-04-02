@@ -16,8 +16,9 @@ export interface BreadcrumbSegment {
   label: string
   route: string
   iconName: string
-  siblings: Array<{ key: string; label: string; num: string; route: string; iconName: string }>
+  siblings: Array<{ key: string; label: string; num: string; route: string; iconName: string; desc?: string }>
   parentLabel?: string
+  hideNum?: boolean
 }
 
 const MODULE_COLORS: Record<string, string> = {
@@ -49,6 +50,27 @@ export function resolveNavPath(pathname: string): NavPath | null {
         if (page.route === pathname) {
           return { module: mod, section, page }
         }
+      }
+    }
+  }
+
+  // Prefix match — e.g. /admin/airports/details resolves to /admin/airports page
+  for (const mod of NAV_TREE) {
+    for (const section of mod.sections) {
+      for (const page of section.pages) {
+        if (page.route !== '/' && pathname.startsWith(page.route + '/')) {
+          return { module: mod, section, page }
+        }
+      }
+    }
+  }
+
+  // Section-level match — pathname is a common prefix of pages in a section
+  // e.g. /admin resolves to the master-database section (pages are /admin/airports, etc.)
+  for (const mod of NAV_TREE) {
+    for (const section of mod.sections) {
+      if (section.pages.some(p => p.route.startsWith(pathname + '/'))) {
+        return { module: mod, section }
       }
     }
   }
@@ -93,41 +115,54 @@ export function resolveNavPath(pathname: string): NavPath | null {
 export function buildBreadcrumbs(path: NavPath): BreadcrumbSegment[] {
   const segs: BreadcrumbSegment[] = []
 
+  const hideNum = path.module.key === 'settings'
+  const skipSection = path.section?.flatBreadcrumb === true
+
   segs.push({
     level: 'module',
     num: path.module.num,
     label: path.module.label,
     route: firstRoute(path.module),
     iconName: path.module.iconName,
+    hideNum,
     siblings: NAV_TREE.map((m) => ({
       key: m.key, label: m.label, num: m.num, route: firstRoute(m), iconName: m.iconName,
     })),
   })
 
-  if (path.section) {
+  if (path.section && !skipSection) {
+    // For non-flat sections with hideNum, also hide section numbers
+    const sectionSiblings = path.module.sections.filter((s) => !s.flatBreadcrumb)
     segs.push({
       level: 'section',
       num: path.section.num,
       label: path.section.label,
       route: firstSectionRoute(path.section),
       iconName: path.section.iconName,
+      hideNum,
       parentLabel: path.module.label,
-      siblings: path.module.sections.map((s) => ({
+      siblings: sectionSiblings.map((s) => ({
         key: s.key, label: s.label, num: s.num, route: firstSectionRoute(s), iconName: s.iconName,
       })),
     })
   }
 
   if (path.page && path.section) {
+    // For flat sections, show all flat-section pages as siblings
+    const allPages = skipSection
+      ? path.module.sections.filter((s) => s.flatBreadcrumb).flatMap((s) => s.pages)
+      : path.section.pages
+
     segs.push({
       level: 'page',
       num: path.page.num,
       label: path.page.label,
       route: path.page.route,
       iconName: path.page.iconName,
-      parentLabel: path.section.label,
-      siblings: path.section.pages.map((p) => ({
-        key: p.key, label: p.label, num: p.num, route: p.route, iconName: p.iconName,
+      hideNum,
+      parentLabel: skipSection ? path.module.label : path.section.label,
+      siblings: allPages.map((p) => ({
+        key: p.key, label: p.label, num: p.num, route: p.route, iconName: p.iconName, desc: p.desc,
       })),
     })
   }

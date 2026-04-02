@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -10,9 +10,12 @@ import {
   Truck,
   Users,
   Settings,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useTheme } from "./theme-provider";
+import { resolveNavPath } from "@skyhub/ui/navigation";
 
 const ACCENT_DEFAULT = "#1e40af";
 
@@ -34,6 +37,8 @@ const TABS: Tab[] = [
 
 function getActiveIndex(pathname: string): number {
   if (pathname === "/") return 0;
+  // Also match /admin routes to settings
+  if (pathname.startsWith("/admin")) return 5;
   const idx = TABS.findIndex((t) => t.href !== "/" && pathname.startsWith(t.href));
   return idx >= 0 ? idx : 0;
 }
@@ -63,123 +68,235 @@ export function SpotlightDock() {
   const accent = ACCENT_DEFAULT;
   const activeIndex = getActiveIndex(pathname);
   const isDesktop = useIsDesktop();
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Auto-collapse on page-level routes, expand on module/section-level
+  useEffect(() => {
+    if (!isDesktop) return;
+    const nav = resolveNavPath(pathname);
+    if (nav?.page) {
+      setCollapsed(true);
+    } else {
+      setCollapsed(false);
+    }
+  }, [pathname, isDesktop]);
+
+  // Reclaim bottom space on page-level routes (dock overlays when expanded)
+  useEffect(() => {
+    const nav = resolveNavPath(pathname);
+    const isPageLevel = !!nav?.page;
+    document.body.classList.toggle("dock-collapsed", isPageLevel && isDesktop);
+    return () => document.body.classList.remove("dock-collapsed");
+  }, [pathname, isDesktop]);
+
+  const toggleCollapsed = useCallback(() => setCollapsed((c) => !c), []);
 
   const indicatorColor = isDark ? "#ffffff" : accent;
   const glowColor = isDark ? "rgba(255,255,255,0.25)" : hexToRgba(accent, 0.20);
   const activeIconColor = isDark ? "#ffffff" : accent;
-  const inactiveIconColor = isDark ? "rgba(255,255,255,0.30)" : "rgba(0,0,0,0.26)";
+  const inactiveIconColor = isDark ? "rgba(255,255,255,0.50)" : "rgba(0,0,0,0.45)";
   const activeLabelColor = isDark ? "rgba(255,255,255,0.90)" : accent;
-  const inactiveLabelColor = isDark ? "rgba(255,255,255,0.26)" : "rgba(0,0,0,0.30)";
+  const inactiveLabelColor = isDark ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.40)";
 
-  const dockStyle: React.CSSProperties = isDesktop
-    ? {
-        position: "fixed",
-        bottom: 16,
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: 50,
-        height: 76,
-        borderRadius: 22,
-        padding: "0 16px",
-        background: isDark ? "rgba(18,18,22,0.78)" : "rgba(255,255,255,0.62)",
-        backdropFilter: "blur(24px) saturate(1.5)",
-        WebkitBackdropFilter: "blur(24px) saturate(1.5)",
-        border: `0.5px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`,
-        boxShadow: isDark
-          ? "0 8px 32px rgba(0,0,0,0.30), inset 0 0.5px 0 rgba(255,255,255,0.06)"
-          : "0 8px 32px rgba(0,0,0,0.08), inset 0 0.5px 0 rgba(255,255,255,0.9)",
-      }
-    : {
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 50,
-        height: 76,
-        borderRadius: 0,
-        background: isDark ? "rgba(18,18,22,0.78)" : "rgba(255,255,255,0.62)",
-        backdropFilter: "blur(24px) saturate(1.5)",
-        WebkitBackdropFilter: "blur(24px) saturate(1.5)",
-        borderTop: `0.5px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`,
-      };
+  // Active tab info for collapsed pill
+  const activeTab = TABS[activeIndex];
+  const ActiveIcon = activeTab.icon;
+
+  const isCollapsedDesktop = collapsed && isDesktop;
+
+  // ── Shared glass styles ──
+  const glassBg = isDark ? "rgba(18,18,22,0.78)" : "rgba(255,255,255,0.62)";
+  const glassBorder = `0.5px solid ${isDark ? "rgba(255,255,255,0.20)" : "rgba(0,0,0,0.08)"}`;
+  const glassBlur = "blur(24px) saturate(1.5)";
+  const dockShadow = isDark
+    ? "0 8px 32px rgba(0,0,0,0.30), inset 0 0.5px 0 rgba(255,255,255,0.06)"
+    : "0 8px 32px rgba(0,0,0,0.08), inset 0 0.5px 0 rgba(255,255,255,0.9)";
+  const pillShadow = isDark
+    ? "0 4px 16px rgba(0,0,0,0.25)"
+    : "0 4px 16px rgba(0,0,0,0.06)";
 
   return (
-    <nav className="flex items-center" style={dockStyle}>
-      {TABS.map((tab, index) => {
-        const Icon = tab.icon;
-        const active = index === activeIndex;
-        const btnWidth = isDesktop ? 76 : undefined;
+    <>
+      {/* ── Collapsed "Navigation" button ── */}
+      {isDesktop && (
+        <button
+          onClick={toggleCollapsed}
+          className="fixed flex items-center gap-1.5 cursor-pointer select-none"
+          style={{
+            bottom: 12,
+            left: "50%",
+            zIndex: 50,
+            padding: "6px 14px",
+            borderRadius: 12,
+            color: isDark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.45)",
+            fontSize: 12,
+            fontWeight: 600,
+            background: glassBg,
+            backdropFilter: glassBlur,
+            WebkitBackdropFilter: glassBlur,
+            border: glassBorder,
+            boxShadow: pillShadow,
+            // Animate in/out
+            transform: isCollapsedDesktop
+              ? "translateX(-50%) translateY(0)"
+              : "translateX(-50%) translateY(20px)",
+            opacity: isCollapsedDesktop ? 1 : 0,
+            pointerEvents: isCollapsedDesktop ? "auto" : "none",
+            transition: "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease",
+          }}
+        >
+          <ChevronUp size={12} strokeWidth={2} />
+          <span>Navigation</span>
+        </button>
+      )}
 
-        return (
-          <Link
-            key={tab.key}
-            href={tab.href}
-            className="relative flex flex-col items-center justify-center overflow-hidden"
+      {/* ── Full dock ── */}
+      <nav
+        className="flex items-center"
+        style={isDesktop ? {
+          position: "fixed",
+          bottom: 16,
+          left: "50%",
+          zIndex: 50,
+          height: 76,
+          borderRadius: 22,
+          padding: "0 16px",
+          background: glassBg,
+          backdropFilter: glassBlur,
+          WebkitBackdropFilter: glassBlur,
+          border: glassBorder,
+          boxShadow: dockShadow,
+          // Animate in/out
+          transform: isCollapsedDesktop
+            ? "translateX(-50%) translateY(100px)"
+            : "translateX(-50%) translateY(0)",
+          opacity: isCollapsedDesktop ? 0 : 1,
+          pointerEvents: isCollapsedDesktop ? "none" : "auto",
+          transition: "transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease",
+        } : {
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 50,
+          height: 76,
+          borderRadius: 0,
+          background: glassBg,
+          backdropFilter: glassBlur,
+          WebkitBackdropFilter: glassBlur,
+          borderTop: glassBorder,
+        }}
+      >
+        {/* Collapse chevron — top center (desktop only) */}
+        {isDesktop && (
+          <button
+            onClick={toggleCollapsed}
+            className="absolute flex items-center justify-center cursor-pointer"
             style={{
-              width: btnWidth,
-              flex: isDesktop ? undefined : 1,
-              height: 76,
-              gap: 3,
+              top: -16,
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: 44,
+              height: 16,
+              borderRadius: "8px 8px 0 0",
+              color: inactiveIconColor,
+              background: glassBg,
+              backdropFilter: "blur(24px)",
+              WebkitBackdropFilter: "blur(24px)",
+              border: glassBorder,
+              borderBottom: "none",
+              transition: "color 0.15s",
             }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = isDark
+                ? "rgba(255,255,255,0.7)"
+                : "rgba(0,0,0,0.5)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = inactiveIconColor;
+            }}
+            title="Collapse dock"
           >
-            {/* Indicator line — crossfade */}
-            <div
-              className="absolute top-0 left-1/2 -translate-x-1/2"
-              style={{
-                width: 28,
-                height: 2.5,
-                borderRadius: "0 0 3px 3px",
-                backgroundColor: indicatorColor,
-                opacity: active ? 1 : 0,
-                transform: active ? "scaleX(1)" : "scaleX(0)",
-                transition: "opacity 0.35s ease, transform 0.35s ease",
-              }}
-            />
+            <ChevronDown size={12} strokeWidth={2} />
+          </button>
+        )}
 
-            {/* Spotlight glow — crossfade */}
-            <div
-              className="absolute top-0 left-1/2 -translate-x-1/2 pointer-events-none"
-              style={{
-                width: 56,
-                height: 48,
-                background: `radial-gradient(ellipse 100% 90% at 50% 0%, ${glowColor} 0%, transparent 65%)`,
-                filter: "blur(4px)",
-                opacity: active ? 1 : 0,
-                transition: "opacity 0.4s ease",
-              }}
-            />
+        {TABS.map((tab, index) => {
+          const Icon = tab.icon;
+          const active = index === activeIndex;
+          const btnWidth = isDesktop ? 76 : undefined;
 
-            {/* Icon */}
-            <Icon
+          return (
+            <Link
+              key={tab.key}
+              href={tab.href}
+              className="relative flex flex-col items-center justify-center overflow-hidden"
               style={{
-                width: 24,
-                height: 24,
-                color: active ? activeIconColor : inactiveIconColor,
-                position: "relative",
-                transform: active ? "scale(1.08)" : "scale(1)",
-                transition: "color 0.3s ease, transform 0.3s ease",
-              }}
-              strokeWidth={1.75}
-            />
-
-            {/* Label */}
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: active ? 700 : 500,
-                letterSpacing: 0.1,
-                color: active ? activeLabelColor : inactiveLabelColor,
-                lineHeight: 1,
-                position: "relative",
-                whiteSpace: "nowrap",
-                transition: "color 0.3s ease",
+                width: btnWidth,
+                flex: isDesktop ? undefined : 1,
+                height: 76,
+                gap: 3,
               }}
             >
-              {tab.label}
-            </span>
-          </Link>
-        );
-      })}
-    </nav>
+              {/* Indicator line */}
+              <div
+                className="absolute top-0 left-1/2 -translate-x-1/2"
+                style={{
+                  width: 28,
+                  height: 2.5,
+                  borderRadius: "0 0 3px 3px",
+                  backgroundColor: indicatorColor,
+                  opacity: active ? 1 : 0,
+                  transform: active ? "scaleX(1)" : "scaleX(0)",
+                  transition: "opacity 0.35s ease, transform 0.35s ease",
+                }}
+              />
+
+              {/* Spotlight glow */}
+              <div
+                className="absolute top-0 left-1/2 -translate-x-1/2 pointer-events-none"
+                style={{
+                  width: 56,
+                  height: 48,
+                  background: `radial-gradient(ellipse 100% 90% at 50% 0%, ${glowColor} 0%, transparent 65%)`,
+                  filter: "blur(4px)",
+                  opacity: active ? 1 : 0,
+                  transition: "opacity 0.4s ease",
+                }}
+              />
+
+              {/* Icon */}
+              <Icon
+                style={{
+                  width: 24,
+                  height: 24,
+                  color: active ? activeIconColor : inactiveIconColor,
+                  position: "relative",
+                  transform: active ? "scale(1.08)" : "scale(1)",
+                  transition: "color 0.3s ease, transform 0.3s ease",
+                }}
+                strokeWidth={1.75}
+              />
+
+              {/* Label */}
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: active ? 700 : 500,
+                  letterSpacing: 0.1,
+                  color: active ? activeLabelColor : inactiveLabelColor,
+                  lineHeight: 1,
+                  position: "relative",
+                  whiteSpace: "nowrap",
+                  transition: "color 0.3s ease",
+                }}
+              >
+                {tab.label}
+              </span>
+            </Link>
+          );
+        })}
+      </nav>
+    </>
   );
 }

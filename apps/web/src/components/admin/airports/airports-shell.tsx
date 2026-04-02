@@ -40,7 +40,7 @@ export function AirportsShell() {
 
     const map = new Map<string, AirportRef[]>();
     for (const a of filtered) {
-      const key = a.country ?? "Unknown";
+      const key = a.countryName ?? a.country ?? "Unknown";
       const arr = map.get(key);
       if (arr) arr.push(a);
       else map.set(key, [a]);

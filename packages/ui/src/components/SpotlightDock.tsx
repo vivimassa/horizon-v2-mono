@@ -141,7 +141,7 @@ export function SpotlightDock({ tabs, activeIndex, onTabChange, isDark: isDarkPr
       <View
         className="flex-1 flex-row"
         style={{
-          backgroundColor: isDark ? 'rgba(18,18,22,0.85)' : 'rgba(255,255,255,0.88)',
+          backgroundColor: isDark ? '#121216' : '#ffffff',
           borderTopWidth: 0.5,
           borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
         }}

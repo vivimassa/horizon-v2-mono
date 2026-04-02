@@ -5,6 +5,15 @@ import { getBreadcrumbChain } from '@skyhub/constants'
 import { useAppTheme } from '../providers/ThemeProvider'
 import { TabletBreadcrumb } from './tablet-breadcrumb'
 
+/**
+ * Map mobile Expo Router paths to web-style paths that match navData routes.
+ * Mobile file-based routing doesn't always match the nav tree hierarchy.
+ */
+const MOBILE_ROUTE_MAP: Record<string, string> = {
+  '/ground-ops': '/ground-ops',
+  '/ground-ops/cargo-loading': '/ground-ops/cargo/cargo-manifest',
+}
+
 const logo = require('../assets/skyhub-logo.png')
 
 interface BreadcrumbHeaderProps {
@@ -16,13 +25,16 @@ export function BreadcrumbHeader({ moduleCode }: BreadcrumbHeaderProps) {
   const router = useRouter()
   const pathname = usePathname()
 
+  // Map mobile paths to web-style paths for nav tree resolution
+  const resolvedPath = MOBILE_ROUTE_MAP[pathname] ?? pathname
+
   // Tablet: use the new pill-segment breadcrumb
   if (isTablet) {
     return (
       <SafeAreaView edges={['top']} style={{ backgroundColor: 'transparent' }}>
         <View className="flex-row items-center justify-between px-4 pt-3 pb-2">
           <TabletBreadcrumb
-            pathname={pathname}
+            pathname={resolvedPath}
             palette={palette}
             isDark={isDark}
             accent={accent}

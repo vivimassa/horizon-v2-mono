@@ -266,7 +266,7 @@ export default function SettingsScreen() {
               {/* Admin Section */}
               <SectionBar title="Administration" color="#7c3aed" palette={palette} />
               <View style={{ gap: 10 }}>
-                <AdminCard icon={Database} iconColor={accent} title="Master Data" subtitle="Airports, aircraft types, airlines, reference data" palette={palette} isDark={isDark} onPress={() => router.push('/(tabs)/settings/airports' as any)} />
+                <AdminCard icon={Database} iconColor={accent} title="Master Database" subtitle="Airports, aircraft types, airlines, reference data" palette={palette} isDark={isDark} onPress={() => router.push('/(tabs)/settings/master-database' as any)} />
                 <AdminCard icon={ShieldCheck} iconColor="#7c3aed" title="Users & Roles" subtitle="User accounts, role assignment, RBAC permissions" palette={palette} isDark={isDark} />
                 <AdminCard icon={ArrowLeftRight} iconColor="#0f766e" title="Interface" subtitle="AMOS, SSIM, MVT integrations and message hub" palette={palette} isDark={isDark} />
                 <AdminCard icon={Building2} iconColor="#b45309" title="Operator Config" subtitle="Airline settings, base airports, fleet configuration" palette={palette} isDark={isDark} />

@@ -45,6 +45,20 @@ export interface Flight {
 }
 
 // ─── Reference types ──────────────────────────────────────
+export interface RunwayData {
+  _id: string
+  identifier: string
+  lengthM: number | null
+  lengthFt: number | null
+  widthM: number | null
+  widthFt: number | null
+  surface: string | null
+  ilsCategory: string | null
+  lighting: boolean
+  status: string
+  notes: string | null
+}
+
 export interface AirportRef {
   _id: string
   icaoCode: string
@@ -66,6 +80,7 @@ export interface AirportRef {
   elevationFt: number | null
   crewReportingTimeMinutes: number | null
   crewDebriefTimeMinutes: number | null
+  runways: RunwayData[]
   numberOfRunways: number | null
   longestRunwayFt: number | null
   hasFuelAvailable: boolean
@@ -104,7 +119,13 @@ export interface CountryRef {
   region: string | null
   subRegion: string | null
   icaoPrefix: string | null
+  currencyCode: string | null
+  currencyName: string | null
+  currencySymbol: string | null
+  phoneCode: string | null
   flagEmoji: string | null
+  latitude: number | null
+  longitude: number | null
   isActive: boolean
 }
 
@@ -194,6 +215,7 @@ export interface AirportLookupResult {
   elevationFt: number | null
   numberOfRunways: number | null
   longestRunwayFt: number | null
+  runways: Omit<RunwayData, '_id'>[]
 }
 
 export interface ReferenceStats {
@@ -253,6 +275,23 @@ export const api = {
   lookupAirport: (icao: string) =>
     request<AirportLookupResult>(`/airports/lookup?icao=${encodeURIComponent(icao)}`),
 
+  addRunway: (airportId: string, data: Omit<RunwayData, '_id'>) =>
+    request<AirportRef>(`/airports/${airportId}/runways`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateRunway: (airportId: string, runwayId: string, data: Partial<Omit<RunwayData, '_id'>>) =>
+    request<AirportRef>(`/airports/${airportId}/runways/${runwayId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteRunway: (airportId: string, runwayId: string) =>
+    request<AirportRef>(`/airports/${airportId}/runways/${runwayId}`, {
+      method: 'DELETE',
+    }),
+
   getAircraftTypes: (operatorId = 'horizon') =>
     request<AircraftTypeRef[]>(`/aircraft-types?operatorId=${operatorId}`),
 
@@ -264,6 +303,25 @@ export const api = {
     if (qs.length) path += `?${qs.join('&')}`
     return request<CountryRef[]>(path)
   },
+
+  getCountry: (id: string) => request<CountryRef>(`/countries/${id}`),
+
+  createCountry: (data: Partial<CountryRef>) =>
+    request<CountryRef>('/countries', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateCountry: (id: string, data: Partial<CountryRef>) =>
+    request<CountryRef>(`/countries/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteCountry: (id: string) =>
+    request<{ success: boolean }>(`/countries/${id}`, {
+      method: 'DELETE',
+    }),
 
   getDelayCodes: (operatorId = 'horizon') =>
     request<DelayCodeRef[]>(`/delay-codes?operatorId=${operatorId}`),

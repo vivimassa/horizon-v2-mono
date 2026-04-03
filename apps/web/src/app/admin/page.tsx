@@ -47,8 +47,8 @@ const SECTIONS: SectionDef[] = [
     icon: Globe,
     color: "#0f766e",
     cards: [
-      { code: "5.1.1", label: "Airports Database", desc: "ICAO/IATA codes, coordinates, facilities", icon: PlaneTakeoff, href: "/admin/airports" },
-      { code: "5.1.2", label: "Countries Database", desc: "ISO codes, regions, currency", icon: Globe, href: "/admin/countries" },
+      { code: "5.1.1", label: "Countries Database", desc: "ISO codes, regions, currency", icon: Globe, href: "/admin/countries" },
+      { code: "5.1.2", label: "Airports Database", desc: "ICAO/IATA codes, coordinates, facilities", icon: PlaneTakeoff, href: "/admin/airports" },
       { code: "5.1.3", label: "Operators Database", desc: "Airlines, codeshare partners", icon: Building2, href: "/admin/operators" },
     ],
   },

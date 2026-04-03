@@ -1,5 +1,22 @@
 import mongoose, { Schema, type InferSchemaType } from 'mongoose'
 
+const runwaySchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    identifier: { type: String, required: true },   // e.g. "08L/26R"
+    lengthM: { type: Number, default: null },
+    lengthFt: { type: Number, default: null },
+    widthM: { type: Number, default: null },
+    widthFt: { type: Number, default: null },
+    surface: { type: String, default: null },        // e.g. "ASPHALT", "CONCRETE"
+    ilsCategory: { type: String, default: null },    // e.g. "CAT I", "CAT II", "CAT III"
+    lighting: { type: Boolean, default: false },
+    status: { type: String, default: 'active' },     // active | closed | under-construction
+    notes: { type: String, default: null },
+  },
+  { _id: false, timestamps: false }
+)
+
 const airportSchema = new Schema(
   {
     _id: { type: String, required: true }, // Supabase UUID preserved
@@ -24,7 +41,10 @@ const airportSchema = new Schema(
     crewReportingTimeMinutes: { type: Number, default: null },
     crewDebriefTimeMinutes: { type: Number, default: null },
 
-    // Runway info
+    // Runways — individual runway records
+    runways: { type: [runwaySchema], default: [] },
+
+    // Runway summary (derived from runways array or manual entry)
     numberOfRunways: { type: Number, default: null },
     longestRunwayFt: { type: Number, default: null },
 

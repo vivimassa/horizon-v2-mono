@@ -3,6 +3,7 @@ export type {
   Flight,
   AirportRef,
   AirportLookupResult,
+  RunwayData,
   AircraftTypeRef,
   CountryRef,
   DelayCodeRef,

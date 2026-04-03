@@ -1,17 +1,16 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { Text, View, ScrollView, Pressable, TextInput, Alert, Platform } from 'react-native'
 import MapView, { Marker } from 'react-native-maps'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter, useLocalSearchParams } from 'expo-router'
-import { api, setApiBaseUrl, type AirportRef } from '@skyhub/api'
+import { api, type AirportRef } from '@skyhub/api'
 import {
   ChevronLeft, Pencil, Save, X, Trash2,
   Info, Plane, Radio, Users,
+  Plus, Lightbulb, Check,
 } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
-
-setApiBaseUrl('http://192.168.1.101:3002')
 
 type TabKey = 'basic' | 'runway' | 'operations' | 'crew'
 
@@ -153,20 +152,11 @@ export default function AirportDetailScreen() {
           </View>
         </View>
 
-        {/* Code pills */}
-        <View className="flex-row items-center mt-2" style={{ gap: 8, marginLeft: 36 }}>
-          <View className="px-2.5 py-1 rounded-lg" style={{ backgroundColor: palette.card, borderWidth: 1, borderColor: palette.cardBorder }}>
-            <Text style={{ fontSize: 15, color: palette.textSecondary }}>IATA: <Text style={{ fontWeight: '700', fontFamily: 'monospace', color: palette.text }}>{airport.iataCode ?? '—'}</Text></Text>
-          </View>
-          <View className="px-2.5 py-1 rounded-lg" style={{ backgroundColor: palette.card, borderWidth: 1, borderColor: palette.cardBorder }}>
-            <Text style={{ fontSize: 15, color: palette.textSecondary }}>ICAO: <Text style={{ fontWeight: '700', fontFamily: 'monospace', color: palette.text }}>{airport.icaoCode}</Text></Text>
-          </View>
-        </View>
       </View>
 
       {/* Map */}
       {airport.latitude != null && airport.longitude != null && (
-        <View style={{ height: 200, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+        <View style={{ height: 250, borderBottomWidth: 1, borderBottomColor: palette.border }}>
           <MapView
             style={{ flex: 1 }}
             initialRegion={{
@@ -192,11 +182,11 @@ export default function AirportDetailScreen() {
 
           {/* Code overlay on map */}
           <View className="absolute top-3 left-3 flex-row" style={{ gap: 6 }}>
-            <View className="px-2 py-1 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.88)', ...Platform.select({ ios: { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }, android: { elevation: 3 } }) }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', fontFamily: 'monospace', color: '#111' }}>{airport.iataCode ?? '—'}</Text>
+            <View className="px-2.5 py-1 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.88)', ...Platform.select({ ios: { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }, android: { elevation: 3 } }) }}>
+              <Text style={{ fontSize: 13, color: '#666' }}>IATA: <Text style={{ fontWeight: '700', fontFamily: 'monospace', color: '#111' }}>{airport.iataCode ?? '—'}</Text></Text>
             </View>
-            <View className="px-2 py-1 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.88)', ...Platform.select({ ios: { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }, android: { elevation: 3 } }) }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', fontFamily: 'monospace', color: '#111' }}>{airport.icaoCode}</Text>
+            <View className="px-2.5 py-1 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.88)', ...Platform.select({ ios: { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }, android: { elevation: 3 } }) }}>
+              <Text style={{ fontSize: 13, color: '#666' }}>ICAO: <Text style={{ fontWeight: '700', fontFamily: 'monospace', color: '#111' }}>{airport.icaoCode}</Text></Text>
             </View>
           </View>
         </View>
@@ -236,8 +226,16 @@ export default function AirportDetailScreen() {
         )}
         {activeTab === 'runway' && (
           <>
-            <Field label="Number of Runways" value={airport.numberOfRunways} editing={editing} fieldKey="numberOfRunways" editValue={get('numberOfRunways')} onChange={handleFieldChange} palette={palette} numeric />
-            <Field label="Longest Runway (ft)" value={airport.longestRunwayFt?.toLocaleString()} editing={editing} fieldKey="longestRunwayFt" editValue={get('longestRunwayFt')} onChange={handleFieldChange} palette={palette} numeric />
+            {/* Runway list */}
+            <RunwayList airport={airport} palette={palette} isDark={isDark} accent={accent} onRefresh={() => {
+              api.getAirport(airport._id).then(setAirport).catch(console.error)
+            }} />
+
+            {/* Facilities */}
+            <View className="mt-4 mb-2 flex-row items-center" style={{ gap: 6 }}>
+              <View style={{ width: 3, height: 16, borderRadius: 2, backgroundColor: accent }} />
+              <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text }}>Facilities</Text>
+            </View>
             <Field label="Number of Gates" value={airport.numberOfGates} editing={editing} fieldKey="numberOfGates" editValue={get('numberOfGates')} onChange={handleFieldChange} palette={palette} numeric />
             <Field label="Fire Category" value={airport.fireCategory} editing={editing} fieldKey="fireCategory" editValue={get('fireCategory')} onChange={handleFieldChange} palette={palette} numeric />
             <ToggleField label="Fuel Available" value={airport.hasFuelAvailable} editing={editing} fieldKey="hasFuelAvailable" editValue={get('hasFuelAvailable')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
@@ -317,6 +315,188 @@ function ToggleField({ label, value, editing, fieldKey, editValue, onChange, pal
         <Text style={{ fontSize: 15, fontWeight: '600', color: value ? (isDark ? '#4ade80' : '#16a34a') : palette.textSecondary }}>
           {value ? 'Yes' : 'No'}
         </Text>
+      )}
+    </View>
+  )
+}
+
+// ── Runway List ──
+
+function RunwayList({ airport, palette, isDark, accent, onRefresh }: {
+  airport: AirportRef; palette: Palette; isDark: boolean; accent: string; onRefresh: () => void
+}) {
+  const runways = airport.runways ?? []
+  const [showAdd, setShowAdd] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({ identifier: '', lengthFt: '', widthFt: '', surface: 'ASPHALT' })
+
+  const handleAdd = useCallback(async () => {
+    if (!form.identifier.trim()) { Alert.alert('Error', 'Identifier is required'); return }
+    setSaving(true)
+    try {
+      const lengthFt = form.lengthFt ? Number(form.lengthFt) : null
+      const widthFt = form.widthFt ? Number(form.widthFt) : null
+      await api.addRunway(airport._id, {
+        identifier: form.identifier.toUpperCase(),
+        lengthFt,
+        lengthM: lengthFt ? Math.round(lengthFt * 0.3048) : null,
+        widthFt,
+        widthM: widthFt ? Math.round(widthFt * 0.3048) : null,
+        surface: form.surface || null,
+        ilsCategory: null,
+        lighting: false,
+        status: 'active',
+        notes: null,
+      })
+      setForm({ identifier: '', lengthFt: '', widthFt: '', surface: 'ASPHALT' })
+      setShowAdd(false)
+      onRefresh()
+    } catch (err: any) { Alert.alert('Error', err.message || 'Failed to add runway') }
+    finally { setSaving(false) }
+  }, [airport._id, form, onRefresh])
+
+  const handleDelete = useCallback((rwId: string, identifier: string) => {
+    Alert.alert('Delete Runway', `Delete runway ${identifier}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.deleteRunway(airport._id, rwId)
+            onRefresh()
+          } catch (err: any) { Alert.alert('Error', err.message || 'Failed to delete') }
+        },
+      },
+    ])
+  }, [airport._id, onRefresh])
+
+  return (
+    <View>
+      {/* Section header */}
+      <View className="flex-row items-center justify-between mb-2">
+        <View className="flex-row items-center" style={{ gap: 6 }}>
+          <View style={{ width: 3, height: 16, borderRadius: 2, backgroundColor: accent }} />
+          <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text }}>Runways</Text>
+          <Text style={{ fontSize: 12, color: palette.textTertiary }}>({runways.length})</Text>
+        </View>
+        {!showAdd && (
+          <Pressable onPress={() => setShowAdd(true)}
+            className="flex-row items-center px-2.5 py-1.5 rounded-lg active:opacity-60"
+            style={{ backgroundColor: accent, gap: 4 }}>
+            <Plus size={12} color="#fff" strokeWidth={2.5} />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#fff' }}>Add</Text>
+          </Pressable>
+        )}
+      </View>
+
+      {/* Add form */}
+      {showAdd && (
+        <View className="mb-3 p-3 rounded-xl" style={{ backgroundColor: palette.card, borderWidth: 1, borderColor: palette.cardBorder }}>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: palette.text, marginBottom: 8 }}>New Runway</Text>
+          <View className="flex-row" style={{ gap: 8, marginBottom: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, color: palette.textSecondary, fontWeight: '600', marginBottom: 2 }}>IDENTIFIER</Text>
+              <TextInput value={form.identifier} placeholder="e.g. 08L/26R"
+                onChangeText={v => setForm(p => ({ ...p, identifier: v.toUpperCase() }))}
+                style={{ fontSize: 13, fontFamily: 'monospace', color: palette.text, borderBottomWidth: 1, borderBottomColor: palette.border, paddingVertical: 4 }}
+                placeholderTextColor={palette.textTertiary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, color: palette.textSecondary, fontWeight: '600', marginBottom: 2 }}>LENGTH (FT)</Text>
+              <TextInput value={form.lengthFt} placeholder="e.g. 12000"
+                onChangeText={v => setForm(p => ({ ...p, lengthFt: v }))} keyboardType="numeric"
+                style={{ fontSize: 13, color: palette.text, borderBottomWidth: 1, borderBottomColor: palette.border, paddingVertical: 4 }}
+                placeholderTextColor={palette.textTertiary} />
+            </View>
+          </View>
+          <View className="flex-row" style={{ gap: 8, marginBottom: 10 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, color: palette.textSecondary, fontWeight: '600', marginBottom: 2 }}>WIDTH (FT)</Text>
+              <TextInput value={form.widthFt} placeholder="e.g. 150"
+                onChangeText={v => setForm(p => ({ ...p, widthFt: v }))} keyboardType="numeric"
+                style={{ fontSize: 13, color: palette.text, borderBottomWidth: 1, borderBottomColor: palette.border, paddingVertical: 4 }}
+                placeholderTextColor={palette.textTertiary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, color: palette.textSecondary, fontWeight: '600', marginBottom: 2 }}>SURFACE</Text>
+              <TextInput value={form.surface}
+                onChangeText={v => setForm(p => ({ ...p, surface: v.toUpperCase() }))}
+                style={{ fontSize: 13, color: palette.text, borderBottomWidth: 1, borderBottomColor: palette.border, paddingVertical: 4 }}
+                placeholderTextColor={palette.textTertiary} />
+            </View>
+          </View>
+          <View className="flex-row" style={{ gap: 8 }}>
+            <Pressable onPress={handleAdd} disabled={saving}
+              className="flex-row items-center px-3 py-2 rounded-lg active:opacity-60"
+              style={{ backgroundColor: accent, gap: 4, opacity: saving ? 0.5 : 1 }}>
+              <Check size={13} color="#fff" strokeWidth={2.5} />
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#fff' }}>{saving ? 'Adding…' : 'Add'}</Text>
+            </Pressable>
+            <Pressable onPress={() => setShowAdd(false)}
+              className="px-3 py-2 rounded-lg active:opacity-60">
+              <Text style={{ fontSize: 12, fontWeight: '500', color: palette.textSecondary }}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {/* Runway cards */}
+      {runways.length === 0 && !showAdd ? (
+        <View className="py-6 items-center">
+          <Text style={{ fontSize: 13, color: palette.textTertiary }}>No runway data available</Text>
+        </View>
+      ) : (
+        <View style={{ gap: 8 }}>
+          {runways.map(rw => (
+            <View key={rw._id} className="p-3 rounded-xl"
+              style={{ backgroundColor: palette.card, borderWidth: 1, borderColor: palette.cardBorder }}>
+              <View className="flex-row items-center justify-between mb-2">
+                <View className="flex-row items-center" style={{ gap: 8 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '800', fontFamily: 'monospace', color: palette.text }}>{rw.identifier}</Text>
+                  <View className="px-1.5 py-0.5 rounded" style={{
+                    backgroundColor: rw.status === 'active' ? (isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7')
+                      : rw.status === 'closed' ? (isDark ? 'rgba(220,38,38,0.15)' : '#fee2e2')
+                      : (isDark ? 'rgba(217,119,6,0.15)' : '#fef3c7')
+                  }}>
+                    <Text style={{ fontSize: 11, fontWeight: '600',
+                      color: rw.status === 'active' ? (isDark ? '#4ade80' : '#166534')
+                        : rw.status === 'closed' ? (isDark ? '#f87171' : '#991b1b')
+                        : (isDark ? '#fbbf24' : '#92400e')
+                    }}>{rw.status === 'under-construction' ? 'WIP' : rw.status?.toUpperCase()}</Text>
+                  </View>
+                  {rw.lighting && <Lightbulb size={14} color="#f59e0b" strokeWidth={2} />}
+                </View>
+                <Pressable onPress={() => handleDelete(rw._id, rw.identifier)} className="p-1.5 active:opacity-60">
+                  <Trash2 size={14} color={palette.textTertiary} strokeWidth={1.8} />
+                </Pressable>
+              </View>
+              <View className="flex-row" style={{ gap: 16 }}>
+                <View>
+                  <Text style={{ fontSize: 10, color: palette.textTertiary, fontWeight: '600' }}>LENGTH</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '500', color: palette.text }}>
+                    {rw.lengthFt ? `${rw.lengthFt.toLocaleString()} ft` : '—'}
+                  </Text>
+                  {rw.lengthM != null && <Text style={{ fontSize: 11, color: palette.textTertiary }}>{rw.lengthM.toLocaleString()} m</Text>}
+                </View>
+                <View>
+                  <Text style={{ fontSize: 10, color: palette.textTertiary, fontWeight: '600' }}>WIDTH</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '500', color: palette.text }}>
+                    {rw.widthFt ? `${rw.widthFt.toLocaleString()} ft` : '—'}
+                  </Text>
+                  {rw.widthM != null && <Text style={{ fontSize: 11, color: palette.textTertiary }}>{rw.widthM.toLocaleString()} m</Text>}
+                </View>
+                <View>
+                  <Text style={{ fontSize: 10, color: palette.textTertiary, fontWeight: '600' }}>SURFACE</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '500', color: palette.text }}>{rw.surface ?? '—'}</Text>
+                </View>
+                <View>
+                  <Text style={{ fontSize: 10, color: palette.textTertiary, fontWeight: '600' }}>ILS</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '500', color: palette.text }}>{rw.ilsCategory ?? 'None'}</Text>
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
       )}
     </View>
   )

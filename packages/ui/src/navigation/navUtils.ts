@@ -39,7 +39,7 @@ function firstRoute(mod: NavModuleData): string {
 }
 
 function firstSectionRoute(section: NavSectionData): string {
-  return section.pages[0]?.route ?? '/'
+  return section.route ?? section.pages[0]?.route ?? '/'
 }
 
 export function resolveNavPath(pathname: string): NavPath | null {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import type { AirportRef, AirportLookupResult, CountryRef } from "@skyhub/api";
 import { api } from "@skyhub/api";
 import { AirportMap } from "./airport-map";
@@ -41,9 +41,10 @@ interface AirportDetailProps {
   onSave?: (id: string, data: Partial<AirportRef>) => Promise<void>;
   onDelete?: (id: string) => Promise<void>;
   onCreate?: (data: Partial<AirportRef>) => Promise<void>;
+  onRefresh?: () => void;
 }
 
-export function AirportDetail({ airport, onSave, onDelete, onCreate }: AirportDetailProps) {
+export function AirportDetail({ airport, onSave, onDelete, onCreate, onRefresh }: AirportDetailProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -120,7 +121,7 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate }: AirportDe
     if (!onCreate || !lookupResult) return;
     setCreating(true);
     try {
-      await onCreate({ icaoCode: lookupResult.icaoCode ?? undefined, iataCode: lookupResult.iataCode, name: lookupResult.name ?? "Unknown", city: lookupResult.city, timezone: lookupResult.timezone ?? "UTC", latitude: lookupResult.latitude, longitude: lookupResult.longitude, elevationFt: lookupResult.elevationFt, numberOfRunways: lookupResult.numberOfRunways, longestRunwayFt: lookupResult.longestRunwayFt, isActive: true } as Partial<AirportRef>);
+      await onCreate({ icaoCode: lookupResult.icaoCode ?? undefined, iataCode: lookupResult.iataCode, name: lookupResult.name ?? "Unknown", city: lookupResult.city, timezone: lookupResult.timezone ?? "UTC", latitude: lookupResult.latitude, longitude: lookupResult.longitude, elevationFt: lookupResult.elevationFt, numberOfRunways: lookupResult.numberOfRunways, longestRunwayFt: lookupResult.longestRunwayFt, runways: lookupResult.runways as any, isActive: true } as Partial<AirportRef>);
       resetCreate();
     } catch (err: any) { setCreateError(friendlyCreateError(err)); }
     finally { setCreating(false); }
@@ -139,6 +140,28 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate }: AirportDe
   }, [onCreate, manualForm, countries, resetCreate, friendlyCreateError]);
 
   const hasCoords = airport.latitude != null && airport.longitude != null;
+
+  // Resizable map
+  const [mapHeight, setMapHeight] = useState(300);
+  const dragRef = useRef<{ startY: number; startH: number } | null>(null);
+
+  const onDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragRef.current = { startY: e.clientY, startH: mapHeight };
+
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return;
+      const delta = ev.clientY - dragRef.current.startY;
+      setMapHeight(Math.max(150, Math.min(700, dragRef.current.startH + delta)));
+    };
+    const onUp = () => {
+      dragRef.current = null;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [mapHeight]);
 
   const handleEdit = useCallback(() => {
     setDraft({});
@@ -459,7 +482,7 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate }: AirportDe
 
       {/* Map with code overlay */}
       {hasCoords && (
-        <div className="h-[300px] shrink-0 border-b border-hz-border relative">
+        <div className="shrink-0 border-b border-hz-border relative" style={{ height: mapHeight }}>
           <AirportMap
             latitude={airport.latitude!}
             longitude={airport.longitude!}
@@ -501,6 +524,13 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate }: AirportDe
               </span>
             )}
           </div>
+          {/* Drag handle to resize map */}
+          <div
+            onMouseDown={onDragStart}
+            className="absolute bottom-0 left-0 right-0 h-2 cursor-row-resize z-10 group flex items-center justify-center"
+          >
+            <div className="w-10 h-1 rounded-full bg-hz-text-secondary/30 group-hover:bg-hz-text-secondary/60 transition-colors" />
+          </div>
         </div>
       )}
 
@@ -532,7 +562,7 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate }: AirportDe
           <AirportBasicTab airport={airport} editing={editing} draft={draft} onChange={handleFieldChange} />
         )}
         {activeTab === "runway" && (
-          <AirportRunwayTab airport={airport} editing={editing} draft={draft} onChange={handleFieldChange} />
+          <AirportRunwayTab airport={airport} editing={editing} draft={draft} onChange={handleFieldChange} onRefresh={onRefresh} />
         )}
         {activeTab === "operations" && (
           <AirportOperationsTab airport={airport} editing={editing} draft={draft} onChange={handleFieldChange} />

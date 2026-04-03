@@ -10,8 +10,23 @@ import { CrewPosition } from '../models/CrewPosition.js'
 import { ExpiryCode, ExpiryCodeCategory } from '../models/ExpiryCode.js'
 import { Operator } from '../models/Operator.js'
 import { FlightInstance } from '../models/FlightInstance.js'
+import { lookupByIcao, getStats, loadOurAirportsData } from '../data/ourairports-cache.js'
 
 // ─── Zod schemas for airport validation ───────────────────
+
+const runwaySchema = z.object({
+  _id: z.string().optional(),
+  identifier: z.string().min(1, 'Runway identifier is required'),
+  lengthM: z.number().min(0).nullable().optional(),
+  lengthFt: z.number().min(0).nullable().optional(),
+  widthM: z.number().min(0).nullable().optional(),
+  widthFt: z.number().min(0).nullable().optional(),
+  surface: z.string().nullable().optional(),
+  ilsCategory: z.string().nullable().optional(),
+  lighting: z.boolean().optional().default(false),
+  status: z.string().optional().default('active'),
+  notes: z.string().nullable().optional(),
+})
 
 const airportCreateSchema = z.object({
   icaoCode: z.string().min(3).max(4).regex(/^[A-Z]{3,4}$/, 'ICAO must be 3-4 uppercase letters'),
@@ -33,6 +48,7 @@ const airportCreateSchema = z.object({
   isCrewBase: z.boolean().optional().default(false),
   crewReportingTimeMinutes: z.number().min(0).nullable().optional(),
   crewDebriefTimeMinutes: z.number().min(0).nullable().optional(),
+  runways: z.array(runwaySchema).optional().default([]),
   numberOfRunways: z.number().int().min(0).nullable().optional(),
   longestRunwayFt: z.number().min(0).nullable().optional(),
   hasFuelAvailable: z.boolean().optional().default(false),
@@ -49,6 +65,38 @@ const airportCreateSchema = z.object({
 }).strict()
 
 const airportUpdateSchema = airportCreateSchema.partial()
+
+/** Recompute summary fields from runways array */
+function recomputeRunwaySummary(runways: any[]): { numberOfRunways: number; longestRunwayFt: number | null } {
+  const active = runways.filter((r: any) => r.status !== 'closed')
+  const longest = active.reduce((max: number, r: any) => {
+    const ft = Number(r.lengthFt) || 0
+    return ft > max ? ft : max
+  }, 0)
+  return { numberOfRunways: active.length, longestRunwayFt: longest || null }
+}
+
+// ─── Zod schemas for country validation ──────────────────
+
+const countryCreateSchema = z.object({
+  isoCode2: z.string().length(2).regex(/^[A-Z]{2}$/, 'ISO 2 must be 2 uppercase letters'),
+  isoCode3: z.string().length(3).regex(/^[A-Z]{3}$/, 'ISO 3 must be 3 uppercase letters'),
+  name: z.string().min(1, 'Country name is required'),
+  officialName: z.string().nullable().optional(),
+  region: z.string().nullable().optional(),
+  subRegion: z.string().nullable().optional(),
+  icaoPrefix: z.string().nullable().optional(),
+  currencyCode: z.string().nullable().optional(),
+  currencyName: z.string().nullable().optional(),
+  currencySymbol: z.string().nullable().optional(),
+  phoneCode: z.string().nullable().optional(),
+  flagEmoji: z.string().nullable().optional(),
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
+  isActive: z.boolean().optional().default(true),
+}).strict()
+
+const countryUpdateSchema = countryCreateSchema.partial()
 
 export async function referenceRoutes(app: FastifyInstance): Promise<void> {
   // ─── Operators ──────────────────────────────────────────
@@ -97,7 +145,41 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const code = icao.toUpperCase()
 
-    // Source 1: mwgg/Airports — 28k+ airports, free, no API key
+    // Source 1: OurAirports cache (85k+ airports, instant, includes runways)
+    const oa = lookupByIcao(code)
+    if (oa) {
+      const active = oa.runways.filter(r => r.status !== 'closed')
+      const longestFt = active.reduce((max, r) => Math.max(max, r.lengthFt ?? 0), 0)
+      return {
+        source: 'OurAirports',
+        icaoCode: oa.icaoCode,
+        iataCode: oa.iataCode,
+        name: oa.name,
+        city: oa.city,
+        country: oa.country,
+        timezone: null,
+        utcOffsetHours: null,
+        latitude: oa.latitude,
+        longitude: oa.longitude,
+        elevationFt: oa.elevationFt,
+        numberOfRunways: active.length || null,
+        longestRunwayFt: longestFt || null,
+        runways: oa.runways.map(r => ({ ...r, ilsCategory: null, notes: null })),
+      }
+    }
+
+    // Source 2 (fallback): airportdb.io
+    try {
+      const res = await fetch(`https://airportdb.io/api/v1/airport/${code}?apiToken=free`)
+      if (res.ok) {
+        const data = await res.json() as Record<string, any>
+        if (data.icao) {
+          return { source: 'airportdb.io', ...mapAirportDbResponse(data) }
+        }
+      }
+    } catch { /* fallback */ }
+
+    // Source 3 (fallback): mwgg/Airports — no runway data
     try {
       const res = await fetch('https://raw.githubusercontent.com/mwgg/Airports/master/airports.json')
       if (res.ok) {
@@ -118,18 +200,8 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
             elevationFt: airport.elevation != null ? Number(airport.elevation) : null,
             numberOfRunways: null,
             longestRunwayFt: null,
+            runways: [],
           }
-        }
-      }
-    } catch { /* fallback */ }
-
-    // Source 2: airportdb.io (backup)
-    try {
-      const res = await fetch(`https://airportdb.io/api/v1/airport/${code}?apiToken=free`)
-      if (res.ok) {
-        const data = await res.json() as Record<string, any>
-        if (data.icao) {
-          return { source: 'airportdb.io', ...mapAirportDbResponse(data) }
         }
       }
     } catch { /* fallback */ }
@@ -174,6 +246,14 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
         body.countryIso2 = country.isoCode2
         body.countryFlag = country.flagEmoji
       }
+    }
+
+    // Assign _id to each runway if provided
+    if (Array.isArray(body.runways)) {
+      body.runways = body.runways.map((r: any) => ({ _id: crypto.randomUUID(), ...r }))
+      const summary = recomputeRunwaySummary(body.runways as any[])
+      body.numberOfRunways = summary.numberOfRunways
+      body.longestRunwayFt = summary.longestRunwayFt
     }
 
     const id = crypto.randomUUID()
@@ -240,6 +320,72 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     return { success: true }
   })
 
+  // ─── Airport Runways CRUD ──────────────────────────────
+  // Add runway
+  app.post('/airports/:id/runways', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const parsed = runwaySchema.safeParse(req.body)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+
+    const runway = { _id: crypto.randomUUID(), ...parsed.data }
+    const doc = await Airport.findByIdAndUpdate(
+      id,
+      { $push: { runways: runway } },
+      { new: true }
+    ).lean()
+    if (!doc) return reply.code(404).send({ error: 'Airport not found' })
+
+    // Recompute summary
+    const summary = recomputeRunwaySummary(doc.runways ?? [])
+    await Airport.findByIdAndUpdate(id, { $set: summary })
+    return { ...doc, ...summary }
+  })
+
+  // Update runway
+  app.patch('/airports/:id/runways/:rwId', async (req, reply) => {
+    const { id, rwId } = req.params as { id: string; rwId: string }
+    const parsed = runwaySchema.partial().safeParse(req.body)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+
+    // Build $set fields for the matched array element
+    const setFields: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(parsed.data)) {
+      setFields[`runways.$.${k}`] = v
+    }
+
+    const doc = await Airport.findOneAndUpdate(
+      { _id: id, 'runways._id': rwId },
+      { $set: setFields },
+      { new: true }
+    ).lean()
+    if (!doc) return reply.code(404).send({ error: 'Airport or runway not found' })
+
+    const summary = recomputeRunwaySummary(doc.runways ?? [])
+    await Airport.findByIdAndUpdate(id, { $set: summary })
+    return { ...doc, ...summary }
+  })
+
+  // Delete runway
+  app.delete('/airports/:id/runways/:rwId', async (req, reply) => {
+    const { id, rwId } = req.params as { id: string; rwId: string }
+    const doc = await Airport.findByIdAndUpdate(
+      id,
+      { $pull: { runways: { _id: rwId } } },
+      { new: true }
+    ).lean()
+    if (!doc) return reply.code(404).send({ error: 'Airport not found' })
+
+    const summary = recomputeRunwaySummary(doc.runways ?? [])
+    await Airport.findByIdAndUpdate(id, { $set: summary })
+    return { ...doc, ...summary }
+  })
+
   // ─── Aircraft Types ─────────────────────────────────────
   app.get('/aircraft-types', async (req) => {
     const { operatorId } = req.query as { operatorId?: string }
@@ -257,9 +403,85 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
         { isoCode2: { $regex: search, $options: 'i' } },
+        { isoCode3: { $regex: search, $options: 'i' } },
       ]
     }
     return Country.find(filter).sort({ name: 1 }).lean()
+  })
+
+  app.get('/countries/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await Country.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Country not found' })
+    return doc
+  })
+
+  // Create country
+  app.post('/countries', async (req, reply) => {
+    const raw = req.body as Record<string, unknown>
+
+    if (raw.isoCode2) raw.isoCode2 = (raw.isoCode2 as string).toUpperCase()
+    if (raw.isoCode3) raw.isoCode3 = (raw.isoCode3 as string).toUpperCase()
+
+    const parsed = countryCreateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+
+    const body = parsed.data as Record<string, unknown>
+
+    // Check for duplicate ISO2
+    const existing = await Country.findOne({ isoCode2: body.isoCode2 }).lean()
+    if (existing) {
+      return reply.code(409).send({ error: `Country with ISO code ${body.isoCode2} already exists` })
+    }
+
+    const id = crypto.randomUUID()
+    const doc = await Country.create({
+      _id: id,
+      ...body,
+      createdAt: new Date().toISOString(),
+    })
+
+    return reply.code(201).send(doc.toObject())
+  })
+
+  // Update country
+  app.patch('/countries/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const raw = req.body as Record<string, unknown>
+
+    if (raw.isoCode2) raw.isoCode2 = (raw.isoCode2 as string).toUpperCase()
+    if (raw.isoCode3) raw.isoCode3 = (raw.isoCode3 as string).toUpperCase()
+
+    const parsed = countryUpdateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+
+    const body = parsed.data as Record<string, unknown>
+    const doc = await Country.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'Country not found' })
+    return doc
+  })
+
+  // Delete country — blocked if airports reference this country
+  app.delete('/countries/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const country = await Country.findById(id).lean()
+    if (!country) return reply.code(404).send({ error: 'Country not found' })
+
+    const airportCount = await Airport.countDocuments({ countryId: id })
+    if (airportCount > 0) {
+      return reply.code(409).send({
+        error: `Cannot delete ${country.name} — ${airportCount} airport${airportCount > 1 ? 's' : ''} reference this country. Deactivate it instead.`,
+      })
+    }
+
+    await Country.findByIdAndDelete(id)
+    return { success: true }
   })
 
   // ─── Delay Codes ────────────────────────────────────────
@@ -326,6 +548,8 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
       ExpiryCode.countDocuments(),
     ])
 
+    const cacheStats = getStats()
+
     return {
       operators,
       airports,
@@ -346,6 +570,23 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
         crewPositions +
         expiryCodeCategories +
         expiryCodes,
+      ourAirportsCache: {
+        loaded: cacheStats.loaded,
+        airports: cacheStats.airports,
+        lastRefreshed: cacheStats.lastLoadTime ? new Date(cacheStats.lastLoadTime).toISOString() : null,
+        ageMinutes: cacheStats.lastLoadTime ? Math.round((Date.now() - cacheStats.lastLoadTime) / 60000) : null,
+      },
+    }
+  })
+
+  // ─── Manual cache refresh ──────────────────────────────
+  app.post('/reference/refresh-cache', async () => {
+    await loadOurAirportsData()
+    const stats = getStats()
+    return {
+      success: true,
+      airports: stats.airports,
+      lastRefreshed: new Date(stats.lastLoadTime).toISOString(),
     }
   })
 }
@@ -353,8 +594,27 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 // ─── External lookup mappers ──────────────────────────────
 
 function mapAirportDbResponse(data: Record<string, any>) {
-  const runways = Array.isArray(data.runways) ? data.runways : []
-  const longestRunway = runways.reduce((max: number, r: any) => {
+  const rawRunways = Array.isArray(data.runways) ? data.runways : []
+
+  // Map individual runways
+  const runways = rawRunways.map((r: any) => {
+    const lengthFt = Number(r.length_ft) || null
+    const widthFt = Number(r.width_ft) || null
+    return {
+      identifier: r.le_ident && r.he_ident ? `${r.le_ident}/${r.he_ident}` : r.le_ident || r.he_ident || 'Unknown',
+      lengthM: lengthFt ? Math.round(lengthFt * 0.3048) : null,
+      lengthFt,
+      widthM: widthFt ? Math.round(widthFt * 0.3048) : null,
+      widthFt,
+      surface: r.surface ?? null,
+      ilsCategory: null,
+      lighting: r.lighted === true || r.lighted === 1 || r.lighted === '1',
+      status: r.closed ? 'closed' : 'active',
+      notes: null,
+    }
+  })
+
+  const longestRunway = rawRunways.reduce((max: number, r: any) => {
     const len = Number(r.length_ft) || 0
     return len > max ? len : max
   }, 0)
@@ -372,10 +632,25 @@ function mapAirportDbResponse(data: Record<string, any>) {
     elevationFt: data.elevation_ft != null ? Number(data.elevation_ft) : null,
     numberOfRunways: runways.length || null,
     longestRunwayFt: longestRunway || null,
+    runways,
   }
 }
 
 function mapAviowikiResponse(data: Record<string, any>) {
+  const rawRunways = Array.isArray(data.runways) ? data.runways : []
+  const runways = rawRunways.map((r: any) => ({
+    identifier: r.ident ?? r.identifier ?? r.name ?? 'Unknown',
+    lengthM: r.length_m != null ? Number(r.length_m) : null,
+    lengthFt: r.length_ft != null ? Number(r.length_ft) : (r.length_m != null ? Math.round(Number(r.length_m) / 0.3048) : null),
+    widthM: r.width_m != null ? Number(r.width_m) : null,
+    widthFt: r.width_ft != null ? Number(r.width_ft) : (r.width_m != null ? Math.round(Number(r.width_m) / 0.3048) : null),
+    surface: r.surface ?? null,
+    ilsCategory: null,
+    lighting: r.lighted === true || r.lighted === 1,
+    status: 'active',
+    notes: null,
+  }))
+
   return {
     icaoCode: data.icao ?? data.icaoCode ?? null,
     iataCode: data.iata ?? data.iataCode ?? null,
@@ -386,7 +661,8 @@ function mapAviowikiResponse(data: Record<string, any>) {
     latitude: data.latitude != null ? Number(data.latitude) : null,
     longitude: data.longitude != null ? Number(data.longitude) : null,
     elevationFt: data.elevation?.feet != null ? Number(data.elevation.feet) : (data.elevationFt ?? null),
-    numberOfRunways: data.runways?.length ?? null,
+    numberOfRunways: runways.length || null,
     longestRunwayFt: null,
+    runways,
   }
 }

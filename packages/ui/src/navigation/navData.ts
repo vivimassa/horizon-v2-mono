@@ -114,17 +114,37 @@ export const NAV_TREE: NavModuleData[] = [
     key: 'groundops', label: 'Ground Ops', num: '4', iconName: 'Truck',
     sections: [
       {
-        key: 'cargo', label: 'Cargo', num: '4.1', iconName: 'Package',
+        key: 'planning', label: 'Planning', num: '4.1', iconName: 'ClipboardList',
         pages: [
-          { key: 'cargo-manifest', label: 'Cargo Manifest', num: '4.1.1', route: '/ground-ops/cargo/cargo-manifest', iconName: 'Package', desc: 'Aircraft loading & manifest' },
+          { key: 'cargo-acceptance', label: 'Cargo Acceptance', num: '4.1.1', route: '/ground-ops/planning/cargo-acceptance', iconName: 'PackageCheck', desc: 'Review booked cargo, weigh, screen' },
+          { key: 'dangerous-goods', label: 'Dangerous Goods', num: '4.1.2', route: '/ground-ops/planning/dangerous-goods', iconName: 'AlertTriangle', desc: 'DG verification & NOTOC generation' },
+          { key: 'loading-plan', label: 'Loading Plan', num: '4.1.3', route: '/ground-ops/cargo/cargo-manifest', iconName: 'Package', desc: 'Assign cargo to compartments (LIR)' },
+          { key: 'seat-plan', label: 'Seat Plan', num: '4.1.4', route: '/ground-ops/planning/seat-plan', iconName: 'Armchair', desc: 'Pax seating distribution for W&B zones' },
         ],
       },
       {
-        key: 'handling', label: 'Handling', num: '4.2', iconName: 'Truck',
+        key: 'loading', label: 'Live Loading', num: '4.2', iconName: 'Loader',
         pages: [
-          { key: 'turnaround', label: 'Turnaround', num: '4.2.1', route: '/ground-ops/handling/turnaround', iconName: 'Repeat', desc: 'Turnaround management' },
-          { key: 'gate-management', label: 'Gate Management', num: '4.2.2', route: '/ground-ops/handling/gate-management', iconName: 'DoorOpen', desc: 'Gate assignment & tracking' },
-          { key: 'ground-handling', label: 'Ground Handling', num: '4.2.3', route: '/ground-ops/handling/ground-handling', iconName: 'LayoutGrid', desc: 'Ground handler view' },
+          { key: 'flight-loading', label: 'Flight Loading', num: '4.2.1', route: '/ground-ops/loading/flight-loading', iconName: 'Plane', desc: 'Unified cargo + pax live view' },
+          { key: 'handler-view', label: 'Handler View', num: '4.2.2', route: '/ground-ops/loading/handler-view', iconName: 'Smartphone', desc: 'Ground handler confirmation (SkyHub)' },
+        ],
+      },
+      {
+        key: 'load-control', label: 'Load Control', num: '4.3', iconName: 'Scale',
+        pages: [
+          { key: 'load-summary', label: 'Load Summary', num: '4.3.1', route: '/ground-ops/load-control/load-summary', iconName: 'BarChart3', desc: 'Combined pax + cargo + bags dashboard' },
+          { key: 'messages', label: 'Messages', num: '4.3.2', route: '/ground-ops/load-control/messages', iconName: 'MessageSquare', desc: 'Generate LDM, CPM, NOTOC' },
+          { key: 'loadsheet', label: 'Loadsheet', num: '4.3.3', route: '/ground-ops/load-control/loadsheet', iconName: 'FileBarChart', desc: 'Weight & Balance' },
+          { key: 'lmc', label: 'Last Minute Changes', num: '4.3.4', route: '/ground-ops/load-control/lmc', iconName: 'PenLine', desc: 'Recalculate after late changes' },
+          { key: 'captain-acceptance', label: 'Captain Acceptance', num: '4.3.5', route: '/ground-ops/load-control/captain-acceptance', iconName: 'BadgeCheck', desc: 'Digital sign-off, push to EFB' },
+        ],
+      },
+      {
+        key: 'reports', label: 'Reports', num: '4.4', iconName: 'BarChart3',
+        pages: [
+          { key: 'loading-history', label: 'Loading History', num: '4.4.1', route: '/ground-ops/reports/loading-history', iconName: 'History', desc: 'Archived loadsheets & messages' },
+          { key: 'ground-performance', label: 'Ground Performance', num: '4.4.2', route: '/ground-ops/reports/ground-performance', iconName: 'TrendingUp', desc: 'Turnaround times & load factors' },
+          { key: 'dg-log', label: 'DG Log', num: '4.4.3', route: '/ground-ops/reports/dg-log', iconName: 'ShieldAlert', desc: 'Dangerous goods audit trail' },
         ],
       },
     ],

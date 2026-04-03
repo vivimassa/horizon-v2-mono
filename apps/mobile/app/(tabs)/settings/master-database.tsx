@@ -36,8 +36,8 @@ const SECTIONS: SectionDef[] = [
     icon: Globe,
     color: '#0f766e',
     cards: [
-      { code: '5.1.1', label: 'Airports Database', desc: 'ICAO/IATA codes, coordinates, facilities', icon: PlaneTakeoff, route: '/(tabs)/settings/airports' },
-      { code: '5.1.2', label: 'Countries Database', desc: 'ISO codes, regions, currency', icon: Globe, route: '' },
+      { code: '5.1.1', label: 'Countries Database', desc: 'ISO codes, regions, currency', icon: Globe, route: '/(tabs)/settings/countries' },
+      { code: '5.1.2', label: 'Airports Database', desc: 'ICAO/IATA codes, coordinates, facilities', icon: PlaneTakeoff, route: '/(tabs)/settings/airports' },
       { code: '5.1.3', label: 'Operators Database', desc: 'Airlines, codeshare partners', icon: Building2, route: '' },
     ],
   },
@@ -225,7 +225,7 @@ const EntityCard = memo(function EntityCard({
       </View>
       {/* Code + chevron */}
       <View className="flex-row items-center" style={{ gap: 6 }}>
-        <Text style={{ fontSize: 15, fontWeight: '600', fontFamily: 'monospace', color: palette.textTertiary }}>{card.code}</Text>
+        <Text style={{ fontSize: 13, fontWeight: '600', fontFamily: 'monospace', color: palette.textTertiary }}>{card.code}</Text>
         <ChevronRight size={16} color={palette.textTertiary} strokeWidth={1.8} />
       </View>
     </Pressable>

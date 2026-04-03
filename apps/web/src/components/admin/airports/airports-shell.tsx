@@ -105,6 +105,7 @@ export function AirportsShell() {
             onSave={handleSave}
             onDelete={handleDelete}
             onCreate={handleCreate}
+            onRefresh={fetchAirports}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center text-hz-text-secondary text-sm">

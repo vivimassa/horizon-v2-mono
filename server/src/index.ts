@@ -6,6 +6,7 @@ import { connectDB } from './db/connection.js'
 import { flightRoutes } from './routes/flights.js'
 import { referenceRoutes } from './routes/reference.js'
 import { userRoutes } from './routes/users.js'
+import { loadOurAirportsData, startAutoRefresh } from './data/ourairports-cache.js'
 
 const port = Number(process.env.PORT) || 3001
 
@@ -20,6 +21,11 @@ async function main(): Promise<void> {
 
   // Database
   await connectDB()
+
+  // OurAirports reference data cache
+  console.log('Loading OurAirports reference data…')
+  await loadOurAirportsData()
+  startAutoRefresh()
 
   // Health check
   app.get('/health', async () => ({ status: 'ok' }))

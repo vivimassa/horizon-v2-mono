@@ -14,6 +14,7 @@ interface AirportMapProps {
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
 export function AirportMap({ latitude, longitude, name }: AirportMapProps) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
@@ -45,6 +46,12 @@ export function AirportMap({ latitude, longitude, name }: AirportMapProps) {
     // Ensure map fills container after tiles load
     map.on("load", () => map.resize());
 
+    // Auto-resize when wrapper dimensions change (e.g. drag handle)
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(() => map.resize());
+    });
+    if (wrapperRef.current) ro.observe(wrapperRef.current);
+
     const marker = new mapboxgl.Marker({ color: "#2563eb" })
       .setLngLat([longitude, latitude])
       .setPopup(
@@ -58,6 +65,7 @@ export function AirportMap({ latitude, longitude, name }: AirportMapProps) {
     markerRef.current = marker;
 
     return () => {
+      ro.disconnect();
       marker.remove();
       map.remove();
     };
@@ -72,8 +80,8 @@ export function AirportMap({ latitude, longitude, name }: AirportMapProps) {
   }
 
   return (
-    <div className="relative h-full w-full">
-      <div ref={containerRef} className="h-full w-full" />
+    <div ref={wrapperRef} className="relative h-full w-full">
+      <div ref={containerRef} className="absolute inset-0" />
       {/* Style toggle */}
       <button
         onClick={() => setStyle((s) => (s === "streets" ? "satellite" : "streets"))}

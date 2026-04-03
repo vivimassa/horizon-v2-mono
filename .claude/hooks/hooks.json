@@ -15,21 +15,41 @@
     "PostToolUse": [
       {
         "matcher": "Write",
-        "description": "Check written .tsx files for Horizon convention violations",
+        "description": "TypeScript type-check after file write",
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/hooks/post-write-check.js"
+            "command": "bash .claude/hooks/post-edit-typecheck.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "description": "Design system + architecture guard after file write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/post-edit-guard.sh"
           }
         ]
       },
       {
         "matcher": "Edit",
-        "description": "Check edited .tsx files for Horizon convention violations",
+        "description": "TypeScript type-check after file edit",
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/hooks/post-write-check.js"
+            "command": "bash .claude/hooks/post-edit-typecheck.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "description": "Design system + architecture guard after file edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/post-edit-guard.sh"
           }
         ]
       }
@@ -37,11 +57,11 @@
     "Stop": [
       {
         "matcher": "*",
-        "description": "Extract learnings from session at end",
+        "description": "Generate session summary markdown on stop",
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/hooks/evaluate-session.js"
+            "command": "bash .claude/hooks/session-summary.sh"
           }
         ]
       }

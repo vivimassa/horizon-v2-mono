@@ -9,16 +9,17 @@ description: Enforce Horizon v2 performance and code quality guardrails on every
 
 | Metric | Limit | Action at Limit |
 |--------|-------|-----------------|
-| Component file lines | **1000 max** | Split into shell + sub-components + hook |
-| useState hooks | **10 max** | Extract to Zustand store |
+| `.tsx/.jsx` component lines | **400 max** | Split into shell + sub-components + hook |
+| `.ts/.js` logic/util lines | **600 max** | Split into focused modules |
+| useState hooks | **8 max** | Extract to Zustand store |
 | useEffect hooks | **5 max** | Consolidate or extract to custom hook |
 | Props | **12 max** | Group into typed objects or use context |
 | Inline computations | **3 max** | Extract to useMemo or pure function |
 
 ### Warning Thresholds
-- **800 lines**: Add a `// WARNING: approaching 1000-line limit` comment and plan split
-- **8 useState**: Start consolidating related state into objects
-- **400 lines in a single function**: Extract helper functions
+- **300 lines (.tsx)**: Plan your split — you're approaching the 400-line limit
+- **6 useState**: Start consolidating related state into objects
+- **200 lines in a single function**: Extract helper functions
 
 ## State Management Tiers
 
@@ -134,8 +135,8 @@ import { FlightCard } from '../common/FlightCard'
 ## Pre-Commit Mental Checklist
 
 Before every commit, verify:
-- [ ] No component exceeds 1000 lines
-- [ ] No file has >10 useState hooks
+- [ ] No component exceeds 400 lines (.tsx) / 600 lines (.ts)
+- [ ] No file has >8 useState hooks
 - [ ] FlatList has getItemLayout + React.memo renderItem
 - [ ] All Gantt rendering uses Skia, not View
 - [ ] Offline reads from WatermelonDB, not API

@@ -93,7 +93,31 @@ export default function ProfileScreen() {
       quality: 0.8,
     })
     if (!result.canceled && result.assets[0]) {
-      setAvatarUri(result.assets[0].uri)
+      const asset = result.assets[0]
+      setAvatarUri(asset.uri)
+
+      // Upload to server
+      try {
+        const uri = asset.uri
+        const filename = uri.split('/').pop() || 'avatar.jpg'
+        const match = /\.(\w+)$/.exec(filename)
+        const type = match ? `image/${match[1]}` : 'image/jpeg'
+
+        const formData = new FormData()
+        formData.append('avatar', { uri, name: filename, type } as any)
+
+        const API_BASE = 'http://192.168.1.101:3002'
+        const res = await fetch(`${API_BASE}/users/me/avatar?userId=skyhub-admin-001`, {
+          method: 'POST',
+          body: formData,
+        })
+        if (!res.ok) {
+          const data = await res.json()
+          Alert.alert('Upload Failed', data.error || 'Could not upload avatar')
+        }
+      } catch (err: any) {
+        Alert.alert('Upload Failed', err.message || 'Could not upload avatar')
+      }
     }
   }, [])
 
@@ -118,6 +142,12 @@ export default function ProfileScreen() {
       }
       setData(fromApi)
       setDraft(fromApi)
+
+      // Load persisted avatar
+      if (user.profile.avatarUrl) {
+        const url = user.profile.avatarUrl
+        setAvatarUri(url.startsWith('/uploads/') ? `http://192.168.1.101:3002${url}` : url)
+      }
     }
   }, [user])
 
@@ -213,7 +243,7 @@ export default function ProfileScreen() {
         {isTablet ? (
           <View className="flex-row px-4 gap-4">
             <View style={{ width: 320 }}>
-              <AvatarPanel current={current} palette={palette} isDark={isDark} isTablet fonts={fonts} fs={fs} />
+              <AvatarPanel current={current} palette={palette} isDark={isDark} isTablet fonts={fonts} fs={fs} pickAvatar={pickAvatar} avatarUri={avatarUri} />
             </View>
             <View className="flex-1">
               <FieldSections current={current} editing={editing} palette={palette} isDark={isDark} update={update} isTablet fonts={fonts} fs={fs} />
@@ -221,7 +251,7 @@ export default function ProfileScreen() {
           </View>
         ) : (
           <View className="px-4">
-            <AvatarPanel current={current} palette={palette} isDark={isDark} fonts={fonts} fs={fs} />
+            <AvatarPanel current={current} palette={palette} isDark={isDark} fonts={fonts} fs={fs} pickAvatar={pickAvatar} avatarUri={avatarUri} />
             <FieldSections current={current} editing={editing} palette={palette} isDark={isDark} update={update} fonts={fonts} fs={fs} />
           </View>
         )}
@@ -231,7 +261,7 @@ export default function ProfileScreen() {
 }
 
 // ── Avatar panel ──
-function AvatarPanel({ current, palette, isDark, isTablet, fonts, fs }: { current: ProfileData; palette: Palette; isDark: boolean; isTablet?: boolean; fonts: any; fs: (n: number) => number }) {
+function AvatarPanel({ current, palette, isDark, isTablet, fonts, fs, pickAvatar, avatarUri }: { current: ProfileData; palette: Palette; isDark: boolean; isTablet?: boolean; fonts: any; fs: (n: number) => number; pickAvatar: () => void; avatarUri: string | null }) {
   const t = isTablet
   return (
     <View

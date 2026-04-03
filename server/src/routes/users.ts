@@ -1,3 +1,7 @@
+import path from 'node:path'
+import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { pipeline } from 'node:stream/promises'
 import type { FastifyInstance } from 'fastify'
 import { User } from '../models/User.js'
 
@@ -124,5 +128,53 @@ export async function userRoutes(app: FastifyInstance) {
     await user.save()
 
     return { success: true, sessions }
+  })
+
+  // ── POST /users/me/avatar — upload avatar image ──
+  app.post('/users/me/avatar', async (req, reply) => {
+    const userId = (req.query as any).userId || 'skyhub-admin-001'
+
+    const file = await req.file()
+    if (!file) return reply.code(400).send({ error: 'No file uploaded' })
+
+    const ext = path.extname(file.filename).toLowerCase()
+    if (!['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) {
+      return reply.code(400).send({ error: 'Only JPG, PNG, or WebP files are allowed' })
+    }
+
+    const __dirname = path.dirname(fileURLToPath(import.meta.url))
+    const uploadsDir = path.resolve(__dirname, '..', '..', 'uploads')
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true })
+
+    const filename = `avatar-${userId}${ext}`
+    const filepath = path.join(uploadsDir, filename)
+    await pipeline(file.file, fs.createWriteStream(filepath))
+
+    const avatarUrl = `/uploads/${filename}`
+    await User.findByIdAndUpdate(userId, {
+      $set: { 'profile.avatarUrl': avatarUrl, updatedAt: new Date().toISOString() },
+    })
+
+    return { success: true, avatarUrl }
+  })
+
+  // ── DELETE /users/me/avatar — remove avatar ──
+  app.delete('/users/me/avatar', async (req, reply) => {
+    const userId = (req.query as any).userId || 'skyhub-admin-001'
+    const user = await User.findById(userId).lean()
+    if (!user) return reply.code(404).send({ error: 'User not found' })
+
+    const avatarUrl = (user as any).profile?.avatarUrl
+    if (avatarUrl && avatarUrl.startsWith('/uploads/')) {
+      const __dirname = path.dirname(fileURLToPath(import.meta.url))
+      const filepath = path.resolve(__dirname, '..', '..', avatarUrl.replace('/uploads/', 'uploads/'))
+      if (fs.existsSync(filepath)) fs.unlinkSync(filepath)
+    }
+
+    await User.findByIdAndUpdate(userId, {
+      $set: { 'profile.avatarUrl': '', updatedAt: new Date().toISOString() },
+    })
+
+    return { success: true }
   })
 }

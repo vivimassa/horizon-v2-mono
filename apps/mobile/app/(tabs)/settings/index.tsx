@@ -50,6 +50,14 @@ export default function SettingsScreen() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [avatarUri, setAvatarUri] = useState<string | null>(null)
 
+  // Load persisted avatar
+  React.useEffect(() => {
+    if (user?.profile?.avatarUrl) {
+      const url = user.profile.avatarUrl
+      setAvatarUri(url.startsWith('/uploads/') ? `http://192.168.1.101:3002${url}` : url)
+    }
+  }, [user])
+
   const pickAvatar = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (status !== 'granted') {
@@ -63,7 +71,23 @@ export default function SettingsScreen() {
       quality: 0.8,
     })
     if (!result.canceled && result.assets[0]) {
-      setAvatarUri(result.assets[0].uri)
+      const asset = result.assets[0]
+      setAvatarUri(asset.uri)
+
+      try {
+        const uri = asset.uri
+        const filename = uri.split('/').pop() || 'avatar.jpg'
+        const match = /\.(\w+)$/.exec(filename)
+        const type = match ? `image/${match[1]}` : 'image/jpeg'
+
+        const formData = new FormData()
+        formData.append('avatar', { uri, name: filename, type } as any)
+
+        await fetch('http://192.168.1.101:3002/users/me/avatar?userId=skyhub-admin-001', {
+          method: 'POST',
+          body: formData,
+        })
+      } catch { /* silent */ }
     }
   }, [])
 

@@ -52,7 +52,7 @@ export default function SettingsPage() {
   if (loading) return null;
 
   return (
-    <div className="min-h-full" style={{ padding: "clamp(16px, 2vw, 32px) clamp(24px, 4vw, 60px)" }}>
+    <div className="min-h-full">
       <div
         style={{
           display: "grid",

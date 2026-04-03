@@ -159,7 +159,11 @@ export default function ProfilePage() {
       const mapped = apiToLocal(user);
       setData(mapped);
       setDraft(mapped);
-      if (user.profile.avatarUrl) setAvatarUrl(user.profile.avatarUrl);
+      if (user.profile.avatarUrl) {
+        const url = user.profile.avatarUrl;
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
+        setAvatarUrl(url.startsWith("/uploads/") ? `${API_BASE}${url}` : url);
+      }
     }
   }, [user, apiToLocal]);
 
@@ -169,7 +173,7 @@ export default function ProfilePage() {
 
   const [avatarError, setAvatarError] = useState<string | null>(null);
 
-  const handleAvatarChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) return;
@@ -179,9 +183,32 @@ export default function ProfilePage() {
       return;
     }
     setAvatarError(null);
-    const url = URL.createObjectURL(file);
-    setAvatarUrl(url);
-  }, []);
+    // Show instant preview
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarUrl(previewUrl);
+
+    // Upload to server
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
+      const res = await fetch(`${API_BASE}/users/me/avatar?userId=skyhub-admin-001`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "Upload failed" }));
+        setAvatarError(data.error || "Could not upload avatar");
+        setTimeout(() => setAvatarError(null), 3000);
+        return;
+      }
+      // Refetch user so avatarUrl persists across refreshes
+      refetch();
+    } catch (err: any) {
+      setAvatarError(err.message || "Could not upload avatar");
+      setTimeout(() => setAvatarError(null), 3000);
+    }
+  }, [refetch]);
 
   const current = editing ? draft : data;
   const profilePercent = computeCompleteness(current, avatarUrl);
@@ -252,8 +279,8 @@ export default function ProfilePage() {
         <div className="flex items-center gap-2">
           {saved && (
             <span
-              className="flex items-center gap-1 font-medium px-3 py-1.5 rounded-lg" style={{ fontSize: 13 }}
-              style={{ color: "#166534", backgroundColor: "#dcfce7" }}
+              className="flex items-center gap-1 font-medium px-3 py-1.5 rounded-lg"
+              style={{ fontSize: 13, color: "#166534", backgroundColor: "#dcfce7" }}
             >
               <Check size={13} strokeWidth={2.5} />
               Saved

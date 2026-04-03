@@ -13,6 +13,7 @@ import {
 } from 'lucide-react-native'
 import type { LucideIcon } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
+import { getApiBaseUrl } from '@skyhub/api'
 import { api } from '@skyhub/api'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { useUser } from '../../../providers/UserProvider'
@@ -106,20 +107,21 @@ export default function ProfileScreen() {
         const formData = new FormData()
         formData.append('avatar', { uri, name: filename, type } as any)
 
-        const API_BASE = 'http://192.168.1.101:3002'
-        const res = await fetch(`${API_BASE}/users/me/avatar?userId=skyhub-admin-001`, {
+        const res = await fetch(`${getApiBaseUrl()}/users/me/avatar?userId=skyhub-admin-001`, {
           method: 'POST',
           body: formData,
         })
         if (!res.ok) {
           const data = await res.json()
           Alert.alert('Upload Failed', data.error || 'Could not upload avatar')
+        } else {
+          refetch()
         }
       } catch (err: any) {
         Alert.alert('Upload Failed', err.message || 'Could not upload avatar')
       }
     }
-  }, [])
+  }, [refetch])
 
   // Sync from API
   React.useEffect(() => {
@@ -146,7 +148,7 @@ export default function ProfileScreen() {
       // Load persisted avatar
       if (user.profile.avatarUrl) {
         const url = user.profile.avatarUrl
-        setAvatarUri(url.startsWith('/uploads/') ? `http://192.168.1.101:3002${url}` : url)
+        setAvatarUri(url.startsWith('/uploads/') ? `${getApiBaseUrl()}${url}` : url)
       }
     }
   }, [user])

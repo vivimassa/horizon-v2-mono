@@ -15,6 +15,7 @@ import {
   type LucideIcon,
 } from 'lucide-react-native'
 import { accentTint, colors, type Palette } from '@skyhub/ui/theme'
+import { getApiBaseUrl } from '@skyhub/api'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { useUser } from '../../../providers/UserProvider'
 
@@ -32,7 +33,7 @@ const ACCENT_PRESETS = [
 export default function SettingsScreen() {
   const router = useRouter()
   const { isDark, palette, accent, rawAccent, toggleDark, setAccent } = useAppTheme()
-  const { user } = useUser()
+  const { user, refetch } = useUser()
   const { width } = useWindowDimensions()
 
   // Computed from API user
@@ -54,7 +55,7 @@ export default function SettingsScreen() {
   React.useEffect(() => {
     if (user?.profile?.avatarUrl) {
       const url = user.profile.avatarUrl
-      setAvatarUri(url.startsWith('/uploads/') ? `http://192.168.1.101:3002${url}` : url)
+      setAvatarUri(url.startsWith('/uploads/') ? `${getApiBaseUrl()}${url}` : url)
     }
   }, [user])
 
@@ -83,13 +84,14 @@ export default function SettingsScreen() {
         const formData = new FormData()
         formData.append('avatar', { uri, name: filename, type } as any)
 
-        await fetch('http://192.168.1.101:3002/users/me/avatar?userId=skyhub-admin-001', {
+        const res = await fetch(`${getApiBaseUrl()}/users/me/avatar?userId=skyhub-admin-001`, {
           method: 'POST',
           body: formData,
         })
+        if (res.ok) refetch()
       } catch { /* silent */ }
     }
-  }, [])
+  }, [refetch])
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>

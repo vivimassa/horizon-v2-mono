@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import {
   Globe, Plane, Truck, Users,
-  PlaneTakeoff, Building2, ArrowLeftRight, Timer, Tag,
+  PlaneTakeoff, Building2, ArrowLeftRight, Armchair, Timer, Tag,
   UserRound, FileCheck, PackageOpen,
   ChevronRight, ChevronLeft,
   Database,
@@ -39,6 +39,7 @@ const SECTIONS: SectionDef[] = [
       { code: '5.1.1', label: 'Countries Database', desc: 'ISO codes, regions, currency', icon: Globe, route: '/(tabs)/settings/countries' },
       { code: '5.1.2', label: 'Airports Database', desc: 'ICAO/IATA codes, coordinates, facilities', icon: PlaneTakeoff, route: '/(tabs)/settings/airports' },
       { code: '5.1.3', label: 'Citypairs Database', desc: 'Routes, distances, block times', icon: ArrowLeftRight, route: '/(tabs)/settings/citypairs' },
+      { code: '5.1.4', label: 'LOPA Database', desc: 'Cabin classes, seat configurations', icon: Armchair, route: '' },
     ],
   },
   {

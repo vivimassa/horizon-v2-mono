@@ -1,4 +1,4 @@
-export { api, setApiBaseUrl } from './client'
+export { api, setApiBaseUrl, getApiBaseUrl } from './client'
 export type {
   Flight,
   AirportRef,
@@ -13,6 +13,9 @@ export type {
   ExpiryCodeCategoryRef,
   ExpiryCodeRef,
   FlightServiceTypeRef,
+  CabinClassRef,
+  CabinEntry,
+  LopaConfigRef,
   OperatorRef,
   ReferenceStats,
   UserData,

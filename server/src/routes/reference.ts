@@ -14,6 +14,8 @@ import { CrewPosition } from '../models/CrewPosition.js'
 import { ExpiryCode, ExpiryCodeCategory } from '../models/ExpiryCode.js'
 import { Operator } from '../models/Operator.js'
 import { FlightInstance } from '../models/FlightInstance.js'
+import { CabinClass } from '../models/CabinClass.js'
+import { LopaConfig } from '../models/LopaConfig.js'
 import { lookupByIcao, getStats, loadOurAirportsData } from '../data/ourairports-cache.js'
 
 // ─── Zod schemas for airport validation ───────────────────
@@ -590,6 +592,240 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     return ExpiryCode.find(filter).sort({ sortOrder: 1, code: 1 }).lean()
   })
 
+  // ─── Cabin Classes ──────────────────────────────────────
+
+  const cabinClassCreateSchema = z.object({
+    operatorId: z.string().min(1),
+    code: z.string().min(1).max(2).regex(/^[A-Z]{1,2}$/, 'Code must be 1-2 uppercase letters'),
+    name: z.string().min(1, 'Name is required'),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be hex color').nullable().optional(),
+    sortOrder: z.number().int().min(0).optional().default(0),
+    seatLayout: z.string().regex(/^[0-9](-[0-9]){1,3}$/, 'Format: 3-3 or 2-2 or 1-2-1').nullable().optional(),
+    seatPitchIn: z.number().min(20).max(90).nullable().optional(),
+    seatWidthIn: z.number().min(14).max(40).nullable().optional(),
+    seatType: z.enum(['standard', 'premium', 'lie-flat', 'suite']).nullable().optional(),
+    hasIfe: z.boolean().optional().default(false),
+    hasPower: z.boolean().optional().default(false),
+    isActive: z.boolean().optional().default(true),
+  }).strict()
+
+  const cabinClassUpdateSchema = z.object({
+    code: z.string().min(1).max(2).regex(/^[A-Z]{1,2}$/, 'Code must be 1-2 uppercase letters'),
+    name: z.string().min(1, 'Name is required'),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be hex color').nullable(),
+    sortOrder: z.number().int().min(0),
+    seatLayout: z.string().regex(/^[0-9](-[0-9]){1,3}$/, 'Format: 3-3 or 2-2 or 1-2-1').nullable(),
+    seatPitchIn: z.number().min(20).max(90).nullable(),
+    seatWidthIn: z.number().min(14).max(40).nullable(),
+    seatType: z.enum(['standard', 'premium', 'lie-flat', 'suite']).nullable(),
+    hasIfe: z.boolean(),
+    hasPower: z.boolean(),
+    isActive: z.boolean(),
+  }).partial().strict()
+
+  app.get('/cabin-classes', async (req) => {
+    const { operatorId } = req.query as { operatorId?: string }
+    const filter: Record<string, unknown> = {}
+    if (operatorId) filter.operatorId = operatorId
+    return CabinClass.find(filter).sort({ sortOrder: 1, code: 1 }).lean()
+  })
+
+  app.get('/cabin-classes/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await CabinClass.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Cabin class not found' })
+    return doc
+  })
+
+  app.post('/cabin-classes', async (req, reply) => {
+    const raw = req.body as Record<string, unknown>
+    if (raw.code) raw.code = (raw.code as string).toUpperCase()
+
+    const parsed = cabinClassCreateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+
+    const body = parsed.data
+
+    const existing = await CabinClass.findOne({ operatorId: body.operatorId, code: body.code }).lean()
+    if (existing) {
+      return reply.code(409).send({ error: `Cabin class with code "${body.code}" already exists` })
+    }
+
+    const id = crypto.randomUUID()
+    const doc = await CabinClass.create({
+      _id: id,
+      ...body,
+      createdAt: new Date().toISOString(),
+    })
+
+    return reply.code(201).send(doc.toObject())
+  })
+
+  app.patch('/cabin-classes/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const raw = req.body as Record<string, unknown>
+    if (raw.code) raw.code = (raw.code as string).toUpperCase()
+
+    const parsed = cabinClassUpdateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+
+    const body = { ...parsed.data, updatedAt: new Date().toISOString() }
+    const doc = await CabinClass.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'Cabin class not found' })
+    return doc
+  })
+
+  app.delete('/cabin-classes/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const cabinClass = await CabinClass.findById(id).lean()
+    if (!cabinClass) return reply.code(404).send({ error: 'Cabin class not found' })
+
+    const refCount = await LopaConfig.countDocuments({
+      operatorId: cabinClass.operatorId,
+      'cabins.classCode': cabinClass.code,
+    })
+    if (refCount > 0) {
+      return reply.code(409).send({
+        error: `Cannot delete "${cabinClass.code}" — ${refCount} LOPA config${refCount > 1 ? 's' : ''} reference this cabin class. Deactivate it instead.`,
+      })
+    }
+
+    await CabinClass.findByIdAndDelete(id)
+    return { success: true }
+  })
+
+  // ─── LOPA Configurations ──────────────────────────────
+
+  const lopaConfigCreateSchema = z.object({
+    operatorId: z.string().min(1),
+    aircraftType: z.string().min(3).max(4).regex(/^[A-Z0-9]{3,4}$/, 'Must be 3-4 uppercase alphanumeric'),
+    configName: z.string().min(1, 'Config name is required'),
+    cabins: z.array(z.object({
+      classCode: z.string().min(1),
+      seats: z.number().int().min(0),
+    })).min(1, 'At least one cabin entry is required'),
+    isDefault: z.boolean().optional().default(false),
+    notes: z.string().nullable().optional(),
+    isActive: z.boolean().optional().default(true),
+  }).strict()
+
+  const lopaConfigUpdateSchema = z.object({
+    aircraftType: z.string().min(3).max(4).regex(/^[A-Z0-9]{3,4}$/, 'Must be 3-4 uppercase alphanumeric'),
+    configName: z.string().min(1, 'Config name is required'),
+    cabins: z.array(z.object({
+      classCode: z.string().min(1),
+      seats: z.number().int().min(0),
+    })).min(1, 'At least one cabin entry is required'),
+    isDefault: z.boolean(),
+    notes: z.string().nullable(),
+    isActive: z.boolean(),
+  }).partial().strict()
+
+  app.get('/lopa-configs', async (req) => {
+    const { operatorId, aircraftType } = req.query as { operatorId?: string; aircraftType?: string }
+    const filter: Record<string, unknown> = {}
+    if (operatorId) filter.operatorId = operatorId
+    if (aircraftType) filter.aircraftType = aircraftType.toUpperCase()
+    return LopaConfig.find(filter).sort({ aircraftType: 1, configName: 1 }).lean()
+  })
+
+  app.get('/lopa-configs/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await LopaConfig.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'LOPA config not found' })
+    return doc
+  })
+
+  app.post('/lopa-configs', async (req, reply) => {
+    const raw = req.body as Record<string, unknown>
+    if (raw.aircraftType) raw.aircraftType = (raw.aircraftType as string).toUpperCase()
+
+    const parsed = lopaConfigCreateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+
+    const body = parsed.data
+    const totalSeats = body.cabins.reduce((sum, c) => sum + c.seats, 0)
+
+    const existing = await LopaConfig.findOne({
+      operatorId: body.operatorId,
+      aircraftType: body.aircraftType,
+      configName: body.configName,
+    }).lean()
+    if (existing) {
+      return reply.code(409).send({ error: `Config "${body.configName}" for ${body.aircraftType} already exists` })
+    }
+
+    // If setting as default, clear other defaults for same operator+aircraftType
+    if (body.isDefault) {
+      await LopaConfig.updateMany(
+        { operatorId: body.operatorId, aircraftType: body.aircraftType },
+        { $set: { isDefault: false } }
+      )
+    }
+
+    const id = crypto.randomUUID()
+    const doc = await LopaConfig.create({
+      _id: id,
+      ...body,
+      totalSeats,
+      createdAt: new Date().toISOString(),
+    })
+
+    return reply.code(201).send(doc.toObject())
+  })
+
+  app.patch('/lopa-configs/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const raw = req.body as Record<string, unknown>
+    if (raw.aircraftType) raw.aircraftType = (raw.aircraftType as string).toUpperCase()
+
+    const parsed = lopaConfigUpdateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+
+    const body: Record<string, unknown> = { ...parsed.data, updatedAt: new Date().toISOString() }
+
+    // Recompute totalSeats if cabins changed
+    if (parsed.data.cabins) {
+      body.totalSeats = parsed.data.cabins.reduce((sum, c) => sum + c.seats, 0)
+    }
+
+    // If setting as default, clear other defaults
+    if (parsed.data.isDefault) {
+      const current = await LopaConfig.findById(id).lean()
+      if (current) {
+        await LopaConfig.updateMany(
+          { operatorId: current.operatorId, aircraftType: parsed.data.aircraftType ?? current.aircraftType, _id: { $ne: id } },
+          { $set: { isDefault: false } }
+        )
+      }
+    }
+
+    const doc = await LopaConfig.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'LOPA config not found' })
+    return doc
+  })
+
+  app.delete('/lopa-configs/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await LopaConfig.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'LOPA config not found' })
+
+    await LopaConfig.findByIdAndDelete(id)
+    return { success: true }
+  })
+
   // ─── Stats endpoint — quick overview ───────────────────
   app.get('/reference/stats', async () => {
     const [
@@ -602,6 +838,8 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
       crewPositions,
       expiryCodeCategories,
       expiryCodes,
+      cabinClasses,
+      lopaConfigs,
     ] = await Promise.all([
       Operator.countDocuments(),
       Airport.countDocuments(),
@@ -612,6 +850,8 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
       CrewPosition.countDocuments(),
       ExpiryCodeCategory.countDocuments(),
       ExpiryCode.countDocuments(),
+      CabinClass.countDocuments(),
+      LopaConfig.countDocuments(),
     ])
 
     const cacheStats = getStats()
@@ -626,6 +866,8 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
       crewPositions,
       expiryCodeCategories,
       expiryCodes,
+      cabinClasses,
+      lopaConfigs,
       total:
         operators +
         airports +
@@ -635,7 +877,9 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
         flightServiceTypes +
         crewPositions +
         expiryCodeCategories +
-        expiryCodes,
+        expiryCodes +
+        cabinClasses +
+        lopaConfigs,
       ourAirportsCache: {
         loaded: cacheStats.loaded,
         airports: cacheStats.airports,

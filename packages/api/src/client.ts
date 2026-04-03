@@ -10,6 +10,11 @@ export function setApiBaseUrl(url: string) {
   _baseUrl = url.replace(/\/$/, '') // strip trailing slash
 }
 
+/** Get the current API base URL (for direct fetch calls like file uploads) */
+export function getApiBaseUrl(): string {
+  return _baseUrl
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = { ...init?.headers as Record<string, string> }
   if (init?.body) headers['Content-Type'] = 'application/json'
@@ -230,6 +235,43 @@ export interface FlightServiceTypeRef {
   isActive: boolean
 }
 
+export interface CabinClassRef {
+  _id: string
+  operatorId: string
+  code: string
+  name: string
+  color: string | null
+  sortOrder: number
+  seatLayout: string | null
+  seatPitchIn: number | null
+  seatWidthIn: number | null
+  seatType: 'standard' | 'premium' | 'lie-flat' | 'suite' | null
+  hasIfe: boolean
+  hasPower: boolean
+  isActive: boolean
+  createdAt: string
+  updatedAt: string | null
+}
+
+export interface CabinEntry {
+  classCode: string
+  seats: number
+}
+
+export interface LopaConfigRef {
+  _id: string
+  operatorId: string
+  aircraftType: string
+  configName: string
+  cabins: CabinEntry[]
+  totalSeats: number
+  isDefault: boolean
+  notes: string | null
+  isActive: boolean
+  createdAt: string
+  updatedAt: string | null
+}
+
 export interface OperatorRef {
   _id: string
   code: string
@@ -441,6 +483,55 @@ export const api = {
     }),
 
   getReferenceStats: () => request<ReferenceStats>('/reference/stats'),
+
+  // ─── Cabin Classes ──────────────────────────────────────
+  getCabinClasses: (operatorId = 'horizon') =>
+    request<CabinClassRef[]>(`/cabin-classes?operatorId=${operatorId}`),
+
+  getCabinClass: (id: string) => request<CabinClassRef>(`/cabin-classes/${id}`),
+
+  createCabinClass: (data: Partial<CabinClassRef>) =>
+    request<CabinClassRef>('/cabin-classes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateCabinClass: (id: string, data: Partial<CabinClassRef>) =>
+    request<CabinClassRef>(`/cabin-classes/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteCabinClass: (id: string) =>
+    request<{ success: boolean }>(`/cabin-classes/${id}`, {
+      method: 'DELETE',
+    }),
+
+  // ─── LOPA Configurations ────────────────────────────────
+  getLopaConfigs: (operatorId = 'horizon', aircraftType?: string) => {
+    let path = `/lopa-configs?operatorId=${operatorId}`
+    if (aircraftType) path += `&aircraftType=${encodeURIComponent(aircraftType)}`
+    return request<LopaConfigRef[]>(path)
+  },
+
+  getLopaConfig: (id: string) => request<LopaConfigRef>(`/lopa-configs/${id}`),
+
+  createLopaConfig: (data: Partial<LopaConfigRef>) =>
+    request<LopaConfigRef>('/lopa-configs', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateLopaConfig: (id: string, data: Partial<LopaConfigRef>) =>
+    request<LopaConfigRef>(`/lopa-configs/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteLopaConfig: (id: string) =>
+    request<{ success: boolean }>(`/lopa-configs/${id}`, {
+      method: 'DELETE',
+    }),
 
   // Health
   health: () => request<{ status: string }>('/health'),

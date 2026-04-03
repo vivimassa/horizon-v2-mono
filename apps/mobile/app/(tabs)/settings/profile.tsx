@@ -1,10 +1,11 @@
 import React, { useState, useCallback } from 'react'
 import {
-  View, Text, ScrollView, Pressable, TextInput,
+  View, Text, ScrollView, Pressable, TextInput, Image,
   useWindowDimensions, Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
+import * as ImagePicker from 'expo-image-picker'
 import {
   ArrowLeft, Camera, Mail, Phone, MapPin,
   Hash, Briefcase, Shield, Edit3, Save, X, Check,
@@ -77,6 +78,24 @@ export default function ProfileScreen() {
   const [data, setData] = useState<ProfileData>(INITIAL)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<ProfileData>(INITIAL)
+  const [avatarUri, setAvatarUri] = useState<string | null>(null)
+
+  const pickAvatar = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow photo library access to change your avatar.')
+      return
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    })
+    if (!result.canceled && result.assets[0]) {
+      setAvatarUri(result.assets[0].uri)
+    }
+  }, [])
 
   // Sync from API
   React.useEffect(() => {
@@ -92,7 +111,7 @@ export default function ProfileScreen() {
         officePhone: user.profile.officePhone,
         dateOfBirth: user.profile.dateOfBirth,
         gender: user.profile.gender,
-        role: user.role,
+        role: user.role.charAt(0).toUpperCase() + user.role.slice(1),
         status: user.isActive ? 'Active' : 'Inactive',
         lastLogin: user.lastLoginUtc,
         location: user.profile.location,
@@ -219,18 +238,22 @@ function AvatarPanel({ current, palette, isDark, isTablet, fonts, fs }: { curren
       className="rounded-2xl border items-center mb-4"
       style={{ backgroundColor: palette.card, borderColor: palette.cardBorder, paddingVertical: t ? 32 : 24, paddingHorizontal: t ? 20 : 16 }}
     >
-      <View className="relative" style={{ marginBottom: t ? 16 : 12 }}>
+      <Pressable className="relative active:opacity-70" style={{ marginBottom: t ? 16 : 12 }} onPress={pickAvatar}>
         <View
-          className="rounded-full items-center justify-center"
+          className="rounded-full items-center justify-center overflow-hidden"
           style={{
             width: t ? 100 : 80,
             height: t ? 100 : 80,
             backgroundColor: accentTint(ACCENT, isDark ? 0.15 : 0.08),
           }}
         >
-          <Text style={{ fontSize: fonts.xxl, fontWeight: '700', color: ACCENT }}>
-            {current.firstName[0]}{current.lastName[0]}
-          </Text>
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={{ width: '100%', height: '100%' }} />
+          ) : (
+            <Text style={{ fontSize: fonts.xxl, fontWeight: '700', color: ACCENT }}>
+              {current.firstName[0]}{current.lastName[0]}
+            </Text>
+          )}
         </View>
         <View
           className="absolute bottom-0 right-0 rounded-full items-center justify-center"
@@ -238,7 +261,7 @@ function AvatarPanel({ current, palette, isDark, isTablet, fonts, fs }: { curren
         >
           <Camera size={t ? 15 : 13} color="#fff" strokeWidth={2} />
         </View>
-      </View>
+      </Pressable>
       <Text style={{ fontSize: fonts.xl, fontWeight: '700', color: palette.text }}>
         {current.firstName} {current.lastName}
       </Text>

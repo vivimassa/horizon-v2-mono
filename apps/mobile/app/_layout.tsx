@@ -1,3 +1,4 @@
+import '../utils/api-url' // auto-detect API base URL — must be first
 import '../global.css'
 import { Slot } from 'expo-router'
 import { View } from 'react-native'

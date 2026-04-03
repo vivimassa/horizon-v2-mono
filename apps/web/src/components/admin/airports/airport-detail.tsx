@@ -351,7 +351,7 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate, onRefresh }
                   type="text" placeholder="Enter ICAO code (e.g. VVTS)" value={lookupCode}
                   onChange={(e) => setLookupCode(e.target.value.toUpperCase())}
                   onKeyDown={(e) => e.key === "Enter" && handleLookup()}
-                  className="flex-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text font-mono"
+                  className="flex-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text"
                   maxLength={4}
                 />
                 <button onClick={handleLookup} disabled={lookupLoading || lookupCode.length < 3}
@@ -368,7 +368,7 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate, onRefresh }
                     <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                     <div>
                       <p className="text-[13px] font-medium text-amber-800 dark:text-amber-300">
-                        Could not locate airport <span className="font-mono font-bold">{lookupCode}</span> in the Master Airport Database.
+                        Could not locate airport <span className="font-bold">{lookupCode}</span> in the Master Airport Database.
                       </p>
                       <p className="text-[12px] text-amber-700/70 dark:text-amber-400/60 mt-1">
                         This may be a new or unregistered airport. You can add it manually with the details you have.
@@ -390,7 +390,7 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate, onRefresh }
                     <span className="text-[11px] text-hz-text-secondary px-2 py-0.5 rounded bg-hz-border/50">{lookupResult.source}</span>
                   </div>
                   <div className="text-[13px] text-hz-text-secondary space-y-1">
-                    <div>ICAO: <span className="font-mono font-bold text-hz-text">{lookupResult.icaoCode}</span> · IATA: <span className="font-mono font-bold text-hz-text">{lookupResult.iataCode ?? "—"}</span></div>
+                    <div>ICAO: <span className="font-bold text-hz-text">{lookupResult.icaoCode}</span> · IATA: <span className="font-bold text-hz-text">{lookupResult.iataCode ?? "—"}</span></div>
                     <div>{[lookupResult.city, lookupResult.country].filter(Boolean).join(" · ")}</div>
                     <div>Timezone: {lookupResult.timezone} · Elevation: {lookupResult.elevationFt ?? "—"} ft</div>
                     {lookupResult.latitude != null && <div>Coordinates: {lookupResult.latitude.toFixed(4)}, {lookupResult.longitude?.toFixed(4)}</div>}
@@ -432,7 +432,7 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate, onRefresh }
                       <button key={c._id} onClick={() => { setManualForm(p => ({ ...p, countryId: c._id })); setCountryOpen(false); setCountrySearch(""); }}
                         className="w-full px-3 py-2 text-left text-[13px] hover:bg-hz-border/30 transition-colors flex items-center justify-between">
                         <span>{c.name}</span>
-                        <span className="text-[11px] text-hz-text-secondary font-mono">{c.isoCode2}</span>
+                        <span className="text-[11px] text-hz-text-secondary">{c.isoCode2}</span>
                       </button>
                     ))}
                   </div>
@@ -453,7 +453,7 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate, onRefresh }
                       className="w-full px-3 py-2 text-[13px] border-b border-hz-border bg-transparent outline-none text-hz-text" autoFocus />
                     {filteredTimezones.map(tz => (
                       <button key={tz} onClick={() => { setManualForm(p => ({ ...p, timezone: tz })); setTzOpen(false); setTzSearch(""); }}
-                        className="w-full px-3 py-2 text-left text-[13px] hover:bg-hz-border/30 transition-colors font-mono">{tz}</button>
+                        className="w-full px-3 py-2 text-left text-[13px] hover:bg-hz-border/30 transition-colors">{tz}</button>
                     ))}
                   </div>
                 )}
@@ -583,7 +583,7 @@ function MiniInput({ label, value, onChange, maxLength, mono, type = "text" }: {
     <div className="flex-1">
       <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">{label}</label>
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)} maxLength={maxLength}
-        className={`w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text ${mono ? "font-mono" : ""}`} />
+        className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text" />
     </div>
   );
 }

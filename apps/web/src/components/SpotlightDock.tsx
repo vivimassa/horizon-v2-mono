@@ -70,24 +70,27 @@ export function SpotlightDock() {
   const isDesktop = useIsDesktop();
   const [collapsed, setCollapsed] = useState(false);
 
-  // Auto-collapse on page-level routes, expand on module/section-level
+  // Routes that act as full-screen workspaces (should collapse dock even though they're module-level)
+  const isFullscreenRoute = pathname === "/ground-ops";
+
+  // Auto-collapse on page-level routes or fullscreen workspaces
   useEffect(() => {
     if (!isDesktop) return;
     const nav = resolveNavPath(pathname);
-    if (nav?.page) {
+    if (nav?.page || isFullscreenRoute) {
       setCollapsed(true);
     } else {
       setCollapsed(false);
     }
-  }, [pathname, isDesktop]);
+  }, [pathname, isDesktop, isFullscreenRoute]);
 
-  // Reclaim bottom space on page-level routes (dock overlays when expanded)
+  // Reclaim bottom space when dock should be collapsed
   useEffect(() => {
     const nav = resolveNavPath(pathname);
-    const isPageLevel = !!nav?.page;
-    document.body.classList.toggle("dock-collapsed", isPageLevel && isDesktop);
+    const shouldCollapse = !!nav?.page || isFullscreenRoute;
+    document.body.classList.toggle("dock-collapsed", shouldCollapse && isDesktop);
     return () => document.body.classList.remove("dock-collapsed");
-  }, [pathname, isDesktop]);
+  }, [pathname, isDesktop, isFullscreenRoute]);
 
   const toggleCollapsed = useCallback(() => setCollapsed((c) => !c), []);
 

@@ -186,7 +186,6 @@ export default function CargoLoading() {
   return (
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
       <BreadcrumbHeader moduleCode="5.1.1" />
-
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
         <FlightPickerBar
           selectedFlight={state.selectedFlight}
@@ -198,14 +197,6 @@ export default function CargoLoading() {
           onPickFlight={state.selectFlight}
           selectedId={state.selectedFlightId}
           palette={palette}
-          accent={accent}
-          isDark={isDark}
-        />
-
-        <AircraftWorkspace
-          activeHold={state.activeHold}
-          hasSelection={state.hasSelection}
-          onSelectHold={state.setActiveHold}
           accent={accent}
           isDark={isDark}
         />

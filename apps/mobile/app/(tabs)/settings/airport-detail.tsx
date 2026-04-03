@@ -11,6 +11,7 @@ import {
 } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { useDevice } from '../../../hooks/useDevice'
 
 type TabKey = 'basic' | 'runway' | 'operations' | 'crew'
 
@@ -25,6 +26,7 @@ export default function AirportDetailScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { palette, isDark, accent } = useAppTheme()
+  const { isTablet } = useDevice()
 
   const [airport, setAirport] = useState<AirportRef | null>(null)
   const [loading, setLoading] = useState(true)
@@ -156,7 +158,7 @@ export default function AirportDetailScreen() {
 
       {/* Map */}
       {airport.latitude != null && airport.longitude != null && (
-        <View style={{ height: 250, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+        <View style={{ height: isTablet ? 350 : 250, borderBottomWidth: 1, borderBottomColor: palette.border }}>
           <MapView
             style={{ flex: 1 }}
             initialRegion={{
@@ -167,10 +169,6 @@ export default function AirportDetailScreen() {
             }}
             userInterfaceStyle={isDark ? 'dark' : 'light'}
             mapType="standard"
-            scrollEnabled={false}
-            zoomEnabled={false}
-            pitchEnabled={false}
-            rotateEnabled={false}
           >
             <Marker
               coordinate={{ latitude: airport.latitude, longitude: airport.longitude }}

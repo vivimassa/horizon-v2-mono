@@ -178,6 +178,48 @@ export interface ExpiryCodeRef {
   sortOrder: number
 }
 
+export interface BlockHourData {
+  _id: string
+  aircraftTypeIcao: string | null
+  seasonType: string
+  dir1BlockMinutes: number
+  dir2BlockMinutes: number
+  dir1FlightMinutes: number | null
+  dir2FlightMinutes: number | null
+  dir1FuelKg: number | null
+  dir2FuelKg: number | null
+  notes: string | null
+}
+
+export interface CityPairRef {
+  _id: string
+  operatorId: string
+  station1Icao: string
+  station1Iata: string | null
+  station1Name: string | null
+  station1City: string | null
+  station1CountryIso2: string | null
+  station1Lat: number | null
+  station1Lon: number | null
+  station2Icao: string
+  station2Iata: string | null
+  station2Name: string | null
+  station2City: string | null
+  station2CountryIso2: string | null
+  station2Lat: number | null
+  station2Lon: number | null
+  distanceNm: number | null
+  distanceKm: number | null
+  routeType: string
+  standardBlockMinutes: number | null
+  isEtops: boolean
+  etopsDiversionTimeMinutes: number | null
+  isOverwater: boolean
+  blockHours: BlockHourData[]
+  isActive: boolean
+  notes: string | null
+}
+
 export interface FlightServiceTypeRef {
   _id: string
   operatorId: string
@@ -196,8 +238,16 @@ export interface OperatorRef {
   iataCode: string | null
   callsign: string | null
   country: string | null
+  countryIso2: string | null
+  regulatoryAuthority: string | null
   timezone: string
+  fdtlRuleset: string | null
+  mainBaseIcao: string | null
+  currencyCode: string | null
+  currencySymbol: string | null
+  enabledModules: string[]
   accentColor: string
+  logoUrl: string | null
   isActive: boolean
 }
 
@@ -323,6 +373,48 @@ export const api = {
       method: 'DELETE',
     }),
 
+  // ─── City Pairs ─────────────────────────────────────────
+  getCityPairs: (operatorId?: string) => {
+    const qs = operatorId ? `?operatorId=${operatorId}` : ''
+    return request<CityPairRef[]>(`/city-pairs${qs}`)
+  },
+
+  getCityPair: (id: string) => request<CityPairRef>(`/city-pairs/${id}`),
+
+  createCityPair: (data: { station1Icao: string; station2Icao: string; standardBlockMinutes?: number; notes?: string }) =>
+    request<CityPairRef>('/city-pairs', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateCityPair: (id: string, data: Partial<CityPairRef>) =>
+    request<CityPairRef>(`/city-pairs/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteCityPair: (id: string) =>
+    request<{ success: boolean }>(`/city-pairs/${id}`, {
+      method: 'DELETE',
+    }),
+
+  addBlockHour: (cityPairId: string, data: Omit<BlockHourData, '_id'>) =>
+    request<CityPairRef>(`/city-pairs/${cityPairId}/block-hours`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateBlockHour: (cityPairId: string, bhId: string, data: Partial<Omit<BlockHourData, '_id'>>) =>
+    request<CityPairRef>(`/city-pairs/${cityPairId}/block-hours/${bhId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteBlockHour: (cityPairId: string, bhId: string) =>
+    request<CityPairRef>(`/city-pairs/${cityPairId}/block-hours/${bhId}`, {
+      method: 'DELETE',
+    }),
+
   getDelayCodes: (operatorId = 'horizon') =>
     request<DelayCodeRef[]>(`/delay-codes?operatorId=${operatorId}`),
 
@@ -339,6 +431,14 @@ export const api = {
     request<FlightServiceTypeRef[]>(`/flight-service-types?operatorId=${operatorId}`),
 
   getOperators: () => request<OperatorRef[]>('/operators'),
+
+  getOperator: (id: string) => request<OperatorRef>(`/operators/${id}`),
+
+  updateOperator: (id: string, data: Partial<OperatorRef>) =>
+    request<OperatorRef>(`/operators/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
 
   getReferenceStats: () => request<ReferenceStats>('/reference/stats'),
 

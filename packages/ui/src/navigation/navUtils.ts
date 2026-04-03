@@ -19,6 +19,8 @@ export interface BreadcrumbSegment {
   siblings: Array<{ key: string; label: string; num: string; route: string; iconName: string; desc?: string }>
   parentLabel?: string
   hideNum?: boolean
+  /** When true, show descriptions in the dropdown (used when section shows its pages) */
+  showDescriptions?: boolean
 }
 
 const MODULE_COLORS: Record<string, string> = {
@@ -62,6 +64,14 @@ export function resolveNavPath(pathname: string): NavPath | null {
           return { module: mod, section, page }
         }
       }
+    }
+  }
+
+  // Module-level landing page match — e.g. /ground-ops is a hub for the module
+  for (const mod of NAV_TREE) {
+    const modSlug = '/' + (mod.sections[0]?.pages[0]?.route.split('/').filter(Boolean)[0] ?? '')
+    if (modSlug === pathname && mod.sections.length > 1) {
+      return { module: mod }
     }
   }
 
@@ -131,19 +141,29 @@ export function buildBreadcrumbs(path: NavPath): BreadcrumbSegment[] {
   })
 
   if (path.section && !skipSection) {
-    // For non-flat sections with hideNum, also hide section numbers
     const sectionSiblings = path.module.sections.filter((s) => !s.flatBreadcrumb)
+
+    // When there's only 1 non-flat section, show its pages as dropdown items
+    // so clicking the section breadcrumb gives quick navigation to all sub-pages (like V1)
+    const usePageSiblings = sectionSiblings.length <= 1
+    const siblings = usePageSiblings
+      ? path.section.pages.map((p) => ({
+          key: p.key, label: p.label, num: p.num, route: p.route, iconName: p.iconName, desc: p.desc,
+        }))
+      : sectionSiblings.map((s) => ({
+          key: s.key, label: s.label, num: s.num, route: firstSectionRoute(s), iconName: s.iconName,
+        }))
+
     segs.push({
-      level: 'section',
+      level: usePageSiblings ? 'section' : 'section',
       num: path.section.num,
       label: path.section.label,
       route: firstSectionRoute(path.section),
       iconName: path.section.iconName,
       hideNum,
       parentLabel: path.module.label,
-      siblings: sectionSiblings.map((s) => ({
-        key: s.key, label: s.label, num: s.num, route: firstSectionRoute(s), iconName: s.iconName,
-      })),
+      siblings,
+      showDescriptions: usePageSiblings,
     })
   }
 

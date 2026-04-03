@@ -15,6 +15,8 @@ export interface NavSectionData {
   label: string
   num: string
   iconName: string
+  /** Optional landing route for this section (e.g. /admin). Falls back to first page route. */
+  route?: string
   pages: NavPageData[]
   /** When true, this section is hidden in breadcrumbs — pages appear directly under the module */
   flatBreadcrumb?: boolean
@@ -125,8 +127,9 @@ export const NAV_TREE: NavModuleData[] = [
       {
         key: 'loading', label: 'Live Loading', num: '4.2', iconName: 'Loader',
         pages: [
-          { key: 'flight-loading', label: 'Flight Loading', num: '4.2.1', route: '/ground-ops/loading/flight-loading', iconName: 'Plane', desc: 'Unified cargo + pax live view' },
-          { key: 'handler-view', label: 'Handler View', num: '4.2.2', route: '/ground-ops/loading/handler-view', iconName: 'Smartphone', desc: 'Ground handler confirmation (SkyHub)' },
+          { key: 'skyhub-go', label: 'SkyHub GO', num: '4.2.1', route: '/ground-ops/loading/skyhub-go', iconName: 'Truck', desc: 'Station board, KPIs & flight ops' },
+          { key: 'flight-loading', label: 'Flight Loading', num: '4.2.2', route: '/ground-ops/loading/flight-loading', iconName: 'Plane', desc: 'Unified cargo + pax live view' },
+          { key: 'handler-view', label: 'Handler View', num: '4.2.3', route: '/ground-ops/loading/handler-view', iconName: 'Smartphone', desc: 'Ground handler confirmation (SkyHub)' },
         ],
       },
       {
@@ -204,11 +207,11 @@ export const NAV_TREE: NavModuleData[] = [
         ],
       },
       {
-        key: 'master-database', label: 'Master Database', num: '6.3', iconName: 'Database',
+        key: 'master-database', label: 'Master Database', num: '6.3', iconName: 'Database', route: '/admin',
         pages: [
-          { key: 'airports', label: 'Airports Database', num: '6.3.1', route: '/admin/airports', iconName: 'PlaneTakeoff', desc: 'ICAO/IATA codes, coordinates, facilities' },
-          { key: 'countries', label: 'Countries Database', num: '6.3.2', route: '/admin/countries', iconName: 'Globe', desc: 'ISO codes, regions, currency' },
-          { key: 'operators', label: 'Operators Database', num: '6.3.3', route: '/admin/operators', iconName: 'Building2', desc: 'Airlines, codeshare partners' },
+          { key: 'countries', label: 'Countries Database', num: '6.3.1', route: '/admin/countries', iconName: 'Globe', desc: 'ISO codes, regions, currency' },
+          { key: 'airports', label: 'Airports Database', num: '6.3.2', route: '/admin/airports', iconName: 'PlaneTakeoff', desc: 'ICAO/IATA codes, coordinates, facilities' },
+          { key: 'city-pairs', label: 'Citypairs Database', num: '6.3.3', route: '/admin/city-pairs', iconName: 'ArrowLeftRight', desc: 'Routes, distances, block times' },
           { key: 'aircraft-types', label: 'Aircraft Types Database', num: '6.3.4', route: '/admin/aircraft-types', iconName: 'Plane', desc: 'Fleet types, capacity, performance' },
           { key: 'delay-codes', label: 'Delay Codes Database', num: '6.3.5', route: '/admin/delay-codes', iconName: 'Timer', desc: 'IATA standard & custom codes' },
           { key: 'service-types', label: 'Service Types Database', num: '6.3.6', route: '/admin/service-types', iconName: 'Tag', desc: 'Flight service categories' },

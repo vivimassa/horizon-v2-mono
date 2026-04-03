@@ -213,7 +213,7 @@ export function AirportRunwayTab({ airport, editing, draft = {}, onChange, onRef
                   className="flex items-center gap-4 px-4 py-3 rounded-xl border border-hz-border bg-hz-card hover:border-hz-border/80 transition-colors">
                   {/* Identifier */}
                   <div className="w-24 shrink-0">
-                    <div className="font-mono text-[14px] font-bold">{rw.identifier}</div>
+                    <div className="text-[14px] font-bold">{rw.identifier}</div>
                     <div className="text-[11px] text-hz-text-secondary mt-0.5">
                       {rw.status === "active" ? (
                         <span className="text-green-600 dark:text-green-400">Active</span>
@@ -303,7 +303,7 @@ function RunwayFormFields({ form, setForm }: { form: RunwayForm; setForm: (fn: (
           <label className="text-[11px] text-hz-text-secondary uppercase tracking-wider font-semibold">Identifier *</label>
           <input type="text" value={form.identifier} placeholder="e.g. 08L/26R"
             onChange={(e) => setForm(p => ({ ...p, identifier: e.target.value.toUpperCase() }))}
-            className="w-full mt-1 px-3 py-2 rounded-lg text-[13px] font-mono border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text" />
+            className="w-full mt-1 px-3 py-2 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text" />
         </div>
         <div className="flex-1">
           <label className="text-[11px] text-hz-text-secondary uppercase tracking-wider font-semibold">Surface</label>

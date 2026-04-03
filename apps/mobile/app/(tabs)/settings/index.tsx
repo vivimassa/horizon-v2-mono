@@ -14,7 +14,7 @@ import {
   ChevronRight,
   type LucideIcon,
 } from 'lucide-react-native'
-import { accentTint, type Palette } from '@skyhub/ui/theme'
+import { accentTint, colors, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { useUser } from '../../../providers/UserProvider'
 
@@ -22,16 +22,16 @@ const ACCENT_DEFAULT = '#1e40af'
 const TABLET_WIDTH = 768
 
 const ACCENT_PRESETS = [
-  { name: 'Green', hex: '#15803d' },
-  { name: 'Blue', hex: '#1e40af' },
-  { name: 'Violet', hex: '#7c3aed' },
-  { name: 'Teal', hex: '#0f766e' },
-  { name: 'Amber', hex: '#b45309' },
+  { name: 'Green', darkName: 'Coral', hex: '#15803d' },
+  { name: 'Blue', darkName: 'Sky', hex: '#1e40af' },
+  { name: 'Violet', darkName: 'Lavender', hex: '#7c3aed' },
+  { name: 'Teal', darkName: 'Aqua', hex: '#0f766e' },
+  { name: 'Amber', darkName: 'Honey', hex: '#b45309' },
 ]
 
 export default function SettingsScreen() {
   const router = useRouter()
-  const { isDark, palette, accent, toggleDark, setAccent } = useAppTheme()
+  const { isDark, palette, accent, rawAccent, toggleDark, setAccent } = useAppTheme()
   const { user } = useUser()
   const { width } = useWindowDimensions()
 
@@ -269,7 +269,7 @@ export default function SettingsScreen() {
                 <AdminCard icon={Database} iconColor={accent} title="Master Database" subtitle="Airports, aircraft types, airlines, reference data" palette={palette} isDark={isDark} onPress={() => router.push('/(tabs)/settings/master-database' as any)} />
                 <AdminCard icon={ShieldCheck} iconColor="#7c3aed" title="Users & Roles" subtitle="User accounts, role assignment, RBAC permissions" palette={palette} isDark={isDark} />
                 <AdminCard icon={ArrowLeftRight} iconColor="#0f766e" title="Interface" subtitle="AMOS, SSIM, MVT integrations and message hub" palette={palette} isDark={isDark} />
-                <AdminCard icon={Building2} iconColor="#b45309" title="Operator Config" subtitle="Airline settings, base airports, fleet configuration" palette={palette} isDark={isDark} />
+                <AdminCard icon={Building2} iconColor="#b45309" title="Operator Config" subtitle="Airline settings, base airports, fleet configuration" palette={palette} isDark={isDark} onPress={() => router.push('/(tabs)/settings/operator-config' as any)} />
               </View>
             </View>
           )}
@@ -310,7 +310,9 @@ export default function SettingsScreen() {
 
             <View className="flex-row flex-wrap" style={{ gap: 12, justifyContent: 'center' }}>
               {ACCENT_PRESETS.map((p) => {
-                const selected = p.hex === accent
+                const selected = p.hex === rawAccent
+                const displayColor = isDark ? (colors.accentPresetsDark[p.hex] ?? p.hex) : p.hex
+                const displayName = isDark ? p.darkName : p.name
                 return (
                   <Pressable
                     key={p.hex}
@@ -323,11 +325,11 @@ export default function SettingsScreen() {
                       style={{
                         width: 48,
                         height: 48,
-                        backgroundColor: p.hex,
+                        backgroundColor: displayColor,
                         borderWidth: selected ? 3 : 0,
                         borderColor: '#fff',
                         ...(selected ? {
-                          shadowColor: p.hex,
+                          shadowColor: displayColor,
                           shadowOffset: { width: 0, height: 0 },
                           shadowOpacity: 0.5,
                           shadowRadius: 8,
@@ -335,14 +337,14 @@ export default function SettingsScreen() {
                         } : {}),
                       }}
                     >
-                      {selected && <Check size={20} color="#fff" strokeWidth={2.5} />}
+                      {selected && <Check size={20} color={isDark ? '#111' : '#fff'} strokeWidth={2.5} />}
                     </View>
                     <Text style={{
                       fontSize: 13,
                       fontWeight: selected ? '700' : '500',
-                      color: selected ? p.hex : palette.textSecondary,
+                      color: selected ? displayColor : palette.textSecondary,
                     }}>
-                      {p.name}
+                      {displayName}
                     </Text>
                   </Pressable>
                 )

@@ -131,10 +131,10 @@ const CountryRow = memo(function CountryRow({
         {country.isoCode2}
       </Text>
       <View className="flex-1 ml-3">
-        <Text style={{ fontSize: 14, fontWeight: '500', color: palette.text }} numberOfLines={1}>
+        <Text style={{ fontSize: 15, fontWeight: '500', color: palette.text }} numberOfLines={1}>
           {country.name}
         </Text>
-        <Text style={{ fontSize: 12, color: palette.textSecondary, marginTop: 1 }}>
+        <Text style={{ fontSize: 13, color: palette.textSecondary, marginTop: 1 }}>
           {country.isoCode2} · {country.isoCode3}
           {country.region ? ` · ${country.region}` : ''}
         </Text>

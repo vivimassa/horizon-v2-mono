@@ -2,14 +2,12 @@ import { useState, useCallback, useEffect, useMemo } from 'react'
 import { Text, View, ScrollView, Pressable, TextInput, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { api, setApiBaseUrl, type AirportRef, type AirportLookupResult, type CountryRef } from '@skyhub/api'
+import { api, type AirportRef, type AirportLookupResult, type CountryRef } from '@skyhub/api'
 import {
   ChevronLeft, Globe, Loader2, AlertCircle, ChevronDown, Check,
 } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
-
-setApiBaseUrl('http://192.168.1.101:3002')
 
 export default function AirportAddScreen() {
   const router = useRouter()

@@ -413,15 +413,15 @@ function CountryBasicTab({ country, editing, draft = {}, onChange }: {
           editing={editing} fieldKey="name" editValue={get("name")} onChange={onChange} />
         <FieldRow label="Official Name" value={country.officialName}
           editing={editing} fieldKey="officialName" editValue={get("officialName")} onChange={onChange} />
-        <FieldRow label="ISO 2 Code" value={<span className="font-mono font-bold">{country.isoCode2}</span>}
+        <FieldRow label="ISO 2 Code" value={<span className="font-bold">{country.isoCode2}</span>}
           editing={editing} fieldKey="isoCode2" editValue={get("isoCode2")} onChange={onChange} />
-        <FieldRow label="ISO 3 Code" value={<span className="font-mono text-hz-text-secondary">{country.isoCode3}</span>}
+        <FieldRow label="ISO 3 Code" value={<span className="text-hz-text-secondary">{country.isoCode3}</span>}
           editing={editing} fieldKey="isoCode3" editValue={get("isoCode3")} onChange={onChange} />
         <FieldRow label="Region" value={country.region}
           editing={editing} fieldKey="region" editValue={get("region")} onChange={onChange} />
         <FieldRow label="Sub-region" value={country.subRegion}
           editing={editing} fieldKey="subRegion" editValue={get("subRegion")} onChange={onChange} />
-        <FieldRow label="ICAO Prefix" value={country.icaoPrefix ? <span className="font-mono">{country.icaoPrefix}</span> : null}
+        <FieldRow label="ICAO Prefix" value={country.icaoPrefix ?? null}
           editing={editing} fieldKey="icaoPrefix" editValue={get("icaoPrefix")} onChange={onChange} />
         <FieldRow label="Flag Emoji" value={country.flagEmoji}
           editing={editing} fieldKey="flagEmoji" editValue={get("flagEmoji")} onChange={onChange} />
@@ -443,7 +443,7 @@ function CountryExtraTab({ country, editing, draft = {}, onChange }: {
   return (
     <div className="px-6 pt-3 pb-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8">
-        <FieldRow label="Currency Code" value={country.currencyCode ? <span className="font-mono">{country.currencyCode}</span> : null}
+        <FieldRow label="Currency Code" value={country.currencyCode ?? null}
           editing={editing} fieldKey="currencyCode" editValue={get("currencyCode")} onChange={onChange} />
         <FieldRow label="Currency Name" value={country.currencyName}
           editing={editing} fieldKey="currencyName" editValue={get("currencyName")} onChange={onChange} />
@@ -469,7 +469,7 @@ function MiniInput({ label, value, onChange, maxLength, mono, type = "text" }: {
     <div className="flex-1">
       <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">{label}</label>
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)} maxLength={maxLength}
-        className={`w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text ${mono ? "font-mono" : ""}`} />
+        className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text" />
     </div>
   );
 }

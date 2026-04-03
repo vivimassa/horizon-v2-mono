@@ -11,6 +11,7 @@ import {
   Users,
   PlaneTakeoff,
   Building2,
+  ArrowLeftRight,
   Timer,
   Tag,
   UserRound,
@@ -49,7 +50,7 @@ const SECTIONS: SectionDef[] = [
     cards: [
       { code: "5.1.1", label: "Countries Database", desc: "ISO codes, regions, currency", icon: Globe, href: "/admin/countries" },
       { code: "5.1.2", label: "Airports Database", desc: "ICAO/IATA codes, coordinates, facilities", icon: PlaneTakeoff, href: "/admin/airports" },
-      { code: "5.1.3", label: "Operators Database", desc: "Airlines, codeshare partners", icon: Building2, href: "/admin/operators" },
+      { code: "5.1.3", label: "Citypairs Database", desc: "Routes, distances, block times", icon: ArrowLeftRight, href: "/admin/city-pairs" },
     ],
   },
   {

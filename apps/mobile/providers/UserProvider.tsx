@@ -1,8 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { api, setApiBaseUrl, type UserData } from '@skyhub/api'
-
-// Set API base — adjust for your dev machine IP
-setApiBaseUrl('http://192.168.1.101:3002')
+import { api, type UserData } from '@skyhub/api'
 
 interface UserContextValue {
   user: UserData | null

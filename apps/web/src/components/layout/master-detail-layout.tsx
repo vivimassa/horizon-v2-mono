@@ -29,7 +29,7 @@ export function MasterDetailLayout({
   const panelBg = theme === "dark" ? "#1e1e22" : "#ffffff";
 
   return (
-    <div className="flex h-full overflow-hidden gap-3 p-3">
+    <div className="flex h-full overflow-hidden gap-3 px-5 pt-4 pb-5">
       {/* Left panel */}
       <aside
         className="shrink-0 flex flex-col rounded-2xl border border-hz-border overflow-hidden"

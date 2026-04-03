@@ -1,9 +1,13 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import { useTheme } from "./theme-provider";
 import { useUser } from "./user-provider";
 import { colors, type Palette as PaletteType } from "@skyhub/ui/theme";
 import { BreadcrumbNav } from "./navigation/breadcrumb-nav";
+import { api, setApiBaseUrl } from "@skyhub/api";
+
+setApiBaseUrl("http://localhost:3002");
 
 export function Breadcrumb() {
   const { theme } = useTheme();
@@ -14,6 +18,28 @@ export function Breadcrumb() {
   const initials = user ? `${user.profile.firstName[0]}${user.profile.lastName[0]}` : "";
   const fullName = user ? `${user.profile.firstName} ${user.profile.lastName}` : "";
   const userRole = user?.role ?? "";
+
+  const [operatorLogo, setOperatorLogo] = useState<string | null>(null);
+
+  const fetchLogo = useCallback(() => {
+    api.getOperators().then((ops) => {
+      if (ops.length > 0 && ops[0].logoUrl) {
+        const url = ops[0].logoUrl;
+        setOperatorLogo(url.startsWith("/uploads/") ? `http://localhost:3002${url}` : url);
+      } else {
+        setOperatorLogo(null);
+      }
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => { fetchLogo(); }, [fetchLogo]);
+
+  // Listen for logo changes from Operator Config
+  useEffect(() => {
+    const handler = () => fetchLogo();
+    window.addEventListener("operator-logo-changed", handler);
+    return () => window.removeEventListener("operator-logo-changed", handler);
+  }, [fetchLogo]);
 
   const today = new Date().toLocaleDateString("en-GB", {
     weekday: "short",
@@ -27,12 +53,12 @@ export function Breadcrumb() {
       {/* Top row: logo left, avatar right */}
       <div className="flex items-center justify-between mb-1">
         <img
-          src="/skyhub-logo.png"
+          src={operatorLogo ?? "/skyhub-logo.png"}
           alt="Sky Hub"
           className="h-[55px] w-auto object-contain select-none"
           draggable={false}
           style={{
-            filter: isDark ? "brightness(0) invert(1)" : "none",
+            filter: !operatorLogo && isDark ? "brightness(0) invert(1)" : "none",
           }}
         />
         <div className="flex items-center gap-3 shrink-0">

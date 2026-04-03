@@ -94,6 +94,14 @@ export const colors = {
     Sky: '#0369a1',
     Pink: '#be185d',
   },
+  /** Dark-mode accent overrides: bright color swap → then 20% desaturation */
+  accentPresetsDark: {
+    '#15803d': '#eea9a9', // Green  → Coral (#fca5a5 → desat 20%)
+    '#1e40af': '#9cc4f0', // Blue   (#93c5fd → desat 20%)
+    '#7c3aed': '#c3b7f0', // Violet (#c4b5fd → desat 20%)
+    '#0f766e': '#74e4d2', // Teal   (#5eead4 → desat 20%)
+    '#b45309': '#f8e69c', // Amber  (#fde68a → desat 20%)
+  } as Record<string, string>,
   defaultAccent: '#1e40af',
 } as const
 

@@ -3,14 +3,12 @@ import { useFocusEffect } from '@react-navigation/native'
 import { Text, View, SectionList, TextInput, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { api, setApiBaseUrl, type AirportRef } from '@skyhub/api'
+import { api, type AirportRef } from '@skyhub/api'
 import {
   Search, ChevronLeft, ChevronRight, PlaneTakeoff, Plus,
 } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
-
-setApiBaseUrl('http://192.168.1.101:3002')
 
 interface CountrySection {
   title: string

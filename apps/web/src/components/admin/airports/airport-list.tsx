@@ -98,7 +98,7 @@ export function AirportList({
                             : "border-l-[3px] border-l-transparent hover:bg-hz-border/30"
                         }`}
                       >
-                        <span className={`font-mono text-[13px] font-bold shrink-0 w-8 ${isSelected ? "text-module-accent" : "text-hz-text-secondary"}`}>
+                        <span className={`text-[13px] font-bold shrink-0 w-8 ${isSelected ? "text-module-accent" : "text-hz-text-secondary"}`}>
                           {airport.iataCode ?? "—"}
                         </span>
                         <div className="min-w-0 flex-1">

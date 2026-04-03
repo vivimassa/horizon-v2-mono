@@ -1,4 +1,8 @@
 import crypto from 'node:crypto'
+import path from 'node:path'
+import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { pipeline } from 'node:stream/promises'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { Airport } from '../models/Airport.js'
@@ -109,6 +113,68 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     const doc = await Operator.findById(id).lean()
     if (!doc) return reply.code(404).send({ error: 'Operator not found' })
     return doc
+  })
+
+  // Update operator
+  app.patch('/operators/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const body = req.body as Record<string, unknown>
+
+    // Uppercase codes
+    if (body.icaoCode) body.icaoCode = (body.icaoCode as string).toUpperCase()
+    if (body.iataCode) body.iataCode = (body.iataCode as string).toUpperCase()
+    if (body.code) body.code = (body.code as string).toUpperCase()
+    if (body.mainBaseIcao) body.mainBaseIcao = (body.mainBaseIcao as string).toUpperCase()
+
+    body.updatedAt = new Date().toISOString()
+
+    const doc = await Operator.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'Operator not found' })
+    return doc
+  })
+
+  // Upload operator logo
+  app.post('/operators/:id/logo', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const op = await Operator.findById(id).lean()
+    if (!op) return reply.code(404).send({ error: 'Operator not found' })
+
+    const file = await req.file()
+    if (!file) return reply.code(400).send({ error: 'No file uploaded' })
+
+    const ext = path.extname(file.filename).toLowerCase()
+    if (!['.jpg', '.jpeg', '.png', '.svg', '.webp'].includes(ext)) {
+      return reply.code(400).send({ error: 'Only JPG, PNG, SVG, or WebP files are allowed' })
+    }
+
+    const __dirname = path.dirname(fileURLToPath(import.meta.url))
+    const uploadsDir = path.resolve(__dirname, '..', '..', 'uploads')
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true })
+
+    const filename = `logo-${id}${ext}`
+    const filepath = path.join(uploadsDir, filename)
+    await pipeline(file.file, fs.createWriteStream(filepath))
+
+    const logoUrl = `/uploads/${filename}`
+    await Operator.findByIdAndUpdate(id, { $set: { logoUrl, updatedAt: new Date().toISOString() } })
+
+    return { success: true, logoUrl }
+  })
+
+  // Delete operator logo
+  app.delete('/operators/:id/logo', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const op = await Operator.findById(id).lean()
+    if (!op) return reply.code(404).send({ error: 'Operator not found' })
+
+    if (op.logoUrl && op.logoUrl.startsWith('/uploads/')) {
+      const __dirname = path.dirname(fileURLToPath(import.meta.url))
+      const filepath = path.resolve(__dirname, '..', '..', op.logoUrl.replace('/uploads/', 'uploads/'))
+      if (fs.existsSync(filepath)) fs.unlinkSync(filepath)
+    }
+
+    await Operator.findByIdAndUpdate(id, { $set: { logoUrl: null, updatedAt: new Date().toISOString() } })
+    return { success: true }
   })
 
   // ─── Airports ───────────────────────────────────────────

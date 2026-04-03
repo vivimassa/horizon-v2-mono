@@ -26,7 +26,7 @@ export function AdminSection({ palette, isDark, accent }: AdminSectionProps) {
     { icon: Database, iconColor: accent, title: "Master Database", subtitle: "Airports, aircraft types, airlines, reference data", href: "/admin" },
     { icon: ShieldCheck, iconColor: "#7c3aed", title: "Users & Roles", subtitle: "User accounts, role assignment, RBAC permissions" },
     { icon: ArrowLeftRight, iconColor: "#0f766e", title: "Interface", subtitle: "AMOS, SSIM, MVT integrations and message hub" },
-    { icon: Building2, iconColor: "#b45309", title: "Operator Config", subtitle: "Airline settings, base airports, fleet configuration" },
+    { icon: Building2, iconColor: "#b45309", title: "Operator Config", subtitle: "Airline settings, base airports, fleet configuration", href: "/settings/admin/operator-config" },
   ];
 
   return (

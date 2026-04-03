@@ -9,6 +9,7 @@ import {
 } from "@skyhub/ui/navigation";
 import { useTheme } from "../theme-provider";
 import { colors, accentTint, type Palette as PaletteType } from "@skyhub/ui/theme";
+import { useGroundOpsStore } from "@/stores/use-ground-ops-store";
 import {
   Home, Globe, Plane, Truck, Users, Settings,
   Calendar, Clock, Handshake, Send,
@@ -21,6 +22,10 @@ import {
   PlaneTakeoff, Lock, Bell, Palette,
   ArrowLeftRight, Building2,
   ChevronDown,
+  ClipboardList, PackageCheck, Package, Armchair,
+  Loader, Smartphone, Scale, FileBarChart,
+  PenLine, BadgeCheck, History, TrendingUp, ShieldAlert,
+  Timer, Tag, UserRound, FileCheck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -36,6 +41,10 @@ const ICON_MAP: Record<string, LucideIcon> = {
   DoorOpen, LayoutGrid,
   PlaneTakeoff, Lock, Bell, Palette,
   ArrowLeftRight, Building2,
+  ClipboardList, PackageCheck, Package, Armchair,
+  Loader, Smartphone, Scale, FileBarChart,
+  PenLine, BadgeCheck, History, TrendingUp, ShieldAlert,
+  Timer, Tag, UserRound, FileCheck,
 };
 
 function NavIcon({ name, size = 14, color }: { name: string; size?: number; color?: string }) {
@@ -129,7 +138,9 @@ export function BreadcrumbNav() {
                     handleSegmentClick(i);
                     return;
                   }
+                  // Section and module segments always open dropdown when they have siblings
                   if (hasSiblings) handleSegmentClick(i);
+                  else if (seg.level === 'section') handleNavigate(seg.route);
                   else handleNavigate(seg.route);
                 }}
                 aria-expanded={isOpen}
@@ -258,7 +269,7 @@ function SegmentDropdown({
   isDark: boolean;
   onItemClick: (route: string) => void;
 }) {
-  const isPageLevel = segment.level === "page";
+  const showDescs = segment.level === "page" || segment.showDescriptions;
 
   return (
     <div
@@ -266,7 +277,7 @@ function SegmentDropdown({
       className="absolute top-full left-0 mt-1.5"
       style={{
         minWidth: 220,
-        maxWidth: 300,
+        maxWidth: segment.showDescriptions ? 340 : 300,
         borderRadius: 12,
         border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
         background: isDark ? "#18181b" : "#ffffff",
@@ -350,7 +361,7 @@ function SegmentDropdown({
               >
                 {item.label}
               </span>
-              {isPageLevel && item.desc && (
+              {showDescs && item.desc && (
                 <span
                   className="text-[11px] block mt-0.5 truncate"
                   style={{ color: palette.textTertiary }}
@@ -370,6 +381,59 @@ function SegmentDropdown({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+// ── Flight context pill (Ground Ops breadcrumb) ──
+function FlightContextPill({
+  accent,
+  palette,
+  isDark,
+}: {
+  accent: string;
+  palette: PaletteType;
+  isDark: boolean;
+}) {
+  const selectedFlight = useGroundOpsStore((s) => s.selectedFlight);
+
+  if (selectedFlight) {
+    return (
+      <div
+        className="flex items-center gap-1.5 ml-auto"
+        style={{
+          background: accentTint(accent, 0.08),
+          color: accent,
+          border: `1px solid ${accentTint(accent, 0.15)}`,
+          padding: "4px 10px",
+          borderRadius: 8,
+          fontSize: 12,
+          fontWeight: 600,
+        }}
+      >
+        <Plane size={12} strokeWidth={2} style={{ transform: "rotate(45deg)" }} />
+        <span>
+          {selectedFlight.id} {selectedFlight.dep}&rarr;{selectedFlight.arr}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex items-center gap-1.5 ml-auto"
+      style={{
+        background: palette.backgroundHover,
+        color: palette.textSecondary,
+        border: `1px solid ${palette.border}`,
+        padding: "4px 10px",
+        borderRadius: 8,
+        fontSize: 12,
+        fontWeight: 600,
+      }}
+    >
+      <Plane size={12} strokeWidth={2} style={{ transform: "rotate(45deg)" }} />
+      <span>Select Flight</span>
     </div>
   );
 }

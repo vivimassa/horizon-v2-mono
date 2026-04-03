@@ -2,6 +2,12 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { useColorScheme, Appearance, useWindowDimensions } from 'react-native'
 import { colors, accentTint, type Palette } from '@skyhub/ui/theme'
 
+/** Resolve accent color for current mode — dark mode uses brighter, desaturated variants */
+function resolveAccent(hex: string, isDark: boolean): string {
+  if (!isDark) return hex
+  return colors.accentPresetsDark[hex] ?? hex
+}
+
 // ── Global font size scale ──
 // Every screen reads these instead of hardcoding sizes.
 // Phone base, tablet gets ~1.2x via `fs()`.
@@ -27,7 +33,10 @@ const TABLET_WIDTH = 768
 interface ThemeContextValue {
   isDark: boolean
   palette: Palette
+  /** Accent color resolved for current mode (bright+desaturated in dark mode) */
   accent: string
+  /** Raw accent hex as chosen by user (light-mode value, for picker comparison) */
+  rawAccent: string
   isTablet: boolean
   /** Global font sizes — use these instead of hardcoded numbers */
   fonts: FontSizes
@@ -41,6 +50,7 @@ const ThemeCtx = createContext<ThemeContextValue>({
   isDark: false,
   palette: colors.light,
   accent: '#1e40af',
+  rawAccent: '#1e40af',
   isTablet: false,
   fonts: PHONE_FONTS,
   fs: (s) => s,
@@ -68,6 +78,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [systemScheme, manualOverride])
 
   const palette = isDark ? colors.dark : colors.light
+  const resolvedAccent = resolveAccent(accent, isDark)
   const fonts = isTablet ? TABLET_FONTS : PHONE_FONTS
   const scale = isTablet ? 1.2 : 1
   const fs = useCallback((size: number) => Math.round(size * scale), [scale])
@@ -80,7 +91,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [isDark])
 
   return (
-    <ThemeCtx.Provider value={{ isDark, palette, accent, isTablet, fonts, fs, toggleDark, setAccent }}>
+    <ThemeCtx.Provider value={{ isDark, palette, accent: resolvedAccent, rawAccent: accent, isTablet, fonts, fs, toggleDark, setAccent }}>
       {children}
     </ThemeCtx.Provider>
   )

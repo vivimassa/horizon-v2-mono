@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Text, View, FlatList, RefreshControl } from 'react-native'
-import { api, setApiBaseUrl, type Flight } from '@skyhub/api'
+import { api, type Flight } from '@skyhub/api'
 import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { getStatusColors, type StatusKey, type Palette } from '@skyhub/ui/theme'
-
-setApiBaseUrl('http://192.168.1.101:3002')
 
 function formatTime(ts: number | null) {
   if (!ts) return '\u2014'

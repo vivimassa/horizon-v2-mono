@@ -4,6 +4,8 @@ export type {
   AirportRef,
   AirportLookupResult,
   RunwayData,
+  CityPairRef,
+  BlockHourData,
   AircraftTypeRef,
   CountryRef,
   DelayCodeRef,

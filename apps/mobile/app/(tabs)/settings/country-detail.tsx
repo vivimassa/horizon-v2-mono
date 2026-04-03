@@ -10,6 +10,7 @@ import {
 import MapView, { Marker } from 'react-native-maps'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { useDevice } from '../../../hooks/useDevice'
 
 type TabKey = 'basic' | 'extra'
 
@@ -22,6 +23,7 @@ export default function CountryDetailScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { palette, isDark, accent } = useAppTheme()
+  const { isTablet } = useDevice()
 
   const [country, setCountry] = useState<CountryRef | null>(null)
   const [loading, setLoading] = useState(true)
@@ -163,21 +165,17 @@ export default function CountryDetailScreen() {
 
       {/* Map */}
       {country.latitude != null && country.longitude != null && (
-        <View style={{ height: 200, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+        <View style={{ height: isTablet ? 350 : 250, borderBottomWidth: 1, borderBottomColor: palette.border }}>
           <MapView
             style={{ flex: 1 }}
             initialRegion={{
               latitude: country.latitude,
               longitude: country.longitude,
-              latitudeDelta: 5,
-              longitudeDelta: 5,
+              latitudeDelta: 15,
+              longitudeDelta: 15,
             }}
             userInterfaceStyle={isDark ? 'dark' : 'light'}
             mapType="standard"
-            scrollEnabled={false}
-            zoomEnabled={false}
-            pitchEnabled={false}
-            rotateEnabled={false}
           >
             <Marker
               coordinate={{ latitude: country.latitude, longitude: country.longitude }}

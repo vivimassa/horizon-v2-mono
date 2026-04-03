@@ -1,4 +1,4 @@
-import { Tabs } from 'expo-router'
+import { Tabs, useRouter } from 'expo-router'
 import {
   Home,
   Globe,
@@ -21,6 +21,7 @@ const TAB_CONFIG = [
 
 export default function TabLayout() {
   const { isDark } = useAppTheme()
+  const router = useRouter()
 
   return (
     <Tabs
@@ -32,7 +33,16 @@ export default function TabLayout() {
           isDark={isDark}
           onTabChange={(index: number) => {
             const route = state.routes[index]
-            navigation.navigate(route.name)
+            if (state.index === index) {
+              // Already on this tab — navigate to root to reset stack
+              const tabRoute = state.routes[index]
+              const nestedState = tabRoute.state
+              if (nestedState && nestedState.index != null && nestedState.index > 0) {
+                router.navigate((`/(tabs)/${route.name}`) as any)
+              }
+            } else {
+              navigation.navigate(route.name)
+            }
           }}
         />
       )}

@@ -153,52 +153,108 @@ export function LopaConfigDetail({ config, cabinClasses, onSave, onDelete, onCre
     return perRow * 60;
   }, [cabinClasses]);
 
+  // Toggle a cabin class on/off in create form
+  const toggleCabinClass = useCallback((code: string) => {
+    setCreateForm(p => {
+      const exists = p.cabins.find(c => c.classCode === code);
+      if (exists) {
+        // Remove — but keep at least one cabin
+        const next = p.cabins.filter(c => c.classCode !== code);
+        return { ...p, cabins: next.length > 0 ? next : p.cabins };
+      }
+      // Add with a sensible default seat count based on class type
+      const cc = cabinClasses.find(c => c.code === code);
+      const layout = (cc?.seatLayout || "3-3").split("-").map(Number);
+      const perRow = layout.reduce((s, g) => s + g, 0);
+      const defaultSeats = perRow <= 2 ? 8 : perRow <= 4 ? 24 : 180;
+      return { ...p, cabins: [...p.cabins, { classCode: code, seats: defaultSeats }] };
+    });
+  }, [cabinClasses]);
+
+  const createTotalSeats = useMemo(
+    () => createForm.cabins.reduce((s, c) => s + c.seats, 0),
+    [createForm.cabins]
+  );
+
   // ── Standalone create mode ──
   if (!config) {
+    const enabledCodes = new Set(createForm.cabins.map(c => c.classCode));
+
     return (
       <div className="flex flex-col h-full overflow-hidden">
+        {/* Header */}
         <div className="px-6 py-4 border-b border-hz-border shrink-0">
-          <h1 className="text-[18px] font-semibold">Add New LOPA Configuration</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-[18px] font-semibold">Add New LOPA Configuration</h1>
+            <button onClick={resetCreate} className="text-[13px] text-hz-text-secondary hover:text-hz-text transition-colors">Cancel</button>
+          </div>
         </div>
-        <div className="flex-1 overflow-y-auto">
-          {/* Live seat map preview */}
-          {createForm.cabins.length > 0 && createForm.cabins.some((c) => c.seats > 0) && (
-            <div className="px-6 py-4 border-b border-hz-border">
-              <AircraftSeatMap cabins={createForm.cabins} cabinClasses={cabinClasses} aircraftType={createForm.aircraftType} />
-            </div>
-          )}
 
-          <div className="px-6 py-4 space-y-3">
+        <div className="flex-1 overflow-y-auto">
+          {/* Aircraft type + config name */}
+          <div className="px-6 pt-4 pb-3 space-y-3 border-b border-hz-border">
             <div className="flex gap-3">
               <MiniInput label="Aircraft Type *" value={createForm.aircraftType}
                 onChange={(v) => setCreateForm(p => ({ ...p, aircraftType: v.toUpperCase() }))} mono maxLength={4} />
               <MiniInput label="Config Name *" value={createForm.configName}
                 onChange={(v) => setCreateForm(p => ({ ...p, configName: v }))} />
             </div>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={createForm.isDefault}
+                  onChange={(e) => setCreateForm(p => ({ ...p, isDefault: e.target.checked }))}
+                  className="w-4 h-4 rounded border-hz-border accent-[#1e40af]" />
+                <span className="text-[13px] font-medium">Set as default</span>
+              </label>
+            </div>
+          </div>
 
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={createForm.isDefault}
-                onChange={(e) => setCreateForm(p => ({ ...p, isDefault: e.target.checked }))}
-                className="w-4 h-4 rounded border-hz-border accent-[#1e40af]" />
-              <span className="text-[13px] font-medium">Set as default for this aircraft type</span>
-            </label>
+          {/* Cabin class toggle chips */}
+          <div className="px-6 py-4 border-b border-hz-border">
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">Cabin Classes</span>
+              <span className="text-[13px] font-bold tabular-nums" style={{ color: "#1e40af" }}>
+                {createTotalSeats} total seats
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {classOptions.map(cc => {
+                const active = enabledCodes.has(cc.code);
+                const color = getClassColor(cc.code);
+                return (
+                  <button
+                    key={cc.code}
+                    onClick={() => toggleCabinClass(cc.code)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[13px] font-medium border transition-all duration-150 ${
+                      active
+                        ? "border-transparent shadow-sm"
+                        : "border-hz-border/50 opacity-50 hover:opacity-80"
+                    }`}
+                    style={active ? { backgroundColor: color + "18", borderColor: color + "40", color } : undefined}
+                  >
+                    <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                    <span className="font-bold font-mono">{cc.code}</span>
+                    <span className={active ? "" : "text-hz-text-secondary"}>{cc.name}</span>
+                    {active && (
+                      <span className="text-[11px] font-bold tabular-nums ml-1 opacity-70">
+                        {createForm.cabins.find(c => c.classCode === cc.code)?.seats ?? 0}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-            {/* Cabin sliders */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">Cabin Layout</span>
-                <div className="flex items-center gap-3">
-                  <span className="text-[13px] font-bold" style={{ color: "#1e40af" }}>
-                    {createForm.cabins.reduce((s, c) => s + c.seats, 0)} seats
-                  </span>
-                  <button onClick={() => setCreateForm(p => ({ ...p, cabins: [...p.cabins, { classCode: "Y", seats: 0 }] }))}
-                    className="text-[12px] font-medium text-[#1e40af] hover:underline">+ Add Cabin</button>
-                </div>
-              </div>
-              <div className="space-y-3">
-                {createForm.cabins.map((cabin, i) => (
+          {/* Seat sliders for enabled classes */}
+          {createForm.cabins.length > 0 && (
+            <div className="px-6 py-4 border-b border-hz-border space-y-2.5">
+              {createForm.cabins.map((cabin, i) => {
+                const cc = cabinClasses.find(c => c.code === cabin.classCode);
+                const sortedIdx = classOptions.findIndex(c => c.code === cabin.classCode);
+                return (
                   <CabinSliderRow
-                    key={i}
+                    key={cabin.classCode}
                     cabin={cabin}
                     classOptions={classOptions}
                     color={getClassColor(cabin.classCode)}
@@ -211,12 +267,22 @@ export function LopaConfigDetail({ config, cabinClasses, onSave, onDelete, onCre
                       const u = [...createForm.cabins]; u[i] = { ...u[i], seats };
                       setCreateForm(p => ({ ...p, cabins: u }));
                     }}
-                    onRemove={createForm.cabins.length > 1 ? () => setCreateForm(p => ({ ...p, cabins: p.cabins.filter((_, idx) => idx !== i) })) : undefined}
+                    onRemove={createForm.cabins.length > 1 ? () => toggleCabinClass(cabin.classCode) : undefined}
                   />
-                ))}
-              </div>
+                );
+              })}
             </div>
+          )}
 
+          {/* Live aircraft seat map */}
+          {createForm.cabins.length > 0 && createForm.cabins.some(c => c.seats > 0) && (
+            <div className="px-6 py-4 border-b border-hz-border">
+              <AircraftSeatMap cabins={createForm.cabins} cabinClasses={cabinClasses} aircraftType={createForm.aircraftType} />
+            </div>
+          )}
+
+          {/* Notes + submit */}
+          <div className="px-6 py-4 space-y-3">
             <MiniInput label="Notes" value={createForm.notes}
               onChange={(v) => setCreateForm(p => ({ ...p, notes: v }))} />
 
@@ -225,10 +291,10 @@ export function LopaConfigDetail({ config, cabinClasses, onSave, onDelete, onCre
                 className="flex-1 py-2.5 rounded-lg text-[13px] font-medium text-hz-text-secondary border border-hz-border hover:bg-hz-border/30 transition-colors">
                 Cancel
               </button>
-              <button onClick={handleCreate} disabled={creating}
+              <button onClick={handleCreate} disabled={creating || !createForm.aircraftType || !createForm.configName || createForm.cabins.length === 0}
                 className="flex-1 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
                 style={{ backgroundColor: "#1e40af" }}>
-                {creating ? "Creating..." : "Add Configuration"}
+                {creating ? "Creating..." : `Add Configuration · ${createTotalSeats} seats`}
               </button>
             </div>
             {createError && <p className="text-[12px] text-red-500">{createError}</p>}
@@ -314,28 +380,76 @@ export function LopaConfigDetail({ config, cabinClasses, onSave, onDelete, onCre
       </div>
 
       {/* Inline create panel */}
-      {showCreate && (
-        <div className="px-6 py-4 border-b border-hz-border shrink-0 space-y-3 overflow-y-auto max-h-[55vh]">
-          <div className="flex items-center justify-between">
-            <span className="text-[15px] font-semibold">Add New LOPA Configuration</span>
-            <button onClick={resetCreate} className="text-[13px] text-hz-text-secondary hover:text-hz-text">Cancel</button>
-          </div>
-          <div className="space-y-3">
-            <div className="flex gap-3">
-              <MiniInput label="Aircraft Type *" value={createForm.aircraftType}
-                onChange={(v) => setCreateForm(p => ({ ...p, aircraftType: v.toUpperCase() }))} mono maxLength={4} />
-              <MiniInput label="Config Name *" value={createForm.configName}
-                onChange={(v) => setCreateForm(p => ({ ...p, configName: v }))} />
+      {showCreate && (() => {
+        const enabledCodes = new Set(createForm.cabins.map(c => c.classCode));
+        const inlineTotal = createForm.cabins.reduce((s, c) => s + c.seats, 0);
+        return (
+          <div className="px-6 py-4 border-b border-hz-border shrink-0 space-y-3 overflow-y-auto max-h-[60vh]">
+            <div className="flex items-center justify-between">
+              <span className="text-[15px] font-semibold">Add New LOPA Configuration</span>
+              <button onClick={resetCreate} className="text-[13px] text-hz-text-secondary hover:text-hz-text">Cancel</button>
             </div>
-            <button onClick={handleCreate} disabled={creating}
-              className="w-full py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
-              style={{ backgroundColor: "#1e40af" }}>
-              {creating ? "Creating..." : "Add Configuration"}
-            </button>
+            <div className="space-y-3">
+              <div className="flex gap-3">
+                <MiniInput label="Aircraft Type *" value={createForm.aircraftType}
+                  onChange={(v) => setCreateForm(p => ({ ...p, aircraftType: v.toUpperCase() }))} mono maxLength={4} />
+                <MiniInput label="Config Name *" value={createForm.configName}
+                  onChange={(v) => setCreateForm(p => ({ ...p, configName: v }))} />
+              </div>
+
+              {/* Cabin class chips */}
+              <div>
+                <span className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">Cabin Classes</span>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {classOptions.map(cc => {
+                    const active = enabledCodes.has(cc.code);
+                    const color = getClassColor(cc.code);
+                    return (
+                      <button key={cc.code} onClick={() => toggleCabinClass(cc.code)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium border transition-all ${
+                          active ? "border-transparent" : "border-hz-border/50 opacity-50 hover:opacity-80"
+                        }`}
+                        style={active ? { backgroundColor: color + "18", borderColor: color + "40", color } : undefined}
+                      >
+                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+                        <span className="font-bold font-mono">{cc.code}</span>
+                        <span className={active ? "" : "text-hz-text-secondary"}>{cc.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Sliders */}
+              {createForm.cabins.map((cabin, i) => (
+                <CabinSliderRow
+                  key={cabin.classCode}
+                  cabin={cabin}
+                  classOptions={classOptions}
+                  color={getClassColor(cabin.classCode)}
+                  maxSeats={getMaxSeats(cabin.classCode)}
+                  onChangeClass={(code) => {
+                    const u = [...createForm.cabins]; u[i] = { ...u[i], classCode: code };
+                    setCreateForm(p => ({ ...p, cabins: u }));
+                  }}
+                  onChangeSeats={(seats) => {
+                    const u = [...createForm.cabins]; u[i] = { ...u[i], seats };
+                    setCreateForm(p => ({ ...p, cabins: u }));
+                  }}
+                  onRemove={createForm.cabins.length > 1 ? () => toggleCabinClass(cabin.classCode) : undefined}
+                />
+              ))}
+
+              <button onClick={handleCreate} disabled={creating || !createForm.aircraftType || !createForm.configName}
+                className="w-full py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
+                style={{ backgroundColor: "#1e40af" }}>
+                {creating ? "Creating..." : `Add Configuration · ${inlineTotal} seats`}
+              </button>
+            </div>
+            {createError && <p className="text-[12px] text-red-500">{createError}</p>}
           </div>
-          {createError && <p className="text-[12px] text-red-500">{createError}</p>}
-        </div>
-      )}
+        );
+      })()}
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">

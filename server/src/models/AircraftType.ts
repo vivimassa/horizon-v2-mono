@@ -42,6 +42,9 @@ const aircraftTypeSchema = new Schema(
       ceilingFl: { type: Number, default: null },
     },
 
+    // Fuel
+    fuelBurnRateKgPerHour: { type: Number, default: null },
+
     // ETOPS
     etopsCapable: { type: Boolean, default: false },
     etopsRatingMinutes: { type: Number, default: null },
@@ -49,6 +52,40 @@ const aircraftTypeSchema = new Schema(
     // Noise & emissions
     noiseCategory: { type: String, default: null },
     emissionsCategory: { type: String, default: null },
+
+    // Cargo
+    cargo: {
+      maxCargoWeightKg: { type: Number, default: null },
+      cargoPositions: { type: Number, default: null },
+      bulkHoldCapacityKg: { type: Number, default: null },
+      uldTypesAccepted: { type: [String], default: [] },
+    },
+
+    // Crew rest facilities
+    crewRest: {
+      cockpitClass: { type: String, default: null },
+      cockpitPositions: { type: Number, default: null },
+      cabinClass: { type: String, default: null },
+      cabinPositions: { type: Number, default: null },
+    },
+
+    // Weather limitations
+    weather: {
+      minCeilingFt: { type: Number, default: null },
+      minRvrM: { type: Number, default: null },
+      minVisibilityM: { type: Number, default: null },
+      maxCrosswindKt: { type: Number, default: null },
+      maxWindKt: { type: Number, default: null },
+    },
+
+    // Approach capabilities
+    approach: {
+      ilsCategoryRequired: { type: String, default: null },
+      autolandCapable: { type: Boolean, default: false },
+    },
+
+    // Notes
+    notes: { type: String, default: null },
 
     // UI
     color: { type: String, default: null },

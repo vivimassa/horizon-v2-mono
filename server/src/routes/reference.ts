@@ -455,11 +455,151 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
   })
 
   // ─── Aircraft Types ─────────────────────────────────────
+
+  const aircraftTypeCreateSchema = z.object({
+    operatorId: z.string().min(1),
+    icaoType: z.string().min(1).max(4),
+    iataType: z.string().max(3).nullable().optional(),
+    iataTypeCode: z.string().max(4).nullable().optional(),
+    name: z.string().min(1, 'Name is required'),
+    family: z.string().nullable().optional(),
+    category: z.enum(['narrow_body', 'wide_body', 'regional', 'turboprop']).optional().default('narrow_body'),
+    manufacturer: z.string().nullable().optional(),
+    paxCapacity: z.number().int().min(0).nullable().optional(),
+    cockpitCrewRequired: z.number().int().min(0).optional().default(2),
+    cabinCrewRequired: z.number().int().min(0).nullable().optional(),
+    tat: z.object({
+      defaultMinutes: z.number().nullable().optional(),
+      domDom: z.number().nullable().optional(),
+      domInt: z.number().nullable().optional(),
+      intDom: z.number().nullable().optional(),
+      intInt: z.number().nullable().optional(),
+      minDd: z.number().nullable().optional(),
+      minDi: z.number().nullable().optional(),
+      minId: z.number().nullable().optional(),
+      minIi: z.number().nullable().optional(),
+    }).optional(),
+    performance: z.object({
+      mtowKg: z.number().nullable().optional(),
+      mlwKg: z.number().nullable().optional(),
+      mzfwKg: z.number().nullable().optional(),
+      oewKg: z.number().nullable().optional(),
+      maxFuelCapacityKg: z.number().nullable().optional(),
+      maxRangeNm: z.number().nullable().optional(),
+      cruisingSpeedKts: z.number().nullable().optional(),
+      ceilingFl: z.number().nullable().optional(),
+    }).optional(),
+    fuelBurnRateKgPerHour: z.number().nullable().optional(),
+    etopsCapable: z.boolean().optional().default(false),
+    etopsRatingMinutes: z.number().nullable().optional(),
+    noiseCategory: z.string().nullable().optional(),
+    emissionsCategory: z.string().nullable().optional(),
+    cargo: z.object({
+      maxCargoWeightKg: z.number().nullable().optional(),
+      cargoPositions: z.number().nullable().optional(),
+      bulkHoldCapacityKg: z.number().nullable().optional(),
+      uldTypesAccepted: z.array(z.string()).optional(),
+    }).optional(),
+    crewRest: z.object({
+      cockpitClass: z.string().nullable().optional(),
+      cockpitPositions: z.number().nullable().optional(),
+      cabinClass: z.string().nullable().optional(),
+      cabinPositions: z.number().nullable().optional(),
+    }).optional(),
+    weather: z.object({
+      minCeilingFt: z.number().nullable().optional(),
+      minRvrM: z.number().nullable().optional(),
+      minVisibilityM: z.number().nullable().optional(),
+      maxCrosswindKt: z.number().nullable().optional(),
+      maxWindKt: z.number().nullable().optional(),
+    }).optional(),
+    approach: z.object({
+      ilsCategoryRequired: z.string().nullable().optional(),
+      autolandCapable: z.boolean().optional(),
+    }).optional(),
+    notes: z.string().nullable().optional(),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be hex color').nullable().optional(),
+    isActive: z.boolean().optional().default(true),
+  }).strict()
+
+  const aircraftTypeUpdateSchema = aircraftTypeCreateSchema.omit({ operatorId: true }).partial().strict()
+
   app.get('/aircraft-types', async (req) => {
     const { operatorId } = req.query as { operatorId?: string }
-    const filter: Record<string, unknown> = { isActive: true }
+    const filter: Record<string, unknown> = {}
     if (operatorId) filter.operatorId = operatorId
     return AircraftType.find(filter).sort({ icaoType: 1 }).lean()
+  })
+
+  app.get('/aircraft-types/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await AircraftType.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Aircraft type not found' })
+    return doc
+  })
+
+  app.post('/aircraft-types', async (req, reply) => {
+    const raw = req.body as Record<string, unknown>
+    if (raw.icaoType) raw.icaoType = (raw.icaoType as string).toUpperCase()
+
+    const parsed = aircraftTypeCreateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+
+    const body = parsed.data
+
+    const existing = await AircraftType.findOne({ operatorId: body.operatorId, icaoType: body.icaoType }).lean()
+    if (existing) {
+      return reply.code(409).send({ error: `Aircraft type "${body.icaoType}" already exists` })
+    }
+
+    const id = crypto.randomUUID()
+    const doc = await AircraftType.create({
+      _id: id,
+      ...body,
+      createdAt: new Date().toISOString(),
+    })
+
+    return reply.code(201).send(doc.toObject())
+  })
+
+  app.patch('/aircraft-types/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const raw = req.body as Record<string, unknown>
+    if (raw.icaoType) raw.icaoType = (raw.icaoType as string).toUpperCase()
+
+    const parsed = aircraftTypeUpdateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+
+    const body = { ...parsed.data, updatedAt: new Date().toISOString() }
+    const doc = await AircraftType.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'Aircraft type not found' })
+    return doc
+  })
+
+  app.delete('/aircraft-types/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const acType = await AircraftType.findById(id).lean()
+    if (!acType) return reply.code(404).send({ error: 'Aircraft type not found' })
+
+    // Safety: check if LOPA configs reference this type
+    const refCount = await LopaConfig.countDocuments({
+      operatorId: acType.operatorId,
+      aircraftType: acType.icaoType,
+    })
+    if (refCount > 0) {
+      return reply.code(409).send({
+        error: `Cannot delete "${acType.icaoType}" — ${refCount} LOPA config${refCount > 1 ? 's' : ''} reference this aircraft type. Deactivate it instead.`,
+      })
+    }
+
+    await AircraftType.findByIdAndDelete(id)
+    return { success: true }
   })
 
   // ─── Countries ──────────────────────────────────────────

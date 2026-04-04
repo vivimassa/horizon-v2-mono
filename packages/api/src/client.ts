@@ -106,13 +106,68 @@ export interface AircraftTypeRef {
   operatorId: string
   icaoType: string
   iataType: string | null
+  iataTypeCode: string | null
   name: string
   family: string | null
   category: string
   manufacturer: string | null
   paxCapacity: number | null
+  cockpitCrewRequired: number
+  cabinCrewRequired: number | null
+  tat: {
+    defaultMinutes: number | null
+    domDom: number | null
+    domInt: number | null
+    intDom: number | null
+    intInt: number | null
+    minDd: number | null
+    minDi: number | null
+    minId: number | null
+    minIi: number | null
+  } | null
+  performance: {
+    mtowKg: number | null
+    mlwKg: number | null
+    mzfwKg: number | null
+    oewKg: number | null
+    maxFuelCapacityKg: number | null
+    maxRangeNm: number | null
+    cruisingSpeedKts: number | null
+    ceilingFl: number | null
+  } | null
+  fuelBurnRateKgPerHour: number | null
+  etopsCapable: boolean
+  etopsRatingMinutes: number | null
+  noiseCategory: string | null
+  emissionsCategory: string | null
+  cargo: {
+    maxCargoWeightKg: number | null
+    cargoPositions: number | null
+    bulkHoldCapacityKg: number | null
+    uldTypesAccepted: string[]
+  } | null
+  crewRest: {
+    cockpitClass: string | null
+    cockpitPositions: number | null
+    cabinClass: string | null
+    cabinPositions: number | null
+  } | null
+  weather: {
+    minCeilingFt: number | null
+    minRvrM: number | null
+    minVisibilityM: number | null
+    maxCrosswindKt: number | null
+    maxWindKt: number | null
+  } | null
+  approach: {
+    ilsCategoryRequired: string | null
+    autolandCapable: boolean
+  } | null
+  notes: string | null
   color: string | null
   isActive: boolean
+  createdAt: string | null
+  updatedAt: string | null
 }
 
 export interface CountryRef {
@@ -386,6 +441,25 @@ export const api = {
 
   getAircraftTypes: (operatorId = 'horizon') =>
     request<AircraftTypeRef[]>(`/aircraft-types?operatorId=${operatorId}`),
+
+  getAircraftType: (id: string) => request<AircraftTypeRef>(`/aircraft-types/${id}`),
+
+  createAircraftType: (data: Partial<AircraftTypeRef>) =>
+    request<AircraftTypeRef>('/aircraft-types', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateAircraftType: (id: string, data: Partial<AircraftTypeRef>) =>
+    request<AircraftTypeRef>(`/aircraft-types/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteAircraftType: (id: string) =>
+    request<{ success: boolean }>(`/aircraft-types/${id}`, {
+      method: 'DELETE',
+    }),
 
   getCountries: (params?: { region?: string; search?: string }) => {
     let path = '/countries'

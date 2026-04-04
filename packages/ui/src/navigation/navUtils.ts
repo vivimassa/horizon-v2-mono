@@ -16,7 +16,7 @@ export interface BreadcrumbSegment {
   label: string
   route: string
   iconName: string
-  siblings: Array<{ key: string; label: string; num: string; route: string; iconName: string; desc?: string }>
+  siblings: Array<{ key: string; label: string; num: string; route: string; iconName: string; desc?: string; group?: string; groupIconName?: string }>
   parentLabel?: string
   hideNum?: boolean
   /** When true, show descriptions in the dropdown (used when section shows its pages) */
@@ -148,7 +148,7 @@ export function buildBreadcrumbs(path: NavPath): BreadcrumbSegment[] {
     const usePageSiblings = sectionSiblings.length <= 1
     const siblings = usePageSiblings
       ? path.section.pages.map((p) => ({
-          key: p.key, label: p.label, num: p.num, route: p.route, iconName: p.iconName, desc: p.desc,
+          key: p.key, label: p.label, num: p.num, route: p.route, iconName: p.iconName, desc: p.desc, group: p.group, groupIconName: p.groupIconName,
         }))
       : sectionSiblings.map((s) => ({
           key: s.key, label: s.label, num: s.num, route: firstSectionRoute(s), iconName: s.iconName,
@@ -182,7 +182,7 @@ export function buildBreadcrumbs(path: NavPath): BreadcrumbSegment[] {
       hideNum,
       parentLabel: skipSection ? path.module.label : path.section.label,
       siblings: allPages.map((p) => ({
-        key: p.key, label: p.label, num: p.num, route: p.route, iconName: p.iconName, desc: p.desc,
+        key: p.key, label: p.label, num: p.num, route: p.route, iconName: p.iconName, desc: p.desc, group: p.group, groupIconName: p.groupIconName,
       })),
     })
   }

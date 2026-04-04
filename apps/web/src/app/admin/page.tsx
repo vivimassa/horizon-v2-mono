@@ -63,8 +63,9 @@ const SECTIONS: SectionDef[] = [
     color: "#1e40af",
     cards: [
       { code: "5.2.1", label: "Aircraft Types Database", desc: "Fleet types, capacity, performance", icon: Plane, href: "/admin/aircraft-types" },
-      { code: "5.2.2", label: "Delay Codes Database", desc: "IATA standard & custom codes", icon: Timer, href: "/admin/delay-codes" },
+      { code: "5.2.2", label: "Aircraft Registrations", desc: "Tail numbers, MSN, status, home base", icon: PlaneTakeoff, href: "/admin/aircraft-registrations" },
       { code: "5.2.3", label: "Service Types Database", desc: "Flight service categories", icon: Tag, href: "/admin/service-types" },
+      { code: "5.2.4", label: "Delay Codes Database", desc: "IATA standard & custom codes", icon: Timer, href: "/admin/delay-codes" },
     ],
   },
   {

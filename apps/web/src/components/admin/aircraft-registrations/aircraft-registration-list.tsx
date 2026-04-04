@@ -1,25 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import type { AircraftTypeRef } from "@skyhub/api";
+import type { AircraftRegistrationRef } from "@skyhub/api";
 import { Search, Plus, ChevronRight, Plane } from "lucide-react";
 
-interface AircraftTypeListProps {
-  groups: [string, AircraftTypeRef[]][];
-  categoryLabels: Record<string, string>;
+const STATUS_DOT: Record<string, string> = {
+  active: "bg-green-500",
+  maintenance: "bg-amber-500",
+  stored: "bg-gray-400",
+  retired: "bg-red-500",
+};
+
+interface AircraftRegistrationListProps {
+  groups: [string, AircraftRegistrationRef[]][];
   totalCount: number;
   filteredCount: number;
-  selected: AircraftTypeRef | null;
-  onSelect: (t: AircraftTypeRef) => void;
+  selected: AircraftRegistrationRef | null;
+  onSelect: (r: AircraftRegistrationRef) => void;
   search: string;
   onSearchChange: (value: string) => void;
   loading: boolean;
   onCreateClick: () => void;
 }
 
-export function AircraftTypeList({
+export function AircraftRegistrationList({
   groups,
-  categoryLabels,
   totalCount,
   filteredCount,
   selected,
@@ -28,7 +33,7 @@ export function AircraftTypeList({
   onSearchChange,
   loading,
   onCreateClick,
-}: AircraftTypeListProps) {
+}: AircraftRegistrationListProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const toggleGroup = (name: string) => {
@@ -45,7 +50,7 @@ export function AircraftTypeList({
       {/* Header */}
       <div className="px-4 py-3 space-y-3 border-b border-hz-border shrink-0">
         <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-bold">Aircraft Types</h2>
+          <h2 className="text-[15px] font-bold">Registrations</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={onCreateClick}
@@ -63,7 +68,7 @@ export function AircraftTypeList({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-hz-text-secondary" />
           <input
             type="text"
-            placeholder="Search type, name, family..."
+            placeholder="Search registration, MSN..."
             className="w-full pl-9 pr-3 py-2 rounded-xl text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 placeholder:text-hz-text-secondary/50 text-hz-text"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
@@ -76,46 +81,52 @@ export function AircraftTypeList({
         {loading ? (
           <div className="text-[13px] text-hz-text-secondary animate-pulse px-3 py-4">Loading...</div>
         ) : groups.length === 0 ? (
-          <div className="text-[13px] text-hz-text-secondary px-3 py-4">No aircraft types found</div>
+          <div className="text-[13px] text-hz-text-secondary px-3 py-4">No registrations found</div>
         ) : (
-          groups.map(([category, items]) => (
-            <div key={category}>
+          groups.map(([icaoType, items]) => (
+            <div key={icaoType}>
               <button
-                onClick={() => toggleGroup(category)}
+                onClick={() => toggleGroup(icaoType)}
                 className="w-full flex items-center gap-2 px-2 py-2 mt-1 first:mt-0 hover:text-hz-text-secondary transition-colors"
               >
                 <ChevronRight
                   className={`h-3 w-3 shrink-0 text-hz-text-secondary/50 transition-transform duration-200 ${
-                    !collapsed.has(category) ? "rotate-90" : ""
+                    !collapsed.has(icaoType) ? "rotate-90" : ""
                   }`}
                 />
                 <Plane className="h-3.5 w-3.5 text-hz-text-secondary/50" />
-                <span className="text-[12px] font-bold uppercase tracking-wider text-hz-text-secondary/70">
-                  {categoryLabels[category] || category}
+                <span className="text-[12px] font-bold font-mono uppercase tracking-wider text-hz-text-secondary/70">
+                  {icaoType}
                 </span>
                 <span className="text-[11px] text-hz-text-secondary/40">({items.length})</span>
                 <div className="flex-1 h-px bg-hz-border/50 ml-1" />
               </button>
-              {!collapsed.has(category) && (
+              {!collapsed.has(icaoType) && (
                 <div className="space-y-0.5">
-                  {items.map((t) => {
-                    const isSelected = selected?._id === t._id;
+                  {items.map((r) => {
+                    const isSelected = selected?._id === r._id;
                     return (
                       <button
-                        key={t._id}
-                        onClick={() => onSelect(t)}
+                        key={r._id}
+                        onClick={() => onSelect(r)}
                         className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 ${
                           isSelected
                             ? "border-l-[3px] border-l-module-accent bg-module-accent/[0.08]"
                             : "border-l-[3px] border-l-transparent hover:bg-hz-border/30"
                         }`}
                       >
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[r.status] || "bg-gray-400"}`} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="text-[14px] font-bold font-mono">{t.icaoType}</span>
-                            <span className="text-[13px] font-medium truncate">{t.name}</span>
+                            <span className="text-[14px] font-bold font-mono">{r.registration}</span>
+                            {r.variant && (
+                              <span className="text-[12px] text-hz-text-secondary truncate">{r.variant}</span>
+                            )}
                           </div>
                         </div>
+                        <span className="text-[11px] text-hz-text-tertiary capitalize shrink-0">
+                          {r.status}
+                        </span>
                       </button>
                     );
                   })}

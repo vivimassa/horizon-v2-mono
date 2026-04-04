@@ -7,6 +7,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { Airport } from '../models/Airport.js'
 import { AircraftType } from '../models/AircraftType.js'
+import { AircraftRegistration } from '../models/AircraftRegistration.js'
 import { Country } from '../models/Country.js'
 import { DelayCode } from '../models/DelayCode.js'
 import { FlightServiceType } from '../models/FlightServiceType.js'
@@ -676,6 +677,152 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     await AircraftType.findByIdAndDelete(id)
     return { success: true }
+  })
+
+  // ─── Aircraft Registrations ─────────────────────────────
+
+  const aircraftRegCreateSchema = z.object({
+    operatorId: z.string().min(1),
+    registration: z.string().min(1).max(10),
+    aircraftTypeId: z.string().min(1),
+    lopaConfigId: z.string().nullable().optional(),
+    serialNumber: z.string().nullable().optional(),
+    variant: z.string().nullable().optional(),
+    status: z.enum(['active', 'maintenance', 'stored', 'retired']).optional().default('active'),
+    homeBaseIcao: z.string().max(4).nullable().optional(),
+    currentLocationIcao: z.string().max(4).nullable().optional(),
+    dateOfManufacture: z.string().nullable().optional(),
+    dateOfDelivery: z.string().nullable().optional(),
+    leaseExpiryDate: z.string().nullable().optional(),
+    selcal: z.string().max(8).nullable().optional(),
+    imageUrl: z.string().nullable().optional(),
+    notes: z.string().nullable().optional(),
+    isActive: z.boolean().optional().default(true),
+  }).strict()
+
+  const aircraftRegUpdateSchema = z.object({
+    registration: z.string().min(1).max(10),
+    aircraftTypeId: z.string().min(1),
+    lopaConfigId: z.string().nullable(),
+    serialNumber: z.string().nullable(),
+    variant: z.string().nullable(),
+    status: z.enum(['active', 'maintenance', 'stored', 'retired']),
+    homeBaseIcao: z.string().max(4).nullable(),
+    currentLocationIcao: z.string().max(4).nullable(),
+    currentLocationUpdatedAt: z.string().nullable(),
+    dateOfManufacture: z.string().nullable(),
+    dateOfDelivery: z.string().nullable(),
+    leaseExpiryDate: z.string().nullable(),
+    selcal: z.string().max(8).nullable(),
+    imageUrl: z.string().nullable(),
+    notes: z.string().nullable(),
+    isActive: z.boolean(),
+  }).partial().strict()
+
+  app.get('/aircraft-registrations', async (req) => {
+    const { operatorId, aircraftTypeId } = req.query as { operatorId?: string; aircraftTypeId?: string }
+    const filter: Record<string, unknown> = {}
+    if (operatorId) filter.operatorId = operatorId
+    if (aircraftTypeId) filter.aircraftTypeId = aircraftTypeId
+    return AircraftRegistration.find(filter).sort({ registration: 1 }).lean()
+  })
+
+  app.get('/aircraft-registrations/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await AircraftRegistration.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Aircraft registration not found' })
+    return doc
+  })
+
+  app.post('/aircraft-registrations', async (req, reply) => {
+    const raw = req.body as Record<string, unknown>
+    if (raw.registration) raw.registration = (raw.registration as string).toUpperCase()
+    if (raw.homeBaseIcao) raw.homeBaseIcao = (raw.homeBaseIcao as string).toUpperCase()
+
+    const parsed = aircraftRegCreateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+
+    const body = parsed.data
+
+    const existing = await AircraftRegistration.findOne({ operatorId: body.operatorId, registration: body.registration }).lean()
+    if (existing) {
+      return reply.code(409).send({ error: `Registration "${body.registration}" already exists` })
+    }
+
+    const id = crypto.randomUUID()
+    const doc = await AircraftRegistration.create({
+      _id: id,
+      ...body,
+      createdAt: new Date().toISOString(),
+    })
+
+    return reply.code(201).send(doc.toObject())
+  })
+
+  app.patch('/aircraft-registrations/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const raw = req.body as Record<string, unknown>
+    if (raw.registration) raw.registration = (raw.registration as string).toUpperCase()
+    if (raw.homeBaseIcao) raw.homeBaseIcao = (raw.homeBaseIcao as string).toUpperCase()
+
+    const parsed = aircraftRegUpdateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+
+    const body = { ...parsed.data, updatedAt: new Date().toISOString() }
+    const doc = await AircraftRegistration.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'Aircraft registration not found' })
+    return doc
+  })
+
+  app.delete('/aircraft-registrations/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const reg = await AircraftRegistration.findById(id).lean()
+    if (!reg) return reply.code(404).send({ error: 'Aircraft registration not found' })
+
+    // Safety: check if flight instances reference this registration
+    const refCount = await FlightInstance.countDocuments({ aircraftRegistrationId: id })
+    if (refCount > 0) {
+      return reply.code(409).send({
+        error: `Cannot delete "${reg.registration}" — ${refCount} flight${refCount > 1 ? 's' : ''} reference this registration. Deactivate it instead.`,
+      })
+    }
+
+    await AircraftRegistration.findByIdAndDelete(id)
+    return { success: true }
+  })
+
+  // Upload aircraft registration image
+  app.post('/aircraft-registrations/:id/image', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const reg = await AircraftRegistration.findById(id).lean()
+    if (!reg) return reply.code(404).send({ error: 'Registration not found' })
+
+    const file = await req.file()
+    if (!file) return reply.code(400).send({ error: 'No file uploaded' })
+
+    const ext = path.extname(file.filename).toLowerCase()
+    if (!['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) {
+      return reply.code(400).send({ error: 'Only JPG, PNG, or WebP files are allowed' })
+    }
+
+    const __dirname = path.dirname(fileURLToPath(import.meta.url))
+    const uploadsDir = path.resolve(__dirname, '..', '..', 'uploads')
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true })
+
+    const filename = `aircraft-${id}${ext}`
+    const filepath = path.join(uploadsDir, filename)
+    await pipeline(file.file, fs.createWriteStream(filepath))
+
+    const imageUrl = `/uploads/${filename}`
+    await AircraftRegistration.findByIdAndUpdate(id, { $set: { imageUrl, updatedAt: new Date().toISOString() } })
+
+    return { success: true, imageUrl }
   })
 
   // ─── Countries ──────────────────────────────────────────

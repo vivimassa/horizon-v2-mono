@@ -170,6 +170,29 @@ export interface AircraftTypeRef {
   updatedAt: string | null
 }
 
+export interface AircraftRegistrationRef {
+  _id: string
+  operatorId: string
+  registration: string
+  aircraftTypeId: string
+  lopaConfigId: string | null
+  serialNumber: string | null
+  variant: string | null
+  status: string
+  homeBaseIcao: string | null
+  currentLocationIcao: string | null
+  currentLocationUpdatedAt: string | null
+  dateOfManufacture: string | null
+  dateOfDelivery: string | null
+  leaseExpiryDate: string | null
+  selcal: string | null
+  imageUrl: string | null
+  notes: string | null
+  isActive: boolean
+  createdAt: string | null
+  updatedAt: string | null
+}
+
 export interface CountryRef {
   _id: string
   isoCode2: string
@@ -460,6 +483,40 @@ export const api = {
     request<{ success: boolean }>(`/aircraft-types/${id}`, {
       method: 'DELETE',
     }),
+
+  // ─── Aircraft Registrations ─────────────────────────────
+  getAircraftRegistrations: (operatorId = 'horizon') =>
+    request<AircraftRegistrationRef[]>(`/aircraft-registrations?operatorId=${operatorId}`),
+
+  getAircraftRegistration: (id: string) => request<AircraftRegistrationRef>(`/aircraft-registrations/${id}`),
+
+  createAircraftRegistration: (data: Partial<AircraftRegistrationRef>) =>
+    request<AircraftRegistrationRef>('/aircraft-registrations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateAircraftRegistration: (id: string, data: Partial<AircraftRegistrationRef>) =>
+    request<AircraftRegistrationRef>(`/aircraft-registrations/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteAircraftRegistration: (id: string) =>
+    request<{ success: boolean }>(`/aircraft-registrations/${id}`, {
+      method: 'DELETE',
+    }),
+
+  uploadAircraftImage: async (id: string, file: File): Promise<{ success: boolean; imageUrl: string }> => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${_baseUrl}/aircraft-registrations/${id}/image`, {
+      method: 'POST',
+      body: form,
+    });
+    if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+    return res.json();
+  },
 
   getCountries: (params?: { region?: string; search?: string }) => {
     let path = '/countries'

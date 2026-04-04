@@ -71,9 +71,6 @@ export function LopaList({
         <div className="flex items-center justify-between">
           <h2 className="text-[15px] font-bold">LOPA</h2>
           <div className="flex items-center gap-2">
-            <span className="text-[12px] text-hz-text-secondary font-medium tabular-nums">
-              {filteredCount === totalCount ? totalCount : `${filteredCount} / ${totalCount}`}
-            </span>
             <button
               onClick={onCreateClick}
               className="flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold text-white transition-colors"

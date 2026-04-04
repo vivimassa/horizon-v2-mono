@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { api, setApiBaseUrl, type CabinClassRef, type LopaConfigRef } from "@skyhub/api";
+import { api, setApiBaseUrl, type CabinClassRef, type LopaConfigRef, type AircraftTypeRef } from "@skyhub/api";
 import { MasterDetailLayout } from "@/components/layout";
 import { LopaList } from "./lopa-list";
 import { CabinClassDetail } from "./cabin-class-detail";
@@ -14,6 +14,7 @@ type ViewMode = "cabin-classes" | "lopa-configs";
 export function LopaShell() {
   const [cabinClasses, setCabinClasses] = useState<CabinClassRef[]>([]);
   const [lopaConfigs, setLopaConfigs] = useState<LopaConfigRef[]>([]);
+  const [aircraftTypes, setAircraftTypes] = useState<AircraftTypeRef[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("cabin-classes");
   const [selectedClass, setSelectedClass] = useState<CabinClassRef | null>(null);
   const [selectedConfig, setSelectedConfig] = useState<LopaConfigRef | null>(null);
@@ -23,10 +24,11 @@ export function LopaShell() {
 
   const fetchData = useCallback(() => {
     setLoading(true);
-    Promise.all([api.getCabinClasses(), api.getLopaConfigs()])
-      .then(([classes, configs]) => {
+    Promise.all([api.getCabinClasses(), api.getLopaConfigs(), api.getAircraftTypes()])
+      .then(([classes, configs, types]) => {
         setCabinClasses(classes);
         setLopaConfigs(configs);
+        setAircraftTypes(types);
         // Re-select current items
         setSelectedClass((prev) => {
           if (prev) {
@@ -173,6 +175,7 @@ export function LopaShell() {
         <LopaConfigDetail
           config={selectedConfig}
           cabinClasses={cabinClasses}
+          aircraftTypes={aircraftTypes}
           onSave={handleSaveConfig}
           onDelete={handleDeleteConfig}
           onCreate={handleCreateConfig}
@@ -184,6 +187,7 @@ export function LopaShell() {
         <LopaConfigDetail
           config={null}
           cabinClasses={cabinClasses}
+          aircraftTypes={aircraftTypes}
           onCreate={handleCreateConfig}
           initialShowCreate={true}
           onCancelCreate={() => setShowCreate(false)}

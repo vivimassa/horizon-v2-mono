@@ -272,55 +272,41 @@ function SegmentDropdown({
   const showDescs = segment.level === "page" || segment.showDescriptions;
 
   return (
-    <div
-      role="listbox"
-      className="absolute top-full left-0 mt-1.5"
-      style={{
-        minWidth: 220,
-        maxWidth: segment.showDescriptions ? 340 : 300,
-        borderRadius: 12,
-        border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
-        background: isDark ? "#18181b" : "#ffffff",
-        boxShadow: isDark
-          ? "0 8px 30px rgba(0,0,0,0.4)"
-          : "0 8px 30px rgba(0,0,0,0.12)",
-        padding: 6,
-        zIndex: 50,
-        animation: "bc-dropdown-in 150ms cubic-bezier(0.16, 1, 0.3, 1)",
-      }}
-    >
-      {/* Section header */}
-      {segment.parentLabel && (
-        <div className="flex items-center gap-2 px-3 pt-1 pb-1.5 mb-0.5">
-          <div
-            className="w-0.5 h-3 rounded-full"
-            style={{ background: accent }}
-          />
-          <span
-            className="text-[10px] font-semibold uppercase tracking-wider"
-            style={{ color: palette.textTertiary }}
-          >
-            {segment.parentLabel}
-          </span>
-        </div>
-      )}
+    (() => {
+      // Check if items have groups — if so, render horizontal columns
+      const hasGroups = segment.siblings.some(s => s.group);
 
-      {/* Items */}
-      {segment.siblings.map((item) => {
+      // Build grouped structure
+      const groups: { name: string; iconName?: string; items: typeof segment.siblings }[] = [];
+      if (hasGroups) {
+        for (const item of segment.siblings) {
+          const gName = item.group || "Other";
+          const existing = groups.find(g => g.name === gName);
+          if (existing) existing.items.push(item);
+          else groups.push({ name: gName, iconName: item.groupIconName, items: [item] });
+        }
+      }
+
+      const renderItem = (item: typeof segment.siblings[0]) => {
         const isCurrent = item.num === segment.num;
-
         return (
-          <button
+          <a
             key={item.key}
+            href={item.route}
             role="option"
             aria-selected={isCurrent}
-            className="relative flex items-center gap-2 w-full px-3 py-2 rounded-lg transition-colors duration-100 cursor-pointer"
+            className="relative flex items-center gap-2 w-full px-3 py-2 rounded-lg transition-colors duration-100 cursor-pointer no-underline"
             style={{
               background: isCurrent
                 ? accentTint(accent, isDark ? 0.1 : 0.06)
                 : "transparent",
             }}
-            onClick={() => onItemClick(item.route)}
+            onClick={(e) => {
+              if (!e.metaKey && !e.ctrlKey && e.button === 0) {
+                e.preventDefault();
+                onItemClick(item.route);
+              }
+            }}
             onMouseEnter={(e) => {
               if (!isCurrent)
                 e.currentTarget.style.background = isDark
@@ -332,7 +318,6 @@ function SegmentDropdown({
                 e.currentTarget.style.background = "transparent";
             }}
           >
-            {/* Icon */}
             <div
               className="flex items-center justify-center w-6 h-6 rounded-md flex-shrink-0"
               style={{
@@ -349,8 +334,6 @@ function SegmentDropdown({
                 color={isCurrent ? accent : palette.textSecondary}
               />
             </div>
-
-            {/* Label + desc */}
             <div className="flex-1 text-left min-w-0">
               <span
                 className="text-[13px] block"
@@ -370,18 +353,68 @@ function SegmentDropdown({
                 </span>
               )}
             </div>
-
-            {/* Active dot */}
             {isCurrent && (
               <div
                 className="w-[5px] h-[5px] rounded-full flex-shrink-0"
                 style={{ background: accent }}
               />
             )}
-          </button>
+          </a>
         );
-      })}
-    </div>
+      };
+
+      return (
+        <div
+          role="listbox"
+          className="absolute top-full left-0 mt-1.5"
+          style={{
+            minWidth: hasGroups ? undefined : 220,
+            maxWidth: hasGroups ? undefined : (segment.showDescriptions ? 340 : 300),
+            borderRadius: 12,
+            border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
+            background: isDark ? "#18181b" : "#ffffff",
+            boxShadow: isDark
+              ? "0 8px 30px rgba(0,0,0,0.4)"
+              : "0 8px 30px rgba(0,0,0,0.12)",
+            padding: 6,
+            zIndex: 50,
+            animation: "bc-dropdown-in 150ms cubic-bezier(0.16, 1, 0.3, 1)",
+          }}
+        >
+          {/* Non-grouped: section header + flat list */}
+          {!hasGroups && segment.parentLabel && (
+            <div className="flex items-center gap-2 px-3 pt-1 pb-1.5 mb-0.5">
+              <div className="w-0.5 h-3 rounded-full" style={{ background: accent }} />
+              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: palette.textTertiary }}>
+                {segment.parentLabel}
+              </span>
+            </div>
+          )}
+
+          {hasGroups ? (
+            /* Grouped: horizontal columns */
+            <div className="flex gap-1">
+              {groups.map((g, gi) => (
+                <div key={g.name} className="flex-1" style={{ minWidth: 200 }}>
+                  {/* Group header */}
+                  <div className="flex items-center gap-2 px-3 pt-2 pb-2 mb-0.5">
+                    {g.iconName && <NavIcon name={g.iconName} size={15} color={palette.textSecondary} />}
+                    <span className="text-[12px] font-bold uppercase tracking-wider" style={{ color: palette.textSecondary }}>
+                      {g.name}
+                    </span>
+                  </div>
+                  {/* Group items */}
+                  {g.items.map(renderItem)}
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Non-grouped: flat list */
+            segment.siblings.map(renderItem)
+          )}
+        </div>
+      );
+    })()
   );
 }
 

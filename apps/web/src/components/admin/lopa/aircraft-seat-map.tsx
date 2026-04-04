@@ -175,6 +175,38 @@ export function AircraftSeatMap({ cabins, cabinClasses, aircraftType }: Aircraft
             // First class (1-1, 2 abreast) gets 1.2x seat depth
             const secSeatH = sec.seatsPerRow <= 2 ? seatH * 1.2 : seatH;
 
+            // Pre-compute which seats are active on the last partial row
+            // so remaining seats are balanced across both sides of the aisle
+            const fullRows = Math.floor(sec.seats / sec.seatsPerRow);
+            const remainder = sec.seats % sec.seatsPerRow;
+            // Build a mask for the last partial row: distribute evenly per group
+            let lastRowActive: boolean[] = [];
+            if (remainder > 0 && sec.layout.length >= 2) {
+              const totalGroups = sec.layout.length;
+              const seatsPerSide = sec.layout.map(g => g); // seats per group
+              // Distribute remainder proportionally across groups
+              let remaining = remainder;
+              const groupFill = seatsPerSide.map(() => 0);
+              // Fill groups round-robin, one seat at a time
+              while (remaining > 0) {
+                for (let gi = 0; gi < totalGroups && remaining > 0; gi++) {
+                  if (groupFill[gi] < seatsPerSide[gi]) {
+                    groupFill[gi]++;
+                    remaining--;
+                  }
+                }
+              }
+              // Center each group's filled seats (fill from center outward)
+              for (let gi = 0; gi < totalGroups; gi++) {
+                const groupSize = seatsPerSide[gi];
+                const filled = groupFill[gi];
+                const startOffset = Math.floor((groupSize - filled) / 2);
+                for (let s = 0; s < groupSize; s++) {
+                  lastRowActive.push(s >= startOffset && s < startOffset + filled);
+                }
+              }
+            }
+
             for (let row = 0; row < sec.rows; row++) {
               const rowX = curX + row * (secSeatH + secRowGap);
 
@@ -182,10 +214,16 @@ export function AircraftSeatMap({ cabins, cabinClasses, aircraftType }: Aircraft
               const totalUsed = secAbreast * secSeatW + (secAbreast - 1) * secSeatGap + secAisleCount * (secAisleW - secSeatGap);
               let seatY = (svgH - totalUsed) / 2;
 
+              let flatIdx = 0; // flat index within this row (across all groups)
               for (let g = 0; g < sec.layout.length; g++) {
                 for (let s = 0; s < sec.layout[g]; s++) {
-                  const seatIdx = row * sec.seatsPerRow + sec.layout.slice(0, g).reduce((a, b) => a + b, 0) + s;
-                  const isActive = seatIdx < sec.seats;
+                  const isLastPartialRow = row === fullRows && remainder > 0;
+                  const isActive = row < fullRows
+                    ? true
+                    : isLastPartialRow
+                      ? (lastRowActive[flatIdx] ?? false)
+                      : false;
+                  flatIdx++;
                   const seatBackW = Math.round(secSeatH * 0.3);
 
                   elements.push(
@@ -261,17 +299,33 @@ function FallbackSeatMap({ sections }: { sections: CabinSection[] }) {
                 <text x={curX + (sW - ROW_GAP) / 2} y={cY - fR - 13} textAnchor="middle" fontSize={8} fontWeight={700} fill={sec.color}>{sec.name}</text>
               </g>
             );
+            // Balanced last row for fallback seat map
+            const fbFullRows = Math.floor(sec.seats / sec.seatsPerRow);
+            const fbRemainder = sec.seats % sec.seatsPerRow;
+            let fbLastRowActive: boolean[] = [];
+            if (fbRemainder > 0 && sec.layout.length >= 2) {
+              let rem = fbRemainder;
+              const gFill = sec.layout.map(() => 0);
+              while (rem > 0) { for (let gi = 0; gi < sec.layout.length && rem > 0; gi++) { if (gFill[gi] < sec.layout[gi]) { gFill[gi]++; rem--; } } }
+              for (let gi = 0; gi < sec.layout.length; gi++) {
+                const gs = sec.layout[gi], f = gFill[gi], off = Math.floor((gs - f) / 2);
+                for (let s = 0; s < gs; s++) fbLastRowActive.push(s >= off && s < off + f);
+              }
+            }
+
             for (let row = 0; row < sec.rows; row++) {
               const rX = curX + row * (SH + ROW_GAP);
-              // Center this section's seats vertically
               const secW = sec.layout.map((c) => c * SW + (c - 1) * SEAT_GAP).reduce((a, b) => a + b, 0) + (sec.layout.length - 1) * AISLE_W;
               let sY = cY - secW / 2;
+              let flatIdx = 0;
               for (let g = 0; g < sec.layout.length; g++) {
                 for (let s = 0; s < sec.layout[g]; s++) {
-                  const idx = row * sec.seatsPerRow + sec.layout.slice(0, g).reduce((a, b) => a + b, 0) + s;
+                  const isLastPartial = row === fbFullRows && fbRemainder > 0;
+                  const active = row < fbFullRows ? true : isLastPartial ? (fbLastRowActive[flatIdx] ?? false) : false;
+                  flatIdx++;
                   const bw = Math.round(SH * 0.3);
                   el.push(
-                    <g key={`s-${si}-${row}-${g}-${s}`} opacity={idx < sec.seats ? 1 : 0.2}>
+                    <g key={`s-${si}-${row}-${g}-${s}`} opacity={active ? 1 : 0.2}>
                       <rect x={rX} y={sY} width={SH} height={SW} rx={1.5} fill={sec.color} opacity={0.18} stroke={sec.color} strokeWidth={0.5} />
                       <rect x={rX + 0.5} y={sY + 0.5} width={bw} height={SW - 1} rx={1.5} fill={sec.color} opacity={0.45} />
                     </g>

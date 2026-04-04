@@ -42,11 +42,6 @@ export function AirportList({
       <div className="px-4 py-3 space-y-3 border-b border-hz-border shrink-0">
         <div className="flex items-center justify-between">
           <h2 className="text-[15px] font-bold">Airports</h2>
-          <span className="text-[12px] text-hz-text-secondary font-medium tabular-nums">
-            {filteredCount === totalCount
-              ? totalCount
-              : `${filteredCount} / ${totalCount}`}
-          </span>
         </div>
 
         {/* Search */}

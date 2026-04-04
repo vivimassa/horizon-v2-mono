@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import type { LopaConfigRef, CabinClassRef, CabinEntry } from "@skyhub/api";
+import type { LopaConfigRef, CabinClassRef, CabinEntry, AircraftTypeRef } from "@skyhub/api";
 import { FieldRow } from "../airports/field-row";
 import { AircraftSeatMap } from "./aircraft-seat-map";
 import { useTheme } from "@/components/theme-provider";
@@ -20,6 +20,7 @@ import {
 interface LopaConfigDetailProps {
   config: LopaConfigRef | null;
   cabinClasses: CabinClassRef[];
+  aircraftTypes?: AircraftTypeRef[];
   onSave?: (id: string, data: Partial<LopaConfigRef>) => Promise<void>;
   onDelete?: (id: string) => Promise<void>;
   onCreate?: (data: Partial<LopaConfigRef>) => Promise<void>;
@@ -27,7 +28,7 @@ interface LopaConfigDetailProps {
   onCancelCreate?: () => void;
 }
 
-export function LopaConfigDetail({ config, cabinClasses, onSave, onDelete, onCreate, initialShowCreate, onCancelCreate }: LopaConfigDetailProps) {
+export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onSave, onDelete, onCreate, initialShowCreate, onCancelCreate }: LopaConfigDetailProps) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -150,7 +151,7 @@ export function LopaConfigDetail({ config, cabinClasses, onSave, onDelete, onCre
     const cc = cabinClasses.find((c) => c.code === classCode);
     const layout = (cc?.seatLayout || "3-3").split("-").map(Number);
     const perRow = layout.reduce((s, g) => s + g, 0);
-    return perRow * 60;
+    return Math.max(perRow * 60, 800);
   }, [cabinClasses]);
 
   // Toggle a cabin class on/off in create form
@@ -194,8 +195,15 @@ export function LopaConfigDetail({ config, cabinClasses, onSave, onDelete, onCre
           {/* Aircraft type + config name */}
           <div className="px-6 pt-4 pb-3 space-y-3 border-b border-hz-border">
             <div className="flex gap-3">
-              <MiniInput label="Aircraft Type *" value={createForm.aircraftType}
-                onChange={(v) => setCreateForm(p => ({ ...p, aircraftType: v.toUpperCase() }))} mono maxLength={4} />
+              <div className="flex-1">
+                <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">Aircraft Type *</label>
+                <select value={createForm.aircraftType}
+                  onChange={(e) => setCreateForm(p => ({ ...p, aircraftType: e.target.value }))}
+                  className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] font-mono border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text">
+                  <option value="">Select type...</option>
+                  {aircraftTypes.map(t => <option key={t._id} value={t.icaoType}>{t.icaoType} — {t.name}</option>)}
+                </select>
+              </div>
               <MiniInput label="Config Name *" value={createForm.configName}
                 onChange={(v) => setCreateForm(p => ({ ...p, configName: v }))} />
             </div>
@@ -384,8 +392,15 @@ export function LopaConfigDetail({ config, cabinClasses, onSave, onDelete, onCre
             </div>
             <div className="space-y-3">
               <div className="flex gap-3">
-                <MiniInput label="Aircraft Type *" value={createForm.aircraftType}
-                  onChange={(v) => setCreateForm(p => ({ ...p, aircraftType: v.toUpperCase() }))} mono maxLength={4} />
+                <div className="flex-1">
+                  <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">Aircraft Type *</label>
+                  <select value={createForm.aircraftType}
+                    onChange={(e) => setCreateForm(p => ({ ...p, aircraftType: e.target.value }))}
+                    className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] font-mono border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text">
+                    <option value="">Select type...</option>
+                    {aircraftTypes.map(t => <option key={t._id} value={t.icaoType}>{t.icaoType} — {t.name}</option>)}
+                  </select>
+                </div>
                 <MiniInput label="Config Name *" value={createForm.configName}
                   onChange={(v) => setCreateForm(p => ({ ...p, configName: v }))} />
               </div>
@@ -490,7 +505,11 @@ export function LopaConfigDetail({ config, cabinClasses, onSave, onDelete, onCre
             </div>
           ) : (
             <div className="space-y-1">
-              {config.cabins.map((cabin, i) => (
+              {[...config.cabins].sort((a, b) => {
+                const aOrder = cabinClasses.find(c => c.code === a.classCode)?.sortOrder ?? 99;
+                const bOrder = cabinClasses.find(c => c.code === b.classCode)?.sortOrder ?? 99;
+                return aOrder - bOrder;
+              }).map((cabin, i) => (
                 <div key={i} className="flex items-center gap-3 py-2.5 px-3 rounded-xl border border-hz-border/30">
                   <span className="w-4 h-4 rounded-full shrink-0"
                     style={{ backgroundColor: getClassColor(cabin.classCode) }} />

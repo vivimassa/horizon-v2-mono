@@ -8,6 +8,9 @@ export interface NavPageData {
   route: string
   iconName: string
   desc?: string
+  /** Optional group header for dropdown rendering (e.g. "Network", "Flight Ops") */
+  group?: string
+  groupIconName?: string
 }
 
 export interface NavSectionData {
@@ -209,15 +212,19 @@ export const NAV_TREE: NavModuleData[] = [
       {
         key: 'master-database', label: 'Master Database', num: '6.3', iconName: 'Database', route: '/admin',
         pages: [
-          { key: 'countries', label: 'Countries Database', num: '6.3.1', route: '/admin/countries', iconName: 'Globe', desc: 'ISO codes, regions, currency' },
-          { key: 'airports', label: 'Airports Database', num: '6.3.2', route: '/admin/airports', iconName: 'PlaneTakeoff', desc: 'ICAO/IATA codes, coordinates, facilities' },
-          { key: 'city-pairs', label: 'Citypairs Database', num: '6.3.3', route: '/admin/city-pairs', iconName: 'ArrowLeftRight', desc: 'Routes, distances, block times' },
-          { key: 'lopa', label: 'LOPA Database', num: '6.3.4', route: '/admin/lopa', iconName: 'Armchair', desc: 'Cabin classes and seat configurations' },
-          { key: 'aircraft-types', label: 'Aircraft Types Database', num: '6.3.5', route: '/admin/aircraft-types', iconName: 'Plane', desc: 'Fleet types, capacity, performance' },
-          { key: 'delay-codes', label: 'Delay Codes Database', num: '6.3.6', route: '/admin/delay-codes', iconName: 'Timer', desc: 'IATA standard & custom codes' },
-          { key: 'service-types', label: 'Service Types Database', num: '6.3.7', route: '/admin/service-types', iconName: 'Tag', desc: 'Flight service categories' },
-          { key: 'crew-positions', label: 'Crew Positions Database', num: '6.3.8', route: '/admin/crew-positions', iconName: 'UserRound', desc: 'Cockpit & cabin roles, rank order' },
-          { key: 'expiry-codes', label: 'Expiry Codes Database', num: '6.3.9', route: '/admin/expiry-codes', iconName: 'FileCheck', desc: 'Qualification validity & formulas' },
+          // Network
+          { key: 'countries', label: 'Countries Database', num: '6.3.1', route: '/admin/countries', iconName: 'Globe', desc: 'ISO codes, regions, currency', group: 'Network', groupIconName: 'Globe' },
+          { key: 'airports', label: 'Airports Database', num: '6.3.2', route: '/admin/airports', iconName: 'PlaneTakeoff', desc: 'ICAO/IATA codes, coordinates, facilities', group: 'Network', groupIconName: 'Globe' },
+          { key: 'city-pairs', label: 'Citypairs Database', num: '6.3.3', route: '/admin/city-pairs', iconName: 'ArrowLeftRight', desc: 'Routes, distances, block times', group: 'Network', groupIconName: 'Globe' },
+          { key: 'lopa', label: 'LOPA Database', num: '6.3.4', route: '/admin/lopa', iconName: 'Armchair', desc: 'Cabin classes and seat configurations', group: 'Network', groupIconName: 'Globe' },
+          // Flight Ops
+          { key: 'aircraft-types', label: 'Aircraft Types Database', num: '6.3.5', route: '/admin/aircraft-types', iconName: 'Plane', desc: 'Fleet types, capacity, performance', group: 'Flight Ops', groupIconName: 'Plane' },
+          { key: 'aircraft-registrations', label: 'Aircraft Registrations', num: '6.3.6', route: '/admin/aircraft-registrations', iconName: 'PlaneTakeoff', desc: 'Tail numbers, MSN, status, home base', group: 'Flight Ops', groupIconName: 'Plane' },
+          { key: 'service-types', label: 'Service Types Database', num: '6.3.7', route: '/admin/service-types', iconName: 'Tag', desc: 'Flight service categories', group: 'Flight Ops', groupIconName: 'Plane' },
+          { key: 'delay-codes', label: 'Delay Codes Database', num: '6.3.8', route: '/admin/delay-codes', iconName: 'Timer', desc: 'IATA standard & custom codes', group: 'Flight Ops', groupIconName: 'Plane' },
+          // Crew Ops
+          { key: 'crew-positions', label: 'Crew Positions Database', num: '6.3.9', route: '/admin/crew-positions', iconName: 'UserRound', desc: 'Cockpit & cabin roles, rank order', group: 'Crew Ops', groupIconName: 'Users' },
+          { key: 'expiry-codes', label: 'Expiry Codes Database', num: '6.3.10', route: '/admin/expiry-codes', iconName: 'FileCheck', desc: 'Qualification validity & formulas', group: 'Crew Ops', groupIconName: 'Users' },
         ],
       },
     ],

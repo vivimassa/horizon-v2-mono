@@ -7,6 +7,7 @@ export type {
   CityPairRef,
   BlockHourData,
   AircraftTypeRef,
+  AircraftRegistrationRef,
   CountryRef,
   DelayCodeRef,
   CrewPositionRef,

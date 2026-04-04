@@ -239,27 +239,26 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
     <div className="flex flex-col h-full overflow-hidden">
       {/* Hero image */}
       {heroImg && (
-        <div className="relative shrink-0 h-[180px] overflow-hidden border-b border-hz-border bg-gradient-to-b from-hz-border/10 to-hz-bg">
+        <div className="relative shrink-0 h-[250px] overflow-hidden border-b border-hz-border bg-gradient-to-b from-hz-border/10 to-hz-bg">
           <img
             src={heroImg}
             alt={aircraftType.icaoType}
-            className="w-full h-full object-contain"
+            className="w-full h-full object-contain opacity-75"
             onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-hz-bg via-transparent to-transparent" />
-          <div className="absolute bottom-3 left-6 flex items-center gap-3">
-            <span className="text-[14px] font-bold font-mono px-2.5 py-1 rounded-lg bg-black/40 text-white backdrop-blur-sm">
-              {aircraftType.icaoType}
-            </span>
-            <span className="text-[16px] font-semibold text-white drop-shadow-md">{aircraftType.name}</span>
-          </div>
-          {aircraftType.manufacturer && (
-            <div className="absolute top-3 left-6">
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/20 text-white backdrop-blur-sm">
+          <div className="absolute top-3 left-6 flex flex-col gap-1.5">
+            <div className="flex items-center gap-2.5">
+              <span className="text-[14px] font-bold font-mono px-2.5 py-1 rounded-lg bg-hz-bg/80 text-hz-text backdrop-blur-sm border border-hz-border/50">
+                {aircraftType.icaoType}
+              </span>
+              <span className="text-[16px] font-semibold text-hz-text">{aircraftType.name}</span>
+            </div>
+            {aircraftType.manufacturer && (
+              <span className="text-[11px] font-semibold text-hz-text-secondary">
                 {aircraftType.manufacturer}
               </span>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 

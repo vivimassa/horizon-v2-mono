@@ -522,7 +522,70 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     isActive: z.boolean().optional().default(true),
   }).strict()
 
-  const aircraftTypeUpdateSchema = aircraftTypeCreateSchema.omit({ operatorId: true }).partial().strict()
+  const aircraftTypeUpdateSchema = z.object({
+    icaoType: z.string().min(1).max(4),
+    iataType: z.string().max(3).nullable(),
+    iataTypeCode: z.string().max(4).nullable(),
+    name: z.string().min(1),
+    family: z.string().nullable(),
+    category: z.enum(['narrow_body', 'wide_body', 'regional', 'turboprop']),
+    manufacturer: z.string().nullable(),
+    paxCapacity: z.number().int().min(0).nullable(),
+    cockpitCrewRequired: z.number().int().min(0),
+    cabinCrewRequired: z.number().int().min(0).nullable(),
+    tat: z.object({
+      defaultMinutes: z.number().nullable().optional(),
+      domDom: z.number().nullable().optional(),
+      domInt: z.number().nullable().optional(),
+      intDom: z.number().nullable().optional(),
+      intInt: z.number().nullable().optional(),
+      minDd: z.number().nullable().optional(),
+      minDi: z.number().nullable().optional(),
+      minId: z.number().nullable().optional(),
+      minIi: z.number().nullable().optional(),
+    }),
+    performance: z.object({
+      mtowKg: z.number().nullable().optional(),
+      mlwKg: z.number().nullable().optional(),
+      mzfwKg: z.number().nullable().optional(),
+      oewKg: z.number().nullable().optional(),
+      maxFuelCapacityKg: z.number().nullable().optional(),
+      maxRangeNm: z.number().nullable().optional(),
+      cruisingSpeedKts: z.number().nullable().optional(),
+      ceilingFl: z.number().nullable().optional(),
+    }),
+    fuelBurnRateKgPerHour: z.number().nullable(),
+    etopsCapable: z.boolean(),
+    etopsRatingMinutes: z.number().nullable(),
+    noiseCategory: z.string().nullable(),
+    emissionsCategory: z.string().nullable(),
+    cargo: z.object({
+      maxCargoWeightKg: z.number().nullable().optional(),
+      cargoPositions: z.number().nullable().optional(),
+      bulkHoldCapacityKg: z.number().nullable().optional(),
+      uldTypesAccepted: z.array(z.string()).optional(),
+    }),
+    crewRest: z.object({
+      cockpitClass: z.string().nullable().optional(),
+      cockpitPositions: z.number().nullable().optional(),
+      cabinClass: z.string().nullable().optional(),
+      cabinPositions: z.number().nullable().optional(),
+    }),
+    weather: z.object({
+      minCeilingFt: z.number().nullable().optional(),
+      minRvrM: z.number().nullable().optional(),
+      minVisibilityM: z.number().nullable().optional(),
+      maxCrosswindKt: z.number().nullable().optional(),
+      maxWindKt: z.number().nullable().optional(),
+    }),
+    approach: z.object({
+      ilsCategoryRequired: z.string().nullable().optional(),
+      autolandCapable: z.boolean().optional(),
+    }),
+    notes: z.string().nullable(),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be hex color').nullable(),
+    isActive: z.boolean(),
+  }).partial().strict()
 
   app.get('/aircraft-types', async (req) => {
     const { operatorId } = req.query as { operatorId?: string }
@@ -561,6 +624,19 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
       ...body,
       createdAt: new Date().toISOString(),
     })
+
+    // Auto-provision fuselage image folder for LOPA seat map
+    try {
+      const __dirname = path.dirname(fileURLToPath(import.meta.url))
+      const assetsDir = path.resolve(__dirname, '../../../apps/web/public/assets/aircraft')
+      const templateFuselage = path.join(assetsDir, 'A320', 'fuselage.png')
+      const targetDir = path.join(assetsDir, body.icaoType)
+      const targetFile = path.join(targetDir, 'fuselage.png')
+      if (fs.existsSync(templateFuselage) && !fs.existsSync(targetFile)) {
+        fs.mkdirSync(targetDir, { recursive: true })
+        fs.copyFileSync(templateFuselage, targetFile)
+      }
+    } catch { /* non-critical — seat map falls back to SVG */ }
 
     return reply.code(201).send(doc.toObject())
   })

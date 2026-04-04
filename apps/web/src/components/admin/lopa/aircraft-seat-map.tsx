@@ -11,11 +11,8 @@ interface AircraftSeatMapProps {
   aircraftType?: string;
 }
 
-// Aircraft types with fuselage template images
-const TYPES_WITH_IMAGES = new Set(["A320", "A321"]);
-
 // Cabin cutout region as % of the image (where seats go)
-// Tuned for the A320/A321 fuselage template
+// Tuned for the fuselage template
 const CABIN_REGION = {
   left: 14,
   right: 77,
@@ -71,10 +68,17 @@ export function AircraftSeatMap({ cabins, cabinClasses, aircraftType }: Aircraft
     const raw = parseSections(cabins, cabinClasses);
     return raw.map((s) => ({ ...s, color: modeColor(s.color, isDark) }));
   }, [cabins, cabinClasses, isDark]);
-  const hasImages = aircraftType ? TYPES_WITH_IMAGES.has(aircraftType.toUpperCase()) : false;
-  const imgType = aircraftType?.toUpperCase() || "A321";
+  const imgType = aircraftType?.toUpperCase() || "";
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerW, setContainerW] = useState(800);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgError, setImgError] = useState(false);
+
+  // Reset image state when aircraft type changes
+  useEffect(() => {
+    setImgLoaded(false);
+    setImgError(false);
+  }, [imgType]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -91,7 +95,7 @@ export function AircraftSeatMap({ cabins, cabinClasses, aircraftType }: Aircraft
     return <div className="text-[13px] text-hz-text-secondary py-4 text-center">No cabin data to display</div>;
   }
 
-  if (!hasImages) {
+  if (!imgType || imgError) {
     return <FallbackSeatMap sections={sections} />;
   }
 
@@ -121,12 +125,14 @@ export function AircraftSeatMap({ cabins, cabinClasses, aircraftType }: Aircraft
 
   return (
     <div ref={containerRef} className="w-full relative rounded-xl overflow-hidden" style={{ backgroundColor: isDark ? "#ffffff" : undefined }}>
-      {/* Aircraft fuselage image (transparent PNG) */}
+      {/* Aircraft fuselage image (transparent PNG — auto-provisioned per type) */}
       <img
         src={`/assets/aircraft/${imgType}/fuselage.png`}
         alt={`${imgType} fuselage`}
         className="w-full h-auto block"
         draggable={false}
+        onLoad={() => setImgLoaded(true)}
+        onError={() => setImgError(true)}
       />
 
       {/* Seats SVG overlay — stretched to fill the cabin cutout */}
@@ -257,7 +263,9 @@ function FallbackSeatMap({ sections }: { sections: CabinSection[] }) {
             );
             for (let row = 0; row < sec.rows; row++) {
               const rX = curX + row * (SH + ROW_GAP);
-              let sY = cY - maxW / 2;
+              // Center this section's seats vertically
+              const secW = sec.layout.map((c) => c * SW + (c - 1) * SEAT_GAP).reduce((a, b) => a + b, 0) + (sec.layout.length - 1) * AISLE_W;
+              let sY = cY - secW / 2;
               for (let g = 0; g < sec.layout.length; g++) {
                 for (let s = 0; s < sec.layout[g]; s++) {
                   const idx = row * sec.seatsPerRow + sec.layout.slice(0, g).reduce((a, b) => a + b, 0) + s;

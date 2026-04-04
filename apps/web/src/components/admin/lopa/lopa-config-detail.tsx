@@ -359,13 +359,6 @@ export function LopaConfigDetail({ config, cabinClasses, onSave, onDelete, onCre
                     <Pencil className="h-3.5 w-3.5" /> Edit
                   </button>
                 )}
-                {onCreate && (
-                  <button onClick={() => { resetCreate(); setShowCreate(true); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white transition-colors"
-                    style={{ backgroundColor: "#1e40af" }}>
-                    <Plus className="h-3.5 w-3.5" /> New
-                  </button>
-                )}
               </>
             )}
           </div>

@@ -12,6 +12,7 @@ import {
 import type { LucideIcon } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
 
 // ── Section & card definitions ──
 
@@ -36,10 +37,11 @@ const SECTIONS: SectionDef[] = [
     icon: Globe,
     color: '#0f766e',
     cards: [
-      { code: '5.1.1', label: 'Countries Database', desc: 'ISO codes, regions, currency', icon: Globe, route: '/(tabs)/settings/countries' },
-      { code: '5.1.2', label: 'Airports Database', desc: 'ICAO/IATA codes, coordinates, facilities', icon: PlaneTakeoff, route: '/(tabs)/settings/airports' },
-      { code: '5.1.3', label: 'Citypairs Database', desc: 'Routes, distances, block times', icon: ArrowLeftRight, route: '/(tabs)/settings/citypairs' },
-      { code: '5.1.4', label: 'LOPA Database', desc: 'Cabin classes, seat configurations', icon: Armchair, route: '' },
+      { code: '5.1.1', label: 'Countries', desc: 'ISO codes, regions, currency', icon: Globe, route: '/(tabs)/settings/countries' },
+      { code: '5.1.2', label: 'Airports', desc: 'ICAO/IATA codes, coordinates, facilities', icon: PlaneTakeoff, route: '/(tabs)/settings/airports' },
+      { code: '5.1.3', label: 'Citypairs', desc: 'Routes, distances, block times', icon: ArrowLeftRight, route: '/(tabs)/settings/citypairs' },
+      { code: '5.1.4', label: 'LOPA', desc: 'Cabin classes and seat configurations', icon: Armchair, route: '/(tabs)/settings/lopa' },
+      { code: '5.1.5', label: 'Flight Service Types', desc: 'Define flight service types for your operation', icon: Tag, route: '/(tabs)/settings/service-types' },
     ],
   },
   {
@@ -47,9 +49,9 @@ const SECTIONS: SectionDef[] = [
     icon: Plane,
     color: '#1e40af',
     cards: [
-      { code: '5.2.1', label: 'Aircraft Types Database', desc: 'Fleet types, capacity, performance', icon: Plane, route: '' },
-      { code: '5.2.2', label: 'Delay Codes Database', desc: 'IATA standard & custom codes', icon: Timer, route: '' },
-      { code: '5.2.3', label: 'Service Types Database', desc: 'Flight service categories', icon: Tag, route: '' },
+      { code: '5.2.1', label: 'Aircraft Types', desc: 'Fleet types, capacity, performance', icon: Plane, route: '/(tabs)/settings/aircraft-types' },
+      { code: '5.2.2', label: 'Aircraft Registrations', desc: 'Tail numbers, MSN, status, home base', icon: PlaneTakeoff, route: '/(tabs)/settings/aircraft-registrations' },
+      { code: '5.2.3', label: 'Delay Codes', desc: 'IATA standard & custom codes', icon: Timer, route: '/(tabs)/settings/delay-codes' },
     ],
   },
   {
@@ -63,23 +65,27 @@ const SECTIONS: SectionDef[] = [
     icon: Users,
     color: '#7c3aed',
     cards: [
-      { code: '5.4.1', label: 'Crew Positions Database', desc: 'Cockpit & cabin roles, rank order', icon: UserRound, route: '' },
-      { code: '5.4.2', label: 'Expiry Codes Database', desc: 'Qualification validity & formulas', icon: FileCheck, route: '' },
+      { code: '5.4.1', label: 'Crew Positions', desc: 'Cockpit & cabin roles, rank order', icon: UserRound, route: '' },
+      { code: '5.4.2', label: 'Expiry Codes', desc: 'Qualification validity & formulas', icon: FileCheck, route: '' },
     ],
   },
 ]
 
 export default function MasterDatabaseScreen() {
   const router = useRouter()
-  const { isDark, palette, accent } = useAppTheme()
+  const { isDark, palette, accent, isTablet } = useAppTheme()
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
-      {/* Header */}
+    <View className="flex-1" style={{ backgroundColor: palette.background }}>
+    <BreadcrumbHeader moduleCode="6" />
+    <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
+      {/* Header — hide back button on tablet (breadcrumb handles navigation) */}
       <View className="flex-row items-center px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
-        <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
-          <ChevronLeft size={24} color={accent} strokeWidth={2} />
-        </Pressable>
+        {!isTablet && (
+          <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
+            <ChevronLeft size={24} color={accent} strokeWidth={2} />
+          </Pressable>
+        )}
         <View
           className="items-center justify-center rounded-lg mr-3"
           style={{ width: 36, height: 36, backgroundColor: accentTint(accent, isDark ? 0.15 : 0.1) }}
@@ -110,6 +116,7 @@ export default function MasterDatabaseScreen() {
         ))}
       </ScrollView>
     </SafeAreaView>
+    </View>
   )
 }
 

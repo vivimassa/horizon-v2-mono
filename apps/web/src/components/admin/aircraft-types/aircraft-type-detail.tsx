@@ -489,11 +489,6 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
                   </table>
                 </div>
               </Section>
-              <Section title="Legacy Default">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
-                  <NestedField label="Default TAT (min)" parent="tat" child="defaultMinutes" type={aircraftType} draft={draft} editing={editing} onChange={handleNestedChange} inputType="number" />
-                </div>
-              </Section>
             </div>
           )}
 

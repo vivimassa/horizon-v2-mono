@@ -17,6 +17,7 @@ import {
 import { accentTint, colors, darkAccent, type Palette } from '@skyhub/ui/theme'
 import { getApiBaseUrl } from '@skyhub/api'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
 import { useUser } from '../../../providers/UserProvider'
 
 const ACCENT_DEFAULT = '#1e40af'
@@ -94,7 +95,9 @@ export default function SettingsScreen() {
   }, [refetch])
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
+    <View className="flex-1" style={{ backgroundColor: palette.background }}>
+    <BreadcrumbHeader moduleCode="6" />
+    <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
@@ -380,6 +383,7 @@ export default function SettingsScreen() {
         </Pressable>
       </Modal>
     </SafeAreaView>
+    </View>
   )
 }
 

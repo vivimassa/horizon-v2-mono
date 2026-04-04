@@ -9,6 +9,7 @@ import {
 } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
 
 interface CountrySection {
   title: string
@@ -73,7 +74,9 @@ export default function AirportsList() {
   }, [airports, search])
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
+    <View className="flex-1" style={{ backgroundColor: palette.background }}>
+    <BreadcrumbHeader moduleCode="6" />
+    <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
       {/* Header */}
       <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
         <View className="flex-row items-center mb-3">
@@ -87,7 +90,7 @@ export default function AirportsList() {
             <PlaneTakeoff size={18} color={accent} strokeWidth={1.8} />
           </View>
           <View className="flex-1">
-            <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>Airports Database</Text>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>Airports</Text>
             <Text style={{ fontSize: 15, color: palette.textSecondary }}>
               {filteredCount === airports.length
                 ? `${airports.length} airports`
@@ -177,6 +180,7 @@ export default function AirportsList() {
         />
       )}
     </SafeAreaView>
+    </View>
   )
 }
 

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
 
 export default function CountriesList() {
   const { palette, isDark, accent } = useAppTheme()
@@ -42,7 +43,9 @@ export default function CountriesList() {
   }, [countries, search])
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
+    <View className="flex-1" style={{ backgroundColor: palette.background }}>
+    <BreadcrumbHeader moduleCode="6" />
+    <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
       {/* Header */}
       <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
         <View className="flex-row items-center mb-3">
@@ -56,7 +59,7 @@ export default function CountriesList() {
             <Globe size={18} color={accent} strokeWidth={1.8} />
           </View>
           <View className="flex-1">
-            <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>Countries Database</Text>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>Countries</Text>
             <Text style={{ fontSize: 13, color: palette.textSecondary }}>
               {filtered.length === countries.length
                 ? `${countries.length} countries`
@@ -102,6 +105,7 @@ export default function CountriesList() {
         />
       )}
     </SafeAreaView>
+    </View>
   )
 }
 
@@ -123,7 +127,7 @@ const CountryRow = memo(function CountryRow({
     >
       <Text
         style={{
-          width: 32, fontSize: 13, fontWeight: '700',
+          width: 44, fontSize: 15, fontWeight: '700',
           fontFamily: 'monospace', color: accent,
           textAlign: 'center',
         }}

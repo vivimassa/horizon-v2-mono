@@ -9,6 +9,7 @@ import {
 } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
 
 const ROUTE_TYPE_ORDER: Record<string, number> = {
   domestic: 0, regional: 1, international: 2, 'long-haul': 3, 'ultra-long-haul': 4, unknown: 5,
@@ -81,7 +82,9 @@ export default function CityPairsList() {
   }, [cityPairs, search])
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
+    <View className="flex-1" style={{ backgroundColor: palette.background }}>
+    <BreadcrumbHeader moduleCode="6" />
+    <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
       {/* Header */}
       <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
         <View className="flex-row items-center mb-3">
@@ -95,7 +98,7 @@ export default function CityPairsList() {
             <ArrowLeftRight size={18} color={accent} strokeWidth={1.8} />
           </View>
           <View className="flex-1">
-            <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>Citypairs Database</Text>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>Citypairs</Text>
             <Text style={{ fontSize: 13, color: palette.textSecondary }}>
               {filteredCount === cityPairs.length
                 ? `${cityPairs.length} citypairs`
@@ -176,6 +179,7 @@ export default function CityPairsList() {
         />
       )}
     </SafeAreaView>
+    </View>
   )
 }
 

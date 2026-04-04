@@ -4,6 +4,8 @@ import { useState, useCallback, useMemo } from "react";
 import type { CabinClassRef, LopaConfigRef } from "@skyhub/api";
 import { FieldRow } from "../airports/field-row";
 import { SeatRowPreview } from "./seat-row-preview";
+import { useTheme } from "@/components/theme-provider";
+import { modeColor } from "@skyhub/ui/theme";
 import {
   Info,
   LayoutGrid,
@@ -257,7 +259,9 @@ export function CabinClassDetail({ cabinClass, lopaConfigs = [], onSave, onDelet
   }
 
   // ── Normal detail view ──
-  const classColor = cabinClass.color || "#9ca3af";
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const classColor = modeColor(cabinClass.color || "#9ca3af", isDark);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">

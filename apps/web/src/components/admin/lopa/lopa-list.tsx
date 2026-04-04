@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { CabinClassRef, LopaConfigRef } from "@skyhub/api";
 import { Search, Plus, ChevronRight, Plane, Star } from "lucide-react";
+import { useTheme } from "@/components/theme-provider";
+import { modeColor } from "@skyhub/ui/theme";
 
 type ViewMode = "cabin-classes" | "lopa-configs";
 
@@ -54,6 +56,9 @@ export function LopaList({
       return next;
     });
   };
+
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
 
   const isCabinMode = viewMode === "cabin-classes";
   const totalCount = isCabinMode ? cabinClassTotal : configTotal;
@@ -143,7 +148,7 @@ export function LopaList({
                   >
                     <span
                       className="shrink-0 w-5 h-5 rounded-full border border-hz-border/50"
-                      style={{ backgroundColor: cc.color || "#9ca3af" }}
+                      style={{ backgroundColor: modeColor(cc.color || "#9ca3af", isDark) }}
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">

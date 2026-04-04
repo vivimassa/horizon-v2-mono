@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState, useEffect } from "react";
 import type { CabinClassRef, CabinEntry } from "@skyhub/api";
 import { useTheme } from "@/components/theme-provider";
+import { modeColor } from "@skyhub/ui/theme";
 
 interface AircraftSeatMapProps {
   cabins: CabinEntry[];
@@ -64,8 +65,12 @@ const CABIN_GAP = 4;
 
 export function AircraftSeatMap({ cabins, cabinClasses, aircraftType }: AircraftSeatMapProps) {
   const { theme } = useTheme();
-  const panelBg = theme === "dark" ? "#1e1e22" : "#ffffff";
-  const sections = useMemo(() => parseSections(cabins, cabinClasses), [cabins, cabinClasses]);
+  const isDark = theme === "dark";
+  const panelBg = isDark ? "#1e1e22" : "#ffffff";
+  const sections = useMemo(() => {
+    const raw = parseSections(cabins, cabinClasses);
+    return raw.map((s) => ({ ...s, color: modeColor(s.color, isDark) }));
+  }, [cabins, cabinClasses, isDark]);
   const hasImages = aircraftType ? TYPES_WITH_IMAGES.has(aircraftType.toUpperCase()) : false;
   const imgType = aircraftType?.toUpperCase() || "A321";
   const containerRef = useRef<HTMLDivElement>(null);
@@ -115,7 +120,7 @@ export function AircraftSeatMap({ cabins, cabinClasses, aircraftType }: Aircraft
   const svgH = maxAbreast * (seatW + SEAT_GAP) + aisleCount * AISLE_W + PAD * 2;
 
   return (
-    <div ref={containerRef} className="w-full relative">
+    <div ref={containerRef} className="w-full relative rounded-xl overflow-hidden" style={{ backgroundColor: isDark ? "#ffffff" : undefined }}>
       {/* Aircraft fuselage image (transparent PNG) */}
       <img
         src={`/assets/aircraft/${imgType}/fuselage.png`}

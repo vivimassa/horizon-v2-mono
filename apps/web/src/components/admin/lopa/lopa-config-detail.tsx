@@ -4,6 +4,8 @@ import { useState, useCallback, useMemo } from "react";
 import type { LopaConfigRef, CabinClassRef, CabinEntry } from "@skyhub/api";
 import { FieldRow } from "../airports/field-row";
 import { AircraftSeatMap } from "./aircraft-seat-map";
+import { useTheme } from "@/components/theme-provider";
+import { modeColor } from "@skyhub/ui/theme";
 import {
   Info,
   Pencil,
@@ -125,14 +127,17 @@ export function LopaConfigDetail({ config, cabinClasses, onSave, onDelete, onCre
   const currentCabins = draftCabins ?? config?.cabins ?? [];
   const computedTotal = useMemo(() => currentCabins.reduce((s, c) => s + c.seats, 0), [currentCabins]);
 
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+
   const classOptions = useMemo(
     () => cabinClasses.filter((c) => c.isActive).sort((a, b) => a.sortOrder - b.sortOrder),
     [cabinClasses]
   );
 
   const getClassColor = useCallback(
-    (code: string) => cabinClasses.find((c) => c.code === code)?.color || "#9ca3af",
-    [cabinClasses]
+    (code: string) => modeColor(cabinClasses.find((c) => c.code === code)?.color || "#9ca3af", isDark),
+    [cabinClasses, isDark]
   );
 
   const getClassName = useCallback(

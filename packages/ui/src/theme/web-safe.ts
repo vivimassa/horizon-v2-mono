@@ -2,6 +2,8 @@
 export {
   colors,
   accentTint,
+  desaturate,
+  modeColor,
   getStatusColors,
   type Palette,
   type StatusKey,

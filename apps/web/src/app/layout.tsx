@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import "mapbox-gl/dist/mapbox-gl.css";
+import "./mapbox-fix.css";
 import { SpotlightDock } from "@/components/SpotlightDock";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { ThemeProvider } from "@/components/theme-provider";

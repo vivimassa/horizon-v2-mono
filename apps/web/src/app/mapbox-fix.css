@@ -1,0 +1,25 @@
+/* ═══ MAPBOX GL + TAILWIND v4 LAYER FIX ═══ */
+/* Tailwind v4's @layer-based preflight interferes with Mapbox GL's internal
+   canvas and container styles. These unlayered overrides always win.
+   This file is deliberately separate from globals.css so @tailwindcss/postcss
+   does not process it — keeping these rules truly unlayered. */
+.mapboxgl-map {
+  overflow: hidden !important;
+}
+.mapboxgl-canvas-container,
+.mapboxgl-canvas-container canvas.mapboxgl-canvas {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+.mapboxgl-control-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+.mapboxgl-control-container > * {
+  pointer-events: auto;
+}

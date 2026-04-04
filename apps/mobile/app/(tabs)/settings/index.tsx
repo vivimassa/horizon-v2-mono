@@ -14,7 +14,7 @@ import {
   ChevronRight,
   type LucideIcon,
 } from 'lucide-react-native'
-import { accentTint, colors, type Palette } from '@skyhub/ui/theme'
+import { accentTint, colors, darkAccent, type Palette } from '@skyhub/ui/theme'
 import { getApiBaseUrl } from '@skyhub/api'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { useUser } from '../../../providers/UserProvider'
@@ -337,7 +337,7 @@ export default function SettingsScreen() {
             <View className="flex-row flex-wrap" style={{ gap: 12, justifyContent: 'center' }}>
               {ACCENT_PRESETS.map((p) => {
                 const selected = p.hex === rawAccent
-                const displayColor = isDark ? (colors.accentPresetsDark[p.hex] ?? p.hex) : p.hex
+                const displayColor = isDark ? darkAccent(p.hex) : p.hex
                 const displayName = isDark ? p.darkName : p.name
                 return (
                   <Pressable

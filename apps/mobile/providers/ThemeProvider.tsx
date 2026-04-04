@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { useColorScheme, Appearance, useWindowDimensions } from 'react-native'
-import { colors, accentTint, type Palette } from '@skyhub/ui/theme'
+import { colors, accentTint, darkAccent, type Palette } from '@skyhub/ui/theme'
 
-/** Resolve accent color for current mode — dark mode uses brighter, desaturated variants */
+/** Resolve accent color for current mode — same hue, 80% saturation, 70% lightness */
 function resolveAccent(hex: string, isDark: boolean): string {
   if (!isDark) return hex
-  return colors.accentPresetsDark[hex] ?? hex
+  return darkAccent(hex)
 }
 
 // ── Global font size scale ──

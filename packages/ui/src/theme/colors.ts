@@ -94,14 +94,8 @@ export const colors = {
     Sky: '#0369a1',
     Pink: '#be185d',
   },
-  /** Dark-mode accent overrides: bright color swap → then 20% desaturation */
-  accentPresetsDark: {
-    '#15803d': '#eea9a9', // Green  → Coral (#fca5a5 → desat 20%)
-    '#1e40af': '#9cc4f0', // Blue   (#93c5fd → desat 20%)
-    '#7c3aed': '#c3b7f0', // Violet (#c4b5fd → desat 20%)
-    '#0f766e': '#74e4d2', // Teal   (#5eead4 → desat 20%)
-    '#b45309': '#f8e69c', // Amber  (#fde68a → desat 20%)
-  } as Record<string, string>,
+  /** @deprecated Use darkAccent(hex) directly instead of this lookup map */
+  accentPresetsDark: {} as Record<string, string>,
   defaultAccent: '#1e40af',
 } as const
 
@@ -126,6 +120,45 @@ export function accentTint(hexColor: string, opacity: number): string {
   const g = parseInt(hexColor.slice(3, 5), 16)
   const b = parseInt(hexColor.slice(5, 7), 16)
   return `rgba(${r},${g},${b},${opacity})`
+}
+
+/**
+ * Convert hex to HSL. Returns [h (0-360), s (0-100), l (0-100)].
+ */
+function hexToHsl(hex: string): [number, number, number] {
+  const r = parseInt(hex.slice(1, 3), 16) / 255
+  const g = parseInt(hex.slice(3, 5), 16) / 255
+  const b = parseInt(hex.slice(5, 7), 16) / 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b)
+  const l = (max + min) / 2
+  if (max === min) return [0, 0, l * 100]
+  const d = max - min
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+  let h = 0
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6
+  else if (max === g) h = ((b - r) / d + 2) / 6
+  else h = ((r - g) / d + 4) / 6
+  return [h * 360, s * 100, l * 100]
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  s /= 100; l /= 100
+  const a = s * Math.min(l, 1 - l)
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1)
+    return Math.round(255 * Math.max(0, Math.min(1, color))).toString(16).padStart(2, '0')
+  }
+  return `#${f(0)}${f(8)}${f(4)}`
+}
+
+/**
+ * Derive a dark-mode accent from a light-mode accent.
+ * Same hue, 80% of original saturation, lightness boosted to 70% for readability.
+ */
+export function darkAccent(hex: string): string {
+  const [h, s, _l] = hexToHsl(hex)
+  return hslToHex(h, s * 0.8, 70)
 }
 
 /**

@@ -216,9 +216,14 @@ export interface DelayCodeRef {
   _id: string
   operatorId: string
   code: string
+  alphaCode: string | null
+  ahm732Process: string | null
+  ahm732Reason: string | null
+  ahm732Stakeholder: string | null
   category: string
   name: string
   description: string | null
+  color: string | null
   isIataStandard: boolean
   isActive: boolean
 }
@@ -591,6 +596,15 @@ export const api = {
   getDelayCodes: (operatorId = 'horizon') =>
     request<DelayCodeRef[]>(`/delay-codes?operatorId=${operatorId}`),
 
+  createDelayCode: (data: Partial<DelayCodeRef>) =>
+    request<DelayCodeRef>('/delay-codes', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateDelayCode: (id: string, data: Partial<DelayCodeRef>) =>
+    request<DelayCodeRef>(`/delay-codes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  deleteDelayCode: (id: string) =>
+    request<{ success: boolean }>(`/delay-codes/${id}`, { method: 'DELETE' }),
+
   getCrewPositions: (operatorId = 'horizon') =>
     request<CrewPositionRef[]>(`/crew-positions?operatorId=${operatorId}`),
 
@@ -602,6 +616,15 @@ export const api = {
 
   getFlightServiceTypes: (operatorId = 'horizon') =>
     request<FlightServiceTypeRef[]>(`/flight-service-types?operatorId=${operatorId}`),
+
+  createFlightServiceType: (data: Partial<FlightServiceTypeRef>) =>
+    request<FlightServiceTypeRef>('/flight-service-types', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateFlightServiceType: (id: string, data: Partial<FlightServiceTypeRef>) =>
+    request<FlightServiceTypeRef>(`/flight-service-types/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  deleteFlightServiceType: (id: string) =>
+    request<{ success: boolean }>(`/flight-service-types/${id}`, { method: 'DELETE' }),
 
   getOperators: () => request<OperatorRef[]>('/operators'),
 

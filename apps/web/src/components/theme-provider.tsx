@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { resolveModule, MODULE_THEMES } from "@skyhub/constants";
+import { darkAccent } from "@skyhub/ui/theme";
 
 type Theme = "light" | "dark";
 type ModuleKey = "network" | "operations" | "ground" | "workforce" | "integration" | "admin" | null;
@@ -34,23 +35,26 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const moduleKey = (currentModule?.module ?? null) as ModuleKey;
   const moduleTheme = moduleKey ? MODULE_THEMES[moduleKey] ?? null : null;
 
+  // Resolve accent for dark mode — same hue, 80% saturation, 70% lightness
+  function resolveAccent(hex: string, isDark: boolean): string {
+    if (!isDark) return hex;
+    return darkAccent(hex);
+  }
+
   // Apply module theme CSS custom properties
   useEffect(() => {
     const root = document.documentElement;
+    const isDark = theme === "dark";
     if (moduleTheme) {
-      root.style.setProperty("--module-accent", moduleTheme.accent);
-      root.style.setProperty("--module-bg", moduleTheme.bg);
-      root.style.setProperty("--module-bg-subtle", moduleTheme.bgSubtle);
-
-      // For dark mode, adjust the bg colors to be more subtle/transparent
-      if (theme === "dark") {
-        root.style.setProperty("--module-bg", hexToRgba(moduleTheme.accent, 0.12));
-        root.style.setProperty("--module-bg-subtle", hexToRgba(moduleTheme.accent, 0.06));
-      }
+      const accent = resolveAccent(moduleTheme.accent, isDark);
+      root.style.setProperty("--module-accent", accent);
+      root.style.setProperty("--module-bg", isDark ? hexToRgba(accent, 0.12) : moduleTheme.bg);
+      root.style.setProperty("--module-bg-subtle", isDark ? hexToRgba(accent, 0.06) : moduleTheme.bgSubtle);
     } else {
-      root.style.setProperty("--module-accent", "#1e40af");
-      root.style.setProperty("--module-bg", theme === "dark" ? "rgba(30, 64, 175, 0.12)" : "#dbeafe");
-      root.style.setProperty("--module-bg-subtle", theme === "dark" ? "rgba(30, 64, 175, 0.06)" : "#eff6ff");
+      const accent = resolveAccent("#1e40af", isDark);
+      root.style.setProperty("--module-accent", accent);
+      root.style.setProperty("--module-bg", isDark ? hexToRgba(accent, 0.12) : "#dbeafe");
+      root.style.setProperty("--module-bg-subtle", isDark ? hexToRgba(accent, 0.06) : "#eff6ff");
     }
   }, [moduleKey, moduleTheme, theme]);
 

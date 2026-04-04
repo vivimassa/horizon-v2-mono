@@ -916,19 +916,159 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
   })
 
   // ─── Delay Codes ────────────────────────────────────────
+  const delayCodeCreateSchema = z.object({
+    operatorId: z.string().min(1),
+    code: z.string().min(1).max(3),
+    alphaCode: z.string().max(2).nullable().optional(),
+    ahm732Process: z.string().max(1).nullable().optional(),
+    ahm732Reason: z.string().max(1).nullable().optional(),
+    ahm732Stakeholder: z.string().max(1).nullable().optional(),
+    category: z.string().min(1),
+    name: z.string().min(1),
+    description: z.string().nullable().optional(),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
+    isActive: z.boolean().optional().default(true),
+    isIataStandard: z.boolean().optional().default(false),
+  }).strict()
+
+  const delayCodeUpdateSchema = z.object({
+    code: z.string().min(1).max(3),
+    alphaCode: z.string().max(2).nullable(),
+    ahm732Process: z.string().max(1).nullable(),
+    ahm732Reason: z.string().max(1).nullable(),
+    ahm732Stakeholder: z.string().max(1).nullable(),
+    category: z.string().min(1),
+    name: z.string().min(1),
+    description: z.string().nullable(),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(),
+    isActive: z.boolean(),
+    isIataStandard: z.boolean(),
+  }).partial().strict()
+
   app.get('/delay-codes', async (req) => {
     const { operatorId } = req.query as { operatorId?: string }
-    const filter: Record<string, unknown> = { isActive: true }
+    const filter: Record<string, unknown> = {}
     if (operatorId) filter.operatorId = operatorId
     return DelayCode.find(filter).sort({ code: 1 }).lean()
   })
 
+  app.get('/delay-codes/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await DelayCode.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Delay code not found' })
+    return doc
+  })
+
+  app.post('/delay-codes', async (req, reply) => {
+    const raw = req.body as Record<string, unknown>
+    const parsed = delayCodeCreateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body = parsed.data
+    const existing = await DelayCode.findOne({ operatorId: body.operatorId, code: body.code }).lean()
+    if (existing) return reply.code(409).send({ error: `Delay code "${body.code}" already exists` })
+    const id = crypto.randomUUID()
+    const doc = await DelayCode.create({ _id: id, ...body, createdAt: new Date().toISOString() })
+    return reply.code(201).send(doc.toObject())
+  })
+
+  app.patch('/delay-codes/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const parsed = delayCodeUpdateSchema.safeParse(req.body)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body = { ...parsed.data, updatedAt: new Date().toISOString() }
+    const doc = await DelayCode.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'Delay code not found' })
+    return doc
+  })
+
+  app.delete('/delay-codes/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await DelayCode.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Delay code not found' })
+    await DelayCode.findByIdAndDelete(id)
+    return { success: true }
+  })
+
   // ─── Flight Service Types ──────────────────────────────
+  const fstCreateSchema = z.object({
+    operatorId: z.string().min(1),
+    code: z.string().min(1).max(2),
+    name: z.string().min(1),
+    description: z.string().nullable().optional(),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
+    isActive: z.boolean().optional().default(true),
+  }).strict()
+
+  const fstUpdateSchema = z.object({
+    code: z.string().min(1).max(2),
+    name: z.string().min(1),
+    description: z.string().nullable(),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(),
+    isActive: z.boolean(),
+  }).partial().strict()
+
   app.get('/flight-service-types', async (req) => {
     const { operatorId } = req.query as { operatorId?: string }
-    const filter: Record<string, unknown> = { isActive: true }
+    const filter: Record<string, unknown> = {}
     if (operatorId) filter.operatorId = operatorId
     return FlightServiceType.find(filter).sort({ code: 1 }).lean()
+  })
+
+  app.get('/flight-service-types/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await FlightServiceType.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Flight service type not found' })
+    return doc
+  })
+
+  app.post('/flight-service-types', async (req, reply) => {
+    const raw = req.body as Record<string, unknown>
+    if (raw.code) raw.code = (raw.code as string).toUpperCase()
+
+    const parsed = fstCreateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+
+    const body = parsed.data
+    const existing = await FlightServiceType.findOne({ operatorId: body.operatorId, code: body.code }).lean()
+    if (existing) return reply.code(409).send({ error: `Service type "${body.code}" already exists` })
+
+    const id = crypto.randomUUID()
+    const doc = await FlightServiceType.create({ _id: id, ...body, createdAt: new Date().toISOString() })
+    return reply.code(201).send(doc.toObject())
+  })
+
+  app.patch('/flight-service-types/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const raw = req.body as Record<string, unknown>
+    if (raw.code) raw.code = (raw.code as string).toUpperCase()
+
+    const parsed = fstUpdateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+
+    const body = { ...parsed.data, updatedAt: new Date().toISOString() }
+    const doc = await FlightServiceType.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'Flight service type not found' })
+    return doc
+  })
+
+  app.delete('/flight-service-types/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await FlightServiceType.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Flight service type not found' })
+    await FlightServiceType.findByIdAndDelete(id)
+    return { success: true }
   })
 
   // ─── Crew Positions ────────────────────────────────────

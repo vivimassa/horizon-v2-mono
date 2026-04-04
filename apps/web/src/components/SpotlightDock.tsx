@@ -206,7 +206,9 @@ export function SpotlightDock() {
               background: glassBg,
               backdropFilter: "blur(24px)",
               WebkitBackdropFilter: "blur(24px)",
-              border: glassBorder,
+              borderTop: glassBorder,
+              borderLeft: glassBorder,
+              borderRight: glassBorder,
               borderBottom: "none",
               transition: "color 0.15s",
             }}

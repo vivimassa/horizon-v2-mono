@@ -4,6 +4,7 @@ export {
   accentTint,
   desaturate,
   modeColor,
+  darkAccent,
   getStatusColors,
   type Palette,
   type StatusKey,

@@ -49,10 +49,11 @@ const SECTIONS: SectionDef[] = [
     icon: Globe,
     color: "#0f766e",
     cards: [
-      { code: "5.1.1", label: "Countries Database", desc: "ISO codes, regions, currency", icon: Globe, href: "/admin/countries" },
-      { code: "5.1.2", label: "Airports Database", desc: "ICAO/IATA codes, coordinates, facilities", icon: PlaneTakeoff, href: "/admin/airports" },
-      { code: "5.1.3", label: "Citypairs Database", desc: "Routes, distances, block times", icon: ArrowLeftRight, href: "/admin/city-pairs" },
-      { code: "5.1.4", label: "LOPA Database", desc: "Cabin classes and seat configurations", icon: Armchair, href: "/admin/lopa" },
+      { code: "5.1.1", label: "Countries", desc: "ISO codes, regions, currency", icon: Globe, href: "/admin/countries" },
+      { code: "5.1.2", label: "Airports", desc: "ICAO/IATA codes, coordinates, facilities", icon: PlaneTakeoff, href: "/admin/airports" },
+      { code: "5.1.3", label: "Citypairs", desc: "Routes, distances, block times", icon: ArrowLeftRight, href: "/admin/city-pairs" },
+      { code: "5.1.4", label: "LOPA", desc: "Cabin classes and seat configurations", icon: Armchair, href: "/admin/lopa" },
+      { code: "5.1.5", label: "Flight Service Types", desc: "Define flight service types for your operation", icon: Tag, href: "/admin/service-types" },
     ],
   },
   {
@@ -62,10 +63,9 @@ const SECTIONS: SectionDef[] = [
     icon: Plane,
     color: "#1e40af",
     cards: [
-      { code: "5.2.1", label: "Aircraft Types Database", desc: "Fleet types, capacity, performance", icon: Plane, href: "/admin/aircraft-types" },
+      { code: "5.2.1", label: "Aircraft Types", desc: "Fleet types, capacity, performance", icon: Plane, href: "/admin/aircraft-types" },
       { code: "5.2.2", label: "Aircraft Registrations", desc: "Tail numbers, MSN, status, home base", icon: PlaneTakeoff, href: "/admin/aircraft-registrations" },
-      { code: "5.2.3", label: "Service Types Database", desc: "Flight service categories", icon: Tag, href: "/admin/service-types" },
-      { code: "5.2.4", label: "Delay Codes Database", desc: "IATA standard & custom codes", icon: Timer, href: "/admin/delay-codes" },
+      { code: "5.2.3", label: "Delay Codes", desc: "IATA standard & custom codes", icon: Timer, href: "/admin/delay-codes" },
     ],
   },
   {
@@ -83,8 +83,8 @@ const SECTIONS: SectionDef[] = [
     icon: Users,
     color: "#7c3aed",
     cards: [
-      { code: "5.4.1", label: "Crew Positions Database", desc: "Cockpit & cabin roles, rank order", icon: UserRound, href: "/admin/crew-positions" },
-      { code: "5.4.2", label: "Expiry Codes Database", desc: "Qualification validity & formulas", icon: FileCheck, href: "/admin/expiry-codes" },
+      { code: "5.4.1", label: "Crew Positions", desc: "Cockpit & cabin roles, rank order", icon: UserRound, href: "/admin/crew-positions" },
+      { code: "5.4.2", label: "Expiry Codes", desc: "Qualification validity & formulas", icon: FileCheck, href: "/admin/expiry-codes" },
     ],
   },
 ];

@@ -84,7 +84,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const [createForm, setCreateForm] = useState({
-    icaoType: "", name: "", manufacturer: "Airbus", category: "narrow_body", family: "", paxCapacity: "",
+    icaoType: "", name: "", manufacturer: "Airbus", category: "narrow_body", family: "",
   });
 
   // Seating tab — LOPA configs for this aircraft type
@@ -122,10 +122,9 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
         manufacturer: createForm.manufacturer || null,
         category: createForm.category,
         family: createForm.family || null,
-        paxCapacity: createForm.paxCapacity ? Number(createForm.paxCapacity) : null,
         isActive: true,
       } as Partial<AircraftTypeRef>);
-      setCreateForm({ icaoType: "", name: "", manufacturer: "Airbus", category: "narrow_body", family: "", paxCapacity: "" });
+      setCreateForm({ icaoType: "", name: "", manufacturer: "Airbus", category: "narrow_body", family: "" });
     } catch (err: any) { setCreateError(friendlyError(err)); }
     finally { setCreating(false); }
   }, [onCreate, createForm, friendlyError]);
@@ -214,12 +213,8 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
               </select>
             </div>
           </div>
-          <div className="flex gap-3">
-            <MiniInput label="Family" value={createForm.family}
-              onChange={(v) => setCreateForm(p => ({ ...p, family: v }))} />
-            <MiniInput label="Pax Capacity" value={createForm.paxCapacity} type="number"
-              onChange={(v) => setCreateForm(p => ({ ...p, paxCapacity: v }))} />
-          </div>
+          <MiniInput label="Family" value={createForm.family}
+            onChange={(v) => setCreateForm(p => ({ ...p, family: v }))} />
           <div className="flex gap-3 pt-2">
             {onCancelCreate && (
               <button onClick={onCancelCreate}
@@ -283,12 +278,6 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
             <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400 capitalize">
               {CATEGORIES[aircraftType.category] || aircraftType.category}
             </span>
-            {aircraftType.paxCapacity && (
-              <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full"
-                style={{ backgroundColor: "rgba(30,64,175,0.1)", color: "#1e40af" }}>
-                {aircraftType.paxCapacity} pax
-              </span>
-            )}
             {aircraftType.isActive ? (
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-400">Active</span>
             ) : (
@@ -399,12 +388,6 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
                   <div className="text-[13px] font-medium">{CATEGORIES[aircraftType.category] || aircraftType.category}</div>
                 )}
               </div>
-              <FieldRow label="Pax Capacity" value={aircraftType.paxCapacity}
-                editing={editing} fieldKey="paxCapacity" editValue={getVal("paxCapacity")} onChange={handleFieldChange} inputType="number" />
-              <FieldRow label="Cockpit Crew Required" value={aircraftType.cockpitCrewRequired}
-                editing={editing} fieldKey="cockpitCrewRequired" editValue={getVal("cockpitCrewRequired")} onChange={handleFieldChange} inputType="number" />
-              <FieldRow label="Cabin Crew Required" value={aircraftType.cabinCrewRequired}
-                editing={editing} fieldKey="cabinCrewRequired" editValue={getVal("cabinCrewRequired")} onChange={handleFieldChange} inputType="number" />
               {/* Color picker */}
               <div className="py-2.5 border-b border-hz-border/50">
                 <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">Schedule Color</div>

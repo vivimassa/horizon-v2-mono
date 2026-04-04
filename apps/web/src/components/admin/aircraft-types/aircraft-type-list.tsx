@@ -119,11 +119,6 @@ export function AircraftTypeList({
                             <span className="text-[13px] font-medium truncate">{t.name}</span>
                           </div>
                         </div>
-                        {t.paxCapacity && (
-                          <span className="text-[11px] text-hz-text-tertiary font-mono shrink-0">
-                            {t.paxCapacity} pax
-                          </span>
-                        )}
                       </button>
                     );
                   })}

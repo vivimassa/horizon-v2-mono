@@ -43,12 +43,15 @@ export function AirportMap({ latitude, longitude, name }: AirportMapProps) {
 
     map.addControl(new mapboxgl.AttributionControl({ compact: true }));
 
+    let removed = false;
+    const safeResize = () => { if (!removed) map.resize(); };
+
     // Ensure map fills container after tiles load
-    map.on("load", () => map.resize());
+    map.on("load", safeResize);
 
     // Auto-resize when wrapper dimensions change (e.g. drag handle)
     const ro = new ResizeObserver(() => {
-      requestAnimationFrame(() => map.resize());
+      requestAnimationFrame(safeResize);
     });
     if (wrapperRef.current) ro.observe(wrapperRef.current);
 
@@ -65,6 +68,7 @@ export function AirportMap({ latitude, longitude, name }: AirportMapProps) {
     markerRef.current = marker;
 
     return () => {
+      removed = true;
       ro.disconnect();
       marker.remove();
       map.remove();
@@ -81,7 +85,7 @@ export function AirportMap({ latitude, longitude, name }: AirportMapProps) {
 
   return (
     <div ref={wrapperRef} className="relative h-full w-full">
-      <div ref={containerRef} className="absolute inset-0" />
+      <div ref={containerRef} className="!absolute inset-0 h-full w-full" />
       {/* Style toggle */}
       <button
         onClick={() => setStyle((s) => (s === "streets" ? "satellite" : "streets"))}

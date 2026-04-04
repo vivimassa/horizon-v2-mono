@@ -50,13 +50,16 @@ export function CountryMap({ iso2, name, officialName, latitude, longitude }: Co
 
     map.addControl(new mapboxgl.AttributionControl({ compact: true }));
 
+    let removed = false;
+    const safeResize = () => { if (!removed) map.resize(); };
+
     const ro = new ResizeObserver(() => {
-      requestAnimationFrame(() => map.resize());
+      requestAnimationFrame(safeResize);
     });
     if (wrapperRef.current) ro.observe(wrapperRef.current);
 
     map.on("load", () => {
-      map.resize();
+      safeResize();
 
       // Fetch GeoJSON border from an open dataset
       const countryCode = iso2.toUpperCase();
@@ -149,6 +152,7 @@ export function CountryMap({ iso2, name, officialName, latitude, longitude }: Co
     mapRef.current = map;
 
     return () => {
+      removed = true;
       ro.disconnect();
       map.remove();
     };
@@ -164,7 +168,7 @@ export function CountryMap({ iso2, name, officialName, latitude, longitude }: Co
 
   return (
     <div ref={wrapperRef} className="relative h-full w-full">
-      <div ref={containerRef} className="absolute inset-0" />
+      <div ref={containerRef} className="!absolute inset-0 h-full w-full" />
 
       {/* Country name overlay */}
       <div className="absolute top-3 left-3 pointer-events-none">

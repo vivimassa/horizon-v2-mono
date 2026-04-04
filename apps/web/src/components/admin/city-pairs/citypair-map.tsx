@@ -219,11 +219,14 @@ export function CityPairMap({ lat1, lon1, lat2, lon2, label1, label2, distanceNm
 
     map.addControl(new mapboxgl.AttributionControl({ compact: true }));
 
-    const ro = new ResizeObserver(() => requestAnimationFrame(() => map.resize()));
+    let removed = false;
+    const safeResize = () => { if (!removed) map.resize(); };
+
+    const ro = new ResizeObserver(() => requestAnimationFrame(safeResize));
     if (wrapperRef.current) ro.observe(wrapperRef.current);
 
     map.on("load", () => {
-      map.resize();
+      safeResize();
 
       // Station markers with labels
       const markerColor = isDark ? "#60a5fa" : "#3b82f6";
@@ -247,7 +250,7 @@ export function CityPairMap({ lat1, lon1, lat2, lon2, label1, label2, distanceNm
 
     setMapInstance(map);
 
-    return () => { ro.disconnect(); map.remove(); setMapInstance(null); };
+    return () => { removed = true; ro.disconnect(); map.remove(); setMapInstance(null); };
   }, [lat1, lon1, lat2, lon2, label1, label2, style, isDark]);
 
   if (!TOKEN) {
@@ -260,7 +263,7 @@ export function CityPairMap({ lat1, lon1, lat2, lon2, label1, label2, distanceNm
 
   return (
     <div ref={wrapperRef} className="relative h-full w-full">
-      <div ref={containerRef} className="absolute inset-0" />
+      <div ref={containerRef} className="!absolute inset-0 h-full w-full" />
 
       {/* Animated route glow overlay */}
       {mapInstance && <PingPongGlow map={mapInstance} points={gcPoints} color={accent} />}

@@ -1,5 +1,6 @@
 // @skyhub/constants — barrel export
 export * from './airport-countries'
+export * from './crew-positions'
 export * from './country-flags'
 export * from './operators'
 export * from './module-registry'

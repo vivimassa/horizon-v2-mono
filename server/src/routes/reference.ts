@@ -1072,11 +1072,126 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
   })
 
   // ─── Crew Positions ────────────────────────────────────
+  const crewPositionCreateSchema = z.object({
+    operatorId: z.string().min(1),
+    code: z.string().min(1).max(4).transform(v => v.toUpperCase().trim()),
+    name: z.string().min(1),
+    category: z.enum(['cockpit', 'cabin']),
+    rankOrder: z.number().int().min(0),
+    isPic: z.boolean().optional().default(false),
+    canDownrank: z.boolean().optional().default(false),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
+    description: z.string().nullable().optional(),
+    isActive: z.boolean().optional().default(true),
+  }).strict()
+
+  const crewPositionUpdateSchema = z.object({
+    code: z.string().min(1).max(4).transform(v => v.toUpperCase().trim()),
+    name: z.string().min(1),
+    category: z.enum(['cockpit', 'cabin']),
+    rankOrder: z.number().int().min(0),
+    isPic: z.boolean(),
+    canDownrank: z.boolean(),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(),
+    description: z.string().nullable(),
+    isActive: z.boolean(),
+  }).partial().strict()
+
   app.get('/crew-positions', async (req) => {
-    const { operatorId } = req.query as { operatorId?: string }
-    const filter: Record<string, unknown> = { isActive: true }
+    const { operatorId, includeInactive } = req.query as { operatorId?: string; includeInactive?: string }
+    const filter: Record<string, unknown> = {}
     if (operatorId) filter.operatorId = operatorId
+    if (includeInactive !== 'true') filter.isActive = true
     return CrewPosition.find(filter).sort({ category: 1, rankOrder: 1 }).lean()
+  })
+
+  app.get('/crew-positions/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await CrewPosition.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Crew position not found' })
+    return doc
+  })
+
+  app.post('/crew-positions', async (req, reply) => {
+    const parsed = crewPositionCreateSchema.safeParse(req.body)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body = parsed.data
+    const existing = await CrewPosition.findOne({ operatorId: body.operatorId, code: body.code }).lean()
+    if (existing) return reply.code(409).send({ error: `Position code "${body.code}" already exists` })
+    const id = crypto.randomUUID()
+    const doc = await CrewPosition.create({ _id: id, ...body, createdAt: new Date().toISOString() })
+    return reply.code(201).send(doc.toObject())
+  })
+
+  app.post('/crew-positions/seed', async (req, reply) => {
+    const { operatorId } = req.body as { operatorId?: string }
+    if (!operatorId) return reply.code(400).send({ error: 'operatorId is required' })
+    const count = await CrewPosition.countDocuments({ operatorId })
+    if (count > 0) return reply.code(409).send({ error: 'Positions already exist for this operator' })
+    const defaults = [
+      { code: 'CP', name: 'Captain', category: 'cockpit', rankOrder: 1, isPic: true, canDownrank: false, color: '#4338ca', description: 'Pilot in Command' },
+      { code: 'FO', name: 'First Officer', category: 'cockpit', rankOrder: 2, isPic: false, canDownrank: false, color: '#4f46e5', description: 'Second in Command' },
+      { code: 'SO', name: 'Second Officer', category: 'cockpit', rankOrder: 3, isPic: false, canDownrank: false, color: '#6366f1', description: 'Relief pilot for augmented crew' },
+      { code: 'FE', name: 'Flight Engineer', category: 'cockpit', rankOrder: 4, isPic: false, canDownrank: false, color: '#818cf8', description: 'Monitors aircraft systems' },
+      { code: 'CC', name: 'Cabin Chief', category: 'cabin', rankOrder: 1, isPic: false, canDownrank: false, color: '#92400e', description: 'Leads cabin operations' },
+      { code: 'SP', name: 'Senior Purser', category: 'cabin', rankOrder: 2, isPic: false, canDownrank: true, color: '#b45309', description: 'Experienced purser with supervisory role' },
+      { code: 'PS', name: 'Purser', category: 'cabin', rankOrder: 3, isPic: false, canDownrank: true, color: '#d97706', description: 'In-charge of cabin service' },
+      { code: 'FA', name: 'Flight Attendant', category: 'cabin', rankOrder: 4, isPic: false, canDownrank: false, color: '#c2410c', description: 'Standard cabin crew member' },
+      { code: 'TF', name: 'Trainee FA', category: 'cabin', rankOrder: 5, isPic: false, canDownrank: false, color: '#ea580c', description: 'Flight attendant under training' },
+    ]
+    const now = new Date().toISOString()
+    const docs = defaults.map(d => ({ _id: crypto.randomUUID(), operatorId, ...d, isActive: true, createdAt: now }))
+    await CrewPosition.insertMany(docs)
+    return reply.code(201).send(docs)
+  })
+
+  app.patch('/crew-positions/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const parsed = crewPositionUpdateSchema.safeParse(req.body)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body = { ...parsed.data, updatedAt: new Date().toISOString() }
+    // If code is changing, check uniqueness
+    if (body.code) {
+      const doc = await CrewPosition.findById(id).lean()
+      if (!doc) return reply.code(404).send({ error: 'Crew position not found' })
+      if (body.code !== doc.code) {
+        const dup = await CrewPosition.findOne({ operatorId: doc.operatorId, code: body.code }).lean()
+        if (dup) return reply.code(409).send({ error: `Position code "${body.code}" already exists` })
+      }
+    }
+    const updated = await CrewPosition.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()
+    if (!updated) return reply.code(404).send({ error: 'Crew position not found' })
+    return updated
+  })
+
+  app.get('/crew-positions/:id/references', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await CrewPosition.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Crew position not found' })
+    const expiryCodes = await ExpiryCode.countDocuments({ applicablePositions: doc.code })
+    return { expiryCodes }
+  })
+
+  app.delete('/crew-positions/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await CrewPosition.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Crew position not found' })
+    // Check references
+    const expiryCodes = await ExpiryCode.countDocuments({ applicablePositions: doc.code })
+    if (expiryCodes > 0) {
+      return reply.code(409).send({
+        error: `Position "${doc.code}" is referenced by ${expiryCodes} expiry code(s). Deactivate instead of deleting.`,
+        references: { expiryCodes },
+      })
+    }
+    await CrewPosition.findByIdAndDelete(id)
+    return { success: true }
   })
 
   // ─── Expiry Code Categories ────────────────────────────

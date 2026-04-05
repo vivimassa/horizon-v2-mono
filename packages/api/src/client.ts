@@ -236,9 +236,16 @@ export interface CrewPositionRef {
   category: 'cockpit' | 'cabin'
   rankOrder: number
   isPic: boolean
+  canDownrank: boolean
   color: string | null
   description: string | null
   isActive: boolean
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface CrewPositionReferences {
+  expiryCodes: number
 }
 
 export interface ExpiryCodeCategoryRef {
@@ -605,8 +612,23 @@ export const api = {
   deleteDelayCode: (id: string) =>
     request<{ success: boolean }>(`/delay-codes/${id}`, { method: 'DELETE' }),
 
-  getCrewPositions: (operatorId = 'horizon') =>
-    request<CrewPositionRef[]>(`/crew-positions?operatorId=${operatorId}`),
+  getCrewPositions: (operatorId = 'horizon', includeInactive = false) =>
+    request<CrewPositionRef[]>(`/crew-positions?operatorId=${operatorId}${includeInactive ? '&includeInactive=true' : ''}`),
+
+  createCrewPosition: (data: Partial<CrewPositionRef>) =>
+    request<CrewPositionRef>('/crew-positions', { method: 'POST', body: JSON.stringify(data) }),
+
+  seedCrewPositions: (operatorId: string) =>
+    request<CrewPositionRef[]>('/crew-positions/seed', { method: 'POST', body: JSON.stringify({ operatorId }) }),
+
+  updateCrewPosition: (id: string, data: Partial<CrewPositionRef>) =>
+    request<CrewPositionRef>(`/crew-positions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  deleteCrewPosition: (id: string) =>
+    request<{ success: boolean }>(`/crew-positions/${id}`, { method: 'DELETE' }),
+
+  getCrewPositionReferences: (id: string) =>
+    request<CrewPositionReferences>(`/crew-positions/${id}/references`),
 
   getExpiryCodeCategories: (operatorId = 'horizon') =>
     request<ExpiryCodeCategoryRef[]>(`/expiry-code-categories?operatorId=${operatorId}`),

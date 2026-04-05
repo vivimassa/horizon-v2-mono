@@ -1,21 +1,22 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api, type ExpiryCodeRef, type ExpiryCodeCategoryRef, type CrewPositionRef } from "@skyhub/api";
-import { EXPIRY_FORMULAS, type FormulaField } from "@skyhub/logic";
-import { SEVERITY_DEFINITIONS } from "@skyhub/logic";
+import { EXPIRY_FORMULAS, SEVERITY_DEFINITIONS } from "@skyhub/logic";
 import { useTheme } from "@/components/theme-provider";
 import { accentTint } from "@skyhub/ui/theme";
 import { FieldRow } from "../airports/field-row";
 import { ACCENT } from "./expiry-codes-shell";
+import { FormulaSection } from "./expiry-formula-section";
+import { SeveritySection } from "./expiry-severity-section";
+import { PositionsSection } from "./expiry-positions-section";
 import {
-  Plus, Pencil, Save, X, Trash2, AlertTriangle, Settings, ShieldAlert, Users, Beaker,
+  Plus, Pencil, Save, X, Trash2, Settings, ShieldAlert, Users, Beaker, FileText,
 } from "lucide-react";
 
 /* ─── Props ─── */
 
 interface DetailProps {
-  /** null = create mode */
   code: ExpiryCodeRef | null;
   categories: ExpiryCodeCategoryRef[];
   onCreate?: (data: Partial<ExpiryCodeRef>) => Promise<void>;
@@ -31,11 +32,8 @@ export function ExpiryCodeDetail({ code, categories, onCreate, onSave, onDelete,
   }
   return (
     <ViewEditPanel
-      code={code}
-      categories={categories}
-      onSave={onSave!}
-      onDelete={onDelete!}
-      onDeactivate={onDeactivate!}
+      code={code} categories={categories}
+      onSave={onSave!} onDelete={onDelete!} onDeactivate={onDeactivate!}
     />
   );
 }
@@ -58,7 +56,7 @@ function CreatePanel({ onCreate, onCancel, categories }: {
     formulaParams: {} as Record<string, any>,
     acTypeScope: "none" as "none" | "family" | "variant",
     linkedTrainingCode: "",
-    warningDays: 30,
+    warningDays: 30 as number | null,
     severity: [] as string[],
     applicablePositions: [] as string[],
     notes: "",
@@ -67,12 +65,10 @@ function CreatePanel({ onCreate, onCancel, categories }: {
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
-    api.getCrewPositions("horizon", true).then(setPositions).catch(console.error);
+    api.getCrewPositions("horizon").then(setPositions).catch(console.error);
   }, []);
 
   const set = (key: string, value: unknown) => setForm((p) => ({ ...p, [key]: value }));
-
-  const formulaDef = EXPIRY_FORMULAS.find(f => f.id === form.formula);
 
   const handleSubmit = async () => {
     if (!form.code.trim() || !form.name.trim()) { setErrorMsg("Code and Name are required"); return; }
@@ -89,7 +85,7 @@ function CreatePanel({ onCreate, onCancel, categories }: {
         formulaParams: form.formulaParams,
         acTypeScope: form.acTypeScope,
         linkedTrainingCode: form.linkedTrainingCode.trim() || null,
-        warningDays: form.warningDays || null,
+        warningDays: form.warningDays != null ? form.warningDays : null,
         severity: form.severity,
         applicablePositions: form.applicablePositions,
         notes: form.notes.trim() || null,
@@ -118,7 +114,6 @@ function CreatePanel({ onCreate, onCancel, categories }: {
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 pt-4 pb-6 space-y-6">
-        {/* Code Info */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
           <FormField label="Code *" value={form.code} placeholder="e.g. OPC"
             onChange={(v) => set("code", v.toUpperCase())} mono maxLength={10} />
@@ -142,34 +137,20 @@ function CreatePanel({ onCreate, onCancel, categories }: {
           </div>
           <FormField label="Description" value={form.description} placeholder="Optional description"
             onChange={(v) => set("description", v)} />
-          <FormField label="Warning Days" value={String(form.warningDays)} type="number"
+          <FormField label="Warning Days" value={form.warningDays != null ? String(form.warningDays) : ""} type="number"
             onChange={(v) => set("warningDays", v === "" ? null : Number(v))} />
         </div>
 
-        {/* Formula */}
-        <FormulaSection
-          formula={form.formula}
-          formulaParams={form.formulaParams}
-          acTypeScope={form.acTypeScope}
+        <FormulaSection formula={form.formula} formulaParams={form.formulaParams} acTypeScope={form.acTypeScope}
           onFormulaChange={(f) => { set("formula", f); set("formulaParams", {}); }}
           onParamsChange={(p) => set("formulaParams", p)}
-          onAcTypeScopeChange={(s) => set("acTypeScope", s)}
-          isDark={isDark}
-        />
+          onAcTypeScopeChange={(s) => set("acTypeScope", s)} isDark={isDark} />
 
-        {/* Severity */}
         <SeveritySection severity={form.severity} onChange={(s) => set("severity", s)} isDark={isDark} />
 
-        {/* Positions */}
-        <PositionsSection
-          selected={form.applicablePositions}
-          positions={positions}
-          crewCategory={form.crewCategory}
-          onChange={(p) => set("applicablePositions", p)}
-          isDark={isDark}
-        />
+        <PositionsSection selected={form.applicablePositions} positions={positions}
+          crewCategory={form.crewCategory} onChange={(p) => set("applicablePositions", p)} isDark={isDark} />
 
-        {/* Extra */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
           <FormField label="Linked Training Code" value={form.linkedTrainingCode} placeholder="e.g. LPC"
             onChange={(v) => set("linkedTrainingCode", v)} />
@@ -177,7 +158,6 @@ function CreatePanel({ onCreate, onCancel, categories }: {
             onChange={(v) => set("notes", v)} />
         </div>
 
-        {/* Submit */}
         <div className="flex justify-end">
           <button onClick={handleSubmit} disabled={saving}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-50"
@@ -209,7 +189,7 @@ function ViewEditPanel({ code, categories, onSave, onDelete, onDeactivate }: {
   const [positions, setPositions] = useState<CrewPositionRef[]>([]);
 
   useEffect(() => {
-    api.getCrewPositions("horizon", true).then(setPositions).catch(console.error);
+    api.getCrewPositions("horizon").then(setPositions).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -243,7 +223,6 @@ function ViewEditPanel({ code, categories, onSave, onDelete, onDeactivate }: {
     finally { setSaving(false); }
   }, [onDeactivate, code._id]);
 
-  // Merged view (code + draft overrides)
   const getVal = <K extends keyof ExpiryCodeRef>(key: K): ExpiryCodeRef[K] =>
     key in draft ? (draft as any)[key] : code[key];
 
@@ -254,9 +233,8 @@ function ViewEditPanel({ code, categories, onSave, onDelete, onDeactivate }: {
   const formulaDef = EXPIRY_FORMULAS.find(f => f.id === getVal("formula"));
   const category = categories.find(c => c._id === getVal("categoryId"));
 
-  const crewCategoryLabel = {
-    both: "Both (FD + CC)", cockpit: "Flight Deck", cabin: "Cabin Crew",
-  }[getVal("crewCategory")] ?? getVal("crewCategory");
+  const crewCatLabels: Record<string, string> = { both: "Both (FD + CC)", cockpit: "Flight Deck", cabin: "Cabin Crew" };
+  const crewCategoryLabel = crewCatLabels[getVal("crewCategory")] ?? getVal("crewCategory");
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -316,16 +294,8 @@ function ViewEditPanel({ code, categories, onSave, onDelete, onDeactivate }: {
               editing={editing} fieldKey="code" editValue={getVal("code")} onChange={setField} />
             <FieldRow label="Name" value={code.name}
               editing={editing} fieldKey="name" editValue={getVal("name")} onChange={setField} />
-            <FieldRow label="Category" value={
-              category ? (
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                  style={{ backgroundColor: accentTint(category.color, isDark ? 0.12 : 0.08), color: category.color }}>
-                  {category.label}
-                </span>
-              ) : <span className="text-hz-text-secondary">Unknown</span>
-            } editing={editing} fieldKey="categoryId" editValue={getVal("categoryId")}
-              onChange={(key, val) => setField(key, val)} />
-            {editing && (
+            {/* Category — show dropdown in edit mode, badge in view mode */}
+            {editing ? (
               <div className="py-2.5 border-b border-hz-border/50">
                 <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1 block">Category</label>
                 <select value={getVal("categoryId")} onChange={(e) => setField("categoryId", e.target.value)}
@@ -333,15 +303,18 @@ function ViewEditPanel({ code, categories, onSave, onDelete, onDeactivate }: {
                   {categories.map(c => <option key={c._id} value={c._id}>{c.label}</option>)}
                 </select>
               </div>
+            ) : (
+              <FieldRow label="Category" value={
+                category ? (
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                    style={{ backgroundColor: accentTint(category.color, isDark ? 0.12 : 0.08), color: category.color }}>
+                    {category.label}
+                  </span>
+                ) : <span className="text-hz-text-secondary">Unknown</span>
+              } />
             )}
-            <FieldRow label="Crew Category" value={
-              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize ${
-                code.crewCategory === "cockpit" ? "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400"
-                : code.crewCategory === "cabin" ? "bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400"
-                : "bg-gray-100 text-gray-600 dark:bg-gray-500/10 dark:text-gray-400"
-              }`}>{crewCategoryLabel}</span>
-            } />
-            {editing && (
+            {/* Crew Category — show dropdown in edit mode, badge in view mode */}
+            {editing ? (
               <div className="py-2.5 border-b border-hz-border/50">
                 <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1 block">Crew Category</label>
                 <select value={getVal("crewCategory")} onChange={(e) => setField("crewCategory", e.target.value)}
@@ -351,6 +324,14 @@ function ViewEditPanel({ code, categories, onSave, onDelete, onDeactivate }: {
                   <option value="cabin">Cabin Crew Only</option>
                 </select>
               </div>
+            ) : (
+              <FieldRow label="Crew Category" value={
+                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize ${
+                  getVal("crewCategory") === "cockpit" ? "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400"
+                  : getVal("crewCategory") === "cabin" ? "bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400"
+                  : "bg-gray-100 text-gray-600 dark:bg-gray-500/10 dark:text-gray-400"
+                }`}>{crewCategoryLabel}</span>
+              } />
             )}
             <FieldRow label="Description" value={code.description || <span className="text-hz-text-secondary">No description</span>}
               editing={editing} fieldKey="description" editValue={getVal("description") ?? ""} onChange={setField} />
@@ -361,39 +342,29 @@ function ViewEditPanel({ code, categories, onSave, onDelete, onDeactivate }: {
 
         {/* Formula */}
         {editing ? (
-          <FormulaSection
-            formula={getVal("formula")}
-            formulaParams={getVal("formulaParams")}
-            acTypeScope={getVal("acTypeScope")}
+          <FormulaSection formula={getVal("formula")} formulaParams={getVal("formulaParams")} acTypeScope={getVal("acTypeScope")}
             onFormulaChange={(f) => { setField("formula", f); setField("formulaParams", {}); }}
             onParamsChange={(p) => setField("formulaParams", p)}
-            onAcTypeScopeChange={(s) => setField("acTypeScope", s)}
-            isDark={isDark}
-          />
+            onAcTypeScopeChange={(s) => setField("acTypeScope", s)} isDark={isDark} />
         ) : (
           <div>
             <SectionHeader icon={<Beaker size={14} />} label="Formula Configuration" />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
-              <FieldRow label="Formula Type" value={
-                <span className="font-medium">{formulaDef?.label ?? code.formula}</span>
-              } />
-              {formulaDef && formulaDef.fields.map(field => {
-                const val = code.formulaParams?.[field.key];
-                return (
-                  <FieldRow key={field.key} label={field.label} value={
-                    val != null ? <span className="font-mono">{val}{field.unit ? ` ${field.unit}` : ""}</span>
+              <FieldRow label="Formula Type" value={<span className="font-medium">{formulaDef?.label ?? code.formula}</span>} />
+              {formulaDef && formulaDef.fields.map(field => (
+                <FieldRow key={field.key} label={field.label} value={
+                  code.formulaParams?.[field.key] != null
+                    ? <span className="font-mono">{code.formulaParams[field.key]}{field.unit ? ` ${field.unit}` : ""}</span>
                     : <span className="text-hz-text-secondary">Not set</span>
-                  } />
-                );
-              })}
+                } />
+              ))}
               <FieldRow label="AC Type Scope" value={
                 code.acTypeScope === "none" ? <span className="text-hz-text-secondary">Not type-specific</span>
                 : <span className="font-medium capitalize">{code.acTypeScope}</span>
               } />
               <FieldRow label="Linked Training Code" value={
-                code.linkedTrainingCode
-                  ? <span className="font-mono font-bold">{code.linkedTrainingCode}</span>
-                  : <span className="text-hz-text-secondary">None</span>
+                code.linkedTrainingCode ? <span className="font-mono font-bold">{code.linkedTrainingCode}</span>
+                : <span className="text-hz-text-secondary">None</span>
               } />
             </div>
           </div>
@@ -414,12 +385,9 @@ function ViewEditPanel({ code, categories, onSave, onDelete, onDeactivate }: {
                   if (!def) return null;
                   return (
                     <span key={key} className={`text-[12px] font-semibold px-2.5 py-1 rounded-lg ${
-                      def.isDestructive
-                        ? "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400"
-                        : "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400"
-                    }`}>
-                      {def.label}
-                    </span>
+                      def.isDestructive ? "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400"
+                      : "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400"
+                    }`}>{def.label}</span>
                   );
                 })}
               </div>
@@ -429,13 +397,8 @@ function ViewEditPanel({ code, categories, onSave, onDelete, onDeactivate }: {
 
         {/* Positions */}
         {editing ? (
-          <PositionsSection
-            selected={getVal("applicablePositions")}
-            positions={positions}
-            crewCategory={getVal("crewCategory")}
-            onChange={(p) => setField("applicablePositions", p)}
-            isDark={isDark}
-          />
+          <PositionsSection selected={getVal("applicablePositions")} positions={positions}
+            crewCategory={getVal("crewCategory")} onChange={(p) => setField("applicablePositions", p)} isDark={isDark} />
         ) : (
           <div>
             <SectionHeader icon={<Users size={14} />} label="Applicable Positions" />
@@ -444,9 +407,7 @@ function ViewEditPanel({ code, categories, onSave, onDelete, onDeactivate }: {
             ) : (
               <div className="flex flex-wrap gap-2">
                 {code.applicablePositions.map(pos => (
-                  <span key={pos} className="text-[12px] font-bold font-mono px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-500/10 dark:text-gray-300">
-                    {pos}
-                  </span>
+                  <span key={pos} className="text-[12px] font-bold font-mono px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-500/10 dark:text-gray-300">{pos}</span>
                 ))}
               </div>
             )}
@@ -456,7 +417,7 @@ function ViewEditPanel({ code, categories, onSave, onDelete, onDeactivate }: {
         {/* Notes */}
         {(code.notes || editing) && (
           <div>
-            <SectionHeader icon={<Settings size={14} />} label="Notes" />
+            <SectionHeader icon={<FileText size={14} />} label="Notes" />
             {editing ? (
               <textarea value={getVal("notes") ?? ""} onChange={(e) => setField("notes", e.target.value || null)}
                 rows={2} placeholder="Internal notes..."
@@ -467,16 +428,13 @@ function ViewEditPanel({ code, categories, onSave, onDelete, onDeactivate }: {
           </div>
         )}
 
-        {/* Active status in edit mode */}
+        {/* Active + linked training in edit mode */}
         {editing && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
             <FieldRow label="Active"
-              value={code.isActive
-                ? <span className="text-green-600 dark:text-green-400 font-semibold">Active</span>
-                : <span className="text-red-500 font-semibold">Inactive</span>}
+              value={code.isActive ? <span className="text-green-600 dark:text-green-400 font-semibold">Active</span> : <span className="text-red-500 font-semibold">Inactive</span>}
               editing={editing} fieldKey="isActive" editValue={getVal("isActive")} onChange={setField} inputType="toggle" />
-            <FieldRow label="Linked Training Code"
-              value={code.linkedTrainingCode ?? ""}
+            <FieldRow label="Linked Training Code" value={code.linkedTrainingCode ?? ""}
               editing={editing} fieldKey="linkedTrainingCode" editValue={getVal("linkedTrainingCode") ?? ""} onChange={(k, v) => setField(k, v === "" ? null : v)} />
           </div>
         )}
@@ -512,205 +470,6 @@ function ViewEditPanel({ code, categories, onSave, onDelete, onDeactivate }: {
               </button>
             )}
           </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Formula Section ─── */
-
-function FormulaSection({ formula, formulaParams, acTypeScope, onFormulaChange, onParamsChange, onAcTypeScopeChange, isDark }: {
-  formula: string;
-  formulaParams: Record<string, any>;
-  acTypeScope: string;
-  onFormulaChange: (f: string) => void;
-  onParamsChange: (p: Record<string, any>) => void;
-  onAcTypeScopeChange: (s: "none" | "family" | "variant") => void;
-  isDark: boolean;
-}) {
-  const formulaDef = EXPIRY_FORMULAS.find(f => f.id === formula);
-
-  const setParam = (key: string, value: any) => {
-    onParamsChange({ ...formulaParams, [key]: value });
-  };
-
-  return (
-    <div className="rounded-2xl p-5"
-      style={{ background: isDark ? accentTint(ACCENT, 0.06) : accentTint(ACCENT, 0.04), border: `1px solid ${accentTint(ACCENT, isDark ? 0.15 : 0.15)}` }}>
-      <div className="flex items-center gap-2 mb-4">
-        <Beaker size={14} color={isDark ? "#e0e0e0" : ACCENT} strokeWidth={1.8} />
-        <span className="text-[12px] font-bold uppercase tracking-wider" style={{ color: isDark ? "#e0e0e0" : ACCENT }}>Formula Configuration</span>
-      </div>
-
-      {/* Formula select */}
-      <div className="mb-4">
-        <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1 block">Formula Type</label>
-        <select value={formula} onChange={(e) => onFormulaChange(e.target.value)}
-          className="w-full text-[13px] font-medium bg-transparent border-b border-hz-accent/30 outline-none focus:border-hz-accent py-0.5 text-hz-text">
-          {EXPIRY_FORMULAS.map(f => (
-            <option key={f.id} value={f.id}>{f.label}</option>
-          ))}
-        </select>
-        {formulaDef && (
-          <p className="text-[11px] text-hz-text-secondary mt-1">{formulaDef.description}</p>
-        )}
-      </div>
-
-      {/* Dynamic param fields */}
-      {formulaDef && formulaDef.fields.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
-          {formulaDef.fields.map(field => (
-            <FormulaFieldInput key={field.key} field={field}
-              value={formulaParams[field.key] ?? ""}
-              onChange={(v) => setParam(field.key, v)} />
-          ))}
-        </div>
-      )}
-
-      {/* AC Type Scope */}
-      {formulaDef?.supportsAcType && (
-        <div className="mt-3 py-2.5 border-t border-hz-border/30">
-          <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1 block">Aircraft Type Scope</label>
-          <select value={acTypeScope} onChange={(e) => onAcTypeScopeChange(e.target.value as any)}
-            className="w-full text-[13px] font-medium bg-transparent border-b border-hz-accent/30 outline-none focus:border-hz-accent py-0.5 text-hz-text">
-            <option value="none">Not type-specific</option>
-            <option value="family">By type family (e.g. A320 family)</option>
-            <option value="variant">By exact variant (e.g. A321neo)</option>
-          </select>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function FormulaFieldInput({ field, value, onChange }: {
-  field: FormulaField; value: any; onChange: (v: any) => void;
-}) {
-  if (field.type === "select" && field.options) {
-    return (
-      <div className="py-2.5 border-b border-hz-border/50">
-        <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1 block">{field.label}</label>
-        <select value={value} onChange={(e) => onChange(e.target.value)}
-          className="w-full text-[13px] font-medium bg-transparent border-b border-hz-accent/30 outline-none focus:border-hz-accent py-0.5 text-hz-text">
-          <option value="">Select...</option>
-          {field.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-      </div>
-    );
-  }
-
-  return (
-    <div className="py-2.5 border-b border-hz-border/50">
-      <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1 block">
-        {field.label}{field.unit ? ` (${field.unit})` : ""}
-      </label>
-      <input
-        type={field.type === "number" ? "number" : "text"}
-        value={value}
-        placeholder={field.placeholder ?? ""}
-        onChange={(e) => onChange(field.type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
-        className="w-full text-[13px] font-medium bg-transparent border-b border-hz-accent/30 outline-none focus:border-hz-accent py-0.5 text-hz-text"
-      />
-    </div>
-  );
-}
-
-/* ─── Severity Section ─── */
-
-function SeveritySection({ severity, onChange, isDark }: {
-  severity: string[]; onChange: (s: string[]) => void; isDark: boolean;
-}) {
-  const toggle = (key: string) => {
-    onChange(severity.includes(key) ? severity.filter(s => s !== key) : [...severity, key]);
-  };
-
-  return (
-    <div className="rounded-2xl p-5"
-      style={{ background: isDark ? "rgba(239,68,68,0.04)" : "rgba(239,68,68,0.03)", border: `1px solid ${isDark ? "rgba(239,68,68,0.12)" : "rgba(239,68,68,0.12)"}` }}>
-      <div className="flex items-center gap-2 mb-4">
-        <ShieldAlert size={14} color={isDark ? "#fca5a5" : "#dc2626"} strokeWidth={1.8} />
-        <span className="text-[12px] font-bold uppercase tracking-wider" style={{ color: isDark ? "#fca5a5" : "#dc2626" }}>Enforcement Rules</span>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {SEVERITY_DEFINITIONS.map(def => {
-          const active = severity.includes(def.key);
-          return (
-            <button key={def.key} onClick={() => toggle(def.key)}
-              className={`text-left flex items-start gap-3 px-3 py-2.5 rounded-xl transition-all border ${
-                active
-                  ? def.isDestructive
-                    ? "border-red-300 bg-red-50 dark:border-red-500/30 dark:bg-red-500/10"
-                    : "border-blue-300 bg-blue-50 dark:border-blue-500/30 dark:bg-blue-500/10"
-                  : "border-hz-border/50 hover:bg-hz-border/20"
-              }`}>
-              <div className={`w-4 h-4 mt-0.5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                active
-                  ? def.isDestructive ? "border-red-500 bg-red-500" : "border-blue-500 bg-blue-500"
-                  : "border-hz-text-secondary/30"
-              }`}>
-                {active && <span className="text-white text-[10px] font-bold">&#10003;</span>}
-              </div>
-              <div className="min-w-0">
-                <div className={`text-[12px] font-semibold ${active ? (def.isDestructive ? "text-red-700 dark:text-red-400" : "text-blue-700 dark:text-blue-400") : "text-hz-text"}`}>
-                  {def.label}
-                </div>
-                <div className="text-[11px] text-hz-text-secondary leading-snug">{def.description}</div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Positions Section ─── */
-
-function PositionsSection({ selected, positions, crewCategory, onChange, isDark }: {
-  selected: string[];
-  positions: CrewPositionRef[];
-  crewCategory: string;
-  onChange: (p: string[]) => void;
-  isDark: boolean;
-}) {
-  // Filter positions by crew category
-  const filtered = useMemo(() => {
-    if (crewCategory === "both") return positions.filter(p => p.isActive);
-    return positions.filter(p => p.isActive && p.category === crewCategory);
-  }, [positions, crewCategory]);
-
-  const toggle = (code: string) => {
-    onChange(selected.includes(code) ? selected.filter(c => c !== code) : [...selected, code]);
-  };
-
-  return (
-    <div className="rounded-2xl p-5"
-      style={{ background: isDark ? accentTint("#7c3aed", 0.04) : accentTint("#7c3aed", 0.03), border: `1px solid ${accentTint("#7c3aed", isDark ? 0.12 : 0.12)}` }}>
-      <div className="flex items-center gap-2 mb-3">
-        <Users size={14} color={isDark ? "#c4b5fd" : "#7c3aed"} strokeWidth={1.8} />
-        <span className="text-[12px] font-bold uppercase tracking-wider" style={{ color: isDark ? "#c4b5fd" : "#7c3aed" }}>
-          Applicable Positions
-        </span>
-        <span className="text-[11px] text-hz-text-secondary">(empty = all positions)</span>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {filtered.map(p => {
-          const active = selected.includes(p.code);
-          return (
-            <button key={p._id} onClick={() => toggle(p.code)}
-              className={`text-[12px] font-bold font-mono px-3 py-1.5 rounded-lg transition-all border ${
-                active
-                  ? "border-purple-400 bg-purple-100 text-purple-800 dark:border-purple-500/40 dark:bg-purple-500/15 dark:text-purple-300"
-                  : "border-hz-border/50 text-hz-text-secondary hover:bg-hz-border/20"
-              }`}>
-              {p.code}
-              <span className="font-normal font-sans ml-1.5 text-[11px]">{p.name}</span>
-            </button>
-          );
-        })}
-        {filtered.length === 0 && (
-          <span className="text-[12px] text-hz-text-secondary">No positions available for this crew category</span>
         )}
       </div>
     </div>

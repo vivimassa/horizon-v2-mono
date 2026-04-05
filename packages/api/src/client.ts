@@ -322,6 +322,98 @@ export interface CrewGroupRef {
   updatedAt: string | null
 }
 
+// ─── FDTL Types ──────────────────────────────────────────
+
+export interface FdtlFrameworkRef {
+  code: string
+  name: string
+  region: string
+  legalBasis: string
+  color: string
+}
+
+export interface FdtlSchemeRef {
+  _id: string
+  operatorId: string
+  frameworkCode: string
+  cabinFrameworkCode: string | null
+  cabinCrewSeparateRules: boolean
+  reportTimeMinutes: number
+  postFlightMinutes: number
+  debriefMinutes: number
+  standbyResponseMinutes: number
+  augmentedComplementKey: string
+  doubleCrewComplementKey: string
+  frmsEnabled: boolean
+  frmsApprovalReference: string | null
+  woclStart: string
+  woclEnd: string
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface FdtlRuleRef {
+  _id: string
+  operatorId: string
+  frameworkCode: string
+  crewType: 'all' | 'cockpit' | 'cabin'
+  category: string
+  subcategory: string
+  ruleCode: string
+  tabKey: string | null
+  label: string
+  description: string | null
+  legalReference: string | null
+  value: string
+  valueType: 'duration' | 'integer' | 'decimal' | 'boolean' | 'text'
+  unit: string | null
+  directionality: 'MAX_LIMIT' | 'MIN_LIMIT' | 'BOOLEAN' | 'ENUM' | 'FORMULA' | null
+  source: 'government' | 'company'
+  templateValue: string | null
+  isTemplateDefault: boolean
+  verificationStatus: 'verified' | 'unverified' | 'disputed'
+  sortOrder: number
+  isActive: boolean
+}
+
+export interface FdtlTableCellRef {
+  rowKey: string
+  colKey: string
+  valueMinutes: number | null
+  displayValue: string | null
+  source: 'government' | 'company'
+  templateValueMinutes: number | null
+  isTemplateDefault: boolean
+  notes: string | null
+}
+
+export interface FdtlTableRef {
+  _id: string
+  operatorId: string
+  frameworkCode: string
+  tableCode: string
+  tabKey: string
+  label: string
+  legalReference: string | null
+  tableType: string
+  rowAxisLabel: string | null
+  colAxisLabel: string | null
+  rowKeys: string[]
+  rowLabels: string[]
+  colKeys: string[]
+  colLabels: string[]
+  cells: FdtlTableCellRef[]
+  crewType: 'all' | 'cockpit' | 'cabin'
+  isActive: boolean
+}
+
+export interface FdtlTabGroup {
+  key: string
+  label: string
+  iconName: string
+  tabs: { key: string; label: string }[]
+}
+
 export interface CrewComplementRef {
   _id: string
   operatorId: string
@@ -782,6 +874,57 @@ export const api = {
     request<{ success: boolean; count: number }>('/crew-groups/seed-defaults', {
       method: 'POST',
       body: JSON.stringify({ operatorId }),
+    }),
+
+  // ─── FDTL ───────────────────────────────────────────────
+  getFdtlFrameworks: () =>
+    request<FdtlFrameworkRef[]>('/fdtl/frameworks'),
+
+  getFdtlTabGroups: () =>
+    request<FdtlTabGroup[]>('/fdtl/tab-groups'),
+
+  getFdtlScheme: (operatorId = 'horizon') =>
+    request<FdtlSchemeRef>(`/fdtl/schemes/${operatorId}`),
+
+  createFdtlScheme: (data: Partial<FdtlSchemeRef>) =>
+    request<FdtlSchemeRef>('/fdtl/schemes', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateFdtlScheme: (id: string, data: Partial<FdtlSchemeRef>) =>
+    request<FdtlSchemeRef>(`/fdtl/schemes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  getFdtlRules: (operatorId = 'horizon', frameworkCode?: string, tabKey?: string) => {
+    let path = `/fdtl/rules?operatorId=${operatorId}`
+    if (frameworkCode) path += `&frameworkCode=${frameworkCode}`
+    if (tabKey) path += `&tabKey=${tabKey}`
+    return request<FdtlRuleRef[]>(path)
+  },
+
+  updateFdtlRule: (id: string, data: Partial<FdtlRuleRef>) =>
+    request<FdtlRuleRef>(`/fdtl/rules/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  resetFdtlRule: (id: string) =>
+    request<FdtlRuleRef>(`/fdtl/rules/${id}/reset`, { method: 'POST' }),
+
+  getFdtlTables: (operatorId = 'horizon', frameworkCode?: string, tabKey?: string) => {
+    let path = `/fdtl/tables?operatorId=${operatorId}`
+    if (frameworkCode) path += `&frameworkCode=${frameworkCode}`
+    if (tabKey) path += `&tabKey=${tabKey}`
+    return request<FdtlTableRef[]>(path)
+  },
+
+  updateFdtlTableCell: (tableId: string, rowKey: string, colKey: string, valueMinutes: number | null) =>
+    request<FdtlTableRef>(`/fdtl/tables/${tableId}/cells`, {
+      method: 'PATCH',
+      body: JSON.stringify({ rowKey, colKey, valueMinutes }),
+    }),
+
+  resetFdtlTable: (tableId: string) =>
+    request<FdtlTableRef>(`/fdtl/tables/${tableId}/reset`, { method: 'POST' }),
+
+  seedFdtl: (operatorId = 'horizon', frameworkCode: string) =>
+    request<{ success: boolean; frameworkCode: string; rulesSeeded: number; tablesSeeded: number }>('/fdtl/seed', {
+      method: 'POST',
+      body: JSON.stringify({ operatorId, frameworkCode }),
     }),
 
   getExpiryCodeCategories: (operatorId = 'horizon') =>

@@ -4,7 +4,9 @@ export interface RuleTemplate {
   category: string
   subcategory: string
   rule_code: string
+  tab_key?: string
   label: string
+  description?: string
   value: string
   value_type: 'duration' | 'integer' | 'decimal' | 'boolean' | 'text'
   unit: string
@@ -21,6 +23,7 @@ export type RuleOverride = { rule_code: string } & Partial<Omit<RuleTemplate, 'r
 export interface FDPTableTemplate {
   table_code: string
   tab_key?: string
+  table_type?: 'fdp_matrix' | 'augmented_matrix' | 'cabin_rest' | 'timezone_comp' | 'single_pilot' | 'custom'
   label: string
   legal_reference?: string
   row_axis_label: string
@@ -30,6 +33,7 @@ export interface FDPTableTemplate {
   col_keys: string[]
   col_labels: string[]
   applies_when?: Record<string, unknown>
+  crew_type?: 'all' | 'cockpit' | 'cabin'
   cells: { row: string; col: string; minutes: number | null; display: string; source: string }[]
 }
 

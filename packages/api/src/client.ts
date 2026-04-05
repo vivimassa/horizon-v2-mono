@@ -268,6 +268,11 @@ export interface DelayCodeRef {
   isActive: boolean
 }
 
+export interface CrewPositionReferences {
+  expiryCodes: number
+  crewComplements: number
+}
+
 export interface CrewPositionRef {
   _id: string
   operatorId: string
@@ -304,6 +309,18 @@ export interface ExpiryCodeRef {
   warningDays: number | null
   isActive: boolean
   sortOrder: number
+}
+
+export interface CrewComplementRef {
+  _id: string
+  operatorId: string
+  aircraftTypeIcao: string
+  templateKey: string
+  counts: Record<string, number>
+  notes: string | null
+  isActive: boolean
+  createdAt: string | null
+  updatedAt: string | null
 }
 
 export interface BlockHourData {
@@ -683,8 +700,56 @@ export const api = {
   deleteDelayCode: (id: string) =>
     request<{ success: boolean }>(`/delay-codes/${id}`, { method: 'DELETE' }),
 
-  getCrewPositions: (operatorId = 'horizon') =>
-    request<CrewPositionRef[]>(`/crew-positions?operatorId=${operatorId}`),
+  getCrewPositions: (operatorId = 'horizon', includeInactive = false) => {
+    let path = `/crew-positions?operatorId=${operatorId}`
+    if (includeInactive) path += '&includeInactive=true'
+    return request<CrewPositionRef[]>(path)
+  },
+
+  createCrewPosition: (data: Partial<CrewPositionRef>) =>
+    request<CrewPositionRef>('/crew-positions', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateCrewPosition: (id: string, data: Partial<CrewPositionRef>) =>
+    request<CrewPositionRef>(`/crew-positions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  deleteCrewPosition: (id: string) =>
+    request<{ success: boolean }>(`/crew-positions/${id}`, { method: 'DELETE' }),
+
+  getCrewPositionReferences: (id: string) =>
+    request<CrewPositionReferences>(`/crew-positions/${id}/references`),
+
+  seedCrewPositions: (operatorId = 'horizon') =>
+    request<{ success: boolean }>('/crew-positions/seed-defaults', {
+      method: 'POST',
+      body: JSON.stringify({ operatorId }),
+    }),
+
+  // ─── Crew Complements ──────────────────────────────────
+  getCrewComplements: (operatorId = 'horizon', aircraftTypeIcao?: string) => {
+    let path = `/crew-complements?operatorId=${operatorId}`
+    if (aircraftTypeIcao) path += `&aircraftTypeIcao=${encodeURIComponent(aircraftTypeIcao)}`
+    return request<CrewComplementRef[]>(path)
+  },
+
+  createCrewComplement: (data: Partial<CrewComplementRef>) =>
+    request<CrewComplementRef>('/crew-complements', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateCrewComplement: (id: string, data: Partial<CrewComplementRef>) =>
+    request<CrewComplementRef>(`/crew-complements/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  deleteCrewComplement: (id: string) =>
+    request<{ success: boolean }>(`/crew-complements/${id}`, { method: 'DELETE' }),
+
+  seedCrewComplementDefaults: (operatorId = 'horizon', aircraftTypeIcao?: string) =>
+    request<{ success: boolean; count: number }>('/crew-complements/seed-defaults', {
+      method: 'POST',
+      body: JSON.stringify({ operatorId, aircraftTypeIcao }),
+    }),
+
+  deleteCrewComplementsByType: (operatorId: string, icaoType: string) =>
+    request<{ success: boolean }>(`/crew-complements/by-type/${encodeURIComponent(icaoType)}?operatorId=${operatorId}`, {
+      method: 'DELETE',
+    }),
 
   getExpiryCodeCategories: (operatorId = 'horizon') =>
     request<ExpiryCodeCategoryRef[]>(`/expiry-code-categories?operatorId=${operatorId}`),

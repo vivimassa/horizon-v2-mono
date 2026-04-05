@@ -18,6 +18,7 @@ import { FlightInstance } from '../models/FlightInstance.js'
 import { CabinClass } from '../models/CabinClass.js'
 import { LopaConfig } from '../models/LopaConfig.js'
 import { ActivityCodeGroup, ActivityCode } from '../models/ActivityCode.js'
+import { CrewComplement } from '../models/CrewComplement.js'
 import { lookupByIcao, getStats, loadOurAirportsData } from '../data/ourairports-cache.js'
 
 // ─── Zod schemas for airport validation ───────────────────
@@ -1074,10 +1075,141 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
   // ─── Crew Positions ────────────────────────────────────
   app.get('/crew-positions', async (req) => {
-    const { operatorId } = req.query as { operatorId?: string }
-    const filter: Record<string, unknown> = { isActive: true }
+    const { operatorId, includeInactive } = req.query as { operatorId?: string; includeInactive?: string }
+    const filter: Record<string, unknown> = {}
     if (operatorId) filter.operatorId = operatorId
+    if (includeInactive !== 'true') filter.isActive = true
     return CrewPosition.find(filter).sort({ category: 1, rankOrder: 1 }).lean()
+  })
+
+  const crewPositionCreateSchema = z.object({
+    operatorId: z.string().min(1),
+    code: z.string().min(1).max(3).regex(/^[A-Z]{1,3}$/, 'Code must be 1-3 uppercase letters'),
+    name: z.string().min(1, 'Name is required'),
+    category: z.enum(['cockpit', 'cabin']),
+    rankOrder: z.number().int().min(0),
+    isPic: z.boolean().optional().default(false),
+    canDownrank: z.boolean().optional().default(false),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
+    description: z.string().nullable().optional(),
+    isActive: z.boolean().optional().default(true),
+  }).strict()
+
+  const crewPositionUpdateSchema = z.object({
+    code: z.string().min(1).max(3).regex(/^[A-Z]{1,3}$/),
+    name: z.string().min(1),
+    category: z.enum(['cockpit', 'cabin']),
+    rankOrder: z.number().int().min(0),
+    isPic: z.boolean(),
+    canDownrank: z.boolean(),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(),
+    description: z.string().nullable(),
+    isActive: z.boolean(),
+  }).partial().strict()
+
+  app.post('/crew-positions', async (req, reply) => {
+    const raw = req.body as Record<string, unknown>
+    if (raw.code) raw.code = (raw.code as string).toUpperCase()
+    const parsed = crewPositionCreateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body = parsed.data
+    const existing = await CrewPosition.findOne({ operatorId: body.operatorId, code: body.code }).lean()
+    if (existing) return reply.code(409).send({ error: `Position "${body.code}" already exists` })
+
+    const id = crypto.randomUUID()
+    const doc = await CrewPosition.create({ _id: id, ...body, createdAt: new Date().toISOString() })
+    return reply.code(201).send(doc.toObject())
+  })
+
+  app.patch('/crew-positions/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const raw = req.body as Record<string, unknown>
+    if (raw.code) raw.code = (raw.code as string).toUpperCase()
+    const parsed = crewPositionUpdateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body = { ...parsed.data, updatedAt: new Date().toISOString() }
+    const doc = await CrewPosition.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'Crew position not found' })
+    return doc
+  })
+
+  app.get('/crew-positions/:id/references', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await CrewPosition.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Crew position not found' })
+
+    const expiryCodes = await ExpiryCode.countDocuments({
+      $or: [{ crewCategory: doc.category }, { crewCategory: 'both' }],
+      isActive: true,
+    })
+    const crewComplements = await CrewComplement.countDocuments({
+      operatorId: doc.operatorId,
+      [`counts.${doc.code}`]: { $exists: true, $gt: 0 },
+    })
+    return { expiryCodes, crewComplements }
+  })
+
+  app.delete('/crew-positions/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await CrewPosition.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Crew position not found' })
+
+    // Check if referenced by expiry codes
+    const expiryRefs = await ExpiryCode.countDocuments({
+      $or: [{ crewCategory: doc.category }, { crewCategory: 'both' }],
+      isActive: true,
+    })
+    if (expiryRefs > 0) {
+      return reply.code(409).send({
+        error: `Position is referenced by ${expiryRefs} expiry code(s). Deactivate instead of deleting.`,
+        canDeactivate: true,
+      })
+    }
+
+    await CrewPosition.findByIdAndDelete(id)
+    return { success: true }
+  })
+
+  // Seed default crew positions
+  app.post('/crew-positions/seed-defaults', async (req, reply) => {
+    const { operatorId } = req.body as { operatorId: string }
+    if (!operatorId) return reply.code(400).send({ error: 'operatorId is required' })
+
+    const existing = await CrewPosition.countDocuments({ operatorId })
+    if (existing > 0) return reply.code(400).send({ error: 'Crew positions already exist for this operator' })
+
+    const now = new Date().toISOString()
+    const defaults = [
+      { code: 'CP', name: 'Captain', category: 'cockpit', rankOrder: 1, isPic: true, color: '#4338ca' },
+      { code: 'FO', name: 'First Officer', category: 'cockpit', rankOrder: 2, isPic: false, color: '#4f46e5' },
+      { code: 'SO', name: 'Second Officer', category: 'cockpit', rankOrder: 3, isPic: false, color: '#6366f1' },
+      { code: 'FE', name: 'Flight Engineer', category: 'cockpit', rankOrder: 4, isPic: false, color: '#818cf8' },
+      { code: 'CC', name: 'Cabin Chief', category: 'cabin', rankOrder: 1, isPic: false, color: '#92400e' },
+      { code: 'SP', name: 'Senior Purser', category: 'cabin', rankOrder: 2, isPic: false, color: '#b45309' },
+      { code: 'PS', name: 'Purser', category: 'cabin', rankOrder: 3, isPic: false, color: '#d97706' },
+      { code: 'FA', name: 'Flight Attendant', category: 'cabin', rankOrder: 4, isPic: false, color: '#c2410c' },
+      { code: 'TF', name: 'Trainee FA', category: 'cabin', rankOrder: 5, isPic: false, color: '#ea580c' },
+    ]
+
+    const rows = defaults.map(d => ({
+      _id: crypto.randomUUID(),
+      operatorId,
+      ...d,
+      canDownrank: false,
+      description: null,
+      isActive: true,
+      createdAt: now,
+      updatedAt: null,
+    }))
+
+    await CrewPosition.insertMany(rows)
+    return { success: true }
   })
 
   // ─── Expiry Code Categories ────────────────────────────
@@ -1685,6 +1817,171 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return { success: true, groupCount: groups.length, codeCount: codes.length }
+  })
+
+  // ─── Crew Complements ───────────────────────────────────
+
+  app.get('/crew-complements', async (req) => {
+    const { operatorId, aircraftTypeIcao } = req.query as { operatorId?: string; aircraftTypeIcao?: string }
+    const filter: Record<string, unknown> = {}
+    if (operatorId) filter.operatorId = operatorId
+    if (aircraftTypeIcao) filter.aircraftTypeIcao = aircraftTypeIcao
+    return CrewComplement.find(filter).sort({ aircraftTypeIcao: 1, createdAt: 1 }).lean()
+  })
+
+  app.get('/crew-complements/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await CrewComplement.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Crew complement not found' })
+    return doc
+  })
+
+  const complementCreateSchema = z.object({
+    operatorId: z.string().min(1),
+    aircraftTypeIcao: z.string().min(2).max(4),
+    templateKey: z.string().min(1),
+    counts: z.record(z.string(), z.number().int().min(0)).optional().default({}),
+    notes: z.string().nullable().optional(),
+  }).strict()
+
+  app.post('/crew-complements', async (req, reply) => {
+    const parsed = complementCreateSchema.safeParse(req.body)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body = parsed.data
+
+    const existing = await CrewComplement.findOne({
+      operatorId: body.operatorId,
+      aircraftTypeIcao: body.aircraftTypeIcao,
+      templateKey: body.templateKey,
+    }).lean()
+    if (existing) {
+      return reply.code(409).send({ error: `Complement "${body.templateKey}" already exists for ${body.aircraftTypeIcao}` })
+    }
+
+    const id = crypto.randomUUID()
+    const doc = await CrewComplement.create({
+      _id: id,
+      ...body,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    })
+    return reply.code(201).send(doc.toObject())
+  })
+
+  const complementUpdateSchema = z.object({
+    templateKey: z.string().min(1),
+    counts: z.record(z.string(), z.number().int().min(0)),
+    notes: z.string().nullable(),
+    isActive: z.boolean(),
+  }).partial().strict()
+
+  app.patch('/crew-complements/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const parsed = complementUpdateSchema.safeParse(req.body)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body = { ...parsed.data, updatedAt: new Date().toISOString() }
+    const doc = await CrewComplement.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'Crew complement not found' })
+    return doc
+  })
+
+  app.delete('/crew-complements/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await CrewComplement.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Crew complement not found' })
+
+    // Protect standard templates — only custom rows can be deleted
+    if (['standard', 'aug1', 'aug2'].includes(doc.templateKey)) {
+      return reply.code(400).send({ error: 'Standard, Aug 1, and Aug 2 templates cannot be deleted. Use the table to set counts to 0 instead.' })
+    }
+
+    await CrewComplement.findByIdAndDelete(id)
+    return { success: true }
+  })
+
+  // Seed default complements for all aircraft types (or a single type)
+  app.post('/crew-complements/seed-defaults', async (req, reply) => {
+    const { operatorId, aircraftTypeIcao } = req.body as { operatorId: string; aircraftTypeIcao?: string }
+    if (!operatorId) return reply.code(400).send({ error: 'operatorId is required' })
+
+    // Get active crew positions to build default counts
+    const positions = await CrewPosition.find({ operatorId, isActive: true }).sort({ category: 1, rankOrder: 1 }).lean()
+    if (positions.length === 0) {
+      return reply.code(400).send({ error: 'No active crew positions found. Configure positions in 5.4.2 first.' })
+    }
+
+    const cockpit = positions.filter(p => p.category === 'cockpit')
+    const cabin = positions.filter(p => p.category === 'cabin')
+
+    // Build default counts per template
+    const buildCounts = (template: 'standard' | 'aug1' | 'aug2'): Record<string, number> => {
+      const counts: Record<string, number> = {}
+      for (const p of [...cockpit, ...cabin]) counts[p.code] = 1
+
+      if (template === 'aug1' && cockpit.length > 0) {
+        counts[cockpit[0].code] = 2 // +1 relief pilot
+      }
+      if (template === 'aug2') {
+        for (const p of cockpit) counts[p.code] = 2 // double cockpit
+        if (cabin.length > 0) counts[cabin[0].code] = 2 // +1 senior cabin
+      }
+      return counts
+    }
+
+    // Get aircraft types to seed
+    let types: { icaoType: string }[]
+    if (aircraftTypeIcao) {
+      types = [{ icaoType: aircraftTypeIcao }]
+    } else {
+      types = await AircraftType.find({ operatorId }).select('icaoType').lean()
+      if (types.length === 0) {
+        return reply.code(400).send({ error: 'No aircraft types found. Add types in 5.2.1 first.' })
+      }
+    }
+
+    const now = new Date().toISOString()
+    const rows: Record<string, unknown>[] = []
+    const templates = ['standard', 'aug1', 'aug2'] as const
+
+    for (const { icaoType } of types) {
+      for (const tmpl of templates) {
+        // Skip if already exists
+        const exists = await CrewComplement.findOne({ operatorId, aircraftTypeIcao: icaoType, templateKey: tmpl }).lean()
+        if (exists) continue
+
+        rows.push({
+          _id: crypto.randomUUID(),
+          operatorId,
+          aircraftTypeIcao: icaoType,
+          templateKey: tmpl,
+          counts: buildCounts(tmpl),
+          notes: null,
+          isActive: true,
+          createdAt: now,
+        })
+      }
+    }
+
+    if (rows.length > 0) {
+      await CrewComplement.insertMany(rows)
+    }
+
+    return { success: true, count: rows.length }
+  })
+
+  // Delete all complements for an aircraft type
+  app.delete('/crew-complements/by-type/:icaoType', async (req, reply) => {
+    const { icaoType } = req.params as { icaoType: string }
+    const { operatorId } = req.query as { operatorId: string }
+    if (!operatorId) return reply.code(400).send({ error: 'operatorId query param is required' })
+    await CrewComplement.deleteMany({ operatorId, aircraftTypeIcao: icaoType })
+    return { success: true }
   })
 }
 

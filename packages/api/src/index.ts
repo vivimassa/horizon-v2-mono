@@ -11,6 +11,8 @@ export type {
   CountryRef,
   DelayCodeRef,
   CrewPositionRef,
+  CrewPositionReferences,
+  CrewComplementRef,
   ExpiryCodeCategoryRef,
   ExpiryCodeRef,
   FlightServiceTypeRef,

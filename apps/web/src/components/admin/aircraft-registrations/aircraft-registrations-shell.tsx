@@ -40,8 +40,15 @@ export function AircraftRegistrationsShell() {
 
   const handleSave = useCallback(async (id: string, data: Partial<AircraftRegistrationRef>) => {
     await api.updateAircraftRegistration(id, data);
-    fetchData();
-  }, [fetchData]);
+    // Optimistically merge the update into local state to avoid a full refetch
+    // which causes scroll reset and visual blink in the detail panel
+    setRegistrations((prev) =>
+      prev.map((r) => (r._id === id ? { ...r, ...data } : r))
+    );
+    setSelected((prev) =>
+      prev && prev._id === id ? { ...prev, ...data } : prev
+    );
+  }, []);
 
   const handleDelete = useCallback(async (id: string) => {
     await api.deleteAircraftRegistration(id);

@@ -87,15 +87,6 @@ export function AircraftRegistrationDetail({
   const [draft, setDraft] = useState<Record<string, unknown>>({});
   const [errorMsg, setErrorMsg] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const pendingScrollRestore = useRef<number | null>(null);
-
-  // Restore scroll position after data refetch re-renders
-  useEffect(() => {
-    if (pendingScrollRestore.current != null && scrollRef.current) {
-      scrollRef.current.scrollTop = pendingScrollRestore.current;
-      pendingScrollRestore.current = null;
-    }
-  });
 
   // Create form
   const [creating, setCreating] = useState(false);
@@ -113,14 +104,17 @@ export function AircraftRegistrationDetail({
   const [lopaConfigs, setLopaConfigs] = useState<LopaConfigRef[]>([]);
   const [cabinClasses, setCabinClasses] = useState<CabinClassRef[]>([]);
 
+  const regId = registration?._id;
+  const regAcTypeId = registration?.aircraftTypeId;
+
   useEffect(() => {
-    if (!registration) return;
-    const acType = typeMap.get(registration.aircraftTypeId);
+    if (!regAcTypeId) return;
+    const acType = typeMap.get(regAcTypeId);
     if (acType) {
       api.getLopaConfigs("horizon", acType.icaoType).then(setLopaConfigs).catch(() => {});
     }
     api.getCabinClasses("horizon").then(setCabinClasses).catch(() => {});
-  }, [registration, typeMap]);
+  }, [regId, regAcTypeId, typeMap]);
 
   // Set default aircraftTypeId for create form
   useEffect(() => {
@@ -439,7 +433,6 @@ export function AircraftRegistrationDetail({
             const handleLopaSelect = async (configId: string) => {
               if (!onSave) return;
               const newId = configId === currentLopaId ? null : configId;
-              pendingScrollRestore.current = scrollRef.current?.scrollTop ?? 0;
               try {
                 await onSave(registration._id, { lopaConfigId: newId } as Partial<AircraftRegistrationRef>);
               } catch (err) { console.error("Failed to update LOPA:", err); }

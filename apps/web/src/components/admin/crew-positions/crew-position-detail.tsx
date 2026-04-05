@@ -238,7 +238,7 @@ function ViewEditPanel({ position, onSave, onDelete, onDeactivate }: {
   const getVal = (key: keyof CrewPositionRef) =>
     key in draft ? (draft as any)[key] : position[key];
 
-  const totalRefs = refs ? refs.expiryCodes : 0;
+  const totalRefs = refs ? refs.expiryCodes + refs.crewComplements : 0;
   const categoryLabel = position.category === "cockpit" ? "Flight Deck" : "Cabin Crew";
 
   return (
@@ -380,7 +380,10 @@ function ViewEditPanel({ position, onSave, onDelete, onDeactivate }: {
                 <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10">
                   <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
                   <div className="text-[13px] text-amber-700 dark:text-amber-400">
-                    This position is referenced by <strong>{refs?.expiryCodes}</strong> expiry code{(refs?.expiryCodes ?? 0) !== 1 ? "s" : ""}.
+                    This position is referenced by{" "}
+                    {(refs?.expiryCodes ?? 0) > 0 && <><strong>{refs?.expiryCodes}</strong> expiry code{(refs?.expiryCodes ?? 0) !== 1 ? "s" : ""}</>}
+                    {(refs?.expiryCodes ?? 0) > 0 && (refs?.crewComplements ?? 0) > 0 && " and "}
+                    {(refs?.crewComplements ?? 0) > 0 && <><strong>{refs?.crewComplements}</strong> crew complement{(refs?.crewComplements ?? 0) !== 1 ? "s" : ""}</>}.
                     It cannot be deleted but can be deactivated.
                   </div>
                 </div>

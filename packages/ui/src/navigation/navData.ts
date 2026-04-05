@@ -228,6 +228,7 @@ export const NAV_TREE: NavModuleData[] = [
           { key: 'expiry-codes', label: 'Expiry Codes', num: '6.3.11', route: '/admin/expiry-codes', iconName: 'FileCheck', desc: 'Qualification validity & formulas', group: 'Crew Ops', groupIconName: 'Users' },
           { key: 'activity-codes', label: 'Activity Codes', num: '6.3.12', route: '/admin/activity-codes', iconName: 'Activity', desc: 'Duty, standby, training & leave classification', group: 'Crew Ops', groupIconName: 'Users' },
           { key: 'crew-complements', label: 'Crew Complements', num: '5.4.5', route: '/admin/crew-complements', iconName: 'Users', desc: 'Aircraft type crew requirements & templates', group: 'Crew Ops', groupIconName: 'Users' },
+          { key: 'crew-groups', label: 'Crew Groups', num: '5.4.6', route: '/admin/crew-groups', iconName: 'Users', desc: 'Scheduling groups & crew classification', group: 'Crew Ops', groupIconName: 'Users' },
         ],
       },
     ],

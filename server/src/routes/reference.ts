@@ -19,6 +19,7 @@ import { CabinClass } from '../models/CabinClass.js'
 import { LopaConfig } from '../models/LopaConfig.js'
 import { ActivityCodeGroup, ActivityCode } from '../models/ActivityCode.js'
 import { CrewComplement } from '../models/CrewComplement.js'
+import { CrewGroup } from '../models/CrewGroup.js'
 import { lookupByIcao, getStats, loadOurAirportsData } from '../data/ourairports-cache.js'
 
 // ─── Zod schemas for airport validation ───────────────────
@@ -1982,6 +1983,114 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     if (!operatorId) return reply.code(400).send({ error: 'operatorId query param is required' })
     await CrewComplement.deleteMany({ operatorId, aircraftTypeIcao: icaoType })
     return { success: true }
+  })
+
+  // ─── Crew Groups ────────────────────────────────────────
+
+  app.get('/crew-groups', async (req) => {
+    const { operatorId, includeInactive } = req.query as { operatorId?: string; includeInactive?: string }
+    const filter: Record<string, unknown> = {}
+    if (operatorId) filter.operatorId = operatorId
+    if (includeInactive !== 'true') filter.isActive = true
+    return CrewGroup.find(filter).sort({ sortOrder: 1, name: 1 }).lean()
+  })
+
+  const crewGroupCreateSchema = z.object({
+    operatorId: z.string().min(1),
+    name: z.string().min(1).max(100),
+    description: z.string().nullable().optional(),
+    sortOrder: z.number().int().min(0).optional(),
+  }).strict()
+
+  const crewGroupUpdateSchema = z.object({
+    name: z.string().min(1).max(100),
+    description: z.string().nullable(),
+    sortOrder: z.number().int().min(0),
+    isActive: z.boolean(),
+  }).partial().strict()
+
+  app.post('/crew-groups', async (req, reply) => {
+    const parsed = crewGroupCreateSchema.safeParse(req.body)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body = parsed.data
+
+    const existing = await CrewGroup.findOne({ operatorId: body.operatorId, name: body.name }).lean()
+    if (existing) return reply.code(409).send({ error: `Group "${body.name}" already exists` })
+
+    // Auto-assign sortOrder if not provided
+    if (body.sortOrder == null) {
+      const count = await CrewGroup.countDocuments({ operatorId: body.operatorId })
+      body.sortOrder = (count + 1) * 10
+    }
+
+    const id = crypto.randomUUID()
+    const doc = await CrewGroup.create({
+      _id: id,
+      ...body,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    })
+    return reply.code(201).send(doc.toObject())
+  })
+
+  app.patch('/crew-groups/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const parsed = crewGroupUpdateSchema.safeParse(req.body)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body = { ...parsed.data, updatedAt: new Date().toISOString() }
+    const doc = await CrewGroup.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'Crew group not found' })
+    return doc
+  })
+
+  app.delete('/crew-groups/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await CrewGroup.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Crew group not found' })
+    await CrewGroup.findByIdAndDelete(id)
+    return { success: true }
+  })
+
+  app.post('/crew-groups/seed-defaults', async (req, reply) => {
+    const { operatorId } = req.body as { operatorId: string }
+    if (!operatorId) return reply.code(400).send({ error: 'operatorId is required' })
+
+    const existing = await CrewGroup.countDocuments({ operatorId })
+    if (existing > 0) return reply.code(400).send({ error: 'Crew groups already exist. Delete all first to re-seed.' })
+
+    const defaults = [
+      'Management Pilots - AFS',
+      'Management Pilots - Non AFS',
+      'Relief First Officers',
+      '50/50 Cockpit Crew',
+      '50/50 Cabin Crew',
+      'Reduced Working Hours Cockpit Crew',
+      'Reduced Working Hours Cabin Crew',
+      'Cockpit Crew Under Training',
+      'Trainer Pilots',
+      'Part-Time Crew',
+    ]
+
+    const now = new Date().toISOString()
+    const rows = defaults.map((name, i) => ({
+      _id: crypto.randomUUID(),
+      operatorId,
+      name,
+      description: null,
+      sortOrder: (i + 1) * 10,
+      isActive: true,
+      createdAt: now,
+      updatedAt: null,
+    }))
+
+    await CrewGroup.insertMany(rows)
+    return { success: true, count: rows.length }
   })
 }
 

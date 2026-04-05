@@ -13,6 +13,7 @@ export type {
   CrewPositionRef,
   CrewPositionReferences,
   CrewComplementRef,
+  CrewGroupRef,
   ExpiryCodeCategoryRef,
   ExpiryCodeRef,
   FlightServiceTypeRef,

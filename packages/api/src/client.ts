@@ -311,6 +311,17 @@ export interface ExpiryCodeRef {
   sortOrder: number
 }
 
+export interface CrewGroupRef {
+  _id: string
+  operatorId: string
+  name: string
+  description: string | null
+  sortOrder: number
+  isActive: boolean
+  createdAt: string | null
+  updatedAt: string | null
+}
+
 export interface CrewComplementRef {
   _id: string
   operatorId: string
@@ -749,6 +760,28 @@ export const api = {
   deleteCrewComplementsByType: (operatorId: string, icaoType: string) =>
     request<{ success: boolean }>(`/crew-complements/by-type/${encodeURIComponent(icaoType)}?operatorId=${operatorId}`, {
       method: 'DELETE',
+    }),
+
+  // ─── Crew Groups ─────────────────────────────────────────
+  getCrewGroups: (operatorId = 'horizon', includeInactive = false) => {
+    let path = `/crew-groups?operatorId=${operatorId}`
+    if (includeInactive) path += '&includeInactive=true'
+    return request<CrewGroupRef[]>(path)
+  },
+
+  createCrewGroup: (data: Partial<CrewGroupRef>) =>
+    request<CrewGroupRef>('/crew-groups', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateCrewGroup: (id: string, data: Partial<CrewGroupRef>) =>
+    request<CrewGroupRef>(`/crew-groups/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  deleteCrewGroup: (id: string) =>
+    request<{ success: boolean }>(`/crew-groups/${id}`, { method: 'DELETE' }),
+
+  seedCrewGroups: (operatorId = 'horizon') =>
+    request<{ success: boolean; count: number }>('/crew-groups/seed-defaults', {
+      method: 'POST',
+      body: JSON.stringify({ operatorId }),
     }),
 
   getExpiryCodeCategories: (operatorId = 'horizon') =>

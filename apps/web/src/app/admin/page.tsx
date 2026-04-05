@@ -91,6 +91,7 @@ const SECTIONS: SectionDef[] = [
       { code: "5.4.3", label: "Expiry Codes", desc: "Qualification validity & formulas", icon: FileCheck, href: "/admin/expiry-codes" },
       { code: "5.4.4", label: "Activity Codes", desc: "Duty, standby, training & leave classification", icon: Activity, href: "/admin/activity-codes" },
       { code: "5.4.5", label: "Crew Complements", desc: "Min crew per aircraft type & augmentation", icon: UsersRound, href: "/admin/crew-complements" },
+      { code: "5.4.6", label: "Crew Groups", desc: "Scheduling groups & crew classification", icon: Users, href: "/admin/crew-groups" },
     ],
   },
 ];

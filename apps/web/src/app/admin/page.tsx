@@ -17,6 +17,7 @@ import {
   Tag,
   UserRound,
   FileCheck,
+  MapPin,
   ChevronRight,
   PackageOpen,
 } from "lucide-react";
@@ -83,8 +84,9 @@ const SECTIONS: SectionDef[] = [
     icon: Users,
     color: "#7c3aed",
     cards: [
-      { code: "5.4.1", label: "Crew Positions", desc: "Cockpit & cabin roles, rank order", icon: UserRound, href: "/admin/crew-positions" },
-      { code: "5.4.2", label: "Expiry Codes", desc: "Qualification validity & formulas", icon: FileCheck, href: "/admin/expiry-codes" },
+      { code: "5.4.1", label: "Crew Bases", desc: "Airport crew home bases & reporting times", icon: MapPin, href: "/admin/crew-bases" },
+      { code: "5.4.2", label: "Crew Positions", desc: "Cockpit & cabin roles, rank order", icon: UserRound, href: "/admin/crew-positions" },
+      { code: "5.4.3", label: "Expiry Codes", desc: "Qualification validity & formulas", icon: FileCheck, href: "/admin/expiry-codes" },
     ],
   },
 ];

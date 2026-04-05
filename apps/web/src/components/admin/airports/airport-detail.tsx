@@ -568,7 +568,7 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate, onRefresh }
           <AirportOperationsTab airport={airport} editing={editing} draft={draft} onChange={handleFieldChange} />
         )}
         {activeTab === "crew" && (
-          <AirportCrewTab airport={airport} editing={editing} draft={draft} onChange={handleFieldChange} />
+          <AirportCrewTab airport={airport} />
         )}
       </div>
     </div>

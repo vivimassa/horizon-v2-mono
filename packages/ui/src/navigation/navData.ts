@@ -223,8 +223,9 @@ export const NAV_TREE: NavModuleData[] = [
           { key: 'aircraft-registrations', label: 'Aircraft Registrations', num: '6.3.7', route: '/admin/aircraft-registrations', iconName: 'PlaneTakeoff', desc: 'Tail numbers, MSN, status, home base', group: 'Flight Ops', groupIconName: 'Plane' },
           { key: 'delay-codes', label: 'Delay Codes', num: '6.3.8', route: '/admin/delay-codes', iconName: 'Timer', desc: 'IATA standard & custom codes', group: 'Flight Ops', groupIconName: 'Plane' },
           // Crew Ops
-          { key: 'crew-positions', label: 'Crew Positions', num: '6.3.9', route: '/admin/crew-positions', iconName: 'UserRound', desc: 'Cockpit & cabin roles, rank order', group: 'Crew Ops', groupIconName: 'Users' },
-          { key: 'expiry-codes', label: 'Expiry Codes', num: '6.3.10', route: '/admin/expiry-codes', iconName: 'FileCheck', desc: 'Qualification validity & formulas', group: 'Crew Ops', groupIconName: 'Users' },
+          { key: 'crew-bases', label: 'Crew Bases', num: '6.3.9', route: '/admin/crew-bases', iconName: 'MapPin', desc: 'Airport crew home bases & reporting times', group: 'Crew Ops', groupIconName: 'Users' },
+          { key: 'crew-positions', label: 'Crew Positions', num: '6.3.10', route: '/admin/crew-positions', iconName: 'UserRound', desc: 'Cockpit & cabin roles, rank order', group: 'Crew Ops', groupIconName: 'Users' },
+          { key: 'expiry-codes', label: 'Expiry Codes', num: '6.3.11', route: '/admin/expiry-codes', iconName: 'FileCheck', desc: 'Qualification validity & formulas', group: 'Crew Ops', groupIconName: 'Users' },
         ],
       },
     ],

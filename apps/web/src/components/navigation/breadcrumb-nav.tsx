@@ -25,7 +25,7 @@ import {
   ClipboardList, PackageCheck, Package, Armchair,
   Loader, Smartphone, Scale, FileBarChart,
   PenLine, BadgeCheck, History, TrendingUp, ShieldAlert,
-  Timer, Tag, UserRound, FileCheck,
+  Timer, Tag, UserRound, FileCheck, MapPin,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -44,7 +44,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   ClipboardList, PackageCheck, Package, Armchair,
   Loader, Smartphone, Scale, FileBarChart,
   PenLine, BadgeCheck, History, TrendingUp, ShieldAlert,
-  Timer, Tag, UserRound, FileCheck,
+  Timer, Tag, UserRound, FileCheck, MapPin,
 };
 
 function NavIcon({ name, size = 14, color }: { name: string; size?: number; color?: string }) {

@@ -266,11 +266,18 @@ export interface ExpiryCodeRef {
   name: string
   description: string | null
   crewCategory: 'both' | 'cockpit' | 'cabin'
+  applicablePositions: string[]
   formula: string
+  formulaParams: Record<string, any>
   acTypeScope: 'none' | 'family' | 'variant'
+  linkedTrainingCode: string | null
   warningDays: number | null
+  severity: string[]
+  notes: string | null
   isActive: boolean
   sortOrder: number
+  createdAt: string | null
+  updatedAt: string | null
 }
 
 export interface BlockHourData {
@@ -633,8 +640,20 @@ export const api = {
   getExpiryCodeCategories: (operatorId = 'horizon') =>
     request<ExpiryCodeCategoryRef[]>(`/expiry-code-categories?operatorId=${operatorId}`),
 
-  getExpiryCodes: (operatorId = 'horizon') =>
-    request<ExpiryCodeRef[]>(`/expiry-codes?operatorId=${operatorId}`),
+  getExpiryCodes: (operatorId = 'horizon', includeInactive = false) =>
+    request<ExpiryCodeRef[]>(`/expiry-codes?operatorId=${operatorId}${includeInactive ? '&includeInactive=true' : ''}`),
+
+  createExpiryCode: (data: Partial<ExpiryCodeRef>) =>
+    request<ExpiryCodeRef>('/expiry-codes', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateExpiryCode: (id: string, data: Partial<ExpiryCodeRef>) =>
+    request<ExpiryCodeRef>(`/expiry-codes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  deleteExpiryCode: (id: string) =>
+    request<{ success: boolean }>(`/expiry-codes/${id}`, { method: 'DELETE' }),
+
+  seedExpiryCodes: (operatorId: string) =>
+    request<ExpiryCodeRef[]>('/expiry-codes/seed', { method: 'POST', body: JSON.stringify({ operatorId }) }),
 
   getFlightServiceTypes: (operatorId = 'horizon') =>
     request<FlightServiceTypeRef[]>(`/flight-service-types?operatorId=${operatorId}`),

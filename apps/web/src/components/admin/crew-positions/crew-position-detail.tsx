@@ -129,8 +129,10 @@ function CreatePanel({ onCreate, onCancel }: { onCreate: (d: Partial<CrewPositio
             <span className="text-[12px] font-bold uppercase tracking-wider" style={{ color: isDark ? "#e0e0e0" : ACCENT }}>Position Properties</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
-            <ToggleField label="Pilot in Command (PIC)" value={form.isPic} onChange={(v) => set("isPic", v)}
-              description="This position is responsible as Pilot in Command" />
+            {form.category === "cockpit" && (
+              <ToggleField label="Pilot in Command (PIC)" value={form.isPic} onChange={(v) => set("isPic", v)}
+                description="This position is responsible as Pilot in Command" />
+            )}
             <ToggleField label="Can Downrank" value={form.canDownrank} onChange={(v) => set("canDownrank", v)}
               description="Crew can be assigned at a lower rank" />
           </div>
@@ -322,11 +324,13 @@ function ViewEditPanel({ position, onSave, onDelete, onDeactivate }: {
             </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
-            <FieldRow label="Pilot in Command (PIC)"
-              value={position.isPic
-                ? <span className="text-amber-600 dark:text-amber-400 font-semibold">Yes</span>
-                : <span className="text-hz-text-secondary">No</span>}
-              editing={editing} fieldKey="isPic" editValue={getVal("isPic")} onChange={handleFieldChange} inputType="toggle" />
+            {position.category === "cockpit" && (
+              <FieldRow label="Pilot in Command (PIC)"
+                value={position.isPic
+                  ? <span className="text-amber-600 dark:text-amber-400 font-semibold">Yes</span>
+                  : <span className="text-hz-text-secondary">No</span>}
+                editing={editing} fieldKey="isPic" editValue={getVal("isPic")} onChange={handleFieldChange} inputType="toggle" />
+            )}
             <FieldRow label="Can Downrank"
               value={position.canDownrank
                 ? <span className="text-green-600 dark:text-green-400 font-semibold">Yes</span>

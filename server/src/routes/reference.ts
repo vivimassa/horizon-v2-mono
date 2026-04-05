@@ -1203,11 +1203,209 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
   })
 
   // ─── Expiry Codes ──────────────────────────────────────
+
+  const expiryCodeCreateSchema = z.object({
+    operatorId: z.string().min(1),
+    categoryId: z.string().min(1),
+    code: z.string().min(1).max(10).regex(/^[A-Z0-9_-]+$/i, 'Code must be alphanumeric'),
+    name: z.string().min(1, 'Name is required'),
+    description: z.string().nullable().optional(),
+    crewCategory: z.enum(['both', 'cockpit', 'cabin']).optional().default('both'),
+    applicablePositions: z.array(z.string()).optional().default([]),
+    formula: z.string().min(1),
+    formulaParams: z.record(z.string(), z.any()).optional().default({}),
+    acTypeScope: z.enum(['none', 'family', 'variant']).optional().default('none'),
+    linkedTrainingCode: z.string().nullable().optional(),
+    warningDays: z.number().int().min(0).nullable().optional(),
+    severity: z.array(z.string()).optional().default([]),
+    notes: z.string().nullable().optional(),
+    isActive: z.boolean().optional().default(true),
+    sortOrder: z.number().int().min(0).optional().default(0),
+  })
+
+  const expiryCodeUpdateSchema = z.object({
+    categoryId: z.string().min(1),
+    code: z.string().min(1).max(10).regex(/^[A-Z0-9_-]+$/i),
+    name: z.string().min(1),
+    description: z.string().nullable(),
+    crewCategory: z.enum(['both', 'cockpit', 'cabin']),
+    applicablePositions: z.array(z.string()),
+    formula: z.string().min(1),
+    formulaParams: z.record(z.string(), z.any()),
+    acTypeScope: z.enum(['none', 'family', 'variant']),
+    linkedTrainingCode: z.string().nullable(),
+    warningDays: z.number().int().min(0).nullable(),
+    severity: z.array(z.string()),
+    notes: z.string().nullable(),
+    isActive: z.boolean(),
+    sortOrder: z.number().int().min(0),
+  }).partial().strict()
+
   app.get('/expiry-codes', async (req) => {
-    const { operatorId } = req.query as { operatorId?: string }
-    const filter: Record<string, unknown> = { isActive: true }
+    const { operatorId, includeInactive } = req.query as { operatorId?: string; includeInactive?: string }
+    const filter: Record<string, unknown> = {}
     if (operatorId) filter.operatorId = operatorId
+    if (includeInactive !== 'true') filter.isActive = true
     return ExpiryCode.find(filter).sort({ sortOrder: 1, code: 1 }).lean()
+  })
+
+  app.post('/expiry-codes/seed', async (req, reply) => {
+    const { operatorId } = req.body as { operatorId?: string }
+    if (!operatorId) return reply.code(400).send({ error: 'operatorId is required' })
+    const count = await ExpiryCode.countDocuments({ operatorId })
+    if (count > 0) return reply.code(409).send({ error: 'Expiry codes already exist for this operator' })
+
+    // Seed categories first
+    const catCount = await ExpiryCodeCategory.countDocuments({ operatorId })
+    const now = new Date().toISOString()
+    if (catCount === 0) {
+      const defaultCategories = [
+        { key: 'license', label: 'Licenses & Ratings', color: '#2563eb', sortOrder: 1 },
+        { key: 'medical', label: 'Medical', color: '#dc2626', sortOrder: 2 },
+        { key: 'training', label: 'Training & Checks', color: '#7c3aed', sortOrder: 3 },
+        { key: 'recency', label: 'Recency', color: '#059669', sortOrder: 4 },
+        { key: 'documents', label: 'Documents & Permits', color: '#d97706', sortOrder: 5 },
+      ]
+      const catDocs = defaultCategories.map(c => ({ _id: crypto.randomUUID(), operatorId, ...c, description: null, createdAt: now }))
+      await ExpiryCodeCategory.insertMany(catDocs)
+    }
+
+    // Fetch category IDs
+    const cats = await ExpiryCodeCategory.find({ operatorId }).lean()
+    const catMap = Object.fromEntries(cats.map(c => [c.key, c._id]))
+
+    const defaultCodes = [
+      {
+        code: 'MED1', name: 'Medical Class 1', categoryId: catMap.medical,
+        crewCategory: 'cockpit' as const, formula: 'age_variation',
+        formulaParams: { age_threshold: 40, validity_under: 12, validity_over: 6 },
+        warningDays: 60, severity: ['block_auto_assign', 'block_manual_assign', 'include_in_reports', 'show_validation_warning'],
+        description: 'ICAO Class 1 medical certificate for flight crew',
+      },
+      {
+        code: 'MED2', name: 'Medical Class 2', categoryId: catMap.medical,
+        crewCategory: 'cabin' as const, formula: 'fixed_validity',
+        formulaParams: { validity_months: 24 },
+        warningDays: 60, severity: ['block_auto_assign', 'include_in_reports', 'show_validation_warning'],
+        description: 'ICAO Class 2 medical certificate for cabin crew',
+      },
+      {
+        code: 'OPC', name: 'Operator Proficiency Check', categoryId: catMap.training,
+        crewCategory: 'cockpit' as const, formula: 'opc_alternating',
+        formulaParams: { validity_months: 6, primary_code: 'OPC', alternate_code: 'LPC' },
+        warningDays: 30, severity: ['block_auto_assign', 'block_manual_assign', 'show_validation_warning', 'expire_on_failure'],
+        description: 'Alternating OPC/LPC cycle \u2014 either renews the code',
+      },
+      {
+        code: 'LCHK', name: 'Line Check', categoryId: catMap.training,
+        crewCategory: 'cockpit' as const, formula: 'route_check',
+        formulaParams: { validity_months: 12 },
+        warningDays: 30, severity: ['block_auto_assign', 'include_in_reports', 'show_validation_warning'],
+        description: 'Annual en-route/line proficiency check',
+      },
+      {
+        code: 'SEP', name: 'Safety & Emergency Procedures', categoryId: catMap.training,
+        crewCategory: 'both' as const, formula: 'fixed_validity',
+        formulaParams: { validity_months: 12 },
+        warningDays: 30, severity: ['block_auto_assign', 'block_manual_assign', 'show_validation_warning'],
+        description: 'Annual SEP training \u2014 required for all crew',
+      },
+      {
+        code: 'DGR', name: 'Dangerous Goods', categoryId: catMap.training,
+        crewCategory: 'both' as const, formula: 'fixed_validity',
+        formulaParams: { validity_months: 24 },
+        warningDays: 60, severity: ['block_auto_assign', 'include_in_reports'],
+        description: 'Dangerous goods awareness and handling training',
+      },
+      {
+        code: 'CRM', name: 'Crew Resource Management', categoryId: catMap.training,
+        crewCategory: 'both' as const, formula: 'fixed_validity',
+        formulaParams: { validity_months: 12 },
+        warningDays: 30, severity: ['include_in_reports', 'show_validation_warning'],
+        description: 'Annual CRM and human factors training',
+      },
+      {
+        code: 'TOLR', name: 'T/O & Landing Recency', categoryId: catMap.recency,
+        crewCategory: 'cockpit' as const, formula: 'takeoff_landing',
+        formulaParams: { required_takeoffs: 3, required_landings: 3, rolling_days: 90 },
+        warningDays: 14, severity: ['block_auto_assign', 'block_manual_assign', 'show_validation_warning'],
+        description: '3 T/O and 3 landings within 90 days',
+      },
+      {
+        code: 'ACTR', name: 'Aircraft Type Recency', categoryId: catMap.recency,
+        crewCategory: 'cockpit' as const, formula: 'ac_type_recency',
+        formulaParams: { min_sectors: 1, rolling_days: 90 },
+        warningDays: 14, severity: ['block_auto_assign', 'show_validation_warning'],
+        description: 'Must operate on type within 90 days',
+        acTypeScope: 'family' as const,
+      },
+      {
+        code: 'VISA', name: 'Country Visa', categoryId: catMap.documents,
+        crewCategory: 'both' as const, formula: 'country_visa',
+        formulaParams: { validity_months: 12 },
+        warningDays: 30, severity: ['block_auto_assign', 'include_in_reports', 'show_validation_warning'],
+        description: 'Visa validity for rostering to specific countries',
+      },
+    ]
+
+    const docs = defaultCodes.map((c, i) => ({
+      _id: crypto.randomUUID(),
+      operatorId,
+      applicablePositions: [],
+      acTypeScope: 'none' as const,
+      linkedTrainingCode: null,
+      notes: null,
+      isActive: true,
+      sortOrder: i,
+      createdAt: now,
+      updatedAt: now,
+      ...c,
+    }))
+    await ExpiryCode.insertMany(docs)
+    return reply.code(201).send(docs)
+  })
+
+  app.post('/expiry-codes', async (req, reply) => {
+    const parsed = expiryCodeCreateSchema.safeParse(req.body)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body = parsed.data
+    const existing = await ExpiryCode.findOne({ operatorId: body.operatorId, code: body.code }).lean()
+    if (existing) return reply.code(409).send({ error: `Expiry code "${body.code}" already exists` })
+    const id = crypto.randomUUID()
+    const now = new Date().toISOString()
+    const doc = await ExpiryCode.create({ _id: id, ...body, createdAt: now, updatedAt: now })
+    return reply.code(201).send(doc.toObject())
+  })
+
+  app.patch('/expiry-codes/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const parsed = expiryCodeUpdateSchema.safeParse(req.body)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body = { ...parsed.data, updatedAt: new Date().toISOString() }
+    if (body.code) {
+      const current = await ExpiryCode.findById(id).lean()
+      if (current && body.code !== current.code) {
+        const dup = await ExpiryCode.findOne({ operatorId: current.operatorId, code: body.code }).lean()
+        if (dup) return reply.code(409).send({ error: `Expiry code "${body.code}" already exists` })
+      }
+    }
+    const updated = await ExpiryCode.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()
+    if (!updated) return reply.code(404).send({ error: 'Expiry code not found' })
+    return updated
+  })
+
+  app.delete('/expiry-codes/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await ExpiryCode.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Expiry code not found' })
+    await ExpiryCode.findByIdAndDelete(id)
+    return { success: true }
   })
 
   // ─── Cabin Classes ──────────────────────────────────────

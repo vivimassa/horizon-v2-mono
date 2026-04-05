@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import type { AircraftRegistrationRef, AircraftTypeRef, LopaConfigRef, CabinClassRef } from "@skyhub/api";
 import { api } from "@skyhub/api";
 import { FieldRow } from "../airports/field-row";
@@ -86,6 +86,16 @@ export function AircraftRegistrationDetail({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [draft, setDraft] = useState<Record<string, unknown>>({});
   const [errorMsg, setErrorMsg] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const pendingScrollRestore = useRef<number | null>(null);
+
+  // Restore scroll position after data refetch re-renders
+  useEffect(() => {
+    if (pendingScrollRestore.current != null && scrollRef.current) {
+      scrollRef.current.scrollTop = pendingScrollRestore.current;
+      pendingScrollRestore.current = null;
+    }
+  });
 
   // Create form
   const [creating, setCreating] = useState(false);
@@ -352,7 +362,7 @@ export function AircraftRegistrationDetail({
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <div className="px-6 pt-3 pb-6">
           {activeTab === "basic" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8">
@@ -428,8 +438,8 @@ export function AircraftRegistrationDetail({
 
             const handleLopaSelect = async (configId: string) => {
               if (!onSave) return;
-              // Toggle: click same = deselect, click different = select
               const newId = configId === currentLopaId ? null : configId;
+              pendingScrollRestore.current = scrollRef.current?.scrollTop ?? 0;
               try {
                 await onSave(registration._id, { lopaConfigId: newId } as Partial<AircraftRegistrationRef>);
               } catch (err) { console.error("Failed to update LOPA:", err); }

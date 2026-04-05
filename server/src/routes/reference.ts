@@ -17,6 +17,7 @@ import { Operator } from '../models/Operator.js'
 import { FlightInstance } from '../models/FlightInstance.js'
 import { CabinClass } from '../models/CabinClass.js'
 import { LopaConfig } from '../models/LopaConfig.js'
+import { ActivityCodeGroup, ActivityCode } from '../models/ActivityCode.js'
 import { lookupByIcao, getStats, loadOurAirportsData } from '../data/ourairports-cache.js'
 
 // ─── Zod schemas for airport validation ───────────────────
@@ -1401,6 +1402,289 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
       airports: stats.airports,
       lastRefreshed: new Date(stats.lastLoadTime).toISOString(),
     }
+  })
+
+  // ─── Activity Code Groups ──────────────────────────────
+  const acGroupCreateSchema = z.object({
+    operatorId: z.string().min(1),
+    code: z.string().min(1).max(8),
+    name: z.string().min(1).max(60),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+    sortOrder: z.number().int().min(0).optional(),
+  }).strict()
+
+  const acGroupUpdateSchema = z.object({
+    code: z.string().min(1).max(8),
+    name: z.string().min(1).max(60),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+    sortOrder: z.number().int().min(0),
+  }).partial().strict()
+
+  app.get('/activity-code-groups', async (req) => {
+    const { operatorId } = req.query as { operatorId?: string }
+    const filter: Record<string, unknown> = {}
+    if (operatorId) filter.operatorId = operatorId
+    return ActivityCodeGroup.find(filter).sort({ sortOrder: 1, code: 1 }).lean()
+  })
+
+  app.post('/activity-code-groups', async (req, reply) => {
+    const raw = req.body as Record<string, unknown>
+    if (raw.code) raw.code = (raw.code as string).toUpperCase()
+    const parsed = acGroupCreateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body = parsed.data
+    const existing = await ActivityCodeGroup.findOne({ operatorId: body.operatorId, code: body.code }).lean()
+    if (existing) return reply.code(409).send({ error: `Group "${body.code}" already exists` })
+
+    // Auto sort order if not provided
+    if (body.sortOrder == null) {
+      const count = await ActivityCodeGroup.countDocuments({ operatorId: body.operatorId })
+      body.sortOrder = (count + 1) * 10
+    }
+
+    const id = crypto.randomUUID()
+    const doc = await ActivityCodeGroup.create({ _id: id, ...body, createdAt: new Date().toISOString() })
+    return reply.code(201).send(doc.toObject())
+  })
+
+  app.patch('/activity-code-groups/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const raw = req.body as Record<string, unknown>
+    if (raw.code) raw.code = (raw.code as string).toUpperCase()
+    const parsed = acGroupUpdateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body = { ...parsed.data, updatedAt: new Date().toISOString() }
+    const doc = await ActivityCodeGroup.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'Group not found' })
+    return doc
+  })
+
+  app.delete('/activity-code-groups/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const group = await ActivityCodeGroup.findById(id).lean()
+    if (!group) return reply.code(404).send({ error: 'Group not found' })
+    const codeCount = await ActivityCode.countDocuments({ groupId: id })
+    if (codeCount > 0) {
+      return reply.code(409).send({
+        error: `Cannot delete "${group.name}" — ${codeCount} activity code${codeCount > 1 ? 's' : ''} belong to this group. Remove them first.`,
+      })
+    }
+    await ActivityCodeGroup.findByIdAndDelete(id)
+    return { success: true }
+  })
+
+  // ─── Activity Codes ────────────────────────────────────
+  const acCodeCreateSchema = z.object({
+    operatorId: z.string().min(1),
+    groupId: z.string().min(1),
+    code: z.string().min(1).max(8),
+    name: z.string().min(1).max(60),
+    description: z.string().nullable().optional(),
+    shortLabel: z.string().nullable().optional(),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
+    isSystem: z.boolean().optional().default(false),
+    isActive: z.boolean().optional().default(true),
+    isArchived: z.boolean().optional().default(false),
+    flags: z.array(z.string()).optional().default([]),
+    creditRatio: z.number().nullable().optional(),
+    creditFixedMin: z.number().int().nullable().optional(),
+    payRatio: z.number().nullable().optional(),
+    minRestBeforeMin: z.number().int().nullable().optional(),
+    minRestAfterMin: z.number().int().nullable().optional(),
+    defaultDurationMin: z.number().int().nullable().optional(),
+    requiresTime: z.boolean().optional().default(false),
+    defaultStartTime: z.string().nullable().optional(),
+    defaultEndTime: z.string().nullable().optional(),
+    simPlatform: z.string().nullable().optional(),
+    simDurationMin: z.number().int().nullable().optional(),
+    applicablePositions: z.array(z.string()).optional().default([]),
+  }).strict()
+
+  const acCodeUpdateSchema = z.object({
+    groupId: z.string().min(1),
+    code: z.string().min(1).max(8),
+    name: z.string().min(1).max(60),
+    description: z.string().nullable(),
+    shortLabel: z.string().nullable(),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(),
+    isActive: z.boolean(),
+    isArchived: z.boolean(),
+    creditRatio: z.number().nullable(),
+    creditFixedMin: z.number().int().nullable(),
+    payRatio: z.number().nullable(),
+    minRestBeforeMin: z.number().int().nullable(),
+    minRestAfterMin: z.number().int().nullable(),
+    defaultDurationMin: z.number().int().nullable(),
+    requiresTime: z.boolean(),
+    defaultStartTime: z.string().nullable(),
+    defaultEndTime: z.string().nullable(),
+    simPlatform: z.string().nullable(),
+    simDurationMin: z.number().int().nullable(),
+  }).partial().strict()
+
+  app.get('/activity-codes', async (req) => {
+    const { operatorId } = req.query as { operatorId?: string }
+    const filter: Record<string, unknown> = {}
+    if (operatorId) filter.operatorId = operatorId
+    return ActivityCode.find(filter).sort({ code: 1 }).lean()
+  })
+
+  app.get('/activity-codes/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await ActivityCode.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Activity code not found' })
+    return doc
+  })
+
+  app.post('/activity-codes', async (req, reply) => {
+    const raw = req.body as Record<string, unknown>
+    if (raw.code) raw.code = (raw.code as string).toUpperCase()
+    const parsed = acCodeCreateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body = parsed.data
+    const existing = await ActivityCode.findOne({ operatorId: body.operatorId, code: body.code }).lean()
+    if (existing) return reply.code(409).send({ error: `Activity code "${body.code}" already exists` })
+    const id = crypto.randomUUID()
+    const doc = await ActivityCode.create({ _id: id, ...body, createdAt: new Date().toISOString() })
+    return reply.code(201).send(doc.toObject())
+  })
+
+  app.patch('/activity-codes/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const raw = req.body as Record<string, unknown>
+    if (raw.code) raw.code = (raw.code as string).toUpperCase()
+    const parsed = acCodeUpdateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const existing = await ActivityCode.findById(id).lean()
+    if (!existing) return reply.code(404).send({ error: 'Activity code not found' })
+    if (existing.isSystem) {
+      // System codes: only allow color updates
+      const allowed = { color: parsed.data.color, updatedAt: new Date().toISOString() } as Record<string, unknown>
+      Object.keys(allowed).forEach(k => { if (allowed[k] === undefined) delete allowed[k] })
+      const doc = await ActivityCode.findByIdAndUpdate(id, { $set: allowed }, { new: true }).lean()
+      return doc
+    }
+    const body = { ...parsed.data, updatedAt: new Date().toISOString() }
+    const doc = await ActivityCode.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()
+    return doc
+  })
+
+  app.patch('/activity-codes/:id/flags', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const { flags } = req.body as { flags: string[] }
+    if (!Array.isArray(flags)) return reply.code(400).send({ error: 'flags must be an array' })
+    const existing = await ActivityCode.findById(id).lean()
+    if (!existing) return reply.code(404).send({ error: 'Activity code not found' })
+    if (existing.isSystem) return reply.code(403).send({ error: 'Cannot modify flags on system codes' })
+    const doc = await ActivityCode.findByIdAndUpdate(id, { $set: { flags, updatedAt: new Date().toISOString() } }, { new: true }).lean()
+    return doc
+  })
+
+  app.patch('/activity-codes/:id/positions', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const { applicablePositions } = req.body as { applicablePositions: string[] }
+    if (!Array.isArray(applicablePositions)) return reply.code(400).send({ error: 'applicablePositions must be an array' })
+    const existing = await ActivityCode.findById(id).lean()
+    if (!existing) return reply.code(404).send({ error: 'Activity code not found' })
+    if (existing.isSystem) return reply.code(403).send({ error: 'Cannot modify positions on system codes' })
+    const doc = await ActivityCode.findByIdAndUpdate(id, { $set: { applicablePositions, updatedAt: new Date().toISOString() } }, { new: true }).lean()
+    return doc
+  })
+
+  app.delete('/activity-codes/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await ActivityCode.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Activity code not found' })
+    if (doc.isSystem) return reply.code(403).send({ error: 'Cannot delete system codes' })
+    await ActivityCode.findByIdAndDelete(id)
+    return { success: true }
+  })
+
+  // ─── Seed Default Activity Codes (V1 data) ─────────────
+  app.post('/activity-codes/seed-defaults', async (req, reply) => {
+    const { operatorId } = req.body as { operatorId: string }
+    if (!operatorId) return reply.code(400).send({ error: 'operatorId is required' })
+
+    const existingGroups = await ActivityCodeGroup.countDocuments({ operatorId })
+    if (existingGroups > 0) {
+      return reply.code(409).send({ error: 'Activity code groups already exist for this operator. Seed is only for initial setup.' })
+    }
+
+    const now = new Date().toISOString()
+
+    const groups = [
+      { code: 'DUTY',  name: 'Flight Duty', color: '#dc2626', sortOrder: 10 },
+      { code: 'STBY',  name: 'Standby',     color: '#f59e0b', sortOrder: 20 },
+      { code: 'TRAIN', name: 'Training',     color: '#3b82f6', sortOrder: 30 },
+      { code: 'LEAVE', name: 'Leave & Off',  color: '#10b981', sortOrder: 40 },
+      { code: 'MED',   name: 'Medical',      color: '#8b5cf6', sortOrder: 50 },
+      { code: 'SYS',   name: 'System',       color: '#6b7280', sortOrder: 90 },
+    ]
+
+    const groupMap: Record<string, string> = {}
+    for (const g of groups) {
+      const id = crypto.randomUUID()
+      groupMap[g.code] = id
+      await ActivityCodeGroup.create({ _id: id, operatorId, ...g, createdAt: now })
+    }
+
+    const codes = [
+      // DUTY
+      { groupCode: 'DUTY', code: 'FLT', name: 'Flight Duty', description: 'Operating crew on a scheduled or charter flight', flags: ['is_flight_duty', 'counts_fdp', 'counts_block_hours', 'counts_duty_time'], creditRatio: 1.0 },
+      { groupCode: 'DUTY', code: 'DH', name: 'Deadhead', description: 'Positioning as a non-operating crew member on a flight', flags: ['is_deadhead', 'counts_duty_time'], creditRatio: 0.5 },
+      { groupCode: 'DUTY', code: 'GRD', name: 'Ground Duty', description: 'Ground-based duty including briefings, admin, and surface positioning', flags: ['is_ground_duty', 'counts_duty_time'] },
+      // STBY
+      { groupCode: 'STBY', code: 'AVLB', name: 'Available', description: 'Crew available and contactable for assignment', flags: ['is_airport_standby', 'counts_fdp'] },
+      { groupCode: 'STBY', code: 'ASBY', name: 'Airport Standby', description: 'Crew physically present at the airport on standby', flags: ['is_airport_standby', 'counts_fdp', 'counts_duty_time'] },
+      { groupCode: 'STBY', code: 'HSBY', name: 'Home Standby', description: 'Crew on standby at home, contactable within defined callout time', flags: ['is_home_standby'] },
+      { groupCode: 'STBY', code: 'RSV', name: 'Reserve', description: 'Reserve crew period — available within short-call parameters', flags: ['is_reserve'] },
+      // TRAIN
+      { groupCode: 'TRAIN', code: 'SIM', name: 'Simulator Check', description: 'Simulator session on an approved FSTD or full-flight simulator', flags: ['is_simulator', 'counts_fdp', 'counts_duty_time'], creditRatio: 1.0, defaultDurationMin: 480 },
+      { groupCode: 'TRAIN', code: 'TRG', name: 'Training', description: 'Ground school, classroom, or computer-based training', flags: ['is_training', 'counts_duty_time'], defaultDurationMin: 480 },
+      { groupCode: 'TRAIN', code: 'OJT', name: 'On-Job Training', description: 'Supervised line training flight as operating crew', flags: ['is_training', 'is_flight_duty', 'counts_fdp', 'counts_block_hours', 'counts_duty_time'], creditRatio: 1.0, defaultDurationMin: 480 },
+      // LEAVE
+      { groupCode: 'LEAVE', code: 'AL', name: 'Annual Leave', description: 'Annual leave entitlement day', flags: ['is_annual_leave', 'is_day_off'] },
+      { groupCode: 'LEAVE', code: 'SL', name: 'Sick Leave', description: 'Sick leave or medical incapacity absence', flags: ['is_sick_leave', 'is_day_off'] },
+      { groupCode: 'LEAVE', code: 'RD', name: 'Rest Day', description: 'Scheduled rest day — no duty obligations apply', flags: ['is_day_off', 'is_rest_period'] },
+      { groupCode: 'LEAVE', code: 'COMP', name: 'Compensatory Off', description: 'Compensatory rest day granted in lieu of worked rest period', flags: ['is_day_off'] },
+      // MED
+      { groupCode: 'MED', code: 'MED', name: 'Medical Check', description: 'Periodic medical examination or aeromedical assessment', flags: ['is_medical', 'counts_duty_time'] },
+      { groupCode: 'MED', code: 'FIT', name: 'Fitness Check', description: 'Fitness-for-duty assessment or recurrency check', flags: ['is_medical'] },
+      // SYS
+      { groupCode: 'SYS', code: 'REST', name: 'Rest Day', description: 'Post-duty recovery day — system-assigned when preceding duty releases past midnight local. Does not count as a regulatory day off.', flags: ['is_rest_period'], isSystem: true },
+      { groupCode: 'SYS', code: 'OFF', name: 'Day Off', description: 'Generic off day — used by automated rostering for unspecified off periods', flags: ['is_day_off'], isSystem: true },
+    ]
+
+    for (const c of codes) {
+      const id = crypto.randomUUID()
+      const { groupCode, ...rest } = c
+      await ActivityCode.create({
+        _id: id,
+        operatorId,
+        groupId: groupMap[groupCode],
+        isActive: true,
+        isArchived: false,
+        isSystem: false,
+        requiresTime: false,
+        applicablePositions: [],
+        ...rest,
+        createdAt: now,
+      })
+    }
+
+    return { success: true, groupCount: groups.length, codeCount: codes.length }
   })
 }
 

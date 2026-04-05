@@ -212,6 +212,46 @@ export interface CountryRef {
   isActive: boolean
 }
 
+export interface ActivityCodeGroupRef {
+  _id: string
+  operatorId: string
+  code: string
+  name: string
+  color: string
+  sortOrder: number
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface ActivityCodeRef {
+  _id: string
+  operatorId: string
+  groupId: string
+  code: string
+  name: string
+  description: string | null
+  shortLabel: string | null
+  color: string | null
+  isSystem: boolean
+  isActive: boolean
+  isArchived: boolean
+  flags: string[]
+  creditRatio: number | null
+  creditFixedMin: number | null
+  payRatio: number | null
+  minRestBeforeMin: number | null
+  minRestAfterMin: number | null
+  defaultDurationMin: number | null
+  requiresTime: boolean
+  defaultStartTime: string | null
+  defaultEndTime: string | null
+  simPlatform: string | null
+  simDurationMin: number | null
+  applicablePositions: string[]
+  createdAt: string | null
+  updatedAt: string | null
+}
+
 export interface DelayCodeRef {
   _id: string
   operatorId: string
@@ -591,6 +631,44 @@ export const api = {
   deleteBlockHour: (cityPairId: string, bhId: string) =>
     request<CityPairRef>(`/city-pairs/${cityPairId}/block-hours/${bhId}`, {
       method: 'DELETE',
+    }),
+
+  // ─── Activity Code Groups ────────────────────────────────
+  getActivityCodeGroups: (operatorId = 'horizon') =>
+    request<ActivityCodeGroupRef[]>(`/activity-code-groups?operatorId=${operatorId}`),
+
+  createActivityCodeGroup: (data: Partial<ActivityCodeGroupRef>) =>
+    request<ActivityCodeGroupRef>('/activity-code-groups', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateActivityCodeGroup: (id: string, data: Partial<ActivityCodeGroupRef>) =>
+    request<ActivityCodeGroupRef>(`/activity-code-groups/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  deleteActivityCodeGroup: (id: string) =>
+    request<{ success: boolean }>(`/activity-code-groups/${id}`, { method: 'DELETE' }),
+
+  // ─── Activity Codes ────────────────────────────────────
+  getActivityCodes: (operatorId = 'horizon') =>
+    request<ActivityCodeRef[]>(`/activity-codes?operatorId=${operatorId}`),
+
+  createActivityCode: (data: Partial<ActivityCodeRef>) =>
+    request<ActivityCodeRef>('/activity-codes', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateActivityCode: (id: string, data: Partial<ActivityCodeRef>) =>
+    request<ActivityCodeRef>(`/activity-codes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  updateActivityCodeFlags: (id: string, flags: string[]) =>
+    request<ActivityCodeRef>(`/activity-codes/${id}/flags`, { method: 'PATCH', body: JSON.stringify({ flags }) }),
+
+  updateActivityCodePositions: (id: string, positions: string[]) =>
+    request<ActivityCodeRef>(`/activity-codes/${id}/positions`, { method: 'PATCH', body: JSON.stringify({ applicablePositions: positions }) }),
+
+  deleteActivityCode: (id: string) =>
+    request<{ success: boolean }>(`/activity-codes/${id}`, { method: 'DELETE' }),
+
+  seedActivityCodeDefaults: (operatorId = 'horizon') =>
+    request<{ success: boolean; groupCount: number; codeCount: number }>('/activity-codes/seed-defaults', {
+      method: 'POST',
+      body: JSON.stringify({ operatorId }),
     }),
 
   getDelayCodes: (operatorId = 'horizon') =>

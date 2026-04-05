@@ -8,3 +8,4 @@ export * from './module-registry'
 // so re-export them as namespaces to avoid collision
 export * as GanttSettings from './gantt-settings'
 export * as MovementSettings from './movement-settings'
+export * from './activity-flags'

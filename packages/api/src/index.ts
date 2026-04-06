@@ -15,6 +15,8 @@ export type {
   CrewComplementRef,
   CrewGroupRef,
   DutyPatternRef,
+  ScheduledFlightRef,
+  ScenarioRef,
   MppLeadTimeGroupRef,
   MppLeadTimeItemRef,
   FdtlFrameworkRef,

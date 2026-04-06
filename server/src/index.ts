@@ -13,6 +13,7 @@ import { referenceRoutes } from './routes/reference.js'
 import { userRoutes } from './routes/users.js'
 import { cityPairRoutes } from './routes/city-pairs.js'
 import { fdtlRoutes } from './routes/fdtl.js'
+import { scheduledFlightRoutes } from './routes/scheduled-flights.js'
 import { loadOurAirportsData, startAutoRefresh } from './data/ourairports-cache.js'
 
 const port = Number(process.env.PORT) || 3001
@@ -54,6 +55,7 @@ async function main(): Promise<void> {
   await app.register(userRoutes)
   await app.register(cityPairRoutes)
   await app.register(fdtlRoutes)
+  await app.register(scheduledFlightRoutes)
 
   // Start
   await app.listen({ port, host: '0.0.0.0' })

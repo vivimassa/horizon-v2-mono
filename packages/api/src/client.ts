@@ -266,6 +266,62 @@ export interface DutyPatternRef {
   updatedAt: string | null
 }
 
+export interface ScheduledFlightRef {
+  _id: string
+  operatorId: string
+  seasonCode: string
+  airlineCode: string
+  flightNumber: string
+  suffix: string | null
+  depStation: string
+  arrStation: string
+  depAirportId: string | null
+  arrAirportId: string | null
+  stdUtc: string
+  staUtc: string
+  stdLocal: string | null
+  staLocal: string | null
+  blockMinutes: number | null
+  arrivalDayOffset: number
+  daysOfWeek: string
+  aircraftTypeId: string | null
+  aircraftTypeIcao: string | null
+  aircraftReg: string | null
+  serviceType: string
+  status: 'draft' | 'active' | 'suspended' | 'cancelled'
+  previousStatus: string | null
+  effectiveFrom: string
+  effectiveUntil: string
+  cockpitCrewRequired: number | null
+  cabinCrewRequired: number | null
+  isEtops: boolean
+  isOverwater: boolean
+  isActive: boolean
+  scenarioId: string | null
+  rotationId: string | null
+  rotationSequence: number | null
+  rotationLabel: string | null
+  source: string
+  formatting: Record<string, unknown>
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface ScenarioRef {
+  _id: string
+  operatorId: string
+  seasonCode: string
+  name: string
+  description: string | null
+  status: 'draft' | 'review' | 'published' | 'archived'
+  parentScenarioId: string | null
+  publishedAt: string | null
+  publishedBy: string | null
+  createdBy: string
+  createdAt: string | null
+  updatedAt: string | null
+}
+
 export interface MppLeadTimeGroupRef {
   _id: string
   operatorId: string
@@ -968,6 +1024,39 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ operatorId }),
     }),
+
+  // ─── Scheduled Flights ──────────────────────────────────
+  getScheduledFlights: (params: { operatorId?: string; seasonCode?: string; scenarioId?: string; status?: string; sortBy?: string; sortDir?: string } = {}) => {
+    const p = new URLSearchParams()
+    if (params.operatorId) p.set('operatorId', params.operatorId)
+    if (params.seasonCode) p.set('seasonCode', params.seasonCode)
+    if (params.scenarioId) p.set('scenarioId', params.scenarioId)
+    if (params.status) p.set('status', params.status)
+    if (params.sortBy) p.set('sortBy', params.sortBy)
+    if (params.sortDir) p.set('sortDir', params.sortDir)
+    return request<ScheduledFlightRef[]>(`/scheduled-flights?${p.toString()}`)
+  },
+
+  getScheduledFlight: (id: string) =>
+    request<ScheduledFlightRef>(`/scheduled-flights/${id}`),
+
+  createScheduledFlight: (data: Partial<ScheduledFlightRef>) =>
+    request<ScheduledFlightRef>('/scheduled-flights', { method: 'POST', body: JSON.stringify(data) }),
+
+  createScheduledFlightsBulk: (data: Partial<ScheduledFlightRef>[]) =>
+    request<{ count: number }>('/scheduled-flights/bulk', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateScheduledFlight: (id: string, data: Partial<ScheduledFlightRef>) =>
+    request<ScheduledFlightRef>(`/scheduled-flights/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  updateScheduledFlightsBulk: (updates: { id: string; changes: Partial<ScheduledFlightRef> }[]) =>
+    request<{ modifiedCount: number }>('/scheduled-flights/bulk', { method: 'PATCH', body: JSON.stringify(updates) }),
+
+  deleteScheduledFlight: (id: string) =>
+    request<{ success: boolean }>(`/scheduled-flights/${id}`, { method: 'DELETE' }),
+
+  deleteScheduledFlightsBulk: (ids: string[]) =>
+    request<{ deletedCount: number }>('/scheduled-flights/bulk', { method: 'DELETE', body: JSON.stringify({ ids }) }),
 
   // ─── FDTL ───────────────────────────────────────────────
   getFdtlFrameworks: () =>

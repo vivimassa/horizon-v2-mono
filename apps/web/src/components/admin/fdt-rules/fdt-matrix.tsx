@@ -13,6 +13,11 @@ interface Props {
   onResetTable: (tableId: string) => Promise<void>;
 }
 
+/** Format "HHMM-HHMM" or "HHMM" row labels as "HH:MM-HH:MM" */
+function formatRowLabel(label: string): string {
+  return label.replace(/\b(\d{2})(\d{2})\b/g, "$1:$2");
+}
+
 export function FdtMatrix({ table, isDark, onCellChange, onResetTable }: Props) {
   const hasModified = table.cells.some(c => !c.isTemplateDefault);
   // Track which cell is being edited: "rowKey|colKey" or null
@@ -77,8 +82,8 @@ export function FdtMatrix({ table, isDark, onCellChange, onResetTable }: Props) 
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-1.5">
         <Table2 size={14} style={{ color: ACCENT }} />
-        <span className="text-[13px] font-semibold">{table.label}</span>
-        <span className="text-[13px] text-hz-text-tertiary">({table.cells.length} cells)</span>
+        <span className="text-[15px] font-bold">{table.label}</span>
+        <span className="text-[13px] text-hz-text-tertiary ml-1">({table.cells.length} cells)</span>
         {hasModified && (
           <button
             onClick={() => onResetTable(table._id)}
@@ -94,14 +99,14 @@ export function FdtMatrix({ table, isDark, onCellChange, onResetTable }: Props) 
       )}
 
       <div className="overflow-x-auto rounded-xl border border-hz-border shadow-sm">
-        <table className="w-full text-[13px]" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+        <table className="w-full text-[13px]" style={{ borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed" }}>
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 px-3 py-2 text-left font-semibold uppercase tracking-wider text-hz-text-tertiary bg-hz-bg border-b border-r border-hz-border">
+              <th className="sticky left-0 z-10 px-4 py-2.5 text-left font-medium uppercase tracking-wider text-hz-text-tertiary bg-hz-bg border-b border-r border-hz-border" style={{ minWidth: 220 }}>
                 {table.rowAxisLabel ?? "Row"}
               </th>
               {table.colLabels.map((cl, ci) => (
-                <th key={ci} className="px-1 py-2 text-center font-semibold uppercase tracking-wider text-hz-text-tertiary bg-hz-bg border-b border-hz-border whitespace-nowrap" style={{ minWidth: 58 }}>
+                <th key={ci} className="px-3 py-2.5 text-center font-medium uppercase tracking-wider text-hz-text-tertiary bg-hz-bg border-b border-hz-border whitespace-nowrap" style={{ minWidth: 72 }}>
                   {cl}
                 </th>
               ))}
@@ -110,8 +115,8 @@ export function FdtMatrix({ table, isDark, onCellChange, onResetTable }: Props) 
           <tbody>
             {table.rowKeys.map((rk, ri) => (
               <tr key={rk} className={ri % 2 === 0 ? "" : "bg-hz-border/[0.04]"}>
-                <td className="sticky left-0 z-10 px-3 py-1.5 font-medium text-hz-text border-r border-hz-border bg-hz-bg whitespace-nowrap">
-                  {table.rowLabels[ri] ?? rk}
+                <td className="sticky left-0 z-10 px-4 py-2.5 font-medium font-mono tabular-nums text-hz-text border-r border-hz-border bg-hz-bg whitespace-nowrap" style={{ minWidth: 220 }}>
+                  {formatRowLabel(table.rowLabels[ri] ?? rk)}
                 </td>
                 {table.colKeys.map(ck => {
                   const cell = table.cells.find(c => c.rowKey === rk && c.colKey === ck);
@@ -170,7 +175,7 @@ function MatrixCell({
 
   if (isProhibited) {
     return (
-      <td className="px-1 py-1.5 text-center">
+      <td className="px-3 py-2.5 text-center">
         <span className="text-red-400 font-semibold">—</span>
       </td>
     );
@@ -178,7 +183,7 @@ function MatrixCell({
 
   if (isNA) {
     return (
-      <td className="px-1 py-1.5 text-center">
+      <td className="px-3 py-2.5 text-center">
         <span className="text-hz-text-tertiary">N/A</span>
       </td>
     );
@@ -186,7 +191,7 @@ function MatrixCell({
 
   if (isEditing) {
     return (
-      <td className="px-1 py-1.5 text-center">
+      <td className="px-3 py-2.5 text-center">
         <input
           ref={inputRef}
           autoFocus
@@ -214,7 +219,7 @@ function MatrixCell({
 
   return (
     <td
-      className="px-1 py-1.5 text-center cursor-pointer transition-colors hover:bg-hz-border/20"
+      className="px-3 py-2.5 text-center cursor-pointer transition-colors hover:bg-hz-border/20"
       style={{
         backgroundColor: isModified ? accentTint(ACCENT, isDark ? 0.08 : 0.05) : undefined,
       }}

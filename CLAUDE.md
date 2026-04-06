@@ -14,51 +14,100 @@ Airline operations management platform replacing legacy systems (AIMS). Built fo
 
 ## Critical Rules — Read Every Session
 
-### 1. Read HORIZON_PROJECT_STATE.md First
-Contains full architecture, current build state, all decisions made. Read it before doing anything.
+### 1. Design System: Core Design System + Stitch Glass
+SkyHub's visual identity is built on three merged layers:
+- **Core Design System (XD)** — gray scale, semantic colors, 6-level elevation, button/badge sizing, typography weights
+- **Stitch Glass Aesthetic** — glass panels (`variant="glass"`), radial glows, accent glow shadows, section accent bars
+- **SkyHub Overrides** — 11px text minimum, 12px card radius, system fonts, Lucide icons
 
-### 2. UTC-Only Time Storage
+**Every component MUST conform to the design tokens in `packages/ui/src/theme/`.** The skill file `.claude/skills/horizon-frontend/SKILL.md` is the canonical reference. Read it before writing ANY UI code.
+
+### 2. Color System — XD Gray Scale + Stitch Depth
+**Light mode grays:** `#FAFAFC` (page) → `#FFFFFF` (card) → `#F2F2F5` (hover) → `#E4E4EB` (border)
+**Dark mode depth:** `#0E0E14` (page) → `#191921` (card) → `#1F1F28` (hover) → `rgba(255,255,255,0.06)` (border)
+**Status colors:** Vibrant XD values — `#06C270` (success), `#FF3B3B` (error), `#FF8800` (warning), `#0063F7` (info)
+All colors via `useTheme()` → `palette.xxx`. NEVER hardcode hex values in component files.
+
+### 3. Shadow System — 6-Level Elevation (CRITICAL)
+Every Card MUST have a shadow. Shadow color is `#606170` (neutral blue-gray, NOT pure black).
+
+| Level | Name | Usage | iOS shadowOpacity |
+|-------|------|-------|-------------------|
+| 01 | `card` | Resting cards, list items | 0.06 |
+| 02 | `cardHover` / `input` | Hovered cards, inputs, search bars | 0.08 |
+| 03 | `raised` | Dropdowns, popovers, floating action cards | 0.10 |
+| 04 | `floating` | Floating panels, sticky headers | 0.12 |
+| 05 | `modal` | Modals, dialogs, bottom sheets | 0.14 |
+| 06 | `overlay` | Top-level overlays, toasts | 0.18 |
+
+Import from `packages/ui/src/theme/shadows.ts`. A card without shadow looks like a wireframe.
+
+### 4. Typography — Weight Rules
+- **Bold (700):** Headings, section titles, stat numbers
+- **SemiBold (600):** Page title, emphasis, badges
+- **Medium (500):** Labels, buttons, card titles, nav items
+- **Regular (400):** Body text, captions, descriptions
+
+Minimum text size: **11px**. The XD system uses 10px for badges — we override to 11px for accessibility. All tokens in `packages/ui/src/theme/typography.ts`.
+
+### 5. Component Dimensions (Core Design System)
+**Buttons:** 24px (sm) → 32px (md) → 40px (lg) → 48px (xl/mobile CTA). Radius 8px. Text: 11–14px Medium.
+**Badges:** 20px (sm) → 24px (md) → 29px (lg). Radius 6px. Exception: detail header status badges (Active/Inactive) use 13px SemiBold pill.
+**Inputs:** 40px height, 8px radius, 14px Regular text, 12px Medium label.
+**Cards:** 12px radius (mobile override of XD's 8px), padding 12–16px.
+**Touch targets:** 44px minimum (Apple HIG).
+Dimension tokens in `packages/ui/src/theme/spacing.ts` → `buttonSize`, `badgeSize`.
+
+### 6. Glass Panels (Stitch Aesthetic)
+Use `<Card variant="glass">` for hero/elevated sections in dark mode. This applies:
+- Background: `rgba(25,25,33,0.85)` with `backdrop-filter: blur(24px)` on web
+- Border: `rgba(255,255,255,0.06)`
+- Use sparingly: profile hero cards, KPI strips, featured sections. NOT for every card.
+
+Glass helper functions in `packages/ui/src/theme/colors.ts` → `glass` export.
+
+### 7. Section Headers — Accent Bar Pattern
+Use `<SectionHeader title="Account" />` for all section dividers. Renders a 3px accent-colored vertical bar before the title text. Optional `badge` prop for labels like "Admin Only". Color defaults to `accentColor`, override with `color` prop (e.g. purple for admin sections).
+
+### 8. UTC-Only Time Storage
 Store UTC milliseconds. Display operator-local. NEVER mix. All timestamp fields must have `Utc`, `Local`, or `Ms` suffix. See skill: `horizon-time-law`.
 
-### 3. operatorId on Every Query
-MongoDB and WatermelonDB queries MUST include operatorId. Missing = multi-tenant data leak. Database-per-tenant is defense-in-depth, not a replacement for query filtering.
+### 9. operatorId on Every Query
+MongoDB and WatermelonDB queries MUST include operatorId. Missing = multi-tenant data leak.
 
-### 4. ICAO Standard Codes
-Aircraft types: `A320`, `A321`, `A333` (industry standard). Airports: ICAO codes (`VVTS`, not `SGN` in data layer). NEVER use custom abbreviations.
+### 10. ICAO Standard Codes
+Aircraft types: `A320`, `A321`, `A333` (industry standard). Airports: ICAO codes (`VVTS`, not `SGN` in data layer).
 
-### 5. Component Size Limit: 400 Lines Max
-Flag at 300 lines. Split at 400. Maximum 8 useState hooks — use Zustand beyond that. Extract business logic to `packages/shared/src/logic/`. React.memo on all list item components. FlatList renderItem must be a memoized component.
+### 11. Component Size Limit: 400 Lines Max
+Flag at 300 lines. Split at 400. Maximum 8 useState hooks — use Zustand beyond that. Extract business logic to `packages/shared/src/logic/`. React.memo on all list item components.
 
-### 6. Styling: NativeWind className ONLY
-Use NativeWind `className` props for all styling. NO `StyleSheet.create()` in component files (exception: `shadowStyles` in theme/ for native platform shadows). NO inline `style={}` objects except for dynamic runtime values (accentColor, status colors). All colors from `useTheme()` → `palette.xxx`. All typography from `packages/ui/src/theme/typography.ts`. Minimum text size 11px. Dark mode mandatory on every component.
+### 12. Styling: NativeWind className ONLY
+Use NativeWind `className` for all styling. NO `StyleSheet.create()` in component files. NO inline `style={}` except for dynamic runtime values (accentColor, status colors, shadows). All colors from `useTheme()`. Minimum text size 11px. Dark mode mandatory.
 
-### 7. Offline-First Architecture
-Every read from WatermelonDB first. Every write to WatermelonDB first, then queue for sync. UI must work with only local data. Sync classification per data type (Reference / Operational / Personal / Disruption).
+### 13. Offline-First Architecture
+Every read from WatermelonDB first. Every write to WatermelonDB first, then queue for sync.
 
-### 8. Skia for Gantt Charts
-All timeline/Gantt rendering via `@shopify/react-native-skia`. NEVER use View-based absolute positioning for timeline bars. Pan/zoom on UI thread via Reanimated.
+### 14. Skia for Gantt Charts
+All timeline/Gantt rendering via `@shopify/react-native-skia`. NEVER View-based absolute positioning for timeline bars.
 
-### 9. Icon System — Zero Emoji
-All icons via `lucide-react-native` through the `<Icon>` wrapper component. NEVER use emoji in any component. NEVER use `@expo/vector-icons` or `react-native-vector-icons`. NEVER import from `lucide-react-native` directly in screen files — use `<Icon>` wrapper or `domainIcons` map from `packages/ui/src/theme/icons.ts`.
+### 15. Icon System — Zero Emoji
+All icons via `lucide-react-native` through `<Icon>` wrapper. NEVER use emoji. NEVER import from `lucide-react-native` directly in screen files.
 
-### 10. Shadow System — No Flat Cards
-Every Card must have shadow applied (`shadowClasses.card` + native `shadowStyles.card`). Shadows defined in `packages/ui/src/theme/shadows.ts`. Cards without shadow look like wireframes, not a finished product.
+### 16. Accent Color — Use Aggressively
+Dynamic per-tenant via `useTheme().accentColor`. Default `#1e40af`. Must appear 3+ times on every screen: section bars, primary buttons, active indicators, stat numbers, links.
 
-### 11. Accent Color — Use Aggressively
-Dynamic per-tenant via `useTheme().accentColor`. Default `#1e40af` (blue). Must appear 3+ times on every screen: section header bars, primary buttons, active list items, stat numbers, links. Applied via `style={{ backgroundColor: accentColor }}` since it's runtime-dynamic.
-
-### 12. Gluestack UI v3 — Accessible Primitives
-Complex interactive components (Button, Input, Modal, Select, Toast, FormControl, Checkbox, Radio, Switch, Actionsheet, AlertDialog, Drawer, Accordion) come from Gluestack v3. Located at `packages/ui/src/gluestack/`. Screen files import ONLY from `@horizon/ui` barrel — NEVER from `@gluestack-ui/*` directly. SkyHub wraps Gluestack for Button and SearchInput with our visual design. See skill: `horizon-frontend`.
+### 17. Gluestack UI v3 — Accessible Primitives
+Complex interactive components from Gluestack v3 at `packages/ui/src/gluestack/`. Screen files import ONLY from `@horizon/ui` barrel.
 
 ## Navigation — 6 Tabs
 ```
 Home | Network | Flight Ops | Ground Ops | Crew Ops | Settings
 ```
-- **Phone/Tablet:** Bottom tab bar, all 6 visible. Active tab: accent tint pill + accent icon/label.
-- **Desktop (web):** Collapsible bottom dock. Chevron to collapse into floating pill.
+- **Phone/Tablet:** Bottom tab bar (SpotlightDock). Active tab: accent glow + accent icon/label.
+- **Desktop (web):** Collapsible bottom dock.
 - **Settings is role-based:**
-  - All users: Account (Profile, Appearance, Notifications, Password, Preferences)
-  - Admin users: + Administration (Master Data, Users & Roles, Interface, Operator Config, Reports)
+  - All users: Account (Profile, Appearance, Notifications, Security, Preferences)
+  - Admin users: + Administration (Master Data, Users & Roles, Interface, Operator Config)
 
 ## Workflow
 1. `/feature-dev` — Full development workflow (research → plan → implement → verify)
@@ -73,20 +122,14 @@ Home | Network | Flight Ops | Ground Ops | Crew Ops | Settings
 - `build-error-resolver` — Fix Expo/Metro/TS/Fastify build errors (Sonnet)
 - `refactor-cleaner` — Dead code cleanup and component splits (Sonnet)
 
-## Skills Available
-- `horizon-frontend` — Design system enforcement (tokens, shadows, accent, icons, Gluestack)
+## Skills
+- `horizon-frontend` — Design system enforcement (tokens, shadows, accent, glass, icons)
 - `horizon-architecture` — Performance guardrails, component limits
-- `horizon-time-law` — UTC storage rules, timezone conversion
+- `horizon-time-law` — UTC storage rules
 - `horizon-db-conventions` — MongoDB + WatermelonDB patterns
-- `search-first` — Research before coding
-- `verification-loop` — Full quality gate sequence
-- `continuous-learning` — Extract session patterns
-- `strategic-compact` — Context management for long sessions
 
 ## Git Conventions
-- Conventional commits: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`, `perf:`, `ci:`
-- Pre-commit hook checks: secrets, console.log, file length, font sizes
-- Commit-msg hook validates format
+Conventional commits: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`, `perf:`, `ci:`
 
 ## Key People / Systems
 - AIMS: Legacy reference system (feature parity target)
@@ -125,14 +168,116 @@ server/                  → Fastify API server
     sync/                → WatermelonDB sync protocol handlers
 ```
 
-## Visual Polish Checklist (Every Screen)
-- [ ] Every card has shadow
-- [ ] Accent color visible 3+ times
+## Component Catalog (Core Design System)
+
+### Buttons — 5 Variants + States
+- **primary** — accent bg, white text (standard CTA)
+- **secondary** — transparent bg, accent border + text
+- **ghost** — transparent, accent text only
+- **destructive** — red `#E63535` bg, white text (delete/remove)
+- **affirmative** — green `#06C270` bg, white text (approve/confirm/apply)
+- **States:** Normal → Hover (lighter fill) → Pressed (darker fill) → Focus (2px accent ring offset) → Disabled (50% opacity)
+- **Progressive:** Loading state with spinner inside button. Use `ButtonSpinner` from Gluestack.
+
+### Badges — 9 Semantic Variants
+INFO (blue `#0063F7`), SUCCESS (green `#06C270`), WARNING (orange `#FF8800`), DANGER (red `#FF3B3B`), REMINDER (pink `#be185d`), MISC (accent), UNAVAILABLE (gray outline), OFFLINE (dark gray `#555770`), PRIMARY (accent blue)
+Detail header status badges: **13px SemiBold** rounded-full pill (exception to standard badge sizes).
+
+### Avatars — 4 Types
+- **Icon** (24px) — fallback Lucide user icon
+- **Initials** (32px) — 2-letter initials on accent-tinted circle
+- **Picture** (32px) — circular image, 2.5px white border
+- **Status dot** — 8px green (active) / gray (idle) dot, offset bottom-right of avatar
+
+### Chips — 5 Variants
+22px height, 8px radius. Types: Text only, Icon+text, Dismissible (with X), Colored (accent bg), Avatar (with mini picture, 11px pill radius).
+
+### Alerts — 4 Semantic + Variants
+Left accent bar (3px) + icon + text + optional dismiss X + optional CTA button.
+- **Info** — blue bar, `AlertCircle` icon, `#0063F7`
+- **Success** — green bar, `CheckCircle` icon, `#06C270`
+- **Error** — red bar, `XCircle` icon, `#E63535`
+- **Warning** — orange bar, `AlertTriangle` icon, `#FF8800`
+Variants: text-only, with header+body, with CTA button, dismissible.
+
+### Forms — Input Rules
+- Height: 40px, radius 8px (`rounded-lg`), 14px Regular text, 12px Medium label above
+- **States:** Normal (gray border) → Focus (accent border + ring) → Error (red `#E63535` border) → Success (green `#06C270` border) → Disabled (50% opacity, gray bg)
+- **Assistive text:** 12px Regular below input, uses status color when validating
+- **Icon positions:** left icon, right icon, or both (double icon). Icon size 16px, color `textSecondary`.
+- **Validation UX:** spinner + "Checking..." → success checkmark → error X with message
+
+### Modals — Standardized Patterns
+Use Gluestack AlertDialog/Modal. Button pairs: "No, Cancel" (secondary) + "Yes, Do It" (primary). Destructive: "No, Cancel" + "Yes, Delete" (red). Always include dismiss X on non-critical modals.
+
+### Tables — Standard Patterns
+- Header: 12px Medium uppercase, `textTertiary`, bottom border
+- Rows: alternating bg (`backgroundHover` on odd rows), hover state
+- Cell padding: `px-3 py-2.5` minimum for data tables
+- Row actions: overflow menu (MoreHorizontal icon) with Edit/Delete/Export
+- Pagination footer: "Showing X-Y of Z" left, numbered pagination right
+- Sortable columns: chevron indicator on header click
+- Selection: checkbox column, accent bg highlight on selected rows
+
+### Pagination
+Button pagination (Prev/Next with chevron icons) or numbered (1, 2, **3**, 4, 5... 12 with active page in accent circle).
+
+### Navigation — Tabs
+3 styles: **Underline** (accent bar under active), **Pill** (accent bg on active), **Box** (bordered bottom). Active tab always uses accent color.
+
+### Progress Indicators
+- **Bar:** 4px height, full radius, track in `border` color, fill in accent
+- **Circular:** 24/32/40px diameter, 3px stroke, accent color
+- **Percentage text:** 12px Medium beside or inside
+
+### Status Icons (standardized Lucide mapping)
+- **info** → `AlertCircle` (blue `#0063F7`)
+- **warning** → `AlertTriangle` (orange `#FF8800`)
+- **error** → `XCircle` (red `#E63535`)
+- **success** → `CheckCircle` (green `#06C270`)
+
+### Primary Color Shades
+`colors.primary` in `colors.ts`: pressed `#3568D4` → default `#3E7BFA` → hover `#5B8DEF` → light `#6698FF` → lighter `#9DBFF9` → lightest `#CCDDFF` → surfaceTint `#E5F0FF`
+
+### Extended Semantic Colors
+Yellow `#FFCC00` / `#FDDD48`, Purple `#6600CC` / `#AC5DD9`, Teal `#00CFDE` / `#73DFE7` — available via `colors.semantic`.
+
+### Notification Badges
+Red dot (8px) or count pill (red bg, white text, min 16px width) positioned top-right of icon with negative offset.
+
+### Tooltips / Popovers
+30px height, 4px radius. Dark bg (`#1C1C28`) in light mode, light bg in dark mode. 12px Regular text. Arrow/caret pointing to trigger.
+
+### Sliders
+Track: accent fill on left, `border` color on right. Thumb: 16px circle, white fill, accent border, shadow level 02. Range slider: two thumbs with accent fill between.
+
+### Calendar / Date Picker
+Selected date: accent circle. Range: connected accent-tinted row. Month nav: chevron left/right. Month grid: pill buttons. Today: subtle outline.
+
+### Dropdowns — Advanced
+Standard (Gluestack Select), Tabbed (with tab switcher inside), Search/auto-suggest (input + filtered list with avatars), Branched/cascading (nested sub-menus).
+
+### Scrollbars
+4px width, 2px radius, thumb in `textTertiary` color, track transparent.
+
+## Visual Polish Checklist (EVERY Screen)
+- [ ] Every card has shadow from `shadowStyles` (level 01 minimum)
+- [ ] Accent color visible 3+ times (section bars, buttons, indicators)
 - [ ] 3+ typography levels (title → heading → body minimum)
-- [ ] SectionHeaders have accent left bar
+- [ ] Section dividers use `<SectionHeader>` with accent bar
+- [ ] Hero/profile sections use `<Card variant="glass">` in dark mode
 - [ ] Empty states for empty lists (never blank space)
 - [ ] Search inputs have shadow + card background
-- [ ] List items have press feedback
-- [ ] Page uses gradient background (not flat white/black)
+- [ ] List items have press feedback (opacity or bg change)
+- [ ] Page uses gradient background via `PageShell` (not flat white/black)
 - [ ] All icons via `<Icon>` wrapper, zero emoji
-- [ ] Dark mode tested and correct
+- [ ] Status chips use vibrant XD colors from `colors.status`
+- [ ] Dark mode tested — no invisible borders, no hardcoded colors
+- [ ] No text below 11px — check badges, tab labels, timestamps
+- [ ] Button heights follow scale: 24/32/40/48px
+- [ ] Buttons use `bg-module-accent`, NEVER hardcoded `#1e40af`
+- [ ] Active/Inactive badges use XD semantic RGBA colors, NEVER Tailwind `bg-green-*`/`bg-red-*`
+- [ ] Form inputs: 40px height, 8px radius, focus ring in accent
+- [ ] Alerts use left accent bar + semantic icon + color
+- [ ] Tables have header in 12px Medium uppercase, adequate cell padding
+- [ ] Delete buttons use `#E63535`, confirm buttons use `#06C270`

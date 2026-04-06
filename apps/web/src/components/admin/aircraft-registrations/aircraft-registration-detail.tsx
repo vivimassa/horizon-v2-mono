@@ -33,10 +33,10 @@ const STATUSES: Record<string, string> = {
 };
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
-  active: { bg: "bg-green-50 dark:bg-green-500/15", text: "text-green-700 dark:text-green-400" },
+  active: { bg: "bg-[rgba(6,194,112,0.12)]", text: "text-[#06C270] dark:text-[#39D98A]" },
   maintenance: { bg: "bg-amber-50 dark:bg-amber-500/15", text: "text-amber-700 dark:text-amber-400" },
   stored: { bg: "bg-gray-100 dark:bg-gray-500/15", text: "text-gray-600 dark:text-gray-400" },
-  retired: { bg: "bg-red-50 dark:bg-red-500/15", text: "text-red-600 dark:text-red-400" },
+  retired: { bg: "bg-[rgba(255,59,59,0.12)]", text: "text-[#E63535] dark:text-[#FF5C5C]" },
 };
 
 const TABS = [
@@ -195,7 +195,7 @@ export function AircraftRegistrationDetail({
       <div className="flex flex-col h-full overflow-hidden">
         <div className="px-6 py-4 border-b border-hz-border shrink-0">
           <div className="flex items-center justify-between">
-            <h1 className="text-[18px] font-semibold">Add New Registration</h1>
+            <h1 className="text-[20px] font-semibold">Add New Registration</h1>
             {onCancelCreate && (
               <button onClick={onCancelCreate} className="text-[13px] text-hz-text-secondary hover:text-hz-text transition-colors">Cancel</button>
             )}
@@ -206,7 +206,7 @@ export function AircraftRegistrationDetail({
             <MiniInput label="Registration *" value={createForm.registration} maxLength={10}
               onChange={(v) => setCreateForm(p => ({ ...p, registration: v.toUpperCase() }))} mono />
             <div className="flex-1">
-              <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">Aircraft Type *</label>
+              <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Aircraft Type *</label>
               <select value={createForm.aircraftTypeId}
                 onChange={(e) => setCreateForm(p => ({ ...p, aircraftTypeId: e.target.value }))}
                 className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text">
@@ -222,7 +222,7 @@ export function AircraftRegistrationDetail({
           </div>
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">Status</label>
+              <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Status</label>
               <select value={createForm.status}
                 onChange={(e) => setCreateForm(p => ({ ...p, status: e.target.value }))}
                 className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text">
@@ -240,8 +240,7 @@ export function AircraftRegistrationDetail({
               </button>
             )}
             <button onClick={handleCreate} disabled={creating}
-              className="flex-1 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
-              style={{ backgroundColor: "#1e40af" }}>
+              className="flex-1 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50 bg-module-accent">
               {creating ? "Creating..." : "Add Registration"}
             </button>
           </div>
@@ -260,7 +259,7 @@ export function AircraftRegistrationDetail({
       <div className="px-6 py-4 border-b border-hz-border shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-[18px] font-bold font-mono px-3 py-1 rounded-lg bg-hz-border/30">
+            <span className="text-[20px] font-semibold font-mono px-3 py-1 rounded-lg bg-hz-border/30">
               {registration.registration}
             </span>
             {acType && (
@@ -268,13 +267,13 @@ export function AircraftRegistrationDetail({
                 {acType.icaoType} — {acType.name}
               </span>
             )}
-            <span className={`text-[12px] font-semibold px-2.5 py-0.5 rounded-full capitalize ${statusStyle.bg} ${statusStyle.text}`}>
+            <span className={`text-[13px] font-semibold px-2.5 py-0.5 rounded-full capitalize ${statusStyle.bg} ${statusStyle.text}`}>
               {STATUSES[registration.status] || registration.status}
             </span>
             {leaseStatus && (
               <span className={`flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${
                 leaseStatus === "expired"
-                  ? "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400"
+                  ? "bg-[rgba(255,59,59,0.12)] text-[#E63535] dark:bg-[rgba(255,92,92,0.15)] dark:text-[#FF5C5C]"
                   : "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400"
               }`}>
                 <AlertTriangle className="h-3 w-3" />
@@ -291,8 +290,7 @@ export function AircraftRegistrationDetail({
                   <X className="h-3.5 w-3.5" /> Cancel
                 </button>
                 <button onClick={handleSave} disabled={saving}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-white transition-colors"
-                  style={{ backgroundColor: "#1e40af" }}>
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-white transition-colors bg-module-accent">
                   <Save className="h-3.5 w-3.5" /> {saving ? "Saving..." : "Save"}
                 </button>
               </>
@@ -301,8 +299,8 @@ export function AircraftRegistrationDetail({
                 {onDelete && (
                   confirmDelete ? (
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[12px] text-red-500 font-medium">Delete?</span>
-                      <button onClick={handleDelete} disabled={saving} className="px-2.5 py-1 rounded-lg text-[12px] font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">Yes</button>
+                      <span className="text-[12px] font-medium" style={{ color: "#E63535" }}>Delete?</span>
+                      <button onClick={handleDelete} disabled={saving} className="px-2.5 py-1 rounded-lg text-[12px] font-semibold text-white transition-colors" style={{ backgroundColor: "#E63535" }}>Yes</button>
                       <button onClick={() => setConfirmDelete(false)} className="px-2.5 py-1 rounded-lg text-[12px] font-medium text-hz-text-secondary hover:bg-hz-border/30 transition-colors">No</button>
                     </div>
                   ) : (
@@ -364,7 +362,7 @@ export function AircraftRegistrationDetail({
                 editing={editing} fieldKey="registration" editValue={getVal("registration")} onChange={handleFieldChange} />
               {/* Aircraft Type */}
               <div className="py-2.5 border-b border-hz-border/50">
-                <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">Aircraft Type</div>
+                <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1">Aircraft Type</div>
                 {editing ? (
                   <select value={getVal("aircraftTypeId") || ""}
                     onChange={(e) => handleFieldChange("aircraftTypeId", e.target.value)}
@@ -381,7 +379,7 @@ export function AircraftRegistrationDetail({
                 editing={editing} fieldKey="variant" editValue={getVal("variant")} onChange={handleFieldChange} />
               {/* Status */}
               <div className="py-2.5 border-b border-hz-border/50">
-                <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">Status</div>
+                <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1">Status</div>
                 {editing ? (
                   <select value={getVal("status") || "active"}
                     onChange={(e) => handleFieldChange("status", e.target.value)}
@@ -404,7 +402,7 @@ export function AircraftRegistrationDetail({
                 editing={editing} fieldKey="dateOfDelivery" editValue={getVal("dateOfDelivery")} onChange={handleFieldChange} />
               {/* Lease expiry with warning */}
               <div className="py-2.5 border-b border-hz-border/50">
-                <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">Lease Expiry</div>
+                <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1">Lease Expiry</div>
                 {editing ? (
                   <input type="text" value={getVal("leaseExpiryDate") ?? ""}
                     onChange={(e) => handleFieldChange("leaseExpiryDate", e.target.value || null)}
@@ -413,22 +411,21 @@ export function AircraftRegistrationDetail({
                 ) : (
                   <div className="flex items-center gap-2">
                     <span className="text-[13px] font-medium">{registration.leaseExpiryDate || "—"}</span>
-                    {leaseStatus === "expired" && <span className="text-[11px] font-semibold text-red-500">Expired</span>}
-                    {leaseStatus === "warning" && <span className="text-[11px] font-semibold text-amber-600">Expiring soon</span>}
+                    {leaseStatus === "expired" && <span className="text-[11px] font-semibold" style={{ color: "#E63535" }}>Expired</span>}
+                    {leaseStatus === "warning" && <span className="text-[11px] font-semibold" style={{ color: "#E67A00" }}>Expiring soon</span>}
                   </div>
                 )}
               </div>
               <FieldRow label="Notes" value={registration.notes}
                 editing={editing} fieldKey="notes" editValue={getVal("notes")} onChange={handleFieldChange} />
               <FieldRow label="Active"
-                value={registration.isActive ? <span className="text-green-600 font-semibold">Active</span> : <span className="text-red-600 font-semibold">Inactive</span>}
+                value={registration.isActive ? <span className="font-semibold" style={{ color: "#06C270" }}>Active</span> : <span className="font-semibold" style={{ color: "#E63535" }}>Inactive</span>}
                 editing={editing} fieldKey="isActive" editValue={getVal("isActive")} onChange={handleFieldChange} inputType="toggle" />
             </div>
           )}
 
           {activeTab === "config" && (() => {
             const currentLopaId = registration.lopaConfigId;
-            const accent = "#1e40af";
 
             const handleLopaSelect = async (configId: string) => {
               if (!onSave) return;
@@ -440,7 +437,7 @@ export function AircraftRegistrationDetail({
 
             return (
               <div className="space-y-4">
-                <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">
+                <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">
                   Select Seating Configuration
                 </div>
 
@@ -458,17 +455,15 @@ export function AircraftRegistrationDetail({
                           onClick={() => handleLopaSelect(lc._id)}
                           className={`w-full text-left rounded-xl border-2 transition-all duration-200 overflow-hidden ${
                             isSelected
-                              ? "border-[#1e40af] shadow-md"
+                              ? "border-module-accent shadow-md"
                               : "border-hz-border/30 opacity-50 hover:opacity-75 hover:border-hz-border"
                           }`}
-                          style={isSelected ? { borderColor: accent, boxShadow: `0 0 0 2px ${accent}30` } : undefined}
                         >
                           {/* Config header */}
-                          <div className="flex items-center gap-3 px-4 py-2.5" style={isSelected ? { backgroundColor: accent + "15" } : undefined}>
+                          <div className={`flex items-center gap-3 px-4 py-2.5 ${isSelected ? "bg-module-accent/10" : ""}`}>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className={`text-[13px] font-semibold ${isSelected ? "" : "text-hz-text-secondary"}`}
-                                  style={isSelected ? { color: accent } : undefined}>
+                                <span className={`text-[13px] font-semibold ${isSelected ? "text-module-accent" : "text-hz-text-secondary"}`}>
                                   {lc.configName}
                                 </span>
                                 {lc.isDefault && <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />}
@@ -477,17 +472,17 @@ export function AircraftRegistrationDetail({
                                 {lc.cabins.map((c, i) => {
                                   const cc = cabinClasses.find(cls => cls.code === c.classCode);
                                   return (
-                                    <span key={i} className="text-[11px] text-hz-text-secondary">
+                                    <span key={i} className="text-[13px] text-hz-text-secondary">
                                       <span className="font-bold font-mono" style={{ color: cc?.color || "#9ca3af" }}>{c.classCode}</span>: {c.seats}
                                     </span>
                                   );
                                 })}
                               </div>
                             </div>
-                            <span className="text-[15px] font-bold tabular-nums" style={{ color: isSelected ? accent : undefined }}>
+                            <span className={`text-[15px] font-bold tabular-nums ${isSelected ? "text-module-accent" : ""}`}>
                               {lc.totalSeats}
                             </span>
-                            <span className="text-[11px] text-hz-text-tertiary">seats</span>
+                            <span className="text-[13px] text-hz-text-tertiary">seats</span>
                           </div>
                           {/* Half-size seat map — crop to show fuselage center */}
                           <div className="px-2 pb-2 flex items-center justify-center" style={{ height: 150, overflow: "hidden" }}>
@@ -547,7 +542,7 @@ export function AircraftRegistrationDetail({
                   </TypeSection>
                   <TypeSection title="ETOPS">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
-                      <FieldRow label="ETOPS Capable" value={acType.etopsCapable ? <span className="text-green-600 font-semibold">Yes</span> : <span className="text-hz-text-secondary">No</span>} />
+                      <FieldRow label="ETOPS Capable" value={acType.etopsCapable ? <span className="font-semibold" style={{ color: "#06C270" }}>Yes</span> : <span className="text-hz-text-secondary">No</span>} />
                       <FieldRow label="ETOPS Rating (min)" value={acType.etopsRatingMinutes ?? null} />
                     </div>
                   </TypeSection>
@@ -622,7 +617,7 @@ export function AircraftRegistrationDetail({
               <TypeSection title="Approach">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
                   <FieldRow label="ILS Category Required" value={acType?.approach?.ilsCategoryRequired ?? null} />
-                  <FieldRow label="Autoland Capable" value={acType?.approach?.autolandCapable ? <span className="text-green-600 font-semibold">Yes</span> : <span className="text-hz-text-secondary">No</span>} />
+                  <FieldRow label="Autoland Capable" value={acType?.approach?.autolandCapable ? <span className="font-semibold" style={{ color: "#06C270" }}>Yes</span> : <span className="text-hz-text-secondary">No</span>} />
                 </div>
               </TypeSection>
               <div className="px-4 py-3 rounded-xl bg-hz-border/10 border border-hz-border/30">
@@ -698,7 +693,7 @@ function ImageDropZone({ registration, acType, onSave }: {
   return (
     <div
       className={`group relative shrink-0 mb-10 overflow-hidden bg-gradient-to-b from-hz-border/5 to-hz-bg transition-colors ${
-        dragging ? "ring-2 ring-[#1e40af] ring-inset bg-[#1e40af]/5" : ""
+        dragging ? "ring-2 ring-module-accent ring-inset bg-module-accent/5" : ""
       }`}
       style={{ maxHeight: 200 }}
       onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -750,8 +745,8 @@ function ImageDropZone({ registration, acType, onSave }: {
       {/* Drag indicator */}
       {dragging && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="absolute inset-0 bg-[#1e40af]/10" />
-          <div className="relative flex items-center gap-2 text-[#1e40af]">
+          <div className="absolute inset-0 bg-module-accent/10" />
+          <div className="relative flex items-center gap-2 text-module-accent">
             <Camera className="h-6 w-6" />
             <span className="text-[15px] font-bold">Drop image here</span>
           </div>
@@ -764,7 +759,7 @@ function ImageDropZone({ registration, acType, onSave }: {
 function TypeSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-[13px] font-bold text-hz-text-secondary uppercase tracking-wider mb-2">{title}</h3>
+      <h3 className="text-[16px] font-bold text-hz-text-secondary uppercase tracking-wider mb-2">{title}</h3>
       {children}
     </div>
   );
@@ -776,9 +771,10 @@ function MiniInput({ label, value, onChange, maxLength, mono, type = "text" }: {
 }) {
   return (
     <div className="flex-1">
-      <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">{label}</label>
+      <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">{label}</label>
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)} maxLength={maxLength}
         className={`w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text ${mono ? "font-mono" : ""}`} />
+
     </div>
   );
 }

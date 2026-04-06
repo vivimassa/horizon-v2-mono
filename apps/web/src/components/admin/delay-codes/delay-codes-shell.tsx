@@ -154,10 +154,9 @@ function DelayCodeList({ groups, selected, onSelect, search, onSearchChange, loa
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 space-y-3 border-b border-hz-border shrink-0">
         <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-bold">Delay Codes</h2>
+          <h2 className="text-[16px] font-bold">Delay Codes</h2>
           <button onClick={onCreateClick}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold text-white transition-colors"
-            style={{ backgroundColor: "#1e40af" }}>
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold text-white transition-colors bg-module-accent">
             <Plus className="h-3 w-3" /> Add
           </button>
         </div>
@@ -166,13 +165,11 @@ function DelayCodeList({ groups, selected, onSelect, search, onSearchChange, loa
         <div className="flex items-center gap-1.5">
           <div className="flex flex-1 rounded-lg border border-hz-border overflow-hidden">
             <button onClick={() => setViewMode("legacy")}
-              className={`flex-1 py-1.5 text-[11px] font-semibold transition-colors ${viewMode === "legacy" ? "text-white" : "text-hz-text-secondary hover:text-hz-text"}`}
-              style={viewMode === "legacy" ? { backgroundColor: "#1e40af" } : undefined}>
+              className={`flex-1 py-1.5 text-[11px] font-semibold transition-colors ${viewMode === "legacy" ? "text-white bg-module-accent" : "text-hz-text-secondary hover:text-hz-text"}`}>
               AHM 730/731
             </button>
             <button onClick={() => setViewMode("ahm732")}
-              className={`flex-1 py-1.5 text-[11px] font-semibold transition-colors ${viewMode === "ahm732" ? "text-white" : "text-hz-text-secondary hover:text-hz-text"}`}
-              style={viewMode === "ahm732" ? { backgroundColor: "#6366f1" } : undefined}>
+              className={`flex-1 py-1.5 text-[11px] font-semibold transition-colors ${viewMode === "ahm732" ? "text-white bg-module-accent" : "text-hz-text-secondary hover:text-hz-text"}`}>
               AHM 732
             </button>
           </div>
@@ -186,7 +183,7 @@ function DelayCodeList({ groups, selected, onSelect, search, onSearchChange, loa
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-hz-text-secondary" />
           <input type="text" placeholder="Search code, name..."
-            className="w-full pl-9 pr-3 py-2 rounded-xl text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 placeholder:text-hz-text-secondary/50 text-hz-text"
+            className="w-full pl-9 pr-3 py-2 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 placeholder:text-hz-text-secondary/50 text-hz-text"
             value={search} onChange={(e) => onSearchChange(e.target.value)} />
         </div>
       </div>
@@ -206,7 +203,7 @@ function DelayCodeList({ groups, selected, onSelect, search, onSearchChange, loa
                   <ChevronRight className={`h-3 w-3 shrink-0 text-hz-text-secondary/50 transition-transform duration-200 ${!collapsed.has(category) ? "rotate-90" : ""}`} />
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: catColor }} />
                   <span className="text-[11px] font-bold uppercase tracking-wider text-hz-text-secondary/70">{category}</span>
-                  <span className="text-[10px] text-hz-text-secondary/40">({items.length})</span>
+                  <span className="text-[11px] text-hz-text-secondary/40">({items.length})</span>
                   <div className="flex-1 h-px bg-hz-border/50 ml-1" />
                 </button>
                 {!collapsed.has(category) && (
@@ -224,11 +221,11 @@ function DelayCodeList({ groups, selected, onSelect, search, onSearchChange, loa
                             <>
                               <span className="text-[14px] font-bold font-mono w-6">{c.code}</span>
                               {c.alphaCode && (
-                                <span className="text-[10px] font-bold font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: catColor + "18", color: catColor }}>{c.alphaCode}</span>
+                                <span className="text-[11px] font-bold font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: catColor + "18", color: catColor }}>{c.alphaCode}</span>
                               )}
                             </>
                           ) : (
-                            <span className="text-[12px] font-bold font-mono px-1.5 py-0.5 rounded tracking-wider" style={{ backgroundColor: "#6366f1" + "18", color: "#6366f1" }}>
+                            <span className="text-[12px] font-bold font-mono px-1.5 py-0.5 rounded tracking-wider bg-module-accent/10 text-module-accent">
                               {ahm732 || "—"}
                             </span>
                           )}
@@ -321,7 +318,7 @@ function DelayCodeDetail({ delayCode, onSave, onDelete, onCreate, onCancelCreate
       <div className="flex flex-col h-full overflow-hidden">
         <div className="px-6 py-4 border-b border-hz-border shrink-0">
           <div className="flex items-center justify-between">
-            <h1 className="text-[18px] font-semibold">Add Delay Code</h1>
+            <h1 className="text-[20px] font-semibold">Add Delay Code</h1>
             {onCancelCreate && <button onClick={onCancelCreate} className="text-[13px] text-hz-text-secondary hover:text-hz-text">Cancel</button>}
           </div>
         </div>
@@ -333,14 +330,14 @@ function DelayCodeDetail({ delayCode, onSave, onDelete, onCreate, onCancelCreate
           </div>
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">Category</label>
+              <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Category</label>
               <select value={createForm.category} onChange={(e) => setCreateForm(p => ({ ...p, category: e.target.value }))}
                 className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text">
                 {CATEGORY_ORDER.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div className="flex-1">
-              <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">Color</label>
+              <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Color</label>
               <div className="flex items-center gap-2 mt-1">
                 <input type="color" value={createForm.color} onChange={(e) => setCreateForm(p => ({ ...p, color: e.target.value }))}
                   className="w-10 h-10 rounded-lg border border-hz-border cursor-pointer" />
@@ -352,11 +349,11 @@ function DelayCodeDetail({ delayCode, onSave, onDelete, onCreate, onCancelCreate
           <MiniInput label="Description" value={createForm.description} onChange={(v) => setCreateForm(p => ({ ...p, description: v }))} />
           <div className="flex gap-3 pt-2">
             {onCancelCreate && <button onClick={onCancelCreate} className="flex-1 py-2.5 rounded-lg text-[13px] font-medium text-hz-text-secondary border border-hz-border hover:bg-hz-border/30 transition-colors">Cancel</button>}
-            <button onClick={handleCreate} disabled={creating} className="flex-1 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50" style={{ backgroundColor: "#1e40af" }}>
+            <button onClick={handleCreate} disabled={creating} className="flex-1 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50 bg-module-accent">
               {creating ? "Creating..." : "Add Delay Code"}
             </button>
           </div>
-          {createError && <p className="text-[12px] text-red-500">{createError}</p>}
+          {createError && <p className="text-[13px]" style={{ color: "#E63535" }}>{createError}</p>}
         </div>
       </div>
     );
@@ -376,26 +373,26 @@ function DelayCodeDetail({ delayCode, onSave, onDelete, onCreate, onCancelCreate
             {delayCode.alphaCode && (
               <span className="text-[14px] font-bold font-mono px-2.5 py-1 rounded-lg" style={{ backgroundColor: catColor + "18", color: catColor }}>{delayCode.alphaCode}</span>
             )}
-            <h1 className="text-[18px] font-semibold">{delayCode.name}</h1>
+            <h1 className="text-[20px] font-semibold">{delayCode.name}</h1>
             <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: catColor + "18", color: catColor }}>{delayCode.category}</span>
             {delayCode.isActive ? (
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-400">Active</span>
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(6,194,112,0.12)] text-[#06C270] dark:bg-[rgba(57,217,138,0.15)] dark:text-[#39D98A]">Active</span>
             ) : (
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400">Inactive</span>
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(255,59,59,0.12)] text-[#E63535] dark:bg-[rgba(255,92,92,0.15)] dark:text-[#FF5C5C]">Inactive</span>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {editing ? (
               <>
                 <button onClick={handleCancel} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-hz-text-secondary hover:bg-hz-border/30"><X className="h-3.5 w-3.5" /> Cancel</button>
-                <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-white" style={{ backgroundColor: "#1e40af" }}><Save className="h-3.5 w-3.5" /> {saving ? "Saving..." : "Save"}</button>
+                <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-white bg-module-accent"><Save className="h-3.5 w-3.5" /> {saving ? "Saving..." : "Save"}</button>
               </>
             ) : (
               <>
                 {onDelete && (confirmDelete ? (
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[12px] text-red-500 font-medium">Delete?</span>
-                    <button onClick={handleDelete} disabled={saving} className="px-2.5 py-1 rounded-lg text-[12px] font-semibold text-white bg-red-500 hover:bg-red-600">Yes</button>
+                    <span className="text-[12px] font-medium" style={{ color: "#E63535" }}>Delete?</span>
+                    <button onClick={handleDelete} disabled={saving} className="px-2.5 py-1 rounded-lg text-[12px] font-semibold text-white" style={{ backgroundColor: "#E63535" }}>Yes</button>
                     <button onClick={() => setConfirmDelete(false)} className="px-2.5 py-1 rounded-lg text-[12px] font-medium text-hz-text-secondary hover:bg-hz-border/30">No</button>
                   </div>
                 ) : (
@@ -469,7 +466,7 @@ function DelayCodeDetail({ delayCode, onSave, onDelete, onCreate, onCancelCreate
               editing={editing} fieldKey="name" editValue={getVal("name")} onChange={handleFieldChange} />
             {/* Category */}
             <div className="py-2.5 border-b border-hz-border/50">
-              <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">Category</div>
+              <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1">Category</div>
               {editing ? (
                 <select value={getVal("category") || ""} onChange={(e) => handleFieldChange("category", e.target.value)}
                   className="w-full text-[13px] font-medium bg-transparent border-b border-hz-accent/30 outline-none focus:border-hz-accent py-0.5 text-hz-text">
@@ -484,7 +481,7 @@ function DelayCodeDetail({ delayCode, onSave, onDelete, onCreate, onCancelCreate
             </div>
             {/* Color */}
             <div className="py-2.5 border-b border-hz-border/50">
-              <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">Color</div>
+              <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1">Color</div>
               {editing ? (
                 <div className="flex items-center gap-2">
                   <input type="color" value={getVal("color") || "#6b7280"} onChange={(e) => handleFieldChange("color", e.target.value)}
@@ -500,7 +497,7 @@ function DelayCodeDetail({ delayCode, onSave, onDelete, onCreate, onCancelCreate
               )}
             </div>
             <FieldRow label="Active"
-              value={delayCode.isActive ? <span className="text-green-600 font-semibold">Active</span> : <span className="text-red-600 font-semibold">Inactive</span>}
+              value={delayCode.isActive ? <span className="font-semibold" style={{ color: "#06C270" }}>Active</span> : <span className="font-semibold" style={{ color: "#E63535" }}>Inactive</span>}
               editing={editing} fieldKey="isActive" editValue={getVal("isActive")} onChange={handleFieldChange} inputType="toggle" />
           </div>
 
@@ -533,7 +530,7 @@ function TripleBox({ label, letter, desc, editing, fieldKey, onChange, getVal, i
       }}
       onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 10px ${accentTint(accent, isDark ? 0.25 : 0.2)}`; }}
       onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}>
-      <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: isDark ? "#e0e0e0" : accent }}>{label}</div>
+      <div className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ color: isDark ? "#e0e0e0" : accent }}>{label}</div>
       {editing ? (
         <input type="text" value={val || ""} maxLength={1}
           onChange={(e) => onChange(fieldKey, e.target.value.toUpperCase() || null)}
@@ -560,8 +557,8 @@ function AHM732HelpPanel({ onClose }: { onClose: () => void }) {
       <div className="px-6 py-4 border-b border-hz-border shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <HelpCircle className="h-5 w-5 text-indigo-500" />
-            <h1 className="text-[18px] font-semibold">Delay Code Standards</h1>
+            <HelpCircle className="h-5 w-5 text-module-accent" />
+            <h1 className="text-[20px] font-semibold">Delay Code Standards</h1>
           </div>
           <button onClick={onClose} className="text-[13px] text-hz-text-secondary hover:text-hz-text transition-colors">Close</button>
         </div>
@@ -581,19 +578,19 @@ function AHM732HelpPanel({ onClose }: { onClose: () => void }) {
 
         {/* Triple-A explanation */}
         <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-xl p-4 text-center bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 mb-1">Process</div>
-            <div className="text-[24px] font-extrabold font-mono text-indigo-600 dark:text-indigo-400">P</div>
+          <div className="rounded-xl p-4 text-center bg-module-accent/10 border border-module-accent/20">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-module-accent mb-1">Process</div>
+            <div className="text-[24px] font-extrabold font-mono text-module-accent">P</div>
             <div className="text-[11px] text-hz-text-secondary mt-1">Which part of the turn</div>
           </div>
-          <div className="rounded-xl p-4 text-center bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 mb-1">Reason</div>
-            <div className="text-[24px] font-extrabold font-mono text-indigo-600 dark:text-indigo-400">R</div>
+          <div className="rounded-xl p-4 text-center bg-module-accent/10 border border-module-accent/20">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-module-accent mb-1">Reason</div>
+            <div className="text-[24px] font-extrabold font-mono text-module-accent">R</div>
             <div className="text-[11px] text-hz-text-secondary mt-1">The specific cause</div>
           </div>
-          <div className="rounded-xl p-4 text-center bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 mb-1">Stakeholder</div>
-            <div className="text-[24px] font-extrabold font-mono text-indigo-600 dark:text-indigo-400">S</div>
+          <div className="rounded-xl p-4 text-center bg-module-accent/10 border border-module-accent/20">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-module-accent mb-1">Stakeholder</div>
+            <div className="text-[24px] font-extrabold font-mono text-module-accent">S</div>
             <div className="text-[11px] text-hz-text-secondary mt-1">Who was responsible</div>
           </div>
         </div>
@@ -609,7 +606,7 @@ function AHM732HelpPanel({ onClose }: { onClose: () => void }) {
                 ["N","Navigation"],["P","Passenger"],["S","Security"],["T","Turnaround"],
               ].map(([k,v]) => (
                 <div key={k} className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded bg-indigo-100 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold flex items-center justify-center shrink-0 font-mono">{k}</span>
+                  <span className="w-5 h-5 rounded bg-module-accent/15 text-module-accent text-[11px] font-bold flex items-center justify-center shrink-0 font-mono">{k}</span>
                   <span className="text-hz-text-secondary">{v}</span>
                 </div>
               ))}
@@ -627,7 +624,7 @@ function AHM732HelpPanel({ onClose }: { onClose: () => void }) {
                 ["T","Technical"],["U","Unscheduled"],["W","Weather"],
               ].map(([k,v]) => (
                 <div key={k} className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded bg-indigo-100 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold flex items-center justify-center shrink-0 font-mono">{k}</span>
+                  <span className="w-5 h-5 rounded bg-module-accent/15 text-module-accent text-[11px] font-bold flex items-center justify-center shrink-0 font-mono">{k}</span>
                   <span className="text-hz-text-secondary">{v}</span>
                 </div>
               ))}
@@ -643,7 +640,7 @@ function AHM732HelpPanel({ onClose }: { onClose: () => void }) {
                 ["W","Weather"],["X","External"],
               ].map(([k,v]) => (
                 <div key={k} className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded bg-indigo-100 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold flex items-center justify-center shrink-0 font-mono">{k}</span>
+                  <span className="w-5 h-5 rounded bg-module-accent/15 text-module-accent text-[11px] font-bold flex items-center justify-center shrink-0 font-mono">{k}</span>
                   <span className="text-hz-text-secondary">{v}</span>
                 </div>
               ))}
@@ -655,10 +652,10 @@ function AHM732HelpPanel({ onClose }: { onClose: () => void }) {
         <div className="rounded-xl border border-hz-border/50 p-4">
           <div className="text-[12px] font-bold text-hz-text mb-2 uppercase tracking-wider">Example</div>
           <div className="flex items-center gap-3 text-[13px]">
-            <span className="text-[18px] font-extrabold font-mono text-indigo-600 dark:text-indigo-400 tracking-[3px]">M – D – A</span>
+            <span className="text-[18px] font-extrabold font-mono text-module-accent tracking-[3px]">M – D – A</span>
             <span className="text-hz-text-secondary">= Maintenance process, Defect found, Airline responsible</span>
           </div>
-          <div className="text-[12px] text-hz-text-secondary mt-1">Legacy equivalent: <span className="font-mono font-bold">41</span> <span className="font-mono font-bold text-indigo-500">TD</span> (Aircraft Defects)</div>
+          <div className="text-[12px] text-hz-text-secondary mt-1">Legacy equivalent: <span className="font-mono font-bold">41</span> <span className="font-mono font-bold text-module-accent">TD</span> (Aircraft Defects)</div>
         </div>
 
         {/* Timeline */}
@@ -681,7 +678,7 @@ function MiniInput({ label, value, onChange, maxLength, mono, type = "text" }: {
 }) {
   return (
     <div className="flex-1">
-      <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">{label}</label>
+      <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">{label}</label>
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)} maxLength={maxLength}
         className={`w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text ${mono ? "font-mono" : ""}`} />
     </div>

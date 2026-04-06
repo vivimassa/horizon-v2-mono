@@ -5,7 +5,7 @@ import { FdtlScheme } from '../models/FdtlScheme.js'
 import { FdtlRule } from '../models/FdtlRule.js'
 import { FdtlTable } from '../models/FdtlTable.js'
 import { FdtlAuditLog } from '../models/FdtlAuditLog.js'
-import { getTemplateForFramework } from '@skyhub/logic/src/fdtl/templates/index.js'
+import { getTemplateForFramework } from '@skyhub/logic/src/fdtl/templates/index'
 
 // ─── Framework Registry ────────────────────────────────────────────────────
 

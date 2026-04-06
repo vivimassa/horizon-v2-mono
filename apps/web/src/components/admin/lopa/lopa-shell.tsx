@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
+import { Armchair, Plane } from "lucide-react";
 import { api, setApiBaseUrl, type CabinClassRef, type LopaConfigRef, type AircraftTypeRef } from "@skyhub/api";
 import { MasterDetailLayout } from "@/components/layout";
 import { LopaList } from "./lopa-list";
@@ -162,9 +163,24 @@ export function LopaShell() {
           />
         );
       }
+      if (cabinClasses.length === 0 && !loading) {
+        return (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-module-accent/10">
+              <Armchair size={24} className="text-module-accent" />
+            </div>
+            <p className="text-[14px] font-medium text-hz-text-secondary">No cabin classes yet</p>
+            <p className="text-[13px] text-hz-text-tertiary">Click + Add to create one.</p>
+          </div>
+        );
+      }
       return (
-        <div className="flex-1 flex items-center justify-center text-hz-text-secondary text-sm">
-          {cabinClasses.length === 0 && !loading ? "No cabin classes yet. Click + Add to create one." : "Select a cabin class"}
+        <div className="flex-1 flex flex-col items-center justify-center gap-3">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-module-accent/10">
+            <Armchair size={24} className="text-module-accent" />
+          </div>
+          <p className="text-[14px] font-medium text-hz-text-secondary">Select a cabin class</p>
+          <p className="text-[13px] text-hz-text-tertiary">Choose a class from the list to view details.</p>
         </div>
       );
     }
@@ -194,9 +210,24 @@ export function LopaShell() {
         />
       );
     }
+    if (lopaConfigs.length === 0 && !loading) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-module-accent/10">
+            <Plane size={24} className="text-module-accent" />
+          </div>
+          <p className="text-[14px] font-medium text-hz-text-secondary">No LOPA configurations yet</p>
+          <p className="text-[13px] text-hz-text-tertiary">Click + Add to create one.</p>
+        </div>
+      );
+    }
     return (
-      <div className="flex-1 flex items-center justify-center text-hz-text-secondary text-sm">
-        {lopaConfigs.length === 0 && !loading ? "No LOPA configurations yet. Click + Add to create one." : "Select a configuration"}
+      <div className="flex-1 flex flex-col items-center justify-center gap-3">
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-module-accent/10">
+          <Plane size={24} className="text-module-accent" />
+        </div>
+        <p className="text-[14px] font-medium text-hz-text-secondary">Select a configuration</p>
+        <p className="text-[13px] text-hz-text-tertiary">Choose a configuration from the list to view details.</p>
       </div>
     );
   };

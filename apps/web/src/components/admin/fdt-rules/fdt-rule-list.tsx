@@ -35,7 +35,7 @@ export function FdtRuleList({ rules, showHeader, onRuleChange, onRuleReset }: Pr
         <div key={sub} className="mb-4">
           <div className="flex items-center gap-2 mb-1.5 px-1">
             <span className="w-1 h-5 rounded-full" style={{ backgroundColor: ACCENT }} />
-            <span className="text-[13px] font-bold uppercase tracking-wider text-hz-text-tertiary">
+            <span className="text-[12px] font-medium uppercase tracking-wider text-hz-text-tertiary">
               {sub.replace(/_/g, " ")}
             </span>
           </div>
@@ -70,6 +70,8 @@ function RuleRow({
   }, [editing]);
 
   const isModified = !rule.isTemplateDefault;
+  const isBoolean = rule.value === "true" || rule.value === "false";
+  const isFormula = !isBoolean && (/[a-z_]{2,}\(/.test(rule.value) || rule.value.includes("_"));
 
   // Check restrictiveness
   const isLessRestrictive = isModified && rule.templateValue && rule.directionality && checkRestrictiveness(rule);
@@ -84,10 +86,10 @@ function RuleRow({
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-hz-border/50 hover:border-hz-border transition-colors group">
       {/* Source badge */}
-      <span className={`text-[13px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
+      <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${
         rule.source === "government"
-          ? "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
-          : "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400"
+          ? "bg-[rgba(255,136,0,0.12)] text-[#E67A00] dark:bg-[rgba(253,172,66,0.15)] dark:text-[#FDAC42]"
+          : "bg-[rgba(102,0,204,0.10)] text-[#6600CC] dark:bg-[rgba(172,93,217,0.15)] dark:text-[#AC5DD9]"
       }`}>
         {rule.source === "government" ? "GOV" : "CO"}
       </span>
@@ -97,10 +99,10 @@ function RuleRow({
         <div className="flex items-center gap-1.5">
           <span className="text-[13px] font-medium text-hz-text">{rule.label}</span>
           {rule.crewType !== "all" && (
-            <span className={`text-[13px] font-semibold px-1.5 py-0.5 rounded-full ${
+            <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${
               rule.crewType === "cockpit"
-                ? "bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400"
-                : "bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-400"
+                ? "bg-[rgba(0,99,247,0.10)] text-[#0063F7] dark:bg-[rgba(91,141,239,0.15)] dark:text-[#5B8DEF]"
+                : "bg-[rgba(102,0,204,0.10)] text-[#6600CC] dark:bg-[rgba(172,93,217,0.15)] dark:text-[#AC5DD9]"
             }`}>
               {rule.crewType === "cockpit" ? "FD" : "CC"}
             </span>
@@ -114,9 +116,21 @@ function RuleRow({
         )}
       </div>
 
-      {/* Value — click to edit */}
+      {/* Value — toggle for booleans, click-to-edit for others */}
       <div className="text-right shrink-0">
-        {editing ? (
+        {isBoolean ? (
+          <button
+            onClick={() => onRuleChange(rule._id, rule.value === "true" ? "false" : "true")}
+            className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200"
+            style={{ backgroundColor: rule.value === "true" ? "#06C270" : "#8F90A6" }}
+            title={rule.value === "true" ? "Enabled — click to disable" : "Disabled — click to enable"}
+          >
+            <span
+              className="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200"
+              style={{ transform: rule.value === "true" ? "translateX(22px)" : "translateX(4px)" }}
+            />
+          </button>
+        ) : editing ? (
           <input
             ref={inputRef}
             autoFocus
@@ -134,20 +148,20 @@ function RuleRow({
         ) : (
           <button
             onClick={() => { setDraft(rule.value); setEditing(true); }}
-            className="text-[14px] font-bold font-mono tabular-nums hover:underline"
+            className={`text-[14px] font-bold hover:underline ${isFormula ? "" : "font-mono tabular-nums"}`}
             style={isModified ? { color: ACCENT } : undefined}
-            title="Click to edit"
+            title={isFormula ? `Raw: ${rule.value} — Click to edit` : "Click to edit"}
           >
-            {rule.value}
+            {isFormula ? humanizeValue(rule.value) : rule.value}
           </button>
         )}
-        {rule.unit && !editing && (
+        {rule.unit && !editing && !isBoolean && (
           <span className="text-[13px] text-hz-text-tertiary ml-1">{rule.unit}</span>
         )}
       </div>
 
-      {/* Reset button (only when modified) */}
-      {isModified && !editing && (
+      {/* Reset button (only when modified, not for booleans) */}
+      {isModified && !editing && !isBoolean && (
         <button
           onClick={() => onRuleReset(rule._id)}
           className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1 rounded-lg hover:bg-amber-500/10 shrink-0"
@@ -157,12 +171,53 @@ function RuleRow({
         </button>
       )}
 
-      {/* Modified dot */}
-      {isModified && !editing && (
+      {/* Modified dot (not for booleans) */}
+      {isModified && !editing && !isBoolean && (
         <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: ACCENT }} />
       )}
     </div>
   );
+}
+
+/* ─── Value Formatter ─── */
+
+function formatValue(value: string): string {
+  if (value === "true") return "Yes";
+  if (value === "false") return "No";
+  return value;
+}
+
+/* ─── Display Formatter ─── */
+
+function humanizeValue(value: string): string {
+  // max(preceding_duty, 12h) → "Preceding duty or 12h (whichever is greater)"
+  const maxMatch = value.match(/^max\((.+?),\s*(.+?)\)$/i);
+  if (maxMatch) {
+    const a = humanizeToken(maxMatch[1].trim());
+    const b = humanizeToken(maxMatch[2].trim());
+    return `${a} or ${b}, whichever is greater`;
+  }
+
+  // min(preceding_duty, 12h) → "Preceding duty or 12h (whichever is less)"
+  const minMatch = value.match(/^min\((.+?),\s*(.+?)\)$/i);
+  if (minMatch) {
+    const a = humanizeToken(minMatch[1].trim());
+    const b = humanizeToken(minMatch[2].trim());
+    return `${a} or ${b}, whichever is less`;
+  }
+
+  // Single tokens like "preceding_duty"
+  if (value.includes("_")) return humanizeToken(value);
+
+  return value;
+}
+
+function humanizeToken(token: string): string {
+  // "12h" / "10h" → keep as-is
+  if (/^\d+h$/i.test(token)) return token;
+  // "preceding_duty" → "Preceding duty"
+  const words = token.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 /* ─── Restrictiveness Check ─── */

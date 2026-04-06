@@ -23,6 +23,7 @@ import {
   Activity,
   UsersRound,
   Shield,
+  CalendarDays,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -94,6 +95,8 @@ const SECTIONS: SectionDef[] = [
       { code: "5.4.5", label: "Crew Complements", desc: "Min crew per aircraft type & augmentation", icon: UsersRound, href: "/admin/crew-complements" },
       { code: "5.4.6", label: "Crew Groups", desc: "Scheduling groups & crew classification", icon: Users, href: "/admin/crew-groups" },
       { code: "5.4.7", label: "FDT Rules", desc: "Flight duty time limitations & regulatory framework", icon: Shield, href: "/admin/fdt-rules" },
+      { code: "5.4.8", label: "Off/Duty Patterns", desc: "ON/OFF rotation patterns for crew rostering", icon: CalendarDays, href: "/admin/duty-patterns" },
+      { code: "5.4.9", label: "MPP Lead Times", desc: "Training & recruitment lead times for manpower planning", icon: Timer, href: "/admin/mpp-lead-times" },
     ],
   },
 ];

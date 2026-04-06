@@ -228,13 +228,13 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate, onRefresh }
         <div className="flex items-center justify-between">
           {/* Name + Active badge */}
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold">{airport.name}</h1>
+            <h1 className="text-[20px] font-semibold">{airport.name}</h1>
             {airport.isActive ? (
-              <span className="text-[13px] font-semibold px-3 py-0.5 rounded-full bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-400">
+              <span className="text-[13px] font-semibold px-3 py-0.5 rounded-full bg-[rgba(6,194,112,0.12)] text-[#06C270] dark:bg-[rgba(57,217,138,0.15)] dark:text-[#39D98A]">
                 Active
               </span>
             ) : (
-              <span className="text-[13px] font-semibold px-3 py-0.5 rounded-full bg-red-50 text-red-600">
+              <span className="text-[13px] font-semibold px-3 py-0.5 rounded-full bg-[rgba(255,59,59,0.12)] text-[#E63535] dark:bg-[rgba(255,92,92,0.15)] dark:text-[#FF5C5C]">
                 Inactive
               </span>
             )}
@@ -255,8 +255,7 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate, onRefresh }
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-white transition-colors"
-                  style={{ backgroundColor: "#1e40af" }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-white transition-colors bg-module-accent"
                 >
                   <Save className="h-3.5 w-3.5" />
                   {saving ? "Saving…" : "Save"}
@@ -304,8 +303,7 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate, onRefresh }
                 {onCreate && (
                   <button
                     onClick={() => { resetCreate(); setShowCreate(true); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white transition-colors"
-                    style={{ backgroundColor: "#1e40af" }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white transition-colors bg-module-accent"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     New
@@ -340,7 +338,7 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate, onRefresh }
       {showCreate && (
         <div className="px-6 py-4 border-b border-hz-border shrink-0 space-y-3 overflow-y-auto max-h-[50vh]">
           <div className="flex items-center justify-between">
-            <span className="text-[15px] font-semibold">Add New Airport</span>
+            <span className="text-[15px] font-bold">Add New Airport</span>
             <button onClick={resetCreate} className="text-[13px] text-hz-text-secondary hover:text-hz-text">Cancel</button>
           </div>
 
@@ -374,8 +372,7 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate, onRefresh }
                         This may be a new or unregistered airport. You can add it manually with the details you have.
                       </p>
                       <button onClick={() => { setManualMode(true); setNotFound(false); setManualForm(p => ({ ...p, icaoCode: lookupCode.toUpperCase() })); }}
-                        className="mt-3 px-4 py-2 rounded-lg text-[13px] font-semibold text-white transition-colors"
-                        style={{ backgroundColor: "#1e40af" }}>
+                        className="mt-3 px-4 py-2 rounded-lg text-[13px] font-semibold text-white transition-colors bg-module-accent">
                         Proceed Adding Manually
                       </button>
                     </div>
@@ -396,8 +393,7 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate, onRefresh }
                     {lookupResult.latitude != null && <div>Coordinates: {lookupResult.latitude.toFixed(4)}, {lookupResult.longitude?.toFixed(4)}</div>}
                   </div>
                   <button onClick={handleCreateFromLookup} disabled={creating}
-                    className="w-full mt-2 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
-                    style={{ backgroundColor: "#1e40af" }}>
+                    className="w-full mt-2 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50 bg-module-accent">
                     {creating ? "Creating…" : "Add to Database"}
                   </button>
                 </div>
@@ -418,7 +414,7 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate, onRefresh }
 
               {/* Country dropdown */}
               <div className="relative">
-                <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">Country</label>
+                <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Country</label>
                 <button onClick={() => { setCountryOpen(!countryOpen); setTzOpen(false); }}
                   className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] text-left border border-hz-border bg-hz-bg text-hz-text flex items-center justify-between">
                   <span>{selectedCountry ? `${selectedCountry.name} (${selectedCountry.isoCode2})` : "Select country…"}</span>
@@ -441,7 +437,7 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate, onRefresh }
 
               {/* Timezone dropdown */}
               <div className="relative">
-                <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">Timezone *</label>
+                <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Timezone *</label>
                 <button onClick={() => { setTzOpen(!tzOpen); setCountryOpen(false); }}
                   className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] text-left border border-hz-border bg-hz-bg text-hz-text flex items-center justify-between">
                   <span>{manualForm.timezone || "Select timezone…"}</span>
@@ -469,8 +465,7 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate, onRefresh }
               </div>
 
               <button onClick={handleManualCreate} disabled={creating}
-                className="w-full py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
-                style={{ backgroundColor: "#1e40af" }}>
+                className="w-full py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50 bg-module-accent">
                 {creating ? "Creating…" : "Add to Database"}
               </button>
             </div>
@@ -493,23 +488,23 @@ export function AirportDetail({ airport, onSave, onDelete, onCreate, onRefresh }
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[13px] font-medium backdrop-blur-md"
               style={{
                 background: "rgba(255,255,255,0.82)",
-                border: "0.5px solid rgba(0,0,0,0.08)",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                border: "0.5px solid rgba(96,97,112,0.08)",
+                boxShadow: "0 2px 8px rgba(96,97,112,0.08)",
               }}
             >
-              <span style={{ color: "#666" }}>IATA:</span>
-              <span className="font-bold" style={{ color: "#111" }}>{airport.iataCode ?? "—"}</span>
+              <span className="text-hz-text-secondary">IATA:</span>
+              <span className="font-bold text-hz-text">{airport.iataCode ?? "—"}</span>
             </span>
             <span
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[13px] font-medium backdrop-blur-md"
               style={{
                 background: "rgba(255,255,255,0.82)",
-                border: "0.5px solid rgba(0,0,0,0.08)",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                border: "0.5px solid rgba(96,97,112,0.08)",
+                boxShadow: "0 2px 8px rgba(96,97,112,0.08)",
               }}
             >
-              <span style={{ color: "#666" }}>ICAO:</span>
-              <span className="font-bold" style={{ color: "#111" }}>{airport.icaoCode}</span>
+              <span className="text-hz-text-secondary">ICAO:</span>
+              <span className="font-bold text-hz-text">{airport.icaoCode}</span>
             </span>
             {airport.countryIso2 && (
               <span
@@ -581,7 +576,7 @@ function MiniInput({ label, value, onChange, maxLength, mono, type = "text" }: {
 }) {
   return (
     <div className="flex-1">
-      <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">{label}</label>
+      <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">{label}</label>
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)} maxLength={maxLength}
         className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text" />
     </div>

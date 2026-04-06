@@ -110,17 +110,16 @@ function ServiceTypeList({ types, selected, onSelect, search, onSearchChange, lo
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 space-y-3 border-b border-hz-border shrink-0">
         <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-bold">Flight Service Types</h2>
+          <h2 className="text-[16px] font-bold">Flight Service Types</h2>
           <button onClick={onCreateClick}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold text-white transition-colors"
-            style={{ backgroundColor: "#1e40af" }}>
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold text-white transition-colors bg-module-accent">
             <Plus className="h-3 w-3" /> Add
           </button>
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-hz-text-secondary" />
           <input type="text" placeholder="Search code or name..."
-            className="w-full pl-9 pr-3 py-2 rounded-xl text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 placeholder:text-hz-text-secondary/50 text-hz-text"
+            className="w-full pl-9 pr-3 py-2 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 placeholder:text-hz-text-secondary/50 text-hz-text"
             value={search} onChange={(e) => onSearchChange(e.target.value)} />
         </div>
       </div>
@@ -236,7 +235,7 @@ function ServiceTypeDetail({ serviceType, onSave, onDelete, onCreate, onCancelCr
       <div className="flex flex-col h-full overflow-hidden">
         <div className="px-6 py-4 border-b border-hz-border shrink-0">
           <div className="flex items-center justify-between">
-            <h1 className="text-[18px] font-semibold">Add Flight Service Type</h1>
+            <h1 className="text-[20px] font-semibold">Add Flight Service Type</h1>
             {onCancelCreate && <button onClick={onCancelCreate} className="text-[13px] text-hz-text-secondary hover:text-hz-text">Cancel</button>}
           </div>
         </div>
@@ -251,7 +250,7 @@ function ServiceTypeDetail({ serviceType, onSave, onDelete, onCreate, onCancelCr
             onChange={(v) => setCreateForm(p => ({ ...p, description: v }))} />
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">Color</label>
+              <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Color</label>
               <div className="flex items-center gap-2 mt-1">
                 <input type="color" value={createForm.color}
                   onChange={(e) => setCreateForm(p => ({ ...p, color: e.target.value }))}
@@ -268,12 +267,11 @@ function ServiceTypeDetail({ serviceType, onSave, onDelete, onCreate, onCancelCr
                 className="flex-1 py-2.5 rounded-lg text-[13px] font-medium text-hz-text-secondary border border-hz-border hover:bg-hz-border/30 transition-colors">Cancel</button>
             )}
             <button onClick={handleCreate} disabled={creating}
-              className="flex-1 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
-              style={{ backgroundColor: "#1e40af" }}>
+              className="flex-1 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50 bg-module-accent">
               {creating ? "Creating..." : "Add Service Type"}
             </button>
           </div>
-          {createError && <p className="text-[12px] text-red-500">{createError}</p>}
+          {createError && <p className="text-[13px]" style={{ color: "#E63535" }}>{createError}</p>}
         </div>
       </div>
     );
@@ -289,11 +287,11 @@ function ServiceTypeDetail({ serviceType, onSave, onDelete, onCreate, onCancelCr
             <span className="w-5 h-5 rounded-full shrink-0 border border-hz-border/50" style={{ backgroundColor: serviceType.color || "#6b7280" }} />
             <span className="text-[20px] font-bold font-mono">{serviceType.code}</span>
             <span className="text-[16px] text-hz-text-secondary">—</span>
-            <h1 className="text-[18px] font-semibold">{serviceType.name}</h1>
+            <h1 className="text-[20px] font-semibold">{serviceType.name}</h1>
             {serviceType.isActive ? (
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-400">Active</span>
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(6,194,112,0.12)] text-[#06C270] dark:bg-[rgba(57,217,138,0.15)] dark:text-[#39D98A]">Active</span>
             ) : (
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400">Inactive</span>
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(255,59,59,0.12)] text-[#E63535] dark:bg-[rgba(255,92,92,0.15)] dark:text-[#FF5C5C]">Inactive</span>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -304,8 +302,7 @@ function ServiceTypeDetail({ serviceType, onSave, onDelete, onCreate, onCancelCr
                   <X className="h-3.5 w-3.5" /> Cancel
                 </button>
                 <button onClick={handleSave} disabled={saving}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-white transition-colors"
-                  style={{ backgroundColor: "#1e40af" }}>
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-white transition-colors bg-module-accent">
                   <Save className="h-3.5 w-3.5" /> {saving ? "Saving..." : "Save"}
                 </button>
               </>
@@ -314,8 +311,8 @@ function ServiceTypeDetail({ serviceType, onSave, onDelete, onCreate, onCancelCr
                 {onDelete && (
                   confirmDelete ? (
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[12px] text-red-500 font-medium">Delete?</span>
-                      <button onClick={handleDelete} disabled={saving} className="px-2.5 py-1 rounded-lg text-[12px] font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">Yes</button>
+                      <span className="text-[12px] font-medium" style={{ color: "#E63535" }}>Delete?</span>
+                      <button onClick={handleDelete} disabled={saving} className="px-2.5 py-1 rounded-lg text-[12px] font-semibold text-white transition-colors" style={{ backgroundColor: "#E63535" }}>Yes</button>
                       <button onClick={() => setConfirmDelete(false)} className="px-2.5 py-1 rounded-lg text-[12px] font-medium text-hz-text-secondary hover:bg-hz-border/30 transition-colors">No</button>
                     </div>
                   ) : (
@@ -353,7 +350,7 @@ function ServiceTypeDetail({ serviceType, onSave, onDelete, onCreate, onCancelCr
               editing={editing} fieldKey="description" editValue={getVal("description")} onChange={handleFieldChange} />
             {/* Color picker */}
             <div className="py-2.5 border-b border-hz-border/50">
-              <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">Color</div>
+              <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1">Color</div>
               {editing ? (
                 <div className="flex items-center gap-2">
                   <input type="color" value={getVal("color") || "#6b7280"} onChange={(e) => handleFieldChange("color", e.target.value)}
@@ -369,7 +366,7 @@ function ServiceTypeDetail({ serviceType, onSave, onDelete, onCreate, onCancelCr
               )}
             </div>
             <FieldRow label="Active"
-              value={serviceType.isActive ? <span className="text-green-600 font-semibold">Active</span> : <span className="text-red-600 font-semibold">Inactive</span>}
+              value={serviceType.isActive ? <span className="font-semibold" style={{ color: "#06C270" }}>Active</span> : <span className="font-semibold" style={{ color: "#E63535" }}>Inactive</span>}
               editing={editing} fieldKey="isActive" editValue={getVal("isActive")} onChange={handleFieldChange} inputType="toggle" />
           </div>
         </div>
@@ -385,7 +382,7 @@ function MiniInput({ label, value, onChange, maxLength, mono, type = "text" }: {
 }) {
   return (
     <div className="flex-1">
-      <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">{label}</label>
+      <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">{label}</label>
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)} maxLength={maxLength}
         className={`w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text ${mono ? "font-mono" : ""}`} />
     </div>

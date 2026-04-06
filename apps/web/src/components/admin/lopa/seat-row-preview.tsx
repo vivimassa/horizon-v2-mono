@@ -198,7 +198,7 @@ export function SeatRowPreview({ seatLayout, color, seatType, pitchIn }: SeatRow
       </svg>
 
       {/* Layout label */}
-      <div className="flex items-center gap-3 text-[12px] text-hz-text-secondary">
+      <div className="flex items-center gap-3 text-[13px] text-hz-text-secondary">
         <span>
           Layout: <span className="font-bold font-mono" style={{ color }}>{seatLayout}</span>
         </span>

@@ -182,7 +182,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
       <div className="flex flex-col h-full overflow-hidden">
         <div className="px-6 py-4 border-b border-hz-border shrink-0">
           <div className="flex items-center justify-between">
-            <h1 className="text-[18px] font-semibold">Add New Aircraft Type</h1>
+            <h1 className="text-[20px] font-semibold">Add New Aircraft Type</h1>
             {onCancelCreate && (
               <button onClick={onCancelCreate} className="text-[13px] text-hz-text-secondary hover:text-hz-text transition-colors">Cancel</button>
             )}
@@ -197,7 +197,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
           </div>
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">Manufacturer</label>
+              <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Manufacturer</label>
               <select value={createForm.manufacturer}
                 onChange={(e) => setCreateForm(p => ({ ...p, manufacturer: e.target.value }))}
                 className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text">
@@ -205,7 +205,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
               </select>
             </div>
             <div className="flex-1">
-              <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">Category</label>
+              <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Category</label>
               <select value={createForm.category}
                 onChange={(e) => setCreateForm(p => ({ ...p, category: e.target.value }))}
                 className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text">
@@ -223,8 +223,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
               </button>
             )}
             <button onClick={handleCreate} disabled={creating}
-              className="flex-1 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
-              style={{ backgroundColor: "#1e40af" }}>
+              className="flex-1 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50 bg-module-accent">
               {creating ? "Creating..." : "Add Aircraft Type"}
             </button>
           </div>
@@ -254,7 +253,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
               <span className="text-[16px] font-semibold text-hz-text">{aircraftType.name}</span>
             </div>
             {aircraftType.manufacturer && (
-              <span className="text-[11px] font-semibold text-hz-text-secondary">
+              <span className="text-[13px] font-semibold text-hz-text-secondary">
                 {aircraftType.manufacturer}
               </span>
             )}
@@ -271,16 +270,16 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
                 <span className="text-[14px] font-bold font-mono px-2.5 py-1 rounded-lg bg-hz-border/30">
                   {aircraftType.icaoType}
                 </span>
-                <h1 className="text-[18px] font-semibold">{aircraftType.name}</h1>
+                <h1 className="text-[20px] font-semibold">{aircraftType.name}</h1>
               </>
             )}
             <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400 capitalize">
               {CATEGORIES[aircraftType.category] || aircraftType.category}
             </span>
             {aircraftType.isActive ? (
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-400">Active</span>
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(6,194,112,0.12)] text-[#06C270] dark:bg-[rgba(57,217,138,0.15)] dark:text-[#39D98A]">Active</span>
             ) : (
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400">Inactive</span>
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(255,59,59,0.12)] text-[#E63535] dark:bg-[rgba(255,92,92,0.15)] dark:text-[#FF5C5C]">Inactive</span>
             )}
           </div>
 
@@ -292,8 +291,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
                   <X className="h-3.5 w-3.5" /> Cancel
                 </button>
                 <button onClick={handleSave} disabled={saving}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-white transition-colors"
-                  style={{ backgroundColor: "#1e40af" }}>
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-white transition-colors bg-module-accent">
                   <Save className="h-3.5 w-3.5" /> {saving ? "Saving..." : "Save"}
                 </button>
               </>
@@ -302,8 +300,8 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
                 {onDelete && (
                   confirmDelete ? (
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[12px] text-red-500 font-medium">Delete?</span>
-                      <button onClick={handleDelete} disabled={saving} className="px-2.5 py-1 rounded-lg text-[12px] font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">Yes</button>
+                      <span className="text-[12px] font-medium" style={{ color: "#E63535" }}>Delete?</span>
+                      <button onClick={handleDelete} disabled={saving} className="px-2.5 py-1 rounded-lg text-[12px] font-semibold text-white transition-colors" style={{ backgroundColor: "#E63535" }}>Yes</button>
                       <button onClick={() => setConfirmDelete(false)} className="px-2.5 py-1 rounded-lg text-[12px] font-medium text-hz-text-secondary hover:bg-hz-border/30 transition-colors">No</button>
                     </div>
                   ) : (
@@ -360,7 +358,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
                 editing={editing} fieldKey="name" editValue={getVal("name")} onChange={handleFieldChange} />
               {/* Manufacturer */}
               <div className="py-2.5 border-b border-hz-border/50">
-                <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">Manufacturer</div>
+                <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1">Manufacturer</div>
                 {editing ? (
                   <select value={getVal("manufacturer") || ""}
                     onChange={(e) => handleFieldChange("manufacturer", e.target.value || null)}
@@ -376,7 +374,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
                 editing={editing} fieldKey="family" editValue={getVal("family")} onChange={handleFieldChange} />
               {/* Category */}
               <div className="py-2.5 border-b border-hz-border/50">
-                <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">Category</div>
+                <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1">Category</div>
                 {editing ? (
                   <select value={getVal("category") || "narrow_body"}
                     onChange={(e) => handleFieldChange("category", e.target.value)}
@@ -389,7 +387,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
               </div>
               {/* Color picker */}
               <div className="py-2.5 border-b border-hz-border/50">
-                <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">Schedule Color</div>
+                <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1">Schedule Color</div>
                 {editing ? (
                   <div className="flex items-center gap-2">
                     <input type="color" value={getVal("color") || "#3b82f6"} onChange={(e) => handleFieldChange("color", e.target.value)}
@@ -405,7 +403,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
                 )}
               </div>
               <FieldRow label="Active"
-                value={aircraftType.isActive ? <span className="text-green-600 font-semibold">Active</span> : <span className="text-red-600 font-semibold">Inactive</span>}
+                value={aircraftType.isActive ? <span className="font-semibold" style={{ color: "#06C270" }}>Active</span> : <span className="font-semibold" style={{ color: "#E63535" }}>Inactive</span>}
                 editing={editing} fieldKey="isActive" editValue={getVal("isActive")} onChange={handleFieldChange} inputType="toggle" />
               <FieldRow label="Notes" value={aircraftType.notes}
                 editing={editing} fieldKey="notes" editValue={getVal("notes")} onChange={handleFieldChange} />
@@ -439,7 +437,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
               <Section title="ETOPS">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
                   <FieldRow label="ETOPS Capable"
-                    value={aircraftType.etopsCapable ? <span className="text-green-600 font-semibold">Yes</span> : <span className="text-hz-text-secondary">No</span>}
+                    value={aircraftType.etopsCapable ? <span className="font-semibold" style={{ color: "#06C270" }}>Yes</span> : <span className="text-hz-text-secondary">No</span>}
                     editing={editing} fieldKey="etopsCapable" editValue={getVal("etopsCapable")} onChange={handleFieldChange} inputType="toggle" />
                   <FieldRow label="ETOPS Rating (min)" value={aircraftType.etopsRatingMinutes}
                     editing={editing} fieldKey="etopsRatingMinutes" editValue={getVal("etopsRatingMinutes")} onChange={handleFieldChange} inputType="number" />
@@ -462,7 +460,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
                 <div className="overflow-x-auto">
                   <table className="w-full text-[13px]">
                     <thead>
-                      <tr className="text-[11px] text-hz-text-secondary uppercase tracking-wider">
+                      <tr className="text-[13px] text-hz-text-secondary uppercase tracking-wider">
                         <th className="text-left py-2 pr-4 font-semibold w-28"></th>
                         <th className="text-center py-2 px-3 font-semibold">DOM → DOM</th>
                         <th className="text-center py-2 px-3 font-semibold">DOM → INT</th>
@@ -472,14 +470,14 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
                     </thead>
                     <tbody>
                       <tr className="border-t border-hz-border/50">
-                        <td className="py-3 pr-4 text-[12px] font-semibold text-hz-text-secondary uppercase">Scheduled</td>
+                        <td className="py-3 pr-4 text-[13px] font-medium text-hz-text-secondary uppercase">Scheduled</td>
                         <TATCell field="tat.domDom" type={aircraftType} draft={draft} editing={editing} onChange={handleNestedChange} />
                         <TATCell field="tat.domInt" type={aircraftType} draft={draft} editing={editing} onChange={handleNestedChange} />
                         <TATCell field="tat.intDom" type={aircraftType} draft={draft} editing={editing} onChange={handleNestedChange} />
                         <TATCell field="tat.intInt" type={aircraftType} draft={draft} editing={editing} onChange={handleNestedChange} />
                       </tr>
                       <tr className="border-t border-hz-border/50">
-                        <td className="py-3 pr-4 text-[12px] font-semibold text-hz-text-secondary uppercase">Minimum</td>
+                        <td className="py-3 pr-4 text-[13px] font-medium text-hz-text-secondary uppercase">Minimum</td>
                         <TATCell field="tat.minDd" type={aircraftType} draft={draft} editing={editing} onChange={handleNestedChange} />
                         <TATCell field="tat.minDi" type={aircraftType} draft={draft} editing={editing} onChange={handleNestedChange} />
                         <TATCell field="tat.minId" type={aircraftType} draft={draft} editing={editing} onChange={handleNestedChange} />
@@ -510,17 +508,17 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
                         {lc.cabins.map((c, i) => {
                           const cc = cabinClasses.find(cls => cls.code === c.classCode);
                           return (
-                            <span key={i} className="text-[12px] text-hz-text-secondary">
+                            <span key={i} className="text-[13px] text-hz-text-secondary">
                               <span className="font-bold font-mono" style={{ color: cc?.color || "#9ca3af" }}>{c.classCode}</span>: {c.seats}
                             </span>
                           );
                         })}
                       </div>
                     </div>
-                    <span className="text-[14px] font-bold tabular-nums" style={{ color: "#1e40af" }}>
+                    <span className="text-[14px] font-bold tabular-nums text-module-accent">
                       {lc.totalSeats}
                     </span>
-                    <span className="text-[12px] text-hz-text-tertiary">seats</span>
+                    <span className="text-[13px] text-hz-text-tertiary">seats</span>
                   </div>
                 ))
               )}
@@ -534,7 +532,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
               <NestedField label="Bulk Hold Capacity (kg)" parent="cargo" child="bulkHoldCapacityKg" type={aircraftType} draft={draft} editing={editing} onChange={handleNestedChange} inputType="number" />
               {/* ULD types as comma-separated */}
               <div className="py-2.5 border-b border-hz-border/50">
-                <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">ULD Types Accepted</div>
+                <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1">ULD Types Accepted</div>
                 {editing ? (
                   <input type="text"
                     value={(() => {
@@ -563,7 +561,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
               <Section title="Cockpit Rest Facility">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
                   <div className="py-2.5 border-b border-hz-border/50">
-                    <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">Class</div>
+                    <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1">Class</div>
                     {editing ? (
                       <select
                         value={getNestedVal("crewRest", "cockpitClass") || ""}
@@ -582,7 +580,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
               <Section title="Cabin Rest Facility">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
                   <div className="py-2.5 border-b border-hz-border/50">
-                    <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">Class</div>
+                    <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1">Class</div>
                     {editing ? (
                       <select
                         value={getNestedVal("crewRest", "cabinClass") || ""}
@@ -615,7 +613,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
               <Section title="Approach">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
                   <div className="py-2.5 border-b border-hz-border/50">
-                    <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">ILS Category Required</div>
+                    <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1">ILS Category Required</div>
                     {editing ? (
                       <select
                         value={getNestedVal("approach", "ilsCategoryRequired") || ""}
@@ -629,7 +627,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
                     )}
                   </div>
                   <div className="py-2.5 border-b border-hz-border/50">
-                    <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">Autoland Capable</div>
+                    <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1">Autoland Capable</div>
                     {editing ? (
                       <button
                         onClick={() => handleNestedChange("approach.autolandCapable", !getNestedVal("approach", "autolandCapable"))}
@@ -643,7 +641,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
                     ) : (
                       <div className="text-[13px] font-medium">
                         {aircraftType.approach?.autolandCapable
-                          ? <span className="text-green-600 font-semibold">Yes</span>
+                          ? <span className="font-semibold" style={{ color: "#06C270" }}>Yes</span>
                           : <span className="text-hz-text-secondary">No</span>}
                       </div>
                     )}
@@ -663,7 +661,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-[13px] font-bold text-hz-text-secondary uppercase tracking-wider mb-2">{title}</h3>
+      <h3 className="text-[16px] font-bold text-hz-text-secondary uppercase tracking-wider mb-2">{title}</h3>
       {children}
     </div>
   );
@@ -728,7 +726,7 @@ function MiniInput({ label, value, onChange, maxLength, mono, type = "text" }: {
 }) {
   return (
     <div className="flex-1">
-      <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">{label}</label>
+      <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">{label}</label>
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)} maxLength={maxLength}
         className={`w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text ${mono ? "font-mono" : ""}`} />
     </div>

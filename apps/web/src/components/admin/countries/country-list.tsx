@@ -30,7 +30,7 @@ export function CountryList({
       {/* Header */}
       <div className="px-4 py-3 space-y-3 border-b border-hz-border shrink-0">
         <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-bold">Countries</h2>
+          <h2 className="text-[16px] font-bold">Countries</h2>
         </div>
 
         {/* Search */}
@@ -39,7 +39,7 @@ export function CountryList({
           <input
             type="text"
             placeholder="Search name, ISO code, region…"
-            className="w-full pl-9 pr-3 py-2 rounded-xl text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 placeholder:text-hz-text-secondary/50 text-hz-text"
+            className="w-full pl-9 pr-3 py-2 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 placeholder:text-hz-text-secondary/50 text-hz-text"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
           />

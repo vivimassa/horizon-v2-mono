@@ -252,6 +252,46 @@ export interface ActivityCodeRef {
   updatedAt: string | null
 }
 
+export interface DutyPatternRef {
+  _id: string
+  operatorId: string
+  code: string
+  description: string | null
+  sequence: number[]
+  cycleDays: number
+  offCode: string
+  isActive: boolean
+  sortOrder: number
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface MppLeadTimeGroupRef {
+  _id: string
+  operatorId: string
+  label: string
+  description: string | null
+  color: string
+  code: string
+  crewType: 'cockpit' | 'cabin' | 'other'
+  sortOrder: number
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface MppLeadTimeItemRef {
+  _id: string
+  operatorId: string
+  groupId: string
+  label: string
+  valueMonths: number
+  note: string | null
+  consumedBy: string | null
+  sortOrder: number
+  createdAt: string | null
+  updatedAt: string | null
+}
+
 export interface DelayCodeRef {
   _id: string
   operatorId: string
@@ -872,6 +912,59 @@ export const api = {
 
   seedCrewGroups: (operatorId = 'horizon') =>
     request<{ success: boolean; count: number }>('/crew-groups/seed-defaults', {
+      method: 'POST',
+      body: JSON.stringify({ operatorId }),
+    }),
+
+  // ─── Duty Patterns ──────────────────────────────────────
+  getDutyPatterns: (operatorId = 'horizon') =>
+    request<DutyPatternRef[]>(`/duty-patterns?operatorId=${operatorId}`),
+
+  createDutyPattern: (data: Partial<DutyPatternRef>) =>
+    request<DutyPatternRef>('/duty-patterns', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateDutyPattern: (id: string, data: Partial<DutyPatternRef>) =>
+    request<DutyPatternRef>(`/duty-patterns/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  deleteDutyPattern: (id: string) =>
+    request<{ success: boolean }>(`/duty-patterns/${id}`, { method: 'DELETE' }),
+
+  seedDutyPatterns: (operatorId = 'horizon') =>
+    request<{ success: boolean; count: number }>('/duty-patterns/seed-defaults', {
+      method: 'POST',
+      body: JSON.stringify({ operatorId }),
+    }),
+
+  // ─── MPP Lead Times ─────────────────────────────────────
+  getMppLeadTimeGroups: (operatorId = 'horizon') =>
+    request<MppLeadTimeGroupRef[]>(`/mpp-lead-time-groups?operatorId=${operatorId}`),
+
+  createMppLeadTimeGroup: (data: Partial<MppLeadTimeGroupRef>) =>
+    request<MppLeadTimeGroupRef>('/mpp-lead-time-groups', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateMppLeadTimeGroup: (id: string, data: Partial<MppLeadTimeGroupRef>) =>
+    request<MppLeadTimeGroupRef>(`/mpp-lead-time-groups/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  deleteMppLeadTimeGroup: (id: string) =>
+    request<{ success: boolean }>(`/mpp-lead-time-groups/${id}`, { method: 'DELETE' }),
+
+  getMppLeadTimeItems: (operatorId = 'horizon', groupId?: string) => {
+    let path = `/mpp-lead-time-items?operatorId=${operatorId}`
+    if (groupId) path += `&groupId=${groupId}`
+    return request<MppLeadTimeItemRef[]>(path)
+  },
+
+  createMppLeadTimeItem: (data: Partial<MppLeadTimeItemRef>) =>
+    request<MppLeadTimeItemRef>('/mpp-lead-time-items', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateMppLeadTimeItem: (id: string, data: Partial<MppLeadTimeItemRef>) =>
+    request<MppLeadTimeItemRef>(`/mpp-lead-time-items/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  deleteMppLeadTimeItem: (id: string) =>
+    request<{ success: boolean }>(`/mpp-lead-time-items/${id}`, { method: 'DELETE' }),
+
+  seedMppLeadTimeDefaults: (operatorId = 'horizon') =>
+    request<{ success: boolean; groupCount: number; itemCount: number }>('/mpp-lead-times/seed-defaults', {
       method: 'POST',
       body: JSON.stringify({ operatorId }),
     }),

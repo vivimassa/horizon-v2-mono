@@ -51,7 +51,7 @@ export function CityPairList({
       {/* Header */}
       <div className="px-4 py-3 space-y-3 border-b border-hz-border shrink-0">
         <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-bold">City Pairs</h2>
+          <h2 className="text-[16px] font-bold">City Pairs</h2>
         </div>
 
         {/* Search */}
@@ -60,7 +60,7 @@ export function CityPairList({
           <input
             type="text"
             placeholder="Search IATA, ICAO, city, route type…"
-            className="w-full pl-9 pr-3 py-2 rounded-xl text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 placeholder:text-hz-text-secondary/50 text-hz-text"
+            className="w-full pl-9 pr-3 py-2 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 placeholder:text-hz-text-secondary/50 text-hz-text"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
           />
@@ -85,7 +85,7 @@ export function CityPairList({
                     !collapsed.has(routeType) ? "rotate-90" : ""
                   }`}
                 />
-                <span className="text-[12px] font-bold uppercase tracking-wider text-hz-text-secondary/70">
+                <span className="text-[12px] font-medium uppercase tracking-wider text-hz-text-secondary/70">
                   {ROUTE_TYPE_LABELS[routeType] ?? routeType}
                 </span>
                 <span className="text-[11px] text-hz-text-secondary/40">({pairs.length})</span>
@@ -117,7 +117,7 @@ export function CityPairList({
                         </span>
                         {/* Cities */}
                         <div className="min-w-0 flex-1 ml-1">
-                          <div className="text-[12px] text-hz-text-secondary truncate">
+                          <div className="text-[13px] text-hz-text-secondary truncate">
                             {cp.station1City && cp.station2City
                               ? `${cp.station1City} – ${cp.station2City}`
                               : cp.station1Name && cp.station2Name
@@ -127,7 +127,7 @@ export function CityPairList({
                         </div>
                         {/* Distance */}
                         {cp.distanceNm && (
-                          <span className="text-[10px] text-hz-text-secondary/50 tabular-nums shrink-0">
+                          <span className="text-[13px] text-hz-text-secondary/50 tabular-nums shrink-0">
                             {cp.distanceNm.toLocaleString()} nm
                           </span>
                         )}

@@ -28,10 +28,43 @@ interface LopaConfigDetailProps {
   onCancelCreate?: () => void;
 }
 
+function Alert({ type, message, onDismiss }: { type: "error" | "warning" | "info" | "success"; message: string; onDismiss?: () => void }) {
+  const c = { info: { bar: "#0063F7", bg: "rgba(0,99,247,0.08)" }, success: { bar: "#06C270", bg: "rgba(6,194,112,0.08)" }, error: { bar: "#E63535", bg: "rgba(255,59,59,0.08)" }, warning: { bar: "#FF8800", bg: "rgba(255,136,0,0.08)" } }[type];
+  return (
+    <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg border border-hz-border/50" style={{ backgroundColor: c.bg }}>
+      <div className="w-[3px] h-full min-h-[20px] rounded-full shrink-0 self-stretch" style={{ backgroundColor: c.bar }} />
+      <span className="text-[13px] flex-1" style={{ color: c.bar }}>{message}</span>
+      {onDismiss && <button onClick={onDismiss} className="shrink-0 p-0.5 rounded hover:bg-hz-border/30 transition-colors"><X size={13} style={{ color: c.bar }} /></button>}
+    </div>
+  );
+}
+
+function DeleteModal({ onConfirm, onCancel, saving }: { onConfirm: () => void; onCancel: () => void; saving: boolean }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}>
+      <div className="bg-hz-card border border-hz-border rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(255,59,59,0.12)" }}>
+            <Trash2 size={20} style={{ color: "#E63535" }} />
+          </div>
+          <div>
+            <h3 className="text-[15px] font-bold">Delete configuration?</h3>
+            <p className="text-[13px] text-hz-text-secondary mt-1">This will permanently remove this LOPA configuration. This action cannot be undone.</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <button onClick={onCancel} disabled={saving} className="px-4 py-2 rounded-lg text-[13px] font-medium text-hz-text-secondary border border-hz-border hover:bg-hz-border/30 transition-colors">No, Cancel</button>
+          <button onClick={onConfirm} disabled={saving} className="px-4 py-2 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50" style={{ backgroundColor: "#E63535" }}>{saving ? "Deleting..." : "Yes, Delete"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onSave, onDelete, onCreate, initialShowCreate, onCancelCreate }: LopaConfigDetailProps) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [draft, setDraft] = useState<Partial<LopaConfigRef>>({});
   const [draftCabins, setDraftCabins] = useState<CabinEntry[] | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
@@ -94,7 +127,7 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
     setDraft({});
     setDraftCabins([...config.cabins]);
     setEditing(true);
-    setConfirmDelete(false);
+    setShowDeleteModal(false);
   }, [config]);
 
   const handleCancel = useCallback(() => { setDraft({}); setDraftCabins(null); setEditing(false); }, []);
@@ -119,7 +152,7 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
     setSaving(true); setErrorMsg("");
     try { await onDelete(config._id); }
     catch (err: any) { setErrorMsg(friendlyError(err)); }
-    finally { setSaving(false); setConfirmDelete(false); }
+    finally { setSaving(false); setShowDeleteModal(false); }
   }, [onDelete, config, friendlyError]);
 
   const getVal = (key: keyof LopaConfigRef) =>
@@ -186,7 +219,7 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
         {/* Header */}
         <div className="px-6 py-4 border-b border-hz-border shrink-0">
           <div className="flex items-center justify-between">
-            <h1 className="text-[18px] font-semibold">Add New LOPA Configuration</h1>
+            <h1 className="text-[20px] font-semibold">Add New LOPA Configuration</h1>
             <button onClick={resetCreate} className="text-[13px] text-hz-text-secondary hover:text-hz-text transition-colors">Cancel</button>
           </div>
         </div>
@@ -196,10 +229,10 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
           <div className="px-6 pt-4 pb-3 space-y-3 border-b border-hz-border">
             <div className="flex gap-3">
               <div className="flex-1">
-                <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">Aircraft Type *</label>
+                <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Aircraft Type *</label>
                 <select value={createForm.aircraftType}
                   onChange={(e) => setCreateForm(p => ({ ...p, aircraftType: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] font-mono border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text">
+                  className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] font-mono border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 focus:border-module-accent transition-colors text-hz-text">
                   <option value="">Select type...</option>
                   {aircraftTypes.map(t => <option key={t._id} value={t.icaoType}>{t.icaoType} — {t.name}</option>)}
                 </select>
@@ -211,7 +244,7 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={createForm.isDefault}
                   onChange={(e) => setCreateForm(p => ({ ...p, isDefault: e.target.checked }))}
-                  className="w-4 h-4 rounded border-hz-border accent-[#1e40af]" />
+                  className="w-4 h-4 rounded border-hz-border accent-module-accent" />
                 <span className="text-[13px] font-medium">Set as default</span>
               </label>
             </div>
@@ -220,8 +253,8 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
           {/* Cabin class toggle chips */}
           <div className="px-6 py-4 border-b border-hz-border">
             <div className="flex items-center justify-between mb-2.5">
-              <span className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">Cabin Classes</span>
-              <span className="text-[13px] font-bold tabular-nums" style={{ color: "#1e40af" }}>
+              <span className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Cabin Classes</span>
+              <span className="text-[13px] font-bold tabular-nums text-module-accent">
                 {createTotalSeats} total seats
               </span>
             </div>
@@ -244,7 +277,7 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
                     <span className="font-bold font-mono">{cc.code}</span>
                     <span className={active ? "" : "text-hz-text-secondary"}>{cc.name}</span>
                     {active && (
-                      <span className="text-[11px] font-bold tabular-nums ml-1 opacity-70">
+                      <span className="text-[13px] font-bold tabular-nums ml-1 opacity-70">
                         {createForm.cabins.find(c => c.classCode === cc.code)?.seats ?? 0}
                       </span>
                     )}
@@ -300,12 +333,11 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
                 Cancel
               </button>
               <button onClick={handleCreate} disabled={creating || !createForm.aircraftType || !createForm.configName || createForm.cabins.length === 0}
-                className="flex-1 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
-                style={{ backgroundColor: "#1e40af" }}>
+                className="flex-1 py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50 bg-module-accent hover:opacity-90">
                 {creating ? "Creating..." : `Add Configuration · ${createTotalSeats} seats`}
               </button>
             </div>
-            {createError && <p className="text-[12px] text-red-500">{createError}</p>}
+            {createError && <Alert type="error" message={createError} onDismiss={() => setCreateError("")} />}
           </div>
         </div>
       </div>
@@ -315,6 +347,14 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
   // ── Normal detail view ──
   return (
     <div className="flex flex-col h-full overflow-hidden">
+      {showDeleteModal && (
+        <DeleteModal
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteModal(false)}
+          saving={saving}
+        />
+      )}
+
       {/* Header */}
       <div className="px-6 py-4 border-b border-hz-border shrink-0">
         <div className="flex items-center justify-between">
@@ -322,14 +362,13 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
             <span className="text-[14px] font-bold font-mono px-2.5 py-1 rounded-lg bg-hz-border/30">
               {config.aircraftType}
             </span>
-            <h1 className="text-[18px] font-semibold">{config.configName}</h1>
+            <h1 className="text-[20px] font-semibold">{config.configName}</h1>
             {config.isDefault && (
-              <span className="flex items-center gap-1 text-[12px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+              <span className="flex items-center gap-1 text-[12px] font-semibold px-2.5 py-0.5 rounded-full bg-[rgba(255,136,0,0.12)] text-[#E67A00] dark:bg-[rgba(253,172,66,0.15)] dark:text-[#FDAC42]">
                 <Star className="h-3 w-3 fill-current" /> Default
               </span>
             )}
-            <span className="text-[13px] font-semibold px-3 py-0.5 rounded-full"
-              style={{ backgroundColor: "rgba(30,64,175,0.1)", color: "#1e40af" }}>
+            <span className="text-[13px] font-semibold px-3 py-0.5 rounded-full text-module-accent bg-module-accent/10">
               {editing ? computedTotal : config.totalSeats} seats
             </span>
           </div>
@@ -342,25 +381,16 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
                   <X className="h-3.5 w-3.5" /> Cancel
                 </button>
                 <button onClick={handleSave} disabled={saving}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-white transition-colors"
-                  style={{ backgroundColor: "#1e40af" }}>
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-white transition-colors bg-module-accent hover:opacity-90">
                   <Save className="h-3.5 w-3.5" /> {saving ? "Saving..." : "Save"}
                 </button>
               </>
             ) : (
               <>
                 {onDelete && (
-                  confirmDelete ? (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[12px] text-red-500 font-medium">Delete?</span>
-                      <button onClick={handleDelete} disabled={saving} className="px-2.5 py-1 rounded-lg text-[12px] font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors">Yes</button>
-                      <button onClick={() => setConfirmDelete(false)} className="px-2.5 py-1 rounded-lg text-[12px] font-medium text-hz-text-secondary hover:bg-hz-border/30 transition-colors">No</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => setConfirmDelete(true)} className="flex items-center gap-1 p-1.5 rounded-lg text-hz-text-secondary/50 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors" title="Delete configuration">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )
+                  <button onClick={() => setShowDeleteModal(true)} className="flex items-center gap-1 p-1.5 rounded-lg text-hz-text-secondary/50 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors" title="Delete configuration">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 )}
                 {onSave && (
                   <button onClick={handleEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-hz-text-secondary hover:bg-hz-border/30 transition-colors">
@@ -373,9 +403,8 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
         </div>
 
         {errorMsg && (
-          <div className="mt-3 flex items-start gap-2 px-3 py-2.5 rounded-lg border border-red-200 bg-red-50 dark:border-red-500/20 dark:bg-red-500/10">
-            <span className="text-[13px] text-red-700 dark:text-red-400">{errorMsg}</span>
-            <button onClick={() => setErrorMsg("")} className="text-red-400 hover:text-red-600 shrink-0 ml-auto"><X className="h-3.5 w-3.5" /></button>
+          <div className="mt-3">
+            <Alert type="error" message={errorMsg} onDismiss={() => setErrorMsg("")} />
           </div>
         )}
       </div>
@@ -393,10 +422,10 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
             <div className="space-y-3">
               <div className="flex gap-3">
                 <div className="flex-1">
-                  <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">Aircraft Type *</label>
+                  <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Aircraft Type *</label>
                   <select value={createForm.aircraftType}
                     onChange={(e) => setCreateForm(p => ({ ...p, aircraftType: e.target.value }))}
-                    className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] font-mono border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text">
+                    className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] font-mono border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 focus:border-module-accent transition-colors text-hz-text">
                     <option value="">Select type...</option>
                     {aircraftTypes.map(t => <option key={t._id} value={t.icaoType}>{t.icaoType} — {t.name}</option>)}
                   </select>
@@ -407,14 +436,14 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
 
               {/* Cabin class chips */}
               <div>
-                <span className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">Cabin Classes</span>
+                <span className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Cabin Classes</span>
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
                   {classOptions.map(cc => {
                     const active = enabledCodes.has(cc.code);
                     const color = getClassColor(cc.code);
                     return (
                       <button key={cc.code} onClick={() => toggleCabinClass(cc.code)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium border transition-all ${
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium border transition-all ${
                           active ? "border-transparent" : "border-hz-border/50 opacity-50 hover:opacity-80"
                         }`}
                         style={active ? { backgroundColor: color + "18", borderColor: color + "40", color } : undefined}
@@ -449,12 +478,11 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
               ))}
 
               <button onClick={handleCreate} disabled={creating || !createForm.aircraftType || !createForm.configName}
-                className="w-full py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
-                style={{ backgroundColor: "#1e40af" }}>
+                className="w-full py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50 bg-module-accent hover:opacity-90">
                 {creating ? "Creating..." : `Add Configuration · ${inlineTotal} seats`}
               </button>
             </div>
-            {createError && <p className="text-[12px] text-red-500">{createError}</p>}
+            {createError && <Alert type="error" message={createError} onDismiss={() => setCreateError("")} />}
           </div>
         );
       })()}
@@ -469,8 +497,8 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
         {/* Cabin sliders (edit mode) or cabin summary (view mode) */}
         <div className="px-6 py-4 border-b border-hz-border">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[14px] font-bold">Cabin Layout</h3>
-            <span className="text-[13px] font-bold" style={{ color: "#1e40af" }}>
+            <h3 className="text-[16px] font-bold">Cabin Layout</h3>
+            <span className="text-[13px] font-bold text-module-accent">
               {computedTotal} total seats
             </span>
           </div>
@@ -497,8 +525,7 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
               ))}
               <button
                 onClick={() => setDraftCabins([...draftCabins, { classCode: "Y", seats: 0 }])}
-                className="flex items-center gap-1.5 text-[13px] font-medium px-3 py-1.5 rounded-lg hover:bg-hz-border/30 transition-colors"
-                style={{ color: "#1e40af" }}
+                className="flex items-center gap-1.5 text-[13px] font-medium px-3 py-1.5 rounded-lg hover:bg-hz-border/30 transition-colors text-module-accent"
               >
                 <Plus className="h-3.5 w-3.5" /> Add Cabin
               </button>
@@ -516,7 +543,7 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
                   <span className="text-[14px] font-bold font-mono w-8">{cabin.classCode}</span>
                   <span className="text-[13px] text-hz-text-secondary">{getClassName(cabin.classCode)}</span>
                   <span className="text-[14px] font-semibold ml-auto tabular-nums">{cabin.seats}</span>
-                  <span className="text-[12px] text-hz-text-tertiary">seats</span>
+                  <span className="text-[13px] text-hz-text-tertiary">seats</span>
                 </div>
               ))}
             </div>
@@ -526,17 +553,17 @@ export function LopaConfigDetail({ config, cabinClasses, aircraftTypes = [], onS
         {/* Details fields */}
         <div className="px-6 pt-3 pb-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8">
-            <FieldRow label="Aircraft Type" value={<span className="font-bold font-mono">{config.aircraftType}</span>}
+            <FieldRow label="Aircraft Type" value={config.aircraftType}
               editing={editing} fieldKey="aircraftType" editValue={getVal("aircraftType")} onChange={handleFieldChange} />
             <FieldRow label="Config Name" value={config.configName}
               editing={editing} fieldKey="configName" editValue={getVal("configName")} onChange={handleFieldChange} />
             <FieldRow label="Default"
-              value={config.isDefault ? <span className="text-amber-600 font-semibold">Default</span> : <span className="text-hz-text-secondary">No</span>}
+              value={config.isDefault ? <span className="font-semibold" style={{ color: "#E67A00" }}>Default</span> : <span className="text-hz-text-secondary">No</span>}
               editing={editing} fieldKey="isDefault" editValue={getVal("isDefault")} onChange={handleFieldChange} inputType="toggle" />
             <FieldRow label="Notes" value={config.notes}
               editing={editing} fieldKey="notes" editValue={getVal("notes")} onChange={handleFieldChange} />
             <FieldRow label="Active"
-              value={config.isActive ? <span className="text-green-600 font-semibold">Active</span> : <span className="text-red-600 font-semibold">Inactive</span>}
+              value={config.isActive ? <span className="font-semibold" style={{ color: "#06C270" }}>Active</span> : <span className="font-semibold" style={{ color: "#E63535" }}>Inactive</span>}
               editing={editing} fieldKey="isActive" editValue={getVal("isActive")} onChange={handleFieldChange} inputType="toggle" />
           </div>
         </div>
@@ -561,7 +588,7 @@ function CabinSliderRow({ cabin, classOptions, color, maxSeats, onChangeClass, o
       <select
         value={cabin.classCode}
         onChange={(e) => onChangeClass(e.target.value)}
-        className="px-2 py-1 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none text-hz-text w-[120px] shrink-0"
+        className="px-2 py-1 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:border-module-accent transition-colors text-hz-text w-[120px] shrink-0"
       >
         {classOptions.map((cc) => (
           <option key={cc.code} value={cc.code}>{cc.code} — {cc.name}</option>
@@ -587,7 +614,7 @@ function CabinSliderRow({ cabin, classOptions, color, maxSeats, onChangeClass, o
         type="number"
         value={cabin.seats}
         onChange={(e) => onChangeSeats(Math.max(0, Number(e.target.value) || 0))}
-        className="w-16 px-2 py-1 rounded-lg text-[13px] font-mono font-bold border border-hz-border bg-hz-bg outline-none text-hz-text text-right"
+        className="w-16 px-2 py-1 rounded-lg text-[13px] font-mono font-bold border border-hz-border bg-hz-bg outline-none focus:border-module-accent transition-colors text-hz-text text-right"
         min={0}
       />
       {onRemove && (
@@ -606,9 +633,9 @@ function MiniInput({ label, value, onChange, maxLength, mono, type = "text" }: {
 }) {
   return (
     <div className="flex-1">
-      <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">{label}</label>
+      <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">{label}</label>
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)} maxLength={maxLength}
-        className={`w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text ${mono ? "font-mono" : ""}`} />
+        className={`w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 focus:border-module-accent transition-colors text-hz-text ${mono ? "font-mono" : ""}`} />
     </div>
   );
 }

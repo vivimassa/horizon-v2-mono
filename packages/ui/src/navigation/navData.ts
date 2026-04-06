@@ -230,6 +230,8 @@ export const NAV_TREE: NavModuleData[] = [
           { key: 'crew-complements', label: 'Crew Complements', num: '5.4.5', route: '/admin/crew-complements', iconName: 'Users', desc: 'Aircraft type crew requirements & templates', group: 'Crew Ops', groupIconName: 'Users' },
           { key: 'crew-groups', label: 'Crew Groups', num: '5.4.6', route: '/admin/crew-groups', iconName: 'Users', desc: 'Scheduling groups & crew classification', group: 'Crew Ops', groupIconName: 'Users' },
           { key: 'fdt-rules', label: 'FDT Rules', num: '5.4.7', route: '/admin/fdt-rules', iconName: 'ShieldCheck', desc: 'Flight duty time limitations & regulatory framework', group: 'Crew Ops', groupIconName: 'Users' },
+          { key: 'duty-patterns', label: 'Off/Duty Patterns', num: '5.4.8', route: '/admin/duty-patterns', iconName: 'CalendarDays', desc: 'ON/OFF rotation patterns for crew rostering', group: 'Crew Ops', groupIconName: 'Users' },
+          { key: 'mpp-lead-times', label: 'MPP Lead Times', num: '5.4.9', route: '/admin/mpp-lead-times', iconName: 'Timer', desc: 'Training & recruitment lead times for manpower planning', group: 'Crew Ops', groupIconName: 'Users' },
         ],
       },
     ],

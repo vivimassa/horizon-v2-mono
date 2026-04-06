@@ -33,7 +33,7 @@ export function AirportBasicTab({ airport, editing, draft = {}, onChange }: Prop
         <FieldRow label="Elevation (ft)" value={airport.elevationFt}
           editing={editing} fieldKey="elevationFt" editValue={get("elevationFt")} onChange={onChange} inputType="number" />
         <FieldRow label="Active"
-          value={airport.isActive ? <span className="text-green-600 font-semibold">Active</span> : <span className="text-red-600 font-semibold">Inactive</span>}
+          value={airport.isActive ? <span className="font-semibold" style={{ color: "#06C270" }}>Active</span> : <span className="font-semibold" style={{ color: "#E63535" }}>Inactive</span>}
           editing={editing} fieldKey="isActive" editValue={get("isActive")} onChange={onChange} inputType="toggle" />
       </div>
     </div>

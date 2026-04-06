@@ -20,6 +20,8 @@ import { LopaConfig } from '../models/LopaConfig.js'
 import { ActivityCodeGroup, ActivityCode } from '../models/ActivityCode.js'
 import { CrewComplement } from '../models/CrewComplement.js'
 import { CrewGroup } from '../models/CrewGroup.js'
+import { DutyPattern } from '../models/DutyPattern.js'
+import { MppLeadTimeGroup, MppLeadTimeItem } from '../models/MppLeadTime.js'
 import { lookupByIcao, getStats, loadOurAirportsData } from '../data/ourairports-cache.js'
 
 // ─── Zod schemas for airport validation ───────────────────
@@ -2091,6 +2093,264 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     await CrewGroup.insertMany(rows)
     return { success: true, count: rows.length }
+  })
+
+  // ─── Duty Patterns ──────────────────────────────────────────
+
+  const dpCreateSchema = z.object({
+    operatorId: z.string().min(1),
+    code: z.string().min(1).max(20),
+    description: z.string().nullable().optional(),
+    sequence: z.array(z.number().int().min(1)).min(2).refine(arr => arr.length % 2 === 0, { message: 'Sequence must have an even number of segments' }),
+    offCode: z.string().min(1).max(10).optional().default('DO'),
+    isActive: z.boolean().optional().default(true),
+    sortOrder: z.number().int().min(0).optional(),
+  }).strict()
+
+  const dpUpdateSchema = z.object({
+    code: z.string().min(1).max(20),
+    description: z.string().nullable(),
+    sequence: z.array(z.number().int().min(1)).min(2).refine(arr => arr.length % 2 === 0, { message: 'Sequence must have an even number of segments' }),
+    offCode: z.string().min(1).max(10),
+    isActive: z.boolean(),
+    sortOrder: z.number().int().min(0),
+  }).partial().strict()
+
+  app.get('/duty-patterns', async (req) => {
+    const { operatorId } = req.query as { operatorId?: string }
+    const filter: Record<string, unknown> = {}
+    if (operatorId) filter.operatorId = operatorId
+    return DutyPattern.find(filter).sort({ sortOrder: 1, code: 1 }).lean()
+  })
+
+  app.get('/duty-patterns/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await DutyPattern.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Duty pattern not found' })
+    return doc
+  })
+
+  app.post('/duty-patterns', async (req, reply) => {
+    const raw = req.body as Record<string, unknown>
+    if (raw.code) raw.code = (raw.code as string).toUpperCase()
+    const parsed = dpCreateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body = parsed.data
+    const existing = await DutyPattern.findOne({ operatorId: body.operatorId, code: body.code }).lean()
+    if (existing) return reply.code(409).send({ error: `Duty pattern '${body.code}' already exists` })
+
+    const cycleDays = body.sequence.reduce((a, b) => a + b, 0)
+    const maxSort = await DutyPattern.findOne({ operatorId: body.operatorId }).sort({ sortOrder: -1 }).lean()
+    const id = crypto.randomUUID()
+    const doc = await DutyPattern.create({
+      _id: id,
+      ...body,
+      cycleDays,
+      sortOrder: body.sortOrder ?? ((maxSort?.sortOrder ?? 0) + 10),
+      createdAt: new Date().toISOString(),
+    })
+    return reply.code(201).send(doc.toObject())
+  })
+
+  app.patch('/duty-patterns/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const raw = req.body as Record<string, unknown>
+    if (raw.code) raw.code = (raw.code as string).toUpperCase()
+    const parsed = dpUpdateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body: Record<string, unknown> = { ...parsed.data, updatedAt: new Date().toISOString() }
+    if (parsed.data.sequence) {
+      body.cycleDays = parsed.data.sequence.reduce((a: number, b: number) => a + b, 0)
+    }
+    const doc = await DutyPattern.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'Duty pattern not found' })
+    return doc
+  })
+
+  app.delete('/duty-patterns/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await DutyPattern.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Duty pattern not found' })
+    await DutyPattern.findByIdAndDelete(id)
+    return { success: true }
+  })
+
+  app.post('/duty-patterns/seed-defaults', async (req, reply) => {
+    const { operatorId } = req.body as { operatorId?: string }
+    if (!operatorId) return reply.code(400).send({ error: 'operatorId required' })
+    const count = await DutyPattern.countDocuments({ operatorId })
+    if (count > 0) return reply.code(409).send({ error: 'Patterns already exist' })
+
+    const defaults = [
+      { code: '52', description: 'Standard 5-on 2-off weekly rotation', sequence: [5, 2], offCode: 'DO', isActive: true },
+      { code: '5243', description: 'Extended rotation with mid-cycle break', sequence: [5, 2, 4, 3], offCode: 'DO', isActive: true },
+      { code: '77', description: 'Equal time 7-on 7-off rotation', sequence: [7, 7], offCode: 'DO', isActive: true },
+      { code: '4331', description: 'Short haul pattern with split rest', sequence: [4, 3, 3, 1], offCode: 'DO', isActive: true },
+      { code: '6242', description: 'Long haul crew rotation pattern', sequence: [6, 2, 4, 2], offCode: 'RDO', isActive: false },
+    ]
+    const rows = defaults.map((d, i) => ({
+      _id: crypto.randomUUID(),
+      operatorId,
+      ...d,
+      cycleDays: d.sequence.reduce((a, b) => a + b, 0),
+      sortOrder: (i + 1) * 10,
+      createdAt: new Date().toISOString(),
+    }))
+    await DutyPattern.insertMany(rows)
+    return { success: true, count: rows.length }
+  })
+
+  // ─── MPP Lead Time Groups ──────────────────────────────────
+
+  const ltGroupCreateSchema = z.object({
+    operatorId: z.string().min(1),
+    label: z.string().min(1).max(80),
+    description: z.string().nullable().optional(),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+    code: z.string().min(1).max(6),
+    crewType: z.enum(['cockpit', 'cabin', 'other']).optional().default('cockpit'),
+    sortOrder: z.number().int().min(0).optional(),
+  }).strict()
+
+  const ltGroupUpdateSchema = ltGroupCreateSchema.omit({ operatorId: true }).partial().strict()
+
+  app.get('/mpp-lead-time-groups', async (req) => {
+    const { operatorId } = req.query as { operatorId?: string }
+    const filter: Record<string, unknown> = {}
+    if (operatorId) filter.operatorId = operatorId
+    return MppLeadTimeGroup.find(filter).sort({ crewType: 1, sortOrder: 1 }).lean()
+  })
+
+  app.post('/mpp-lead-time-groups', async (req, reply) => {
+    const raw = req.body as Record<string, unknown>
+    if (raw.code) raw.code = (raw.code as string).toUpperCase()
+    const parsed = ltGroupCreateSchema.safeParse(raw)
+    if (!parsed.success) return reply.code(400).send({ error: 'Validation failed', details: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`) })
+    const body = parsed.data
+    const existing = await MppLeadTimeGroup.findOne({ operatorId: body.operatorId, code: body.code }).lean()
+    if (existing) return reply.code(409).send({ error: `Group code '${body.code}' already exists` })
+    const maxSort = await MppLeadTimeGroup.findOne({ operatorId: body.operatorId }).sort({ sortOrder: -1 }).lean()
+    const id = crypto.randomUUID()
+    const doc = await MppLeadTimeGroup.create({ _id: id, ...body, sortOrder: body.sortOrder ?? ((maxSort?.sortOrder ?? 0) + 10), createdAt: new Date().toISOString() })
+    return reply.code(201).send(doc.toObject())
+  })
+
+  app.patch('/mpp-lead-time-groups/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const raw = req.body as Record<string, unknown>
+    if (raw.code) raw.code = (raw.code as string).toUpperCase()
+    const parsed = ltGroupUpdateSchema.safeParse(raw)
+    if (!parsed.success) return reply.code(400).send({ error: 'Validation failed', details: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`) })
+    const doc = await MppLeadTimeGroup.findByIdAndUpdate(id, { $set: { ...parsed.data, updatedAt: new Date().toISOString() } }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'Group not found' })
+    return doc
+  })
+
+  app.delete('/mpp-lead-time-groups/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await MppLeadTimeGroup.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Group not found' })
+    await MppLeadTimeItem.deleteMany({ groupId: id })
+    await MppLeadTimeGroup.findByIdAndDelete(id)
+    return { success: true }
+  })
+
+  // ─── MPP Lead Time Items ──────────────────────────────────
+
+  const ltItemCreateSchema = z.object({
+    operatorId: z.string().min(1),
+    groupId: z.string().min(1),
+    label: z.string().min(1).max(120),
+    valueMonths: z.number().int().min(1).max(120),
+    note: z.string().nullable().optional(),
+    consumedBy: z.string().nullable().optional(),
+    sortOrder: z.number().int().min(0).optional(),
+  }).strict()
+
+  const ltItemUpdateSchema = ltItemCreateSchema.omit({ operatorId: true }).partial().strict()
+
+  app.get('/mpp-lead-time-items', async (req) => {
+    const { operatorId, groupId } = req.query as { operatorId?: string; groupId?: string }
+    const filter: Record<string, unknown> = {}
+    if (operatorId) filter.operatorId = operatorId
+    if (groupId) filter.groupId = groupId
+    return MppLeadTimeItem.find(filter).sort({ sortOrder: 1 }).lean()
+  })
+
+  app.post('/mpp-lead-time-items', async (req, reply) => {
+    const raw = req.body as Record<string, unknown>
+    const parsed = ltItemCreateSchema.safeParse(raw)
+    if (!parsed.success) return reply.code(400).send({ error: 'Validation failed', details: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`) })
+    const body = parsed.data
+    const maxSort = await MppLeadTimeItem.findOne({ groupId: body.groupId }).sort({ sortOrder: -1 }).lean()
+    const id = crypto.randomUUID()
+    const doc = await MppLeadTimeItem.create({ _id: id, ...body, sortOrder: body.sortOrder ?? ((maxSort?.sortOrder ?? 0) + 10), createdAt: new Date().toISOString() })
+    return reply.code(201).send(doc.toObject())
+  })
+
+  app.patch('/mpp-lead-time-items/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const parsed = ltItemUpdateSchema.safeParse(req.body)
+    if (!parsed.success) return reply.code(400).send({ error: 'Validation failed', details: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`) })
+    const doc = await MppLeadTimeItem.findByIdAndUpdate(id, { $set: { ...parsed.data, updatedAt: new Date().toISOString() } }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'Item not found' })
+    return doc
+  })
+
+  app.delete('/mpp-lead-time-items/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await MppLeadTimeItem.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Item not found' })
+    await MppLeadTimeItem.findByIdAndDelete(id)
+    return { success: true }
+  })
+
+  app.post('/mpp-lead-times/seed-defaults', async (req, reply) => {
+    const { operatorId } = req.body as { operatorId?: string }
+    if (!operatorId) return reply.code(400).send({ error: 'operatorId required' })
+    const count = await MppLeadTimeGroup.countDocuments({ operatorId })
+    if (count > 0) return reply.code(409).send({ error: 'Lead time groups already exist' })
+
+    const now = new Date().toISOString()
+    const groups = [
+      { code: 'PER', label: 'External Recruitment', description: 'New pilots joining from outside the organisation', color: '#7c3aed', crewType: 'cockpit' as const, sortOrder: 10 },
+      { code: 'PIN', label: 'Internal Movement', description: 'Upgrades and fleet changes within existing pilot pool', color: '#0891b2', crewType: 'cockpit' as const, sortOrder: 20 },
+      { code: 'CCP', label: 'Cabin Crew', description: 'Initial courses, upgrades, and fleet transitions for cabin crew', color: '#be185d', crewType: 'cabin' as const, sortOrder: 30 },
+    ]
+    const items = [
+      { groupCode: 'PER', label: 'Direct Entry Captain (AOC)', valueMonths: 6, consumedBy: 'MPP · AOC Captain event' },
+      { groupCode: 'PER', label: 'First Officer — External Hire (AOC)', valueMonths: 5, consumedBy: 'MPP · AOC FO event' },
+      { groupCode: 'PER', label: 'Cadet — Ab Initio (CDT)', valueMonths: 16, consumedBy: 'MPP · CDT event' },
+      { groupCode: 'PIN', label: 'Crew Upgrade FO → Captain (CUG)', valueMonths: 4, consumedBy: 'MPP · CUG event' },
+      { groupCode: 'PIN', label: 'Cross-Crew Qualification (CCQ)', valueMonths: 3, consumedBy: 'MPP · CCQ event' },
+      { groupCode: 'CCP', label: 'Cabin Crew — Initial Course', valueMonths: 2, consumedBy: 'MPP · CC Initial event' },
+      { groupCode: 'CCP', label: 'Senior Purser Upgrade', valueMonths: 2, consumedBy: 'MPP · SP Upgrade event' },
+      { groupCode: 'CCP', label: 'Cabin Fleet Type Training', valueMonths: 1, consumedBy: 'MPP · CC Fleet event' },
+    ]
+
+    const groupDocs = groups.map(g => ({ _id: crypto.randomUUID(), operatorId, ...g, createdAt: now }))
+    await MppLeadTimeGroup.insertMany(groupDocs)
+
+    const codeToId = new Map(groupDocs.map(g => [g.code, g._id]))
+    const itemDocs = items.map((it, i) => ({
+      _id: crypto.randomUUID(),
+      operatorId,
+      groupId: codeToId.get(it.groupCode)!,
+      label: it.label,
+      valueMonths: it.valueMonths,
+      consumedBy: it.consumedBy,
+      sortOrder: (i + 1) * 10,
+      createdAt: now,
+    }))
+    await MppLeadTimeItem.insertMany(itemDocs)
+
+    return { success: true, groupCount: groupDocs.length, itemCount: itemDocs.length }
   })
 }
 

@@ -26,7 +26,7 @@ export function MasterDetailLayout({
   right,
 }: MasterDetailLayoutProps) {
   const { theme } = useTheme();
-  const panelBg = theme === "dark" ? "#1e1e22" : "#ffffff";
+  const panelBg = theme === "dark" ? "#191921" : "#FFFFFF";
 
   return (
     <div className="flex h-full overflow-hidden gap-3 px-5 pt-4 pb-5">

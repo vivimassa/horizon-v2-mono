@@ -76,8 +76,9 @@ export const domainIcons = {
   calendarDays: CalendarDays,
   timer: Timer,
   // Status
+  info: AlertCircle,
   warning: AlertTriangle,
-  error: AlertCircle,
+  error: XCircle,
   success: CheckCircle,
   cancelled: XCircle,
   // Operations

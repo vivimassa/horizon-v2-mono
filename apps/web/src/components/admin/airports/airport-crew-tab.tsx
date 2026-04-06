@@ -12,13 +12,13 @@ export function AirportCrewTab({ airport }: Props) {
     <div className="px-6 pt-3 pb-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
         <FieldRow label="Crew Base"
-          value={airport.isCrewBase ? <span className="text-purple-600 font-semibold">Yes</span> : <span className="text-hz-text-secondary">No</span>} />
+          value={airport.isCrewBase ? <span className="font-semibold" style={{ color: "#7c3aed" }}>Yes</span> : <span className="text-hz-text-secondary">No</span>} />
         <FieldRow label="Crew Reporting Time (min)"
           value={airport.crewReportingTimeMinutes != null ? `${airport.crewReportingTimeMinutes} min` : null} />
         <FieldRow label="Crew Debrief Time (min)"
           value={airport.crewDebriefTimeMinutes != null ? `${airport.crewDebriefTimeMinutes} min` : null} />
         <FieldRow label="Crew Facilities"
-          value={airport.hasCrewFacilities ? <span className="text-green-600 font-semibold">Yes</span> : <span className="text-hz-text-secondary">No</span>} />
+          value={airport.hasCrewFacilities ? <span className="font-semibold" style={{ color: "#06C270" }}>Yes</span> : <span className="text-hz-text-secondary">No</span>} />
       </div>
 
       {airport.isCrewBase && (

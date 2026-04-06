@@ -44,10 +44,11 @@ function greatCirclePoints(
   return pts;
 }
 
-// ── Ping-pong glow SVG overlay ──
-const GLOW_SPEED = 80;
-const GLOW_FRACTION = 0.12;
-const PAUSE_MS = 250;
+// ── Continuous light beam overlay ──
+// A smooth beam of light travels A→B then B→A in a seamless loop.
+// The beam has a soft gradient head/tail and a glow filter for premium feel.
+const CYCLE_MS = 5000; // full A→B→A round trip
+const BEAM_FRACTION = 0.15; // beam length as fraction of route
 
 function PingPongGlow({ map, points, color }: { map: mapboxgl.Map; points: [number, number][]; color: string }) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -60,49 +61,69 @@ function PingPongGlow({ map, points, color }: { map: mapboxgl.Map; points: [numb
 
     while (svg.firstChild) svg.removeChild(svg.firstChild);
 
-    // Defs
-    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-    const fadeGrad = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
+    const ns = "http://www.w3.org/2000/svg";
+
+    // Defs — gradient for static line fade + glow filter
+    const defs = document.createElementNS(ns, "defs");
+
+    const fadeGrad = document.createElementNS(ns, "linearGradient");
     fadeGrad.setAttribute("id", "routeFade");
     fadeGrad.setAttribute("gradientUnits", "userSpaceOnUse");
     [
-      { offset: "0%", opacity: "0" }, { offset: "12%", opacity: "1" },
-      { offset: "88%", opacity: "1" }, { offset: "100%", opacity: "0" },
+      { offset: "0%", opacity: "0" }, { offset: "10%", opacity: "1" },
+      { offset: "90%", opacity: "1" }, { offset: "100%", opacity: "0" },
     ].forEach(s => {
-      const stop = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+      const stop = document.createElementNS(ns, "stop");
       stop.setAttribute("offset", s.offset);
       stop.setAttribute("stop-color", color);
       stop.setAttribute("stop-opacity", s.opacity);
       fadeGrad.appendChild(stop);
     });
     defs.appendChild(fadeGrad);
+
+    // Glow filter
+    const filter = document.createElementNS(ns, "filter");
+    filter.setAttribute("id", "beamGlow");
+    filter.setAttribute("x", "-50%"); filter.setAttribute("y", "-50%");
+    filter.setAttribute("width", "200%"); filter.setAttribute("height", "200%");
+    const blur = document.createElementNS(ns, "feGaussianBlur");
+    blur.setAttribute("in", "SourceGraphic"); blur.setAttribute("stdDeviation", "3");
+    blur.setAttribute("result", "blur");
+    filter.appendChild(blur);
+    const merge = document.createElementNS(ns, "feMerge");
+    const mn1 = document.createElementNS(ns, "feMergeNode"); mn1.setAttribute("in", "blur");
+    const mn2 = document.createElementNS(ns, "feMergeNode"); mn2.setAttribute("in", "SourceGraphic");
+    merge.appendChild(mn1); merge.appendChild(mn2);
+    filter.appendChild(merge);
+    defs.appendChild(filter);
+
     svg.appendChild(defs);
 
-    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    const g = document.createElementNS(ns, "g");
 
-    // Static route line (faded at ends)
-    const staticPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    // Static faint route line
+    const staticPath = document.createElementNS(ns, "path");
     staticPath.setAttribute("fill", "none");
     staticPath.setAttribute("stroke", "url(#routeFade)");
-    staticPath.setAttribute("stroke-opacity", "0.25");
+    staticPath.setAttribute("stroke-opacity", "0.18");
     staticPath.setAttribute("stroke-width", "1.5");
     staticPath.setAttribute("stroke-linejoin", "round");
     g.appendChild(staticPath);
 
-    // Glow path
-    const glowPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    glowPath.setAttribute("fill", "none");
-    glowPath.setAttribute("stroke", color);
-    glowPath.setAttribute("stroke-width", "2.5");
-    glowPath.setAttribute("stroke-linecap", "round");
-    glowPath.setAttribute("stroke-linejoin", "round");
-    glowPath.style.filter = `drop-shadow(0 0 4px ${color}) drop-shadow(0 0 8px ${color})`;
-    g.appendChild(glowPath);
+    // Beam path (the moving light)
+    const beamPath = document.createElementNS(ns, "path");
+    beamPath.setAttribute("fill", "none");
+    beamPath.setAttribute("stroke", color);
+    beamPath.setAttribute("stroke-width", "2.5");
+    beamPath.setAttribute("stroke-linecap", "round");
+    beamPath.setAttribute("stroke-linejoin", "round");
+    beamPath.setAttribute("filter", "url(#beamGlow)");
+    g.appendChild(beamPath);
 
     svg.appendChild(g);
 
     let totalLength = 0;
-    let glowLen = 0;
+    let beamLen = 0;
 
     function buildPath() {
       const projected = points.map(([lng, lat]) => {
@@ -111,7 +132,7 @@ function PingPongGlow({ map, points, color }: { map: mapboxgl.Map; points: [numb
       });
       const d = "M" + projected.map(([x, y]) => `${x},${y}`).join("L");
       staticPath.setAttribute("d", d);
-      glowPath.setAttribute("d", d);
+      beamPath.setAttribute("d", d);
 
       if (projected.length >= 2) {
         fadeGrad.setAttribute("x1", String(projected[0][0]));
@@ -120,48 +141,39 @@ function PingPongGlow({ map, points, color }: { map: mapboxgl.Map; points: [numb
         fadeGrad.setAttribute("y2", String(projected[projected.length - 1][1]));
       }
 
-      totalLength = glowPath.getTotalLength();
-      if (totalLength > 0) {
-        glowLen = totalLength * GLOW_FRACTION;
-        glowPath.setAttribute("stroke-dasharray", `${glowLen} ${totalLength - glowLen}`);
-      }
+      totalLength = beamPath.getTotalLength();
+      beamLen = totalLength * BEAM_FRACTION;
     }
 
     buildPath();
 
-    let phase: "fwd" | "pause-b" | "rev" | "pause-a" = "fwd";
-    let progress = 0;
-    let pauseRemaining = 0;
-    let lastTime = performance.now();
+    const startTime = performance.now();
 
     function animate(time: number) {
       if (cancelled) return;
-      const delta = time - lastTime;
-      lastTime = time;
-
       if (totalLength <= 0) { animId = requestAnimationFrame(animate); return; }
 
-      if (phase === "pause-b" || phase === "pause-a") {
-        pauseRemaining -= delta;
-        if (pauseRemaining <= 0) {
-          phase = phase === "pause-b" ? "rev" : "fwd";
-          progress = 0;
-        }
-      } else {
-        const step = (delta / 1000) * GLOW_SPEED / totalLength;
-        progress = Math.min(progress + step, 1);
+      // t goes 0→1 over CYCLE_MS, continuously
+      const elapsed = (time - startTime) % CYCLE_MS;
+      const t = elapsed / CYCLE_MS;
 
-        if (phase === "fwd") {
-          glowPath.setAttribute("stroke-dashoffset", String(-progress * totalLength));
-        } else {
-          glowPath.setAttribute("stroke-dashoffset", String(-(1 - progress) * totalLength));
-        }
+      // Smooth ping-pong: 0→1 (forward) then 1→0 (reverse)
+      // Use sine easing for buttery smooth acceleration/deceleration
+      const pingPong = t < 0.5
+        ? (1 - Math.cos(t * 2 * Math.PI)) / 2       // 0→1 with ease
+        : (1 + Math.cos((t - 0.5) * 2 * Math.PI)) / 2; // 1→0 with ease
 
-        if (progress >= 1) {
-          phase = phase === "fwd" ? "pause-b" : "pause-a";
-          pauseRemaining = PAUSE_MS;
-        }
-      }
+      // Beam position: offset from start
+      const offset = pingPong * (totalLength - beamLen);
+
+      // Use dash-array: [beamLen, totalLength] with offset
+      beamPath.setAttribute("stroke-dasharray", `${beamLen} ${totalLength}`);
+      beamPath.setAttribute("stroke-dashoffset", String(-offset));
+
+      // Fade beam opacity slightly at endpoints for softness
+      const edgeDist = Math.min(offset, totalLength - beamLen - offset);
+      const edgeFade = Math.min(1, edgeDist / (beamLen * 0.8));
+      beamPath.setAttribute("stroke-opacity", String(edgeFade));
 
       animId = requestAnimationFrame(animate);
     }
@@ -194,13 +206,16 @@ export function CityPairMap({ lat1, lon1, lat2, lon2, label1, label2, distanceNm
   const wrapperRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<mapboxgl.Map | null>(null);
+  const [mapReady, setMapReady] = useState(false);
   const [style, setStyle] = useState<"streets" | "satellite">("streets");
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const accent = isDark ? "#60a5fa" : "#3b82f6";
 
   const gcPoints = useMemo(() => greatCirclePoints(lat1, lon1, lat2, lon2), [lat1, lon1, lat2, lon2]);
 
+  // Effect 1: Create the map ONCE (only recreate on style/theme change)
   useEffect(() => {
     if (!containerRef.current || !TOKEN) return;
 
@@ -213,7 +228,10 @@ export function CityPairMap({ lat1, lon1, lat2, lon2, label1, label2, distanceNm
       accessToken: TOKEN,
       style: mapStyle,
       center: [(lon1 + lon2) / 2, (lat1 + lat2) / 2],
-      zoom: 3,
+      zoom: 5,
+      projection: 'globe' as any,
+      dragRotate: false,
+      pitchWithRotate: false,
       attributionControl: false,
     });
 
@@ -227,31 +245,51 @@ export function CityPairMap({ lat1, lon1, lat2, lon2, label1, label2, distanceNm
 
     map.on("load", () => {
       safeResize();
-
-      // Station markers with labels
-      const markerColor = isDark ? "#60a5fa" : "#3b82f6";
-
-      [{ lon: lon1, lat: lat1, label: label1 }, { lon: lon2, lat: lat2, label: label2 }].forEach(({ lon, lat, label }) => {
-        const el = document.createElement("div");
-        el.style.cssText = "display:flex;flex-direction:column;align-items:center;";
-        el.innerHTML = `
-          <div style="width:16px;height:16px;background:${markerColor};border:2.5px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.35);"></div>
-          <span style="margin-top:4px;padding:1px 6px;border-radius:8px;font-size:13px;font-weight:700;color:white;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);white-space:nowrap;">${label}</span>
-        `;
-        new mapboxgl.Marker({ element: el, anchor: "top" }).setLngLat([lon, lat]).addTo(map);
-      });
-
-      // Fit bounds
-      const bounds = new mapboxgl.LngLatBounds();
-      bounds.extend([lon1, lat1]);
-      bounds.extend([lon2, lat2]);
-      map.fitBounds(bounds, { padding: 60, maxZoom: 10, duration: 800 });
+      setMapReady(true);
     });
 
     setMapInstance(map);
 
-    return () => { removed = true; ro.disconnect(); map.remove(); setMapInstance(null); };
-  }, [lat1, lon1, lat2, lon2, label1, label2, style, isDark]);
+    return () => {
+      removed = true;
+      ro.disconnect();
+      markersRef.current.forEach(m => m.remove());
+      markersRef.current = [];
+      map.remove();
+      setMapInstance(null);
+      setMapReady(false);
+    };
+  }, [style, isDark]);
+
+  // Effect 2: Update markers and fly to new bounds when citypair changes
+  useEffect(() => {
+    if (!mapInstance || !mapReady) return;
+
+    // Remove old markers
+    markersRef.current.forEach(m => m.remove());
+    markersRef.current = [];
+
+    const markerColor = isDark ? "#60a5fa" : "#3b82f6";
+
+    [{ lon: lon1, lat: lat1, label: label1 }, { lon: lon2, lat: lat2, label: label2 }].forEach(({ lon, lat, label }) => {
+      const dot = document.createElement("div");
+      dot.style.cssText = `width:16px;height:16px;background:${markerColor};border:2.5px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.35);`;
+      const dotMarker = new mapboxgl.Marker({ element: dot, anchor: "center" }).setLngLat([lon, lat]).addTo(mapInstance);
+      markersRef.current.push(dotMarker);
+
+      const lbl = document.createElement("div");
+      lbl.style.cssText = "padding:1px 6px;border-radius:8px;font-size:13px;font-weight:700;color:white;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);white-space:nowrap;";
+      lbl.textContent = label;
+      const lblMarker = new mapboxgl.Marker({ element: lbl, anchor: "top", offset: [0, 12] }).setLngLat([lon, lat]).addTo(mapInstance);
+      markersRef.current.push(lblMarker);
+    });
+
+    // Fly to new bounds with smooth animation
+    const bounds = new mapboxgl.LngLatBounds();
+    bounds.extend([lon1, lat1]);
+    bounds.extend([lon2, lat2]);
+    mapInstance.fitBounds(bounds, { padding: 50, maxZoom: 8, duration: 1200, essential: true });
+  }, [mapInstance, mapReady, lat1, lon1, lat2, lon2, label1, label2, isDark]);
 
   if (!TOKEN) {
     return (

@@ -51,6 +51,7 @@ export function CountryMap({ iso2, name, officialName, latitude, longitude }: Co
     map.addControl(new mapboxgl.AttributionControl({ compact: true }));
 
     let removed = false;
+    let dashAnimId = 0;
     const safeResize = () => { if (!removed) map.resize(); };
 
     const ro = new ResizeObserver(() => {
@@ -98,7 +99,7 @@ export function CountryMap({ iso2, name, officialName, latitude, longitude }: Co
         },
       });
 
-      // Dashed accent border line
+      // Animated dashed accent border (marching ants effect)
       map.addLayer({
         id: "country-border-dash",
         type: "line",
@@ -106,12 +107,23 @@ export function CountryMap({ iso2, name, officialName, latitude, longitude }: Co
         "source-layer": "country_boundaries",
         filter: ["==", ["get", "iso_3166_1"], countryCode],
         paint: {
-          "line-color": isDark ? "#60a5fa" : "#1e40af",
+          "line-color": isDark ? "#60a5fa" : "#3E7BFA",
           "line-width": 2.5,
-          "line-opacity": 0.8,
-          "line-dasharray": [3, 2],
+          "line-opacity": 0.7,
+          "line-dasharray": [2, 2],
         },
       });
+
+      // Animate the dash by cycling line-dasharray offset
+      let dashStep = 0;
+      const animateDash = () => {
+        dashStep = (dashStep + 0.05) % 4;
+        if (map.getLayer("country-border-dash")) {
+          map.setPaintProperty("country-border-dash", "line-dasharray", [2, 2, dashStep, 100 - dashStep]);
+        }
+        dashAnimId = requestAnimationFrame(animateDash);
+      };
+      dashAnimId = requestAnimationFrame(animateDash);
 
       // Fit map to country bounds
       // Query the rendered features to get the bounding box
@@ -154,6 +166,7 @@ export function CountryMap({ iso2, name, officialName, latitude, longitude }: Co
     return () => {
       removed = true;
       ro.disconnect();
+      cancelAnimationFrame(dashAnimId);
       map.remove();
     };
   }, [iso2, latitude, longitude, style, isDark]);

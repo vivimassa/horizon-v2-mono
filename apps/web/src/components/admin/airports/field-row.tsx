@@ -25,7 +25,7 @@ export function FieldRow({
   if (editing && fieldKey && onChange) {
     return (
       <div className="py-2.5 border-b border-hz-border/50">
-        <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">
+        <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1">
           {label}
         </div>
         {inputType === "toggle" ? (
@@ -33,8 +33,8 @@ export function FieldRow({
             onClick={() => onChange(fieldKey, !editValue)}
             className="text-[13px] font-medium px-2.5 py-1 rounded-lg transition-colors"
             style={{
-              backgroundColor: editValue ? "rgba(22,163,74,0.1)" : "rgba(220,38,38,0.1)",
-              color: editValue ? "#16a34a" : "#dc2626",
+              backgroundColor: editValue ? "rgba(6,194,112,0.12)" : "rgba(255,59,59,0.12)",
+              color: editValue ? "#06C270" : "#E63535",
             }}
           >
             {editValue ? "Yes" : "No"}
@@ -58,7 +58,7 @@ export function FieldRow({
 
   return (
     <div className="py-2.5 border-b border-hz-border/50">
-      <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">
+      <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1">
         {label}
       </div>
       <div className="text-[13px] font-medium">{value ?? "—"}</div>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { CabinClassRef, LopaConfigRef } from "@skyhub/api";
-import { Search, Plus, ChevronRight, Plane, Star } from "lucide-react";
+import { Search, Plus, ChevronRight, Plane, Star, LayoutGrid } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { modeColor } from "@skyhub/ui/theme";
 
@@ -69,12 +69,11 @@ export function LopaList({
       {/* Header */}
       <div className="px-4 py-3 space-y-3 border-b border-hz-border shrink-0">
         <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-bold">LOPA</h2>
+          <h2 className="text-[16px] font-bold">LOPA</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={onCreateClick}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold text-white transition-colors"
-              style={{ backgroundColor: "#1e40af" }}
+              className="flex items-center gap-1 px-3 py-2 rounded-lg text-[13px] font-semibold text-white transition-colors bg-module-accent"
             >
               <Plus className="h-3 w-3" />
               Add
@@ -88,10 +87,9 @@ export function LopaList({
             onClick={() => onViewChange("cabin-classes")}
             className={`flex-1 py-1.5 text-[12px] font-semibold transition-colors ${
               isCabinMode
-                ? "text-white"
+                ? "text-white bg-module-accent"
                 : "text-hz-text-secondary hover:text-hz-text"
             }`}
-            style={isCabinMode ? { backgroundColor: "#1e40af" } : undefined}
           >
             Cabin Classes
           </button>
@@ -99,10 +97,9 @@ export function LopaList({
             onClick={() => onViewChange("lopa-configs")}
             className={`flex-1 py-1.5 text-[12px] font-semibold transition-colors ${
               !isCabinMode
-                ? "text-white"
+                ? "text-white bg-module-accent"
                 : "text-hz-text-secondary hover:text-hz-text"
             }`}
-            style={!isCabinMode ? { backgroundColor: "#1e40af" } : undefined}
           >
             Configurations
           </button>
@@ -114,7 +111,7 @@ export function LopaList({
           <input
             type="text"
             placeholder={isCabinMode ? "Search code or name..." : "Search aircraft type or config..."}
-            className="w-full pl-9 pr-3 py-2 rounded-xl text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 placeholder:text-hz-text-secondary/50 text-hz-text"
+            className="w-full pl-9 pr-3 py-2 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 placeholder:text-hz-text-secondary/50 text-hz-text"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
           />
@@ -128,7 +125,13 @@ export function LopaList({
         ) : isCabinMode ? (
           // ── Cabin Classes list ──
           cabinClasses.length === 0 ? (
-            <div className="text-[13px] text-hz-text-secondary px-3 py-4">No cabin classes found</div>
+            <div className="py-12 flex flex-col items-center justify-center gap-3">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-module-accent/10">
+                <LayoutGrid size={24} className="text-module-accent" />
+              </div>
+              <p className="text-[14px] font-medium text-hz-text-secondary">No cabin classes found</p>
+              <p className="text-[13px] text-hz-text-tertiary">Create a cabin class to get started.</p>
+            </div>
           ) : (
             <div className="space-y-0.5">
               {cabinClasses.map((cc) => {
@@ -153,7 +156,7 @@ export function LopaList({
                         <span className="text-[13px] font-medium truncate">{cc.name}</span>
                       </div>
                     </div>
-                    <span className="text-[11px] text-hz-text-tertiary font-mono shrink-0">
+                    <span className="text-[13px] text-hz-text-tertiary font-mono shrink-0">
                       #{cc.sortOrder}
                     </span>
                   </button>
@@ -164,7 +167,13 @@ export function LopaList({
         ) : (
           // ── LOPA Configs list (grouped by aircraft type) ──
           configGroups.length === 0 ? (
-            <div className="text-[13px] text-hz-text-secondary px-3 py-4">No configurations found</div>
+            <div className="py-12 flex flex-col items-center justify-center gap-3">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-module-accent/10">
+                <Plane size={24} className="text-module-accent" />
+              </div>
+              <p className="text-[14px] font-medium text-hz-text-secondary">No configurations found</p>
+              <p className="text-[13px] text-hz-text-tertiary">Create a LOPA configuration to get started.</p>
+            </div>
           ) : (
             configGroups.map(([aircraftType, configs]) => (
               <div key={aircraftType}>
@@ -181,7 +190,7 @@ export function LopaList({
                   <span className="text-[12px] font-bold font-mono uppercase tracking-wider text-hz-text-secondary/70">
                     {aircraftType}
                   </span>
-                  <span className="text-[11px] text-hz-text-secondary/40">({configs.length})</span>
+                  <span className="text-[13px] text-hz-text-secondary/40">({configs.length})</span>
                   <div className="flex-1 h-px bg-hz-border/50 ml-1" />
                 </button>
                 {!collapsed.has(aircraftType) && (
@@ -202,7 +211,7 @@ export function LopaList({
                             <div className="flex items-center gap-1.5">
                               <span className="text-[13px] font-medium truncate">{config.configName}</span>
                               {config.isDefault && (
-                                <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
+                                <Star className="h-3 w-3 shrink-0" style={{ color: "#E67A00" }} />
                               )}
                             </div>
                             <div className="text-[12px] text-hz-text-secondary truncate">

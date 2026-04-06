@@ -13,7 +13,63 @@ import {
   X,
   Trash2,
   Plus,
+  XCircle,
+  AlertCircle,
+  Check,
 } from "lucide-react";
+
+// ── Alert (XD pattern) ──
+function Alert({ type, message, onDismiss }: { type: "error" | "warning" | "info" | "success"; message: string; onDismiss?: () => void }) {
+  const c = {
+    info:    { bar: "#0063F7", icon: AlertCircle, bg: "rgba(0,99,247,0.08)" },
+    success: { bar: "#06C270", icon: Check,       bg: "rgba(6,194,112,0.08)" },
+    error:   { bar: "#E63535", icon: XCircle,      bg: "rgba(255,59,59,0.08)" },
+    warning: { bar: "#FF8800", icon: AlertCircle,  bg: "rgba(255,136,0,0.08)" },
+  }[type];
+  const Icon = c.icon;
+  return (
+    <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg border border-hz-border/50" style={{ backgroundColor: c.bg }}>
+      <div className="w-[3px] h-full min-h-[20px] rounded-full shrink-0 self-stretch" style={{ backgroundColor: c.bar }} />
+      <Icon size={15} className="shrink-0 mt-0.5" style={{ color: c.bar }} />
+      <span className="text-[13px] flex-1" style={{ color: c.bar }}>{message}</span>
+      {onDismiss && (
+        <button onClick={onDismiss} className="shrink-0 p-0.5 rounded hover:bg-hz-border/30 transition-colors">
+          <X size={13} style={{ color: c.bar }} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Delete Modal (XD pattern) ──
+function DeleteModal({ onConfirm, onCancel, saving }: { onConfirm: () => void; onCancel: () => void; saving: boolean }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}>
+      <div className="bg-hz-card border border-hz-border rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(255,59,59,0.12)" }}>
+            <Trash2 size={20} style={{ color: "#E63535" }} />
+          </div>
+          <div>
+            <h3 className="text-[15px] font-bold">Delete country?</h3>
+            <p className="text-[13px] text-hz-text-secondary mt-1">This will permanently remove the country from the database. This action cannot be undone.</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <button onClick={onCancel} disabled={saving}
+            className="px-4 py-2 rounded-lg text-[13px] font-medium text-hz-text-secondary border border-hz-border hover:bg-hz-border/30 transition-colors">
+            No, Cancel
+          </button>
+          <button onClick={onConfirm} disabled={saving}
+            className="px-4 py-2 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
+            style={{ backgroundColor: "#E63535" }}>
+            {saving ? "Deleting..." : "Yes, Delete"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const TABS = [
   { key: "basic", label: "Basic", icon: Info },
@@ -33,7 +89,7 @@ export function CountryDetail({ country, onSave, onDelete, onCreate }: CountryDe
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [draft, setDraft] = useState<Partial<CountryRef>>({});
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -103,7 +159,7 @@ export function CountryDetail({ country, onSave, onDelete, onCreate }: CountryDe
   const handleEdit = useCallback(() => {
     setDraft({});
     setEditing(true);
-    setConfirmDelete(false);
+    setShowDeleteModal(false);
   }, []);
 
   const handleCancel = useCallback(() => {
@@ -149,7 +205,7 @@ export function CountryDetail({ country, onSave, onDelete, onCreate }: CountryDe
       }
     } finally {
       setSaving(false);
-      setConfirmDelete(false);
+      setShowDeleteModal(false);
     }
   }, [onDelete, country._id]);
 
@@ -180,93 +236,58 @@ export function CountryDetail({ country, onSave, onDelete, onCreate }: CountryDe
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
+      {/* Delete modal */}
+      {showDeleteModal && (
+        <DeleteModal onConfirm={handleDelete} onCancel={() => setShowDeleteModal(false)} saving={saving} />
+      )}
+
       {/* Header */}
       <div className="px-6 py-4 border-b border-hz-border shrink-0">
         <div className="flex items-center justify-between">
-          {/* Name + flag + Active badge */}
           <div className="flex items-center gap-3">
             {country.isoCode2 && <CountryFlag iso2={country.isoCode2} size={28} />}
             <h1 className="text-xl font-semibold">{country.name}</h1>
             {country.isActive ? (
-              <span className="text-[13px] font-semibold px-3 py-0.5 rounded-full bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-400">
+              <span className="text-[13px] font-semibold px-3 py-0.5 rounded-full bg-[rgba(6,194,112,0.12)] text-[#06C270] dark:bg-[rgba(57,217,138,0.15)] dark:text-[#39D98A]">
                 Active
               </span>
             ) : (
-              <span className="text-[13px] font-semibold px-3 py-0.5 rounded-full bg-red-50 text-red-600">
+              <span className="text-[13px] font-semibold px-3 py-0.5 rounded-full bg-[rgba(255,59,59,0.12)] text-[#E63535] dark:bg-[rgba(255,92,92,0.15)] dark:text-[#FF5C5C]">
                 Inactive
               </span>
             )}
           </div>
 
-          {/* Actions */}
           <div className="flex items-center gap-2 shrink-0">
             {editing ? (
               <>
-                <button
-                  onClick={handleCancel}
-                  disabled={saving}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-hz-text-secondary hover:bg-hz-border/30 transition-colors"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  Cancel
+                <button onClick={handleCancel} disabled={saving}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-hz-text-secondary hover:bg-hz-border/30 transition-colors">
+                  <X className="h-3.5 w-3.5" /> Cancel
                 </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-white transition-colors"
-                  style={{ backgroundColor: "#1e40af" }}
-                >
-                  <Save className="h-3.5 w-3.5" />
-                  {saving ? "Saving…" : "Save"}
+                <button onClick={handleSave} disabled={saving}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-white bg-module-accent transition-colors">
+                  <Save className="h-3.5 w-3.5" /> {saving ? "Saving..." : "Save"}
                 </button>
               </>
             ) : (
               <>
                 {onDelete && (
-                  confirmDelete ? (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[12px] text-red-500 font-medium">Delete?</span>
-                      <button
-                        onClick={handleDelete}
-                        disabled={saving}
-                        className="px-2.5 py-1 rounded-lg text-[12px] font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors"
-                      >
-                        Yes
-                      </button>
-                      <button
-                        onClick={() => setConfirmDelete(false)}
-                        className="px-2.5 py-1 rounded-lg text-[12px] font-medium text-hz-text-secondary hover:bg-hz-border/30 transition-colors"
-                      >
-                        No
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setConfirmDelete(true)}
-                      className="flex items-center gap-1 p-1.5 rounded-lg text-hz-text-secondary/50 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                      title="Delete country"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )
+                  <button onClick={() => setShowDeleteModal(true)}
+                    className="p-1.5 rounded-lg text-hz-text-secondary/50 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors" title="Delete country">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 )}
                 {onSave && (
-                  <button
-                    onClick={handleEdit}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-hz-text-secondary hover:bg-hz-border/30 transition-colors"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                    Edit
+                  <button onClick={handleEdit}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-hz-text-secondary hover:bg-hz-border/30 transition-colors">
+                    <Pencil className="h-3.5 w-3.5" /> Edit
                   </button>
                 )}
                 {onCreate && (
-                  <button
-                    onClick={() => { resetCreate(); setShowCreate(true); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white transition-colors"
-                    style={{ backgroundColor: "#1e40af" }}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    New
+                  <button onClick={() => { resetCreate(); setShowCreate(true); }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold text-white bg-module-accent transition-colors">
+                    <Plus className="h-3.5 w-3.5" /> New
                   </button>
                 )}
               </>
@@ -274,22 +295,14 @@ export function CountryDetail({ country, onSave, onDelete, onCreate }: CountryDe
           </div>
         </div>
 
-        {/* Error message */}
-        {errorMsg && (
-          <div className="mt-3 flex items-start gap-2 px-3 py-2.5 rounded-lg border border-red-200 bg-red-50 dark:border-red-500/20 dark:bg-red-500/10">
-            <span className="text-[13px] text-red-700 dark:text-red-400">{errorMsg}</span>
-            <button onClick={() => setErrorMsg("")} className="text-red-400 hover:text-red-600 shrink-0 ml-auto">
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
+        {errorMsg && <div className="mt-3"><Alert type="error" message={errorMsg} onDismiss={() => setErrorMsg("")} /></div>}
       </div>
 
       {/* ── Create Country Panel ── */}
       {showCreate && (
         <div className="px-6 py-4 border-b border-hz-border shrink-0 space-y-3 overflow-y-auto max-h-[50vh]">
           <div className="flex items-center justify-between">
-            <span className="text-[15px] font-semibold">Add New Country</span>
+            <span className="text-[15px] font-bold">Add New Country</span>
             <button onClick={resetCreate} className="text-[13px] text-hz-text-secondary hover:text-hz-text">Cancel</button>
           </div>
 
@@ -334,13 +347,12 @@ export function CountryDetail({ country, onSave, onDelete, onCreate }: CountryDe
             </div>
 
             <button onClick={handleManualCreate} disabled={creating}
-              className="w-full py-2.5 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-50"
-              style={{ backgroundColor: "#1e40af" }}>
+              className="w-full py-2.5 rounded-lg text-[13px] font-semibold text-white bg-module-accent transition-colors disabled:opacity-50">
               {creating ? "Creating…" : "Add to Database"}
             </button>
           </div>
 
-          {createError && <p className="text-[12px] text-red-500">{createError}</p>}
+          {createError && <Alert type="error" message={createError} onDismiss={() => setCreateError("")} />}
         </div>
       )}
 
@@ -364,23 +376,18 @@ export function CountryDetail({ country, onSave, onDelete, onCreate }: CountryDe
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-hz-border shrink-0 overflow-x-auto">
+      {/* Tabs — underline style */}
+      <div className="flex items-center gap-0 px-4 border-b border-hz-border shrink-0">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const active = activeTab === tab.key;
           return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[14px] font-medium transition-colors duration-150 shrink-0 ${
-                active
-                  ? "bg-module-accent/15 text-module-accent"
-                  : "text-hz-text-secondary hover:bg-hz-border/30 hover:text-hz-text"
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              {tab.label}
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+              className={`relative flex items-center gap-2 px-4 py-3 text-[13px] font-medium transition-colors duration-150 shrink-0 ${
+                active ? "text-module-accent" : "text-hz-text-secondary hover:text-hz-text"
+              }`}>
+              <Icon className="h-4 w-4" /> {tab.label}
+              {active && <div className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-module-accent" />}
             </button>
           );
         })}
@@ -413,20 +420,16 @@ function CountryBasicTab({ country, editing, draft = {}, onChange }: {
           editing={editing} fieldKey="name" editValue={get("name")} onChange={onChange} />
         <FieldRow label="Official Name" value={country.officialName}
           editing={editing} fieldKey="officialName" editValue={get("officialName")} onChange={onChange} />
-        <FieldRow label="ISO 2 Code" value={<span className="font-bold">{country.isoCode2}</span>}
+        <FieldRow label="ISO 2 Code" value={country.isoCode2}
           editing={editing} fieldKey="isoCode2" editValue={get("isoCode2")} onChange={onChange} />
-        <FieldRow label="ISO 3 Code" value={<span className="text-hz-text-secondary">{country.isoCode3}</span>}
+        <FieldRow label="ISO 3 Code" value={country.isoCode3}
           editing={editing} fieldKey="isoCode3" editValue={get("isoCode3")} onChange={onChange} />
         <FieldRow label="Region" value={country.region}
           editing={editing} fieldKey="region" editValue={get("region")} onChange={onChange} />
         <FieldRow label="Sub-region" value={country.subRegion}
           editing={editing} fieldKey="subRegion" editValue={get("subRegion")} onChange={onChange} />
-        <FieldRow label="ICAO Prefix" value={country.icaoPrefix ?? null}
-          editing={editing} fieldKey="icaoPrefix" editValue={get("icaoPrefix")} onChange={onChange} />
-        <FieldRow label="Flag Emoji" value={country.flagEmoji}
-          editing={editing} fieldKey="flagEmoji" editValue={get("flagEmoji")} onChange={onChange} />
         <FieldRow label="Active"
-          value={country.isActive ? <span className="text-green-600 font-semibold">Active</span> : <span className="text-red-600 font-semibold">Inactive</span>}
+          value={country.isActive ? <span className="font-semibold" style={{ color: "#06C270" }}>Active</span> : <span className="font-semibold" style={{ color: "#E63535" }}>Inactive</span>}
           editing={editing} fieldKey="isActive" editValue={get("isActive")} onChange={onChange} inputType="toggle" />
       </div>
     </div>
@@ -467,9 +470,9 @@ function MiniInput({ label, value, onChange, maxLength, mono, type = "text" }: {
 }) {
   return (
     <div className="flex-1">
-      <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold">{label}</label>
+      <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">{label}</label>
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)} maxLength={maxLength}
-        className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text" />
+        className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 focus:border-module-accent text-hz-text transition-colors" />
     </div>
   );
 }

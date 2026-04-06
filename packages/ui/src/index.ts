@@ -27,12 +27,14 @@ export {
   modeColor,
   darkAccent,
   getStatusColors,
+  glass,
   type Palette,
   type StatusKey,
 } from './theme/colors'
 export { typography, type TypographyKey } from './theme/typography'
-export { shadowClasses, shadowStyles, type ShadowKey } from './theme/shadows'
+export { shadowClasses, shadowStyles, type ShadowLevel, type ShadowKey } from './theme/shadows'
 export { domainIcons, type DomainIconName, type LucideIcon } from './theme/icons'
+export { buttonSize, badgeSize, type ButtonSizeKey, type BadgeSizeKey } from './theme/spacing'
 
 // ── Navigation ──
 export * from './navigation'

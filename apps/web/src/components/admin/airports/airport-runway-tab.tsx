@@ -135,15 +135,14 @@ export function AirportRunwayTab({ airport, editing, draft = {}, onChange, onRef
       <div>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className="w-1 h-5 rounded-full" style={{ backgroundColor: "#1e40af" }} />
-            <h3 className="text-[14px] font-bold">Runways</h3>
+            <div className="w-1 h-5 rounded-full bg-module-accent" />
+            <h3 className="text-[16px] font-bold">Runways</h3>
             <span className="text-[12px] text-hz-text-secondary">({runways.length})</span>
           </div>
           {!showAdd && !editId && (
             <button
               onClick={() => { setShowAdd(true); setAddForm({ ...emptyForm }); setError(""); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-colors"
-              style={{ backgroundColor: "#1e40af" }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-colors bg-module-accent"
             >
               <Plus className="h-3 w-3" />
               Add Runway
@@ -165,8 +164,7 @@ export function AirportRunwayTab({ airport, editing, draft = {}, onChange, onRef
             <RunwayFormFields form={addForm} setForm={setAddForm} />
             <div className="flex items-center gap-2 pt-1">
               <button onClick={handleAdd} disabled={saving}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-colors disabled:opacity-50"
-                style={{ backgroundColor: "#1e40af" }}>
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-colors disabled:opacity-50 bg-module-accent">
                 <Check className="h-3 w-3" />
                 {saving ? "Adding…" : "Add"}
               </button>
@@ -194,8 +192,7 @@ export function AirportRunwayTab({ airport, editing, draft = {}, onChange, onRef
                     <RunwayFormFields form={editForm} setForm={setEditForm} />
                     <div className="flex items-center gap-2 pt-1">
                       <button onClick={handleEditSave} disabled={saving}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-colors disabled:opacity-50"
-                        style={{ backgroundColor: "#1e40af" }}>
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white transition-colors disabled:opacity-50 bg-module-accent">
                         <Save className="h-3 w-3" />
                         {saving ? "Saving…" : "Save"}
                       </button>
@@ -216,11 +213,11 @@ export function AirportRunwayTab({ airport, editing, draft = {}, onChange, onRef
                     <div className="text-[14px] font-bold">{rw.identifier}</div>
                     <div className="text-[11px] text-hz-text-secondary mt-0.5">
                       {rw.status === "active" ? (
-                        <span className="text-green-600 dark:text-green-400">Active</span>
+                        <span style={{ color: "#06C270" }}>Active</span>
                       ) : rw.status === "closed" ? (
-                        <span className="text-red-500">Closed</span>
+                        <span style={{ color: "#E63535" }}>Closed</span>
                       ) : (
-                        <span className="text-amber-600 dark:text-amber-400">Construction</span>
+                        <span style={{ color: "#E67A00" }}>Construction</span>
                       )}
                     </div>
                   </div>
@@ -274,8 +271,8 @@ export function AirportRunwayTab({ airport, editing, draft = {}, onChange, onRef
       {/* ── Facilities Section ── */}
       <div>
         <div className="flex items-center gap-2 mb-3">
-          <div className="w-1 h-5 rounded-full" style={{ backgroundColor: "#1e40af" }} />
-          <h3 className="text-[14px] font-bold">Facilities</h3>
+          <div className="w-1 h-5 rounded-full bg-module-accent" />
+          <h3 className="text-[16px] font-bold">Facilities</h3>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
           <FieldRow label="Number of Gates" value={airport.numberOfGates}
@@ -283,10 +280,10 @@ export function AirportRunwayTab({ airport, editing, draft = {}, onChange, onRef
           <FieldRow label="Fire Category" value={airport.fireCategory}
             editing={editing} fieldKey="fireCategory" editValue={get("fireCategory")} onChange={onChange} inputType="number" />
           <FieldRow label="Fuel Available"
-            value={airport.hasFuelAvailable ? <span className="text-green-600 font-semibold">Yes</span> : <span className="text-hz-text-secondary">No</span>}
+            value={airport.hasFuelAvailable ? <span className="font-semibold" style={{ color: "#06C270" }}>Yes</span> : <span className="text-hz-text-secondary">No</span>}
             editing={editing} fieldKey="hasFuelAvailable" editValue={get("hasFuelAvailable")} onChange={onChange} inputType="toggle" />
           <FieldRow label="Crew Facilities"
-            value={airport.hasCrewFacilities ? <span className="text-green-600 font-semibold">Yes</span> : <span className="text-hz-text-secondary">No</span>}
+            value={airport.hasCrewFacilities ? <span className="font-semibold" style={{ color: "#06C270" }}>Yes</span> : <span className="text-hz-text-secondary">No</span>}
             editing={editing} fieldKey="hasCrewFacilities" editValue={get("hasCrewFacilities")} onChange={onChange} inputType="toggle" />
         </div>
       </div>
@@ -300,13 +297,13 @@ function RunwayFormFields({ form, setForm }: { form: RunwayForm; setForm: (fn: (
     <>
       <div className="flex gap-3">
         <div className="flex-1">
-          <label className="text-[11px] text-hz-text-secondary uppercase tracking-wider font-semibold">Identifier *</label>
+          <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Identifier *</label>
           <input type="text" value={form.identifier} placeholder="e.g. 08L/26R"
             onChange={(e) => setForm(p => ({ ...p, identifier: e.target.value.toUpperCase() }))}
             className="w-full mt-1 px-3 py-2 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text" />
         </div>
         <div className="flex-1">
-          <label className="text-[11px] text-hz-text-secondary uppercase tracking-wider font-semibold">Surface</label>
+          <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Surface</label>
           <select value={form.surface}
             onChange={(e) => setForm(p => ({ ...p, surface: e.target.value }))}
             className="w-full mt-1 px-3 py-2 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text">
@@ -314,7 +311,7 @@ function RunwayFormFields({ form, setForm }: { form: RunwayForm; setForm: (fn: (
           </select>
         </div>
         <div className="flex-1">
-          <label className="text-[11px] text-hz-text-secondary uppercase tracking-wider font-semibold">Status</label>
+          <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Status</label>
           <select value={form.status}
             onChange={(e) => setForm(p => ({ ...p, status: e.target.value }))}
             className="w-full mt-1 px-3 py-2 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text">
@@ -324,19 +321,19 @@ function RunwayFormFields({ form, setForm }: { form: RunwayForm; setForm: (fn: (
       </div>
       <div className="flex gap-3">
         <div className="flex-1">
-          <label className="text-[11px] text-hz-text-secondary uppercase tracking-wider font-semibold">Length (ft)</label>
+          <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Length (ft)</label>
           <input type="number" value={form.lengthFt}
             onChange={(e) => setForm(p => ({ ...p, lengthFt: e.target.value }))}
             className="w-full mt-1 px-3 py-2 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text" />
         </div>
         <div className="flex-1">
-          <label className="text-[11px] text-hz-text-secondary uppercase tracking-wider font-semibold">Width (ft)</label>
+          <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Width (ft)</label>
           <input type="number" value={form.widthFt}
             onChange={(e) => setForm(p => ({ ...p, widthFt: e.target.value }))}
             className="w-full mt-1 px-3 py-2 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text" />
         </div>
         <div className="flex-1">
-          <label className="text-[11px] text-hz-text-secondary uppercase tracking-wider font-semibold">ILS Category</label>
+          <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">ILS Category</label>
           <select value={form.ilsCategory}
             onChange={(e) => setForm(p => ({ ...p, ilsCategory: e.target.value }))}
             className="w-full mt-1 px-3 py-2 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text">
@@ -365,7 +362,7 @@ function RunwayFormFields({ form, setForm }: { form: RunwayForm; setForm: (fn: (
 function Field({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div>
-      <div className="text-[10px] text-hz-text-secondary uppercase tracking-wider font-semibold">{label}</div>
+      <div className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">{label}</div>
       <div className="text-[13px] font-medium">{value}</div>
       {sub && <div className="text-[11px] text-hz-text-secondary">{sub}</div>}
     </div>

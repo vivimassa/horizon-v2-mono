@@ -4,11 +4,11 @@ import { useState } from "react";
 import type { AircraftRegistrationRef } from "@skyhub/api";
 import { Search, Plus, ChevronRight, Plane } from "lucide-react";
 
-const STATUS_DOT: Record<string, string> = {
-  active: "bg-green-500",
-  maintenance: "bg-amber-500",
-  stored: "bg-gray-400",
-  retired: "bg-red-500",
+const STATUS_DOT_COLOR: Record<string, string> = {
+  active: "#06C270",
+  maintenance: "#E67A00",
+  stored: "#9ca3af",
+  retired: "#E63535",
 };
 
 interface AircraftRegistrationListProps {
@@ -50,12 +50,11 @@ export function AircraftRegistrationList({
       {/* Header */}
       <div className="px-4 py-3 space-y-3 border-b border-hz-border shrink-0">
         <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-bold">Registrations</h2>
+          <h2 className="text-[16px] font-bold">Registrations</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={onCreateClick}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold text-white transition-colors"
-              style={{ backgroundColor: "#1e40af" }}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold text-white transition-colors bg-module-accent"
             >
               <Plus className="h-3 w-3" />
               Add
@@ -69,7 +68,7 @@ export function AircraftRegistrationList({
           <input
             type="text"
             placeholder="Search registration, MSN..."
-            className="w-full pl-9 pr-3 py-2 rounded-xl text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 placeholder:text-hz-text-secondary/50 text-hz-text"
+            className="w-full pl-9 pr-3 py-2 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 placeholder:text-hz-text-secondary/50 text-hz-text"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
           />
@@ -98,7 +97,7 @@ export function AircraftRegistrationList({
                 <span className="text-[12px] font-bold font-mono uppercase tracking-wider text-hz-text-secondary/70">
                   {icaoType}
                 </span>
-                <span className="text-[11px] text-hz-text-secondary/40">({items.length})</span>
+                <span className="text-[13px] text-hz-text-secondary/40">({items.length})</span>
                 <div className="flex-1 h-px bg-hz-border/50 ml-1" />
               </button>
               {!collapsed.has(icaoType) && (
@@ -115,7 +114,7 @@ export function AircraftRegistrationList({
                             : "border-l-[3px] border-l-transparent hover:bg-hz-border/30"
                         }`}
                       >
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_DOT[r.status] || "bg-gray-400"}`} />
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT_COLOR[r.status] || "#9ca3af" }} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span className="text-[14px] font-bold font-mono">{r.registration}</span>
@@ -124,7 +123,7 @@ export function AircraftRegistrationList({
                             )}
                           </div>
                         </div>
-                        <span className="text-[11px] text-hz-text-tertiary capitalize shrink-0">
+                        <span className="text-[13px] text-hz-text-tertiary capitalize shrink-0">
                           {r.status}
                         </span>
                       </button>

@@ -161,13 +161,13 @@ export function FdtRulesShell() {
           <div className="px-4 py-4 border-b border-hz-border shrink-0">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: activeFramework?.color ?? ACCENT }} />
-              <span className="text-[15px] font-bold" style={{ color: activeFramework?.color ?? ACCENT }}>
+              <span className="text-[16px] font-bold" style={{ color: activeFramework?.color ?? ACCENT }}>
                 {activeFramework?.name ?? scheme.frameworkCode}
               </span>
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1.5">
-                <span className="text-[13px] font-bold px-1.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">GOV</span>
+                <span className="text-[13px] font-bold px-1.5 rounded bg-[rgba(255,136,0,0.12)] text-[#E67A00] dark:bg-[rgba(253,172,66,0.15)] dark:text-[#FDAC42]">GOV</span>
                 <span className="text-[13px] text-hz-text-secondary">Default</span>
               </div>
               <div className="flex items-center gap-1.5">
@@ -190,7 +190,7 @@ export function FdtRulesShell() {
                 <div key={group.key} className="mb-3">
                   {/* Group label */}
                   <div className="px-2 py-1.5 mb-1">
-                    <span className="text-[13px] font-bold uppercase tracking-wider text-hz-text-tertiary">
+                    <span className="text-[12px] font-medium uppercase tracking-wider text-hz-text-tertiary">
                       {group.label}
                     </span>
                   </div>
@@ -240,7 +240,7 @@ export function FdtRulesShell() {
           <div className="px-6 py-4 border-b border-hz-border shrink-0">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-[17px] font-bold">{activeTabLabel}</h2>
+                <h2 className="text-[16px] font-bold">{activeTabLabel}</h2>
                 <p className="text-[13px] text-hz-text-secondary mt-0.5">
                   {activeTab === "reporting_times"
                     ? "Configure reporting and debrief defaults"
@@ -338,7 +338,7 @@ function FrameworkSetup({
         <Shield size={24} color={ACCENT} strokeWidth={1.8} />
       </div>
       <div className="text-center">
-        <h2 className="text-[20px] font-bold text-hz-text mb-1">Flight Duty Time Rules</h2>
+        <h2 className="text-xl font-semibold text-hz-text mb-1">Flight Duty Time Rules</h2>
         <p className="text-[14px] text-hz-text-secondary max-w-lg">
           Select the regulatory framework for your operation. This will populate all FDP tables,
           rest requirements, cumulative limits, and augmented crew rules.
@@ -377,8 +377,7 @@ function FrameworkSetup({
       <button
         onClick={() => selected && onSeed(selected)}
         disabled={!selected || seeding}
-        className="flex items-center gap-2 px-6 py-3 rounded-xl text-[14px] font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-40"
-        style={{ backgroundColor: ACCENT }}
+        className="flex items-center gap-2 px-6 py-3 rounded-xl text-[14px] font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-40 bg-module-accent"
       >
         <Sparkles className="h-4 w-4" />
         {seeding ? "Seeding rules & tables..." : "Initialize Framework"}

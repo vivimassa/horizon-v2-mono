@@ -100,8 +100,7 @@ export function FdtSchemeSettings({ scheme, onUpdate }: Props) {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-50"
-            style={{ backgroundColor: ACCENT }}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium text-white transition-colors hover:opacity-90 disabled:opacity-50 bg-module-accent"
           >
             <Save className="h-3.5 w-3.5" />
             {saving ? "Saving..." : "Save Settings"}
@@ -120,7 +119,7 @@ function SettingsSection({ icon: Icon, title, children }: { icon: React.Componen
       <div className="flex items-center gap-2 mb-3">
         <span className="w-1 h-5 rounded-full shrink-0" style={{ backgroundColor: ACCENT }} />
         <Icon size={14} style={{ color: ACCENT }} />
-        <span className="text-[13px] font-semibold">{title}</span>
+        <span className="text-[13px] font-bold">{title}</span>
       </div>
       <div className="space-y-2 pl-5">{children}</div>
     </div>
@@ -179,11 +178,11 @@ function ToggleInput({ value, onChange }: { value: boolean; onChange: (v: boolea
   return (
     <button
       onClick={() => onChange(!value)}
-      className={`h-7 px-3 text-[13px] font-semibold rounded-lg transition-colors ${
-        value
-          ? "bg-green-500/10 text-green-600 dark:text-green-400"
-          : "bg-red-500/10 text-red-500 dark:text-red-400"
-      }`}
+      className="h-7 px-3 text-[13px] font-semibold rounded-lg transition-colors"
+      style={{
+        backgroundColor: value ? "rgba(6,194,112,0.12)" : "rgba(255,59,59,0.12)",
+        color: value ? "#06C270" : "#E63535",
+      }}
     >
       {value ? "Yes" : "No"}
     </button>

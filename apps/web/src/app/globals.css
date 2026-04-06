@@ -52,7 +52,7 @@
  * Images opt out to keep photos/logos looking correct.
  */
 /* Dark mode saturation is now handled by DisplayProvider via JS filter */
-html.dark main img {
+html.dark main img:not([data-watermark]) {
   filter: saturate(1.25); /* compensate so images stay vivid */
 }
 

@@ -62,6 +62,11 @@ interface ScheduleGridState {
   removeNewRow: (id: string) => void;
   clearNewRows: () => void;
 
+  // Soft-deleted rows (pending Save to actually remove from DB)
+  deletedIds: Set<string>;
+  markDeleted: (id: string) => void;
+  clearDeleted: () => void;
+
   // Cell formatting
   cellFormats: Map<string, CellFormat>;
   setCellFormat: (rowId: string, colKey: string, format: Partial<CellFormat>) => void;
@@ -93,6 +98,31 @@ interface ScheduleGridState {
   addSeparator: (afterRowIdx: number) => void;
   removeSeparator: (afterRowIdx: number) => void;
   clearSeparators: () => void;
+}
+
+/** Iterate over all cells in the current selection (range or single cell) */
+function forEachSelectedCell(state: ScheduleGridState, fn: (rowId: string, colKey: string) => void) {
+  const { selectedCell, selectionRange, rows, newRows, deletedIds } = state;
+  if (!selectedCell) return;
+  const allRows = [...rows, ...newRows].filter((r) => !deletedIds.has(r._id));
+
+  if (selectionRange) {
+    const r1 = Math.min(selectionRange.startRow, selectionRange.endRow);
+    const r2 = Math.max(selectionRange.startRow, selectionRange.endRow);
+    const c1 = Math.min(selectionRange.startCol, selectionRange.endCol);
+    const c2 = Math.max(selectionRange.startCol, selectionRange.endCol);
+    for (let ri = r1; ri <= r2; ri++) {
+      const row = allRows[ri];
+      if (!row) continue;
+      for (let ci = c1; ci <= c2; ci++) {
+        const col = GRID_COLUMNS[ci];
+        if (col) fn(row._id, col.key);
+      }
+    }
+  } else {
+    const row = allRows[selectedCell.rowIdx];
+    if (row) fn(row._id, selectedCell.colKey);
+  }
 }
 
 /** Clone a dirtyMap for snapshot */
@@ -247,6 +277,14 @@ export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
   removeNewRow: (id) => set((state) => ({ newRows: state.newRows.filter((r) => r._id !== id) })),
   clearNewRows: () => set({ newRows: [] }),
 
+  deletedIds: new Set(),
+  markDeleted: (id) => set((state) => {
+    const next = new Set(state.deletedIds);
+    next.add(id);
+    return { deletedIds: next };
+  }),
+  clearDeleted: () => set({ deletedIds: new Set() }),
+
   cellFormats: new Map(),
   setCellFormat: (rowId, colKey, format) =>
     set((state) => {
@@ -365,31 +403,25 @@ export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
 
   // ── Formatting toggles ──
   toggleBold: () => {
-    const { selectedCell, rows, newRows, getCellFormat, setCellFormat } = get();
-    if (!selectedCell) return;
-    const allRows = [...rows, ...newRows];
-    const row = allRows[selectedCell.rowIdx];
-    if (!row) return;
-    const current = getCellFormat(row._id, selectedCell.colKey);
-    setCellFormat(row._id, selectedCell.colKey, { bold: !current?.bold });
+    const state = get();
+    forEachSelectedCell(state, (rowId, colKey) => {
+      const current = state.getCellFormat(rowId, colKey);
+      state.setCellFormat(rowId, colKey, { bold: !current?.bold });
+    });
   },
   toggleItalic: () => {
-    const { selectedCell, rows, newRows, getCellFormat, setCellFormat } = get();
-    if (!selectedCell) return;
-    const allRows = [...rows, ...newRows];
-    const row = allRows[selectedCell.rowIdx];
-    if (!row) return;
-    const current = getCellFormat(row._id, selectedCell.colKey);
-    setCellFormat(row._id, selectedCell.colKey, { italic: !current?.italic });
+    const state = get();
+    forEachSelectedCell(state, (rowId, colKey) => {
+      const current = state.getCellFormat(rowId, colKey);
+      state.setCellFormat(rowId, colKey, { italic: !current?.italic });
+    });
   },
   toggleUnderline: () => {
-    const { selectedCell, rows, newRows, getCellFormat, setCellFormat } = get();
-    if (!selectedCell) return;
-    const allRows = [...rows, ...newRows];
-    const row = allRows[selectedCell.rowIdx];
-    if (!row) return;
-    const current = getCellFormat(row._id, selectedCell.colKey);
-    setCellFormat(row._id, selectedCell.colKey, { underline: !current?.underline });
+    const state = get();
+    forEachSelectedCell(state, (rowId, colKey) => {
+      const current = state.getCellFormat(rowId, colKey);
+      state.setCellFormat(rowId, colKey, { underline: !current?.underline });
+    });
   },
 
   // ── Cycle separators ──

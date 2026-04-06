@@ -10,6 +10,7 @@ interface UseGridKeyboardOptions {
   onSave: () => void;
   onAddFlight: () => void;
   onDeleteFlight: (rowIdx: number) => void;
+  onTabWrapDown?: () => void;
   onOpenFind?: () => void;
   onOpenReplace?: () => void;
 }
@@ -18,6 +19,7 @@ export function useGridKeyboard({
   onSave,
   onAddFlight,
   onDeleteFlight,
+  onTabWrapDown,
   onOpenFind,
   onOpenReplace,
 }: UseGridKeyboardOptions) {
@@ -49,24 +51,9 @@ export function useGridKeyboard({
 
       // ── While typing in an input: intercept navigation + global shortcuts ──
       if (isTyping) {
-        // Tab: commit edit and move to next/prev editable cell
+        // Tab: let the cell's own handleKeyDown handle it (it has commitAcType, autoBlock, etc.)
+        // Only intercept here if the cell won't handle it (shouldn't happen, but safety net)
         if (e.key === "Tab") {
-          e.preventDefault();
-          e.stopPropagation();
-          state.commitEdit();
-          const sc = state.selectedCell;
-          if (sc) {
-            const editableCols = GRID_COLUMNS.filter((c) => c.editable);
-            const curIdx = editableCols.findIndex((c) => c.key === sc.colKey);
-            const allRows = [...state.rows, ...state.newRows];
-            if (e.shiftKey) {
-              if (curIdx > 0) state.startEditing({ rowIdx: sc.rowIdx, colKey: editableCols[curIdx - 1].key });
-              else if (sc.rowIdx > 0) state.startEditing({ rowIdx: sc.rowIdx - 1, colKey: editableCols[editableCols.length - 1].key });
-            } else {
-              if (curIdx < editableCols.length - 1) state.startEditing({ rowIdx: sc.rowIdx, colKey: editableCols[curIdx + 1].key });
-              else if (sc.rowIdx < allRows.length - 1) state.startEditing({ rowIdx: sc.rowIdx + 1, colKey: editableCols[0].key });
-            }
-          }
           return;
         }
         // Enter: commit edit and move down one row
@@ -103,6 +90,30 @@ export function useGridKeyboard({
         if (mod && (e.key === "y" || (e.shiftKey && e.key === "Z"))) {
           e.preventDefault();
           state.redo();
+          return;
+        }
+        // Ctrl+N or Insert — add flight (even while editing)
+        if ((mod && e.key.toLowerCase() === "n") || e.key === "Insert") {
+          e.preventDefault();
+          e.stopPropagation();
+          state.commitEdit();
+          callbackRefs.current.onAddFlight();
+          return;
+        }
+        // Ctrl+Shift++ — add flight
+        if (mod && e.shiftKey && (e.key === "+" || e.key === "=")) {
+          e.preventDefault();
+          e.stopPropagation();
+          state.commitEdit();
+          callbackRefs.current.onAddFlight();
+          return;
+        }
+        // Ctrl+- — delete flight
+        if (mod && e.key === "-" && state.selectedCell) {
+          e.preventDefault();
+          e.stopPropagation();
+          state.commitEdit();
+          callbackRefs.current.onDeleteFlight(state.selectedCell.rowIdx);
           return;
         }
         // Let the input handle all other keys
@@ -253,6 +264,20 @@ export function useGridKeyboard({
         return;
       }
 
+      // Ctrl+Shift++ — add flight
+      if (mod && e.shiftKey && (e.key === "+" || e.key === "=")) {
+        e.preventDefault();
+        callbackRefs.current.onAddFlight();
+        return;
+      }
+
+      // Ctrl+- — delete flight
+      if (mod && e.key === "-" && selectedCell) {
+        e.preventDefault();
+        callbackRefs.current.onDeleteFlight(selectedCell.rowIdx);
+        return;
+      }
+
       // F12 — save as scenario
       if (e.key === "F12") {
         e.preventDefault();
@@ -351,8 +376,13 @@ export function useGridKeyboard({
             if (curIdx > 0) state.startEditing({ rowIdx, colKey: editableCols[curIdx - 1].key });
             else if (rowIdx > 0) state.startEditing({ rowIdx: rowIdx - 1, colKey: editableCols[editableCols.length - 1].key });
           } else {
-            if (curIdx < editableCols.length - 1) state.startEditing({ rowIdx, colKey: editableCols[curIdx + 1].key });
-            else if (rowIdx < allRows.length - 1) state.startEditing({ rowIdx: rowIdx + 1, colKey: editableCols[0].key });
+            if (curIdx < editableCols.length - 1) {
+              state.startEditing({ rowIdx, colKey: editableCols[curIdx + 1].key });
+            } else if (onTabWrapDown) {
+              onTabWrapDown();
+            } else if (rowIdx < allRows.length - 1) {
+              state.startEditing({ rowIdx: rowIdx + 1, colKey: editableCols[0].key });
+            }
           }
           break;
         }

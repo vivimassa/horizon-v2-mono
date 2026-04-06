@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   ArrowLeft,
   Camera,
@@ -745,12 +746,21 @@ function EditableField({
     );
   }
 
+  if (type === "date") {
+    return (
+      <div className="py-2.5" style={{ borderBottom: `0.5px solid ${palette.border}` }}>
+        <label className="block" style={{ fontSize: F.min, color: palette.textTertiary, marginBottom: 6 }}>{label}</label>
+        <DatePicker value={value} onChange={(v) => onChange(fieldKey, v)} />
+      </div>
+    );
+  }
+
   return (
     <div className="py-2.5" style={{ borderBottom: `0.5px solid ${palette.border}` }}>
       <label className="block" style={{ fontSize: F.min, color: palette.textTertiary, marginBottom: 6 }}>{label}</label>
       <input
         type={type}
-        value={type === "date" ? value : value}
+        value={value}
         onChange={(e) => onChange(fieldKey, e.target.value)}
         style={inputStyle}
         onFocus={(e) => {

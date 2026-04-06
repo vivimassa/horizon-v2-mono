@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
-import { ChevronLeft, ChevronRight, Filter, Search, Loader2, CalendarDays, Plane, MapPin } from "lucide-react";
+import { useState, useCallback } from "react";
+import { ChevronLeft, ChevronRight, Filter, Search, Loader2 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 
 interface FilterPanelProps {
   seasonCode: string;
@@ -45,10 +46,13 @@ export function FilterPanel({ seasonCode, onSeasonChange, onApplyFilters, loadin
   const glassBorder = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)";
   const sectionBorder = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)";
 
+  const periodMissing = !dateFrom || !dateTo;
+
   const handleGo = useCallback(() => {
+    if (periodMissing) return;
     onApplyFilters({ seasonCode, dateFrom, dateTo, depStation, arrStation, aircraftType, status });
     setCollapsed(true);
-  }, [seasonCode, dateFrom, dateTo, depStation, arrStation, aircraftType, status, onApplyFilters]);
+  }, [periodMissing, seasonCode, dateFrom, dateTo, depStation, arrStation, aircraftType, status, onApplyFilters]);
 
   const activeCount = [dateFrom, dateTo, depStation, arrStation, aircraftType, status].filter(Boolean).length;
 
@@ -105,10 +109,7 @@ export function FilterPanel({ seasonCode, onSeasonChange, onApplyFilters, loadin
 
         {/* Date Range */}
         <FilterSection label="Period">
-          <div className="grid grid-cols-2 gap-1.5">
-            <DateInput label="From" value={dateFrom} onChange={setDateFrom} isDark={isDark} />
-            <DateInput label="To" value={dateTo} onChange={setDateTo} isDark={isDark} />
-          </div>
+          <DateRangePicker from={dateFrom} to={dateTo} onChangeFrom={setDateFrom} onChangeTo={setDateTo} />
         </FilterSection>
 
         {/* Departure */}
@@ -141,12 +142,15 @@ export function FilterPanel({ seasonCode, onSeasonChange, onApplyFilters, loadin
       <div className="px-5 py-4 shrink-0" style={{ borderTop: `1px solid ${sectionBorder}` }}>
         <button
           onClick={handleGo}
-          disabled={loading}
+          disabled={loading || periodMissing}
           className="w-full h-9 flex items-center justify-center gap-2 rounded-xl text-[13px] font-semibold text-white bg-module-accent hover:opacity-90 transition-opacity disabled:opacity-50"
         >
           {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
           {loading ? "Loading..." : "Go"}
         </button>
+        {periodMissing && (
+          <p className="text-[11px] text-hz-text-secondary mt-1.5 text-center">Select the period to continue</p>
+        )}
       </div>
     </div>
   );
@@ -185,53 +189,6 @@ function FilterSelect({ value, options, onChange, isDark }: {
   );
 }
 
-function DateInput({ label, value, onChange, isDark }: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  isDark: boolean;
-}) {
-  const bg = isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.7)";
-  const border = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)";
-  const activeBorder = value ? "rgba(62,123,250,0.40)" : border;
-  const activeBg = value ? (isDark ? "rgba(62,123,250,0.10)" : "rgba(62,123,250,0.05)") : bg;
-
-  // Format YYYY-MM-DD → DD/MM/YYYY for display
-  const displayValue = value
-    ? value.split("-").reverse().join("/")
-    : "";
-
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const handleClick = () => {
-    try { inputRef.current?.showPicker(); }
-    catch { inputRef.current?.focus(); }
-  };
-
-  return (
-    <div className="relative cursor-pointer" onClick={handleClick}>
-      {/* Visible display */}
-      <div
-        className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[12px] font-mono font-medium transition-all"
-        style={{ background: activeBg, border: `1px solid ${activeBorder}`, minHeight: 32,
-          color: value ? undefined : (isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.25)"),
-        }}
-      >
-        <CalendarDays size={12} className={value ? "text-module-accent" : "opacity-40"} />
-        <span>{displayValue || label.toUpperCase()}</span>
-      </div>
-      {/* Hidden native date input */}
-      <input
-        ref={inputRef}
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"
-        tabIndex={-1}
-      />
-    </div>
-  );
-}
 
 function StationInput({ value, onChange, placeholder, isDark }: {
   value: string;

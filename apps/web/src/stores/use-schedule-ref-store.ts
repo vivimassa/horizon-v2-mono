@@ -25,6 +25,9 @@ interface ScheduleRefState {
 
   /** Resolve shorthand or full ICAO to {id, icao} */
   resolveAcType: (input: string) => { id: string; icao: string } | null;
+
+  /** Get scheduled TAT in minutes for an aircraft type, route-type aware (DOM/INT) */
+  getTatMinutes: (icao: string, dep?: string, arr?: string) => number | null;
 }
 
 export const useScheduleRefStore = create<ScheduleRefState>((set, get) => ({
@@ -105,4 +108,46 @@ export const useScheduleRefStore = create<ScheduleRefState>((set, get) => ({
         label: `${t.code} — ${t.name}`,
       }))
       .sort((a, b) => a.value.localeCompare(b.value)),
+
+  getTatMinutes: (icao: string, dep?: string, arr?: string) => {
+    if (!icao) return null;
+    const q = icao.toUpperCase().trim();
+    const acType = get().aircraftTypes.find((t) => t.icaoType === q);
+    if (!acType?.tat) return null;
+    const tat = acType.tat;
+
+    // Determine DOM/INT for the arriving and departing legs using city pair country data
+    if (dep && arr) {
+      const depU = dep.toUpperCase();
+      const arrU = arr.toUpperCase();
+      const pairs = get().cityPairs;
+
+      // Find country for each station from city pairs
+      const getCountry = (icaoCode: string): string | null => {
+        for (const cp of pairs) {
+          if (cp.station1Icao === icaoCode) return cp.station1CountryIso2;
+          if (cp.station2Icao === icaoCode) return cp.station2CountryIso2;
+        }
+        return null;
+      };
+
+      const depCountry = getCountry(depU);
+      const arrCountry = getCountry(arrU);
+
+      if (depCountry && arrCountry) {
+        const isDom = depCountry === arrCountry;
+        // The TAT at the turnaround station depends on:
+        // - arriving flight route type (the flight that just landed)
+        // - departing flight route type (the next flight taking off)
+        // For auto-suggest on Add, both legs share the turnaround station (prev ARR = next DEP)
+        // So we use: arriving leg DOM/INT and departing leg is unknown yet → use arriving type for both
+        if (isDom) return tat.domDom ?? tat.defaultMinutes ?? null;
+        // If different countries, it's international
+        return tat.intInt ?? tat.defaultMinutes ?? null;
+      }
+    }
+
+    // Fallback: domDom → defaultMinutes
+    return tat.domDom ?? tat.defaultMinutes ?? null;
+  },
 }));

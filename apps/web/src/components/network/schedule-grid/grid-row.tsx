@@ -13,10 +13,12 @@ import { useTheme } from "@/components/theme-provider";
 interface GridRowProps {
   row: ScheduledFlightRef;
   rowIdx: number;
+  prevRow?: ScheduledFlightRef | null;
   onContextMenu?: (e: React.MouseEvent, rowIdx: number, colKey: string) => void;
+  onTabWrapDown?: () => void;
 }
 
-export const GridRow = React.memo(function GridRow({ row, rowIdx, onContextMenu }: GridRowProps) {
+export const GridRow = React.memo(function GridRow({ row, rowIdx, prevRow, onContextMenu, onTabWrapDown }: GridRowProps) {
   const selectedCell = useScheduleGridStore((s) => s.selectedCell);
   const editingCell = useScheduleGridStore((s) => s.editingCell);
   const editValue = useScheduleGridStore((s) => s.editValue);
@@ -29,6 +31,7 @@ export const GridRow = React.memo(function GridRow({ row, rowIdx, onContextMenu 
   const dirtyMap = useScheduleGridStore((s) => s.dirtyMap);
   const markDirty = useScheduleGridStore((s) => s.markDirty);
   const getBlockMinutes = useScheduleRefStore((s) => s.getBlockMinutes);
+  const getTatMinutes = useScheduleRefStore((s) => s.getTatMinutes);
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const border = isDark ? CELL_BORDER_DARK : CELL_BORDER;
@@ -94,15 +97,61 @@ export const GridRow = React.memo(function GridRow({ row, rowIdx, onContextMenu 
   const handleCommitWithAutoBlock = useCallback(() => {
     commitEdit();
     const dirty = dirtyMap.get(row._id);
-    if (dirty) {
-      const dep = (dirty.depStation as string) ?? row.depStation;
-      const arr = (dirty.arrStation as string) ?? row.arrStation;
-      if (dep && arr && !row.blockMinutes) {
-        const block = getBlockMinutes(dep, arr);
-        if (block && block > 0) markDirty(row._id, { blockMinutes: block } as Partial<ScheduledFlightRef>);
+    if (!dirty) return;
+
+    const dep = (dirty.depStation as string) ?? row.depStation;
+    const arr = (dirty.arrStation as string) ?? row.arrStation;
+    const std = (dirty.stdUtc as string) ?? row.stdUtc;
+
+    if (dep && arr) {
+      const block = getBlockMinutes(dep, arr);
+      if (block && block > 0) {
+        // Auto-set blockMinutes
+        const dirtyBlock = (dirty.blockMinutes as number | null) ?? row.blockMinutes;
+        if (!dirtyBlock) {
+          markDirty(row._id, { blockMinutes: block } as Partial<ScheduledFlightRef>);
+        }
+        // Auto-suggest STA = STD + block (if STD exists and STA is empty)
+        const sta = (dirty.staUtc as string) ?? row.staUtc;
+        if (std && !sta) {
+          const clean = std.replace(":", "");
+          const hh = clean.length >= 3 ? Number(clean.slice(0, clean.length - 2)) : NaN;
+          const mm = clean.length >= 3 ? Number(clean.slice(-2)) : NaN;
+          if (!isNaN(hh) && !isNaN(mm)) {
+            const totalMin = hh * 60 + mm + block;
+            const h = Math.floor(totalMin / 60) % 24;
+            const m = totalMin % 60;
+            const suggestedSta = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+            markDirty(row._id, { staUtc: suggestedSta } as Partial<ScheduledFlightRef>);
+          }
+        }
       }
     }
-  }, [commitEdit, dirtyMap, row, getBlockMinutes, markDirty]);
+
+    // Auto-suggest STD from previous row's STA + TAT (if STD is empty)
+    if (prevRow && !std) {
+      const prevDirty = dirtyMap.get(prevRow._id);
+      const prevSta = (prevDirty?.staUtc as string) ?? prevRow.staUtc ?? "";
+      const prevAcType = (prevDirty?.aircraftTypeIcao as string) ?? prevRow.aircraftTypeIcao ?? "";
+      const prevDep = (prevDirty?.depStation as string) ?? prevRow.depStation ?? "";
+      const prevArr = (prevDirty?.arrStation as string) ?? prevRow.arrStation ?? "";
+      if (prevSta && prevAcType) {
+        const tatMin = getTatMinutes(prevAcType, prevDep, prevArr);
+        if (tatMin != null) {
+          const clean = prevSta.replace(":", "");
+          const hh = clean.length >= 3 ? Number(clean.slice(0, clean.length - 2)) : NaN;
+          const mm = clean.length >= 3 ? Number(clean.slice(-2)) : NaN;
+          if (!isNaN(hh) && !isNaN(mm)) {
+            const totalMin = hh * 60 + mm + tatMin;
+            const h = Math.floor(totalMin / 60) % 24;
+            const m = totalMin % 60;
+            const suggestedStd = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+            markDirty(row._id, { stdUtc: suggestedStd } as Partial<ScheduledFlightRef>);
+          }
+        }
+      }
+    }
+  }, [commitEdit, dirtyMap, row, prevRow, getBlockMinutes, getTatMinutes, markDirty]);
 
   function handleNavigate(dir: "up" | "down" | "left" | "right") {
     if (!selectedCell) return;
@@ -112,8 +161,16 @@ export const GridRow = React.memo(function GridRow({ row, rowIdx, onContextMenu 
     else if (dir === "up") selectCell({ rowIdx: Math.max(0, rowIdx - 1), colKey: selectedCell.colKey });
     else if (dir === "right") {
       const next = GRID_COLUMNS.slice(colIdx + 1).find((c) => c.editable);
-      if (next) startEditing({ rowIdx, colKey: next.key });
-      else startEditing({ rowIdx: rowIdx + 1, colKey: editableCols[0]?.key ?? selectedCell.colKey });
+      if (next) {
+        startEditing({ rowIdx, colKey: next.key });
+      } else {
+        // Last editable column — wrap to next row
+        if (onTabWrapDown) {
+          onTabWrapDown();
+        } else {
+          startEditing({ rowIdx: rowIdx + 1, colKey: editableCols[0]?.key ?? selectedCell.colKey });
+        }
+      }
     } else if (dir === "left") {
       const prev = GRID_COLUMNS.slice(0, colIdx).reverse().find((c) => c.editable);
       if (prev) startEditing({ rowIdx, colKey: prev.key });

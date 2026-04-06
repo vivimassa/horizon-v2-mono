@@ -5,24 +5,27 @@ import { Save, X } from "lucide-react";
 interface FloatingSaveBarProps {
   dirtyCount: number;
   newCount: number;
+  deletedCount: number;
   saving: boolean;
   onSave: () => void;
   onDiscard: () => void;
 }
 
-export function FloatingSaveBar({ dirtyCount, newCount, saving, onSave, onDiscard }: FloatingSaveBarProps) {
-  const total = dirtyCount + newCount;
+export function FloatingSaveBar({ dirtyCount, newCount, deletedCount, saving, onSave, onDiscard }: FloatingSaveBarProps) {
+  const total = dirtyCount + newCount + deletedCount;
   if (total === 0) return null;
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 rounded-2xl border border-hz-border shadow-xl backdrop-blur-lg"
+    <div className="fixed bottom-6 right-6 z-40 flex items-center gap-3 px-5 py-3 rounded-2xl border border-hz-border shadow-xl backdrop-blur-lg"
       style={{ backgroundColor: "rgba(25,25,33,0.92)" }}>
       <div className="flex items-center gap-2">
         <div className="w-2 h-2 rounded-full bg-[#FF8800] animate-pulse" />
         <span className="text-[13px] font-medium text-white">
-          {dirtyCount > 0 && `${dirtyCount} modified`}
-          {dirtyCount > 0 && newCount > 0 && ", "}
-          {newCount > 0 && `${newCount} new`}
+          {[
+            dirtyCount > 0 && `${dirtyCount} modified`,
+            newCount > 0 && `${newCount} new`,
+            deletedCount > 0 && `${deletedCount} removed`,
+          ].filter(Boolean).join(", ")}
         </span>
       </div>
 

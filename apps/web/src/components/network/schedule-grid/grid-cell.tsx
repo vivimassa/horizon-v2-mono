@@ -50,10 +50,10 @@ export const GridCell = React.memo(function GridCell({
   const acTypeOptions = useScheduleRefStore((s) => s.getAcTypeOptions);
   const svcOptions = useScheduleRefStore((s) => s.getSvcOptions);
   const resolveAcType = useScheduleRefStore((s) => s.resolveAcType);
-  const getCellFormat = useScheduleGridStore((s) => s.getCellFormat);
+  const cellFormats = useScheduleGridStore((s) => s.cellFormats);
   const filterDateFrom = useScheduleGridStore((s) => s.filterDateFrom);
   const filterDateTo = useScheduleGridStore((s) => s.filterDateTo);
-  const fmt: CellFormat | undefined = getCellFormat(rowId, column.key);
+  const fmt: CellFormat | undefined = cellFormats.get(`${rowId}:${column.key}`);
   const condFmt = getConditionalFormat(row, column.key);
 
   // Date validation: check if FROM/TO falls outside filter period
@@ -163,6 +163,29 @@ export const GridCell = React.memo(function GridCell({
             <option value="">—</option>
             {options.map((o) => <option key={o.value} value={o.value}>{o.value}</option>)}
           </select>
+        </td>
+      );
+    }
+
+    // Time columns (STD, STA): only allow digits and colon
+    if (column.type === "time") {
+      return (
+        <td style={editCellStyle}>
+          <input ref={inputRef} type="text" value={editValue} maxLength={5}
+            onChange={(e) => {
+              const v = e.target.value.replace(/[^0-9:]/g, "");
+              // Auto-insert colon after 2 digits if user is typing continuously
+              if (v.length === 3 && !v.includes(":")) {
+                onEditChange(v.slice(0, 2) + ":" + v.slice(2));
+              } else {
+                onEditChange(v);
+              }
+            }}
+            onKeyDown={handleKeyDown} onBlur={onCommit}
+            placeholder="HH:MM"
+            className="w-full h-full bg-transparent border-none outline-none text-[13px] text-center text-hz-text"
+            style={{ fontFamily: monoFont }}
+          />
         </td>
       );
     }

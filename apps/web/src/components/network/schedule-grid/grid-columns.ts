@@ -14,7 +14,7 @@ export interface GridColumn {
 
 export const GRID_COLUMNS: GridColumn[] = [
   { key: 'ac',              label: 'AC',        width: '5%',   editable: false, type: 'readonly',  align: 'center', mono: true },
-  { key: 'aircraftTypeIcao',label: 'TYPE',      width: '5%',   editable: true,  type: 'text',      align: 'center', mono: true, maxLength: 4 },
+  { key: 'aircraftTypeIcao',label: 'AC TYPE',      width: '5%',   editable: true,  type: 'text',      align: 'center', mono: true, maxLength: 4 },
   { key: 'effectiveFrom',   label: 'FROM',      width: '7%',   editable: true,  type: 'date',      align: 'center', mono: true },
   { key: 'effectiveUntil',  label: 'TO',        width: '7%',   editable: true,  type: 'date',      align: 'center', mono: true },
   { key: 'depStation',      label: 'DEP',       width: '5%',   editable: true,  type: 'text',      align: 'center', mono: true, maxLength: 4 },

@@ -18,6 +18,7 @@ interface ScheduleGridProps {
   onSave: () => void;
   onAddFlight: () => void;
   onDeleteFlight: (rowIdx: number) => void;
+  onTabWrapDown?: () => void;
   onOpenFind?: () => void;
   onOpenReplace?: () => void;
 }
@@ -25,7 +26,7 @@ interface ScheduleGridProps {
 const SEPARATOR_HEIGHT = 12;
 
 export function ScheduleGrid({
-  rows, onSave, onAddFlight, onDeleteFlight, onOpenFind, onOpenReplace,
+  rows, onSave, onAddFlight, onDeleteFlight, onTabWrapDown, onOpenFind, onOpenReplace,
 }: ScheduleGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedCell = useScheduleGridStore((s) => s.selectedCell);
@@ -42,7 +43,7 @@ export function ScheduleGrid({
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
 
   // Global capture-phase keyboard handler
-  useGridKeyboard({ onSave, onAddFlight, onDeleteFlight, onOpenFind, onOpenReplace });
+  useGridKeyboard({ onSave, onAddFlight, onDeleteFlight, onTabWrapDown, onOpenFind, onOpenReplace });
 
   // Sorting + column filters
   const sortKey = useGridSortStore((s) => s.sortKey);
@@ -63,8 +64,10 @@ export function ScheduleGrid({
     });
   }, [rows]);
 
+  const deletedIds = useScheduleGridStore((s) => s.deletedIds);
+
   const processedRows = useMemo(() => {
-    let result = [...rows, ...newRows];
+    let result = [...rows, ...newRows].filter((r) => !deletedIds.has(r._id));
     for (const [colKey, allowedValues] of columnFilters) {
       result = result.filter((row) => {
         const v = (row as any)[colKey];
@@ -72,10 +75,23 @@ export function ScheduleGrid({
       });
     }
     return sortRows(result, sortKey, sortDir);
-  }, [rows, newRows, columnFilters, sortKey, sortDir]);
+  }, [rows, newRows, deletedIds, columnFilters, sortKey, sortDir]);
 
-  // Build virtual list with separator rows injected
-  type VirtualItem = { type: "data"; rowIdx: number } | { type: "separator"; afterRowIdx: number };
+  // Pad with empty placeholder rows to fill viewport (Excel-like)
+  const [viewportHeight, setViewportHeight] = useState(600);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(([entry]) => setViewportHeight(entry.contentRect.height));
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  const headerHeight = 36; // approximate header row height
+  const minRows = Math.max(1, Math.ceil((viewportHeight - headerHeight) / ROW_HEIGHT));
+  const emptyRowCount = Math.max(0, minRows - processedRows.length);
+
+  // Build virtual list with separator rows + empty padding injected
+  type VirtualItem = { type: "data"; rowIdx: number } | { type: "separator"; afterRowIdx: number } | { type: "empty"; emptyIdx: number };
   const virtualItems = useMemo<VirtualItem[]>(() => {
     const items: VirtualItem[] = [];
     for (let i = 0; i < processedRows.length; i++) {
@@ -84,8 +100,11 @@ export function ScheduleGrid({
         items.push({ type: "separator", afterRowIdx: i });
       }
     }
+    for (let i = 0; i < emptyRowCount; i++) {
+      items.push({ type: "empty", emptyIdx: i });
+    }
     return items;
-  }, [processedRows, separatorAfter]);
+  }, [processedRows, separatorAfter, emptyRowCount]);
 
   // Virtualization
   const virtualizer = useVirtualizer({
@@ -144,6 +163,20 @@ export function ScheduleGrid({
                 );
               }
 
+              if (item.type === "empty") {
+                return (
+                  <tr key={`empty-${item.emptyIdx}`} style={{ height: ROW_HEIGHT }}>
+                    <td
+                      colSpan={totalColSpan}
+                      style={{
+                        borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)"}`,
+                        padding: 0,
+                      }}
+                    />
+                  </tr>
+                );
+              }
+
               const row = processedRows[item.rowIdx];
               if (!row) return null;
               return (
@@ -151,7 +184,9 @@ export function ScheduleGrid({
                   key={row._id}
                   row={row}
                   rowIdx={item.rowIdx}
+                  prevRow={item.rowIdx > 0 ? processedRows[item.rowIdx - 1] : null}
                   onContextMenu={handleContextMenu}
+                  onTabWrapDown={onTabWrapDown}
                 />
               );
             })}

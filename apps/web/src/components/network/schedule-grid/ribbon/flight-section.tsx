@@ -12,7 +12,7 @@ interface Props {
 export function FlightSection({ onAdd, onRemove, hasSelection }: Props) {
   return (
     <RibbonSection label="Flight">
-      <RibbonButton icon={PlaneTakeoff} label="Add" onClick={onAdd} shortcut="Ctrl+N" />
+      <RibbonButton icon={PlaneTakeoff} label="Add" onClick={onAdd} shortcut="Insert" />
       <RibbonButton icon={Trash2} label="Remove" onClick={onRemove} disabled={!hasSelection} shortcut="Ctrl+Del" />
     </RibbonSection>
   );

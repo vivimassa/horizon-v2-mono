@@ -68,22 +68,21 @@ export function ScheduleGrid({ rows, onSave, onAddFlight, onDeleteFlight }: Sche
     if (selectedCell) virtualizer.scrollToIndex(selectedCell.rowIdx, { align: "auto" });
   }, [selectedCell, virtualizer]);
 
-  // Attach at window level (capture phase) to intercept browser shortcuts like Ctrl+N, Ctrl+S, Ctrl+F
+  // Intercept browser shortcuts globally on this page (capture phase, no focus check)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Only intercept when grid is focused
-      if (!scrollRef.current?.contains(document.activeElement) && document.activeElement !== scrollRef.current) return;
       const ctrl = e.ctrlKey || e.metaKey;
       if (!ctrl) return;
       const key = e.key.toLowerCase();
-      if (["s", "n", "f", "h", "b", "i", "u", "a"].includes(key)) {
+      if (["s", "f", "h"].includes(key)) {
         e.preventDefault();
         e.stopPropagation();
+        if (key === "s") onSave();
       }
     };
     window.addEventListener("keydown", handler, { capture: true });
     return () => window.removeEventListener("keydown", handler, { capture: true });
-  }, []);
+  }, [onSave, onAddFlight]);
 
   const glassBg = isDark ? "rgba(25,25,33,0.85)" : "rgba(255,255,255,0.85)";
   const glassBorder = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)";

@@ -50,8 +50,7 @@ export function useGridKeyboard({ onSave, onAddFlight, onDeleteFlight }: UseGrid
             onSave();
             return;
           case "n":
-            e.preventDefault();
-            onAddFlight();
+            // Reserved by browser — use Insert key instead
             return;
           case "z":
             e.preventDefault();

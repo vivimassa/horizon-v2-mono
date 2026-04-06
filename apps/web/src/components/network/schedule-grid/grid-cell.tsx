@@ -187,7 +187,7 @@ export const GridCell = React.memo(function GridCell({
       <span
         className="block w-full truncate"
         style={{
-          color: isOutOfPeriod ? "#E63535" : isSuggested ? "#8F90A6" : fmt?.textColor ?? condFmt?.textColor ?? (column.key === "flightNumber" ? "#E63535" : statusColor),
+          color: isOutOfPeriod ? "#E63535" : isSuggested ? "#8F90A6" : fmt?.textColor ?? condFmt?.textColor ?? (column.key === "flightNumber" ? "#3E7BFA" : statusColor),
           fontWeight: fmt?.bold || condFmt?.bold ? 700 : (column.key === "flightNumber" || statusColor ? 600 : undefined),
           fontStyle: fmt?.italic || condFmt?.italic || isSuggested ? "italic" : undefined,
           textDecoration: fmt?.underline || condFmt?.underline ? "underline" : undefined,

@@ -90,11 +90,12 @@ export function ScheduleGridShell() {
   const handleAddFlight = useCallback(() => {
     const id = crypto.randomUUID();
 
-    // Smart FROM/TO: inherit from previous row, or fall back to filter period
+    // Smart FROM/TO: inherit from previous row (including unsaved edits), or fall back to filter period
     const allRows = [...rows, ...newRows];
     const lastRow = allRows[allRows.length - 1];
-    const defaultFrom = lastRow?.effectiveFrom || filterDateFrom || "";
-    const defaultTo = lastRow?.effectiveUntil || filterDateTo || "";
+    const lastDirty = lastRow ? dirtyMap.get(lastRow._id) : undefined;
+    const defaultFrom = (lastDirty?.effectiveFrom as string) ?? lastRow?.effectiveFrom ?? filterDateFrom ?? "";
+    const defaultTo = (lastDirty?.effectiveUntil as string) ?? lastRow?.effectiveUntil ?? filterDateTo ?? "";
 
     addNewRow({
       _id: id,

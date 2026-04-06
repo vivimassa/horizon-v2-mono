@@ -37,22 +37,40 @@ export const GridRow = React.memo(function GridRow({ row, rowIdx }: GridRowProps
 
   const operatorDateFormat = useOperatorStore((s) => s.dateFormat);
 
+  /** Format HHMM → HH:MM for display */
+  function fmtTime(t: string): string {
+    if (!t) return "";
+    const clean = t.replace(":", "");
+    if (clean.length >= 4) return `${clean.slice(0, 2)}:${clean.slice(2, 4)}`;
+    return t;
+  }
+
   function getCellValue(colKey: string): string {
+    // Computed columns always go through their formatter regardless of dirty state
+    if (colKey === "ac") return row.rotationLabel ?? (row.aircraftTypeIcao ? `${row.aircraftTypeIcao}` : "—");
+    if (colKey === "blockMinutes") {
+      const dirtyBlock = getDirtyValue(row._id, "blockMinutes") as number | undefined;
+      const std = (getDirtyValue(row._id, "stdUtc") as string) ?? row.stdUtc;
+      const sta = (getDirtyValue(row._id, "staUtc") as string) ?? row.staUtc;
+      const block = dirtyBlock ?? row.blockMinutes ?? calcBlockMinutes(std, sta);
+      return fmtMinutes(block);
+    }
+
     const dirty = getDirtyValue(row._id, colKey);
     if (dirty !== undefined) {
       const v = String(dirty);
       if (colKey === "effectiveFrom" || colKey === "effectiveUntil") return formatDate(v, operatorDateFormat);
+      if (colKey === "stdUtc" || colKey === "staUtc") return fmtTime(v);
       return v;
-    }
-    if (colKey === "ac") return row.rotationLabel ?? (row.aircraftTypeIcao ? `${row.aircraftTypeIcao}` : "—");
-    if (colKey === "blockMinutes") {
-      const block = row.blockMinutes ?? calcBlockMinutes(row.stdUtc, row.staUtc);
-      return fmtMinutes(block);
     }
     if (colKey === "tat") return "";
     if (colKey === "effectiveFrom" || colKey === "effectiveUntil") {
       const val = (row as any)[colKey];
       return val ? formatDate(String(val), operatorDateFormat) : "";
+    }
+    if (colKey === "stdUtc" || colKey === "staUtc") {
+      const val = (row as any)[colKey];
+      return val ? fmtTime(String(val)) : "";
     }
     const val = (row as any)[colKey];
     return val != null ? String(val) : "";

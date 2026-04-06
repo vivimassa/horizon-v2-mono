@@ -42,14 +42,28 @@ export const GridCell = React.memo(function GridCell({
 
   const acTypeOptions = useScheduleRefStore((s) => s.getAcTypeOptions);
   const svcOptions = useScheduleRefStore((s) => s.getSvcOptions);
+  const resolveAcType = useScheduleRefStore((s) => s.resolveAcType);
   const getCellFormat = useScheduleGridStore((s) => s.getCellFormat);
+  const filterDateFrom = useScheduleGridStore((s) => s.filterDateFrom);
+  const filterDateTo = useScheduleGridStore((s) => s.filterDateTo);
   const fmt: CellFormat | undefined = getCellFormat(rowId, column.key);
   const condFmt = getConditionalFormat(row, column.key);
 
+  // Date validation: check if FROM/TO falls outside filter period
+  const isDateCol = column.key === "effectiveFrom" || column.key === "effectiveUntil";
+  const isOutOfPeriod = isDateCol && value && filterDateFrom && filterDateTo &&
+    (value < filterDateFrom || value > filterDateTo);
+  const isSuggested = isDateCol && value && !isDirty && row.status === "draft";
+
   useEffect(() => {
     if (isEditing) {
-      if (column.type === "select" || column.key === "aircraftTypeIcao") selectRef.current?.focus();
-      else { inputRef.current?.focus(); inputRef.current?.select(); }
+      if (column.type === "select") selectRef.current?.focus();
+      else if (inputRef.current) {
+        inputRef.current.focus();
+        // Position cursor at end so typing appends
+        const len = inputRef.current.value.length;
+        inputRef.current.setSelectionRange(len, len);
+      }
     }
   }, [isEditing, column.type, column.key]);
 
@@ -94,21 +108,28 @@ export const GridCell = React.memo(function GridCell({
     };
 
     if (column.key === "aircraftTypeIcao") {
-      const options = acTypeOptions();
+      const commitAcType = () => {
+        const resolved = resolveAcType(editValue);
+        if (resolved) {
+          onEditChange(resolved.icao);
+          if (onFieldWire) onFieldWire("aircraftTypeId", resolved.id);
+        }
+        onCommit();
+      };
       return (
         <td style={editCellStyle}>
-          <select ref={selectRef} value={editValue}
-            onChange={(e) => {
-              const opt = options.find((o) => o.icao === e.target.value);
-              onEditChange(e.target.value);
-              if (opt && onFieldWire) onFieldWire("aircraftTypeId", opt.value);
-              setTimeout(onCommit, 0);
+          <input ref={inputRef} type="text" value={editValue} maxLength={4}
+            onChange={(e) => onEditChange(e.target.value.toUpperCase())}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); commitAcType(); onNavigate("down"); }
+              else if (e.key === "Tab") { e.preventDefault(); commitAcType(); onNavigate(e.shiftKey ? "left" : "right"); }
+              else if (e.key === "Escape") { e.preventDefault(); onCancel(); }
             }}
-            onKeyDown={handleKeyDown} onBlur={onCommit}
-            className="w-full h-full bg-transparent border-none outline-none text-[13px] text-center text-hz-text">
-            <option value="">—</option>
-            {options.map((o) => <option key={o.value} value={o.icao}>{o.icao}</option>)}
-          </select>
+            onBlur={commitAcType}
+            placeholder="e.g. 321"
+            className="w-full h-full bg-transparent border-none outline-none text-[13px] text-center text-hz-text"
+            style={{ fontFamily: monoFont }}
+          />
         </td>
       );
     }
@@ -132,9 +153,7 @@ export const GridCell = React.memo(function GridCell({
       <td style={editCellStyle}>
         <input ref={inputRef} type="text" value={editValue} maxLength={column.maxLength}
           onChange={(e) => {
-            let v = e.target.value;
-            if (column.key === "depStation" || column.key === "arrStation" || column.key === "flightNumber") v = v.toUpperCase();
-            onEditChange(v);
+            onEditChange(e.target.value.toUpperCase());
           }}
           onKeyDown={handleKeyDown} onBlur={onCommit}
           className="w-full h-full bg-transparent border-none outline-none text-[13px] text-center text-hz-text"
@@ -144,10 +163,16 @@ export const GridCell = React.memo(function GridCell({
     );
   }
 
+  // Out-of-period styling
+  const periodWarningStyle: React.CSSProperties = isOutOfPeriod
+    ? { outline: "2px solid #E63535", outlineOffset: -2 }
+    : {};
+
   // ── Display mode ──
   return (
     <td
-      style={{ ...cellStyle, ...selectionStyle }}
+      style={{ ...cellStyle, ...selectionStyle, ...periodWarningStyle }}
+      title={isOutOfPeriod ? `Date falls outside the designated period (${filterDateFrom} to ${filterDateTo}). Please adjust to stay within the selected period.` : undefined}
       onClick={onSelect}
       onDoubleClick={() => column.editable && onStartEdit()}
       onContextMenu={onContextMenu}
@@ -155,9 +180,9 @@ export const GridCell = React.memo(function GridCell({
       <span
         className="block w-full truncate"
         style={{
-          color: fmt?.textColor ?? condFmt?.textColor ?? (column.key === "flightNumber" ? "#E63535" : statusColor),
+          color: isOutOfPeriod ? "#E63535" : isSuggested ? "#8F90A6" : fmt?.textColor ?? condFmt?.textColor ?? (column.key === "flightNumber" ? "#E63535" : statusColor),
           fontWeight: fmt?.bold || condFmt?.bold ? 700 : (column.key === "flightNumber" || statusColor ? 600 : undefined),
-          fontStyle: fmt?.italic || condFmt?.italic ? "italic" : undefined,
+          fontStyle: fmt?.italic || condFmt?.italic || isSuggested ? "italic" : undefined,
           textDecoration: fmt?.underline || condFmt?.underline ? "underline" : undefined,
           fontFamily: fmt?.fontFamily ? (fmt.fontFamily === "Mono" ? monoFont : fmt.fontFamily) : undefined,
           fontSize: fmt?.fontSize ? `${fmt.fontSize}px` : column.key === "status" ? "11px" : undefined,

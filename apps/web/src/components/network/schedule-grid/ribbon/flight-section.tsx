@@ -18,13 +18,15 @@ export function FlightSection({ onAdd, onRemove, hasSelection }: Props) {
   );
 }
 
-export function RibbonSection({ label, children }: { label: string; children: React.ReactNode }) {
+export function RibbonSection({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
   return (
-    <div className="relative flex flex-col items-center">
-      <div className="flex items-center gap-0.5">
+    <div className={`flex flex-col items-center self-stretch justify-between py-2 ${wide ? "px-4 min-w-[280px]" : "px-3"}`}>
+      <div className="flex items-center justify-center gap-2 flex-1">
         {children}
       </div>
-      <span className="text-[10px] text-hz-text-tertiary/50 font-medium mt-0.5 leading-none">{label}</span>
+      <div className="w-full text-center border-t border-hz-border/20 pt-1.5 mt-1.5">
+        <span className="text-[11px] text-hz-text-tertiary/50 font-medium leading-none whitespace-nowrap">{label}</span>
+      </div>
     </div>
   );
 }

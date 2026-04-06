@@ -33,6 +33,9 @@ export function ScheduleGridShell() {
   const addNewRow = useScheduleGridStore((s) => s.addNewRow);
   const clearNewRows = useScheduleGridStore((s) => s.clearNewRows);
   const selectedCell = useScheduleGridStore((s) => s.selectedCell);
+  const setFilterPeriod = useScheduleGridStore((s) => s.setFilterPeriod);
+  const filterDateFrom = useScheduleGridStore((s) => s.filterDateFrom);
+  const filterDateTo = useScheduleGridStore((s) => s.filterDateTo);
   const [showFind, setShowFind] = useState(false);
   const [showReplace, setShowReplace] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -84,6 +87,13 @@ export function ScheduleGridShell() {
 
   const handleAddFlight = useCallback(() => {
     const id = crypto.randomUUID();
+
+    // Smart FROM/TO: inherit from previous row, or fall back to filter period
+    const allRows = [...rows, ...newRows];
+    const lastRow = allRows[allRows.length - 1];
+    const defaultFrom = lastRow?.effectiveFrom || filterDateFrom || "";
+    const defaultTo = lastRow?.effectiveUntil || filterDateTo || "";
+
     addNewRow({
       _id: id,
       operatorId: "horizon",
@@ -108,8 +118,8 @@ export function ScheduleGridShell() {
       serviceType: "J",
       status: "draft",
       previousStatus: null,
-      effectiveFrom: "",
-      effectiveUntil: "",
+      effectiveFrom: defaultFrom,
+      effectiveUntil: defaultTo,
       cockpitCrewRequired: null,
       cabinCrewRequired: null,
       isEtops: false,
@@ -134,6 +144,7 @@ export function ScheduleGridShell() {
         onSeasonChange={setSeasonCode}
         onApplyFilters={(filters) => {
           setSeasonCode(filters.seasonCode);
+          setFilterPeriod(filters.dateFrom, filters.dateTo);
           fetchFlights();
         }}
         loading={loading}

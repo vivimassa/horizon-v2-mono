@@ -118,6 +118,13 @@ export function useGridKeyboard({ onSave, onAddFlight, onDeleteFlight }: UseGrid
         return;
       }
 
+      // ── Insert — add flight ──
+      if (e.key === "Insert") {
+        e.preventDefault();
+        onAddFlight();
+        return;
+      }
+
       // ── F12 — save as ──
       if (e.key === "F12") {
         e.preventDefault();
@@ -158,11 +165,11 @@ export function useGridKeyboard({ onSave, onAddFlight, onDeleteFlight }: UseGrid
           const editableCols = GRID_COLUMNS.filter((c) => c.editable);
           const curIdx = editableCols.findIndex((c) => c.key === colKey);
           if (e.shiftKey) {
-            if (curIdx > 0) state.selectCell({ rowIdx, colKey: editableCols[curIdx - 1].key });
-            else if (rowIdx > 0) state.selectCell({ rowIdx: rowIdx - 1, colKey: editableCols[editableCols.length - 1].key });
+            if (curIdx > 0) state.startEditing({ rowIdx, colKey: editableCols[curIdx - 1].key });
+            else if (rowIdx > 0) state.startEditing({ rowIdx: rowIdx - 1, colKey: editableCols[editableCols.length - 1].key });
           } else {
-            if (curIdx < editableCols.length - 1) state.selectCell({ rowIdx, colKey: editableCols[curIdx + 1].key });
-            else if (rowIdx < allRows.length - 1) state.selectCell({ rowIdx: rowIdx + 1, colKey: editableCols[0].key });
+            if (curIdx < editableCols.length - 1) state.startEditing({ rowIdx, colKey: editableCols[curIdx + 1].key });
+            else if (rowIdx < allRows.length - 1) state.startEditing({ rowIdx: rowIdx + 1, colKey: editableCols[0].key });
           }
           break;
         }

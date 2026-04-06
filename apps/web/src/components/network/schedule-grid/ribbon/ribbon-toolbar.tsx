@@ -33,8 +33,8 @@ export function RibbonToolbar({
 
   return (
     <div
-      className="flex items-center gap-2.5 px-3 py-2 rounded-2xl shrink-0 overflow-x-auto"
-      style={{ background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: "blur(20px)", minHeight: 68 }}
+      className="flex items-stretch gap-0 rounded-2xl shrink-0 overflow-x-auto"
+      style={{ background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: "blur(20px)", minHeight: 120 }}
     >
       <FlightSection onAdd={onAddFlight} onRemove={onDeleteFlight} hasSelection={hasSelection} />
       <Divider isDark={isDark} />
@@ -56,7 +56,7 @@ export function RibbonToolbar({
 function Divider({ isDark }: { isDark: boolean }) {
   return (
     <div
-      className="self-stretch mx-1 my-1 shrink-0"
+      className="self-stretch shrink-0"
       style={{ width: 1, background: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)" }}
     />
   );

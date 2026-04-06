@@ -15,6 +15,7 @@ export { PageShell } from './components/PageShell'
 // to avoid eagerly pulling in react-native-reanimated/worklets
 export { SpotlightDock } from './components/SpotlightDock'
 export { NavTile } from './components/NavTile'
+export { Tooltip } from './components/Tooltip'
 
 // ── Gluestack Primitives ──
 export * from './gluestack'

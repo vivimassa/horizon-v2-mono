@@ -28,7 +28,7 @@ export function GridHeader({ scrollLeft, rows, columnFilters, onApplyFilter }: G
         {/* Row number column */}
         <th
           className="text-[11px] font-medium text-hz-text-tertiary bg-hz-bg select-none"
-          style={{ width: 40, border, textAlign: "center" }}
+          style={{ width: "3%", border, textAlign: "center" }}
         />
         {GRID_COLUMNS.map((col) => {
           const isSorted = sortKey === col.key;

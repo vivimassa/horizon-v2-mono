@@ -102,16 +102,6 @@ export function FilterPanel({ seasonCode, onSeasonChange, onApplyFilters, loadin
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
 
-        {/* Season */}
-        <FilterSection label="Season">
-          <FilterSelect
-            value={seasonCode}
-            options={SEASONS.map(s => ({ value: s, label: s }))}
-            onChange={onSeasonChange}
-            isDark={isDark}
-          />
-        </FilterSection>
-
         {/* Date Range */}
         <FilterSection label="Period">
           <div className="grid grid-cols-2 gap-1.5">
@@ -204,15 +194,29 @@ function DateInput({ label, value, onChange, isDark }: {
   const border = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)";
   const activeBorder = value ? "rgba(62,123,250,0.40)" : border;
   const activeBg = value ? (isDark ? "rgba(62,123,250,0.10)" : "rgba(62,123,250,0.05)") : bg;
+
+  // Format YYYY-MM-DD → DD/MM/YYYY for display
+  const displayValue = value
+    ? value.split("-").reverse().join("/")
+    : "";
+
   return (
-    <div>
+    <div className="relative">
+      {/* Visible display */}
+      <div
+        className="w-full px-2 py-1.5 rounded-lg text-[12px] font-mono font-medium text-center transition-all cursor-pointer"
+        style={{ background: activeBg, border: `1px solid ${activeBorder}`, minHeight: 30, lineHeight: "18px",
+          color: value ? undefined : (isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.25)"),
+        }}
+      >
+        {displayValue || label.toUpperCase()}
+      </div>
+      {/* Hidden native date input */}
       <input
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={label}
-        className="w-full px-2 py-1.5 rounded-lg text-[12px] font-mono font-medium text-center outline-none focus:ring-1 focus:ring-module-accent/20 text-hz-text transition-all"
-        style={{ background: activeBg, border: `1px solid ${activeBorder}` }}
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
       />
     </div>
   );

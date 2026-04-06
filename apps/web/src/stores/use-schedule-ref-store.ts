@@ -22,6 +22,9 @@ interface ScheduleRefState {
 
   /** Get service type options for dropdown */
   getSvcOptions: () => { value: string; label: string }[];
+
+  /** Resolve shorthand or full ICAO to {id, icao} */
+  resolveAcType: (input: string) => { id: string; icao: string } | null;
 }
 
 export const useScheduleRefStore = create<ScheduleRefState>((set, get) => ({
@@ -76,6 +79,23 @@ export const useScheduleRefStore = create<ScheduleRefState>((set, get) => ({
         icao: t.icaoType,
       }))
       .sort((a, b) => a.icao.localeCompare(b.icao)),
+
+  /** Resolve shorthand (320, 321) or full ICAO (A320, A321) to {id, icao} */
+  resolveAcType: (input: string) => {
+    const q = input.toUpperCase().trim();
+    if (!q) return null;
+    const types = get().aircraftTypes.filter((t) => t.isActive);
+    // Exact ICAO match first
+    const exact = types.find((t) => t.icaoType === q);
+    if (exact) return { id: exact._id, icao: exact.icaoType };
+    // Shorthand: input is numeric suffix — match any type ending with it
+    const byEnding = types.find((t) => t.icaoType.endsWith(q));
+    if (byEnding) return { id: byEnding._id, icao: byEnding.icaoType };
+    // Partial match
+    const partial = types.find((t) => t.icaoType.includes(q));
+    if (partial) return { id: partial._id, icao: partial.icaoType };
+    return null;
+  },
 
   getSvcOptions: () =>
     get()

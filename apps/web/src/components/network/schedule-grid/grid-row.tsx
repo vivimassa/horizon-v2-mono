@@ -71,12 +71,12 @@ export const GridRow = React.memo(function GridRow({ row, rowIdx }: GridRowProps
     else if (dir === "up") selectCell({ rowIdx: Math.max(0, rowIdx - 1), colKey: selectedCell.colKey });
     else if (dir === "right") {
       const next = GRID_COLUMNS.slice(colIdx + 1).find((c) => c.editable);
-      if (next) selectCell({ rowIdx, colKey: next.key });
-      else selectCell({ rowIdx: rowIdx + 1, colKey: editableCols[0]?.key ?? selectedCell.colKey });
+      if (next) startEditing({ rowIdx, colKey: next.key });
+      else startEditing({ rowIdx: rowIdx + 1, colKey: editableCols[0]?.key ?? selectedCell.colKey });
     } else if (dir === "left") {
       const prev = GRID_COLUMNS.slice(0, colIdx).reverse().find((c) => c.editable);
-      if (prev) selectCell({ rowIdx, colKey: prev.key });
-      else if (rowIdx > 0) selectCell({ rowIdx: rowIdx - 1, colKey: editableCols[editableCols.length - 1]?.key ?? selectedCell.colKey });
+      if (prev) startEditing({ rowIdx, colKey: prev.key });
+      else if (rowIdx > 0) startEditing({ rowIdx: rowIdx - 1, colKey: editableCols[editableCols.length - 1]?.key ?? selectedCell.colKey });
     }
   }
 
@@ -95,7 +95,7 @@ export const GridRow = React.memo(function GridRow({ row, rowIdx }: GridRowProps
       {/* Row number */}
       <td
         className="text-[11px] text-hz-text-tertiary select-none text-center"
-        style={{ width: 40, border }}
+        style={{ width: "3%", border }}
       >
         {rowIdx + 1}
       </td>

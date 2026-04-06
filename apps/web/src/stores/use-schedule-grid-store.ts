@@ -10,6 +10,11 @@ export interface CellAddress {
 }
 
 interface ScheduleGridState {
+  // Filter period (from left panel)
+  filterDateFrom: string;
+  filterDateTo: string;
+  setFilterPeriod: (from: string, to: string) => void;
+
   // Data
   rows: ScheduledFlightRef[];
   setRows: (rows: ScheduledFlightRef[]) => void;
@@ -47,6 +52,9 @@ interface ScheduleGridState {
 }
 
 export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
+  filterDateFrom: "",
+  filterDateTo: "",
+  setFilterPeriod: (from, to) => set({ filterDateFrom: from, filterDateTo: to }),
   rows: [],
   setRows: (rows) => set({ rows }),
 

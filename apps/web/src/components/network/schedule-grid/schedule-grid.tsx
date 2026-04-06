@@ -1,26 +1,26 @@
 "use client";
 
-import { useRef, useCallback, useEffect } from "react";
+import { useRef, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ScheduledFlightRef } from "@skyhub/api";
 import { useScheduleGridStore } from "@/stores/use-schedule-grid-store";
 import { GridHeader } from "./grid-header";
 import { GridRow } from "./grid-row";
-import { GRID_COLUMNS, ROW_HEIGHT, HEADER_HEIGHT, TOTAL_WIDTH } from "./grid-columns";
+import { ROW_HEIGHT, TOTAL_WIDTH } from "./grid-columns";
+import { useGridKeyboard } from "./use-grid-keyboard";
 
 interface ScheduleGridProps {
   rows: ScheduledFlightRef[];
+  onSave: () => void;
+  onAddFlight: () => void;
+  onDeleteFlight: (rowIdx: number) => void;
 }
 
-export function ScheduleGrid({ rows }: ScheduleGridProps) {
+export function ScheduleGrid({ rows, onSave, onAddFlight, onDeleteFlight }: ScheduleGridProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const selectedCell = useScheduleGridStore((s) => s.selectedCell);
-  const editingCell = useScheduleGridStore((s) => s.editingCell);
-  const selectCell = useScheduleGridStore((s) => s.selectCell);
-  const startEditing = useScheduleGridStore((s) => s.startEditing);
-  const commitEdit = useScheduleGridStore((s) => s.commitEdit);
-  const cancelEdit = useScheduleGridStore((s) => s.cancelEdit);
   const newRows = useScheduleGridStore((s) => s.newRows);
+  const handleKeyDown = useGridKeyboard({ onSave, onAddFlight, onDeleteFlight });
 
   const allRows = [...rows, ...newRows];
 
@@ -30,79 +30,6 @@ export function ScheduleGrid({ rows }: ScheduleGridProps) {
     estimateSize: () => ROW_HEIGHT,
     overscan: 30,
   });
-
-  // Keyboard navigation
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      // Don't intercept if editing (let input handle it)
-      if (editingCell) return;
-
-      if (!selectedCell) return;
-
-      const { rowIdx, colKey } = selectedCell;
-      const colIdx = GRID_COLUMNS.findIndex((c) => c.key === colKey);
-
-      switch (e.key) {
-        case "ArrowDown":
-          e.preventDefault();
-          if (rowIdx < allRows.length - 1) selectCell({ rowIdx: rowIdx + 1, colKey });
-          break;
-        case "ArrowUp":
-          e.preventDefault();
-          if (rowIdx > 0) selectCell({ rowIdx: rowIdx - 1, colKey });
-          break;
-        case "ArrowRight":
-          e.preventDefault();
-          if (colIdx < GRID_COLUMNS.length - 1) selectCell({ rowIdx, colKey: GRID_COLUMNS[colIdx + 1].key });
-          break;
-        case "ArrowLeft":
-          e.preventDefault();
-          if (colIdx > 0) selectCell({ rowIdx, colKey: GRID_COLUMNS[colIdx - 1].key });
-          break;
-        case "Enter":
-        case "F2": {
-          e.preventDefault();
-          const col = GRID_COLUMNS[colIdx];
-          if (col?.editable) startEditing({ rowIdx, colKey });
-          break;
-        }
-        case "Tab": {
-          e.preventDefault();
-          const editableCols = GRID_COLUMNS.filter((c) => c.editable);
-          const curEditIdx = editableCols.findIndex((c) => c.key === colKey);
-          if (e.shiftKey) {
-            if (curEditIdx > 0) selectCell({ rowIdx, colKey: editableCols[curEditIdx - 1].key });
-            else if (rowIdx > 0) selectCell({ rowIdx: rowIdx - 1, colKey: editableCols[editableCols.length - 1].key });
-          } else {
-            if (curEditIdx < editableCols.length - 1) selectCell({ rowIdx, colKey: editableCols[curEditIdx + 1].key });
-            else if (rowIdx < allRows.length - 1) selectCell({ rowIdx: rowIdx + 1, colKey: editableCols[0].key });
-          }
-          break;
-        }
-        case "Escape":
-          e.preventDefault();
-          selectCell(null);
-          break;
-        case "Delete":
-        case "Backspace":
-          e.preventDefault();
-          // Clear cell — start editing with empty value
-          if (GRID_COLUMNS[colIdx]?.editable) startEditing({ rowIdx, colKey }, "");
-          break;
-        default:
-          // Typing a character starts editing
-          if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-            const col = GRID_COLUMNS[colIdx];
-            if (col?.editable) {
-              e.preventDefault();
-              startEditing({ rowIdx, colKey }, e.key);
-            }
-          }
-          break;
-      }
-    },
-    [selectedCell, editingCell, allRows.length, selectCell, startEditing]
-  );
 
   // Scroll selected cell into view
   useEffect(() => {

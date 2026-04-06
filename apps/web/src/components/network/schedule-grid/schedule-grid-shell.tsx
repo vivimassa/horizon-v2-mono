@@ -3,8 +3,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, setApiBaseUrl } from "@skyhub/api";
 import { useScheduleGridStore } from "@/stores/use-schedule-grid-store";
+import { useScheduleRefStore } from "@/stores/use-schedule-ref-store";
 import { ScheduleGrid } from "./schedule-grid";
 import { FloatingSaveBar } from "./floating-save-bar";
+import { RibbonToolbar } from "./ribbon/ribbon-toolbar";
 import { Plus, RefreshCw } from "lucide-react";
 
 setApiBaseUrl("http://localhost:3002");
@@ -13,6 +15,10 @@ export function ScheduleGridShell() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [seasonCode, setSeasonCode] = useState("S26");
+  const loadRefData = useScheduleRefStore((s) => s.loadAll);
+
+  // Load reference data (AC types, service types, citypairs) once
+  useEffect(() => { loadRefData(); }, [loadRefData]);
   const rows = useScheduleGridStore((s) => s.rows);
   const setRows = useScheduleGridStore((s) => s.setRows);
   const dirtyMap = useScheduleGridStore((s) => s.dirtyMap);
@@ -20,6 +26,7 @@ export function ScheduleGridShell() {
   const newRows = useScheduleGridStore((s) => s.newRows);
   const addNewRow = useScheduleGridStore((s) => s.addNewRow);
   const clearNewRows = useScheduleGridStore((s) => s.clearNewRows);
+  const selectedCell = useScheduleGridStore((s) => s.selectedCell);
 
   const fetchFlights = useCallback(async () => {
     setLoading(true);
@@ -150,7 +157,34 @@ export function ScheduleGridShell() {
       </div>
 
       {/* Grid */}
-      <ScheduleGrid rows={rows} />
+      {/* Ribbon toolbar */}
+      <RibbonToolbar
+        onAddFlight={handleAddFlight}
+        onDeleteFlight={() => {
+          if (!selectedCell) return;
+          const allRows = [...rows, ...newRows];
+          const row = allRows[selectedCell.rowIdx];
+          if (row) api.deleteScheduledFlight(row._id).then(fetchFlights).catch(console.error);
+        }}
+        onSave={handleSave}
+        hasDirty={dirtyMap.size > 0 || newRows.length > 0}
+        hasSelection={selectedCell !== null}
+        saving={saving}
+      />
+
+      {/* Grid */}
+      <ScheduleGrid
+        rows={rows}
+        onSave={handleSave}
+        onAddFlight={handleAddFlight}
+        onDeleteFlight={(rowIdx) => {
+          const allRows = [...rows, ...newRows];
+          const row = allRows[rowIdx];
+          if (row) {
+            api.deleteScheduledFlight(row._id).then(fetchFlights).catch(console.error);
+          }
+        }}
+      />
 
       {/* Floating save bar */}
       <FloatingSaveBar

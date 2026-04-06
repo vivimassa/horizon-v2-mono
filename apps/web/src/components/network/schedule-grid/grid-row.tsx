@@ -1,10 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useCallback } from "react";
 import type { ScheduledFlightRef } from "@skyhub/api";
 import { GRID_COLUMNS, ROW_HEIGHT, fmtMinutes, calcBlockMinutes } from "./grid-columns";
 import { GridCell } from "./grid-cell";
 import { useScheduleGridStore } from "@/stores/use-schedule-grid-store";
+import { useScheduleRefStore } from "@/stores/use-schedule-ref-store";
 
 interface GridRowProps {
   row: ScheduledFlightRef;
@@ -23,25 +24,50 @@ export const GridRow = React.memo(function GridRow({ row, rowIdx, style }: GridR
   const cancelEdit = useScheduleGridStore((s) => s.cancelEdit);
   const getDirtyValue = useScheduleGridStore((s) => s.getDirtyValue);
   const dirtyMap = useScheduleGridStore((s) => s.dirtyMap);
-
-  const isRowDirty = dirtyMap.has(row._id);
+  const markDirty = useScheduleGridStore((s) => s.markDirty);
+  const getBlockMinutes = useScheduleRefStore((s) => s.getBlockMinutes);
 
   function getCellValue(colKey: string): string {
-    // Check dirty value first
     const dirty = getDirtyValue(row._id, colKey);
     if (dirty !== undefined) return String(dirty);
 
-    // Computed columns
     if (colKey === "ac") return row.rotationLabel ?? (row.aircraftTypeIcao ? `${row.aircraftTypeIcao}` : "—");
     if (colKey === "blockMinutes") {
       const block = row.blockMinutes ?? calcBlockMinutes(row.stdUtc, row.staUtc);
       return fmtMinutes(block);
     }
-    if (colKey === "tat") return ""; // TAT calculated in shell from rotation chains
+    if (colKey === "tat") return "";
 
-    const val = (row as Record<string, unknown>)[colKey];
+    const val = (row as any)[colKey];
     return val != null ? String(val) : "";
   }
+
+  // Wire extra fields when a primary field changes (e.g. AC type sets aircraftTypeId)
+  const handleFieldWire = useCallback((field: string, value: string) => {
+    markDirty(row._id, { [field]: value } as Partial<ScheduledFlightRef>);
+  }, [row._id, markDirty]);
+
+  // Auto-populate block minutes when DEP or ARR changes
+  const handleCommitWithAutoBlock = useCallback(() => {
+    commitEdit();
+
+    // After commit, check if we should auto-populate block minutes
+    const editCell = useScheduleGridStore.getState().editingCell;
+    if (!editCell) {
+      // editingCell was just cleared by commitEdit, check what was edited
+      const dirty = dirtyMap.get(row._id);
+      if (dirty) {
+        const dep = (dirty.depStation as string) ?? row.depStation;
+        const arr = (dirty.arrStation as string) ?? row.arrStation;
+        if (dep && arr && !row.blockMinutes) {
+          const block = getBlockMinutes(dep, arr);
+          if (block && block > 0) {
+            markDirty(row._id, { blockMinutes: block } as Partial<ScheduledFlightRef>);
+          }
+        }
+      }
+    }
+  }, [commitEdit, dirtyMap, row, getBlockMinutes, markDirty]);
 
   function handleNavigate(dir: "up" | "down" | "left" | "right") {
     if (!selectedCell) return;
@@ -89,12 +115,14 @@ export const GridRow = React.memo(function GridRow({ row, rowIdx, style }: GridR
             isEditing={isEditing}
             editValue={isEditing ? editValue : ""}
             rowIdx={rowIdx}
+            rowId={row._id}
             onSelect={() => selectCell({ rowIdx, colKey: col.key })}
             onStartEdit={() => startEditing({ rowIdx, colKey: col.key })}
             onEditChange={setEditValue}
-            onCommit={commitEdit}
+            onCommit={handleCommitWithAutoBlock}
             onCancel={cancelEdit}
             onNavigate={handleNavigate}
+            onFieldWire={handleFieldWire}
             isDirty={cellDirty}
           />
         );

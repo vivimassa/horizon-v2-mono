@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState, useMemo, useCallback } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ScheduledFlightRef } from "@skyhub/api";
 import { useScheduleGridStore } from "@/stores/use-schedule-grid-store";
@@ -8,6 +8,7 @@ import { GridHeader } from "./grid-header";
 import { GridRow } from "./grid-row";
 import { ROW_HEIGHT, TOTAL_WIDTH } from "./grid-columns";
 import { useGridKeyboard } from "./use-grid-keyboard";
+import { useGridSortStore, sortRows } from "./use-grid-sort";
 
 interface ScheduleGridProps {
   rows: ScheduledFlightRef[];
@@ -22,10 +23,49 @@ export function ScheduleGrid({ rows, onSave, onAddFlight, onDeleteFlight }: Sche
   const newRows = useScheduleGridStore((s) => s.newRows);
   const handleKeyDown = useGridKeyboard({ onSave, onAddFlight, onDeleteFlight });
 
-  const allRows = [...rows, ...newRows];
+  // Sorting
+  const sortKey = useGridSortStore((s) => s.sortKey);
+  const sortDir = useGridSortStore((s) => s.sortDir);
+
+  // Column filters
+  const [columnFilters, setColumnFilters] = useState<Map<string, Set<string>>>(new Map());
+
+  const handleApplyFilter = useCallback((colKey: string, values: Set<string>) => {
+    setColumnFilters((prev) => {
+      const next = new Map(prev);
+      // If all values selected, remove the filter
+      const allValues = new Set<string>();
+      for (const row of rows) {
+        const v = (row as any)[colKey];
+        if (v != null && v !== "") allValues.add(String(v));
+      }
+      if (values.size >= allValues.size) {
+        next.delete(colKey);
+      } else {
+        next.set(colKey, values);
+      }
+      return next;
+    });
+  }, [rows]);
+
+  // Apply filters then sort
+  const processedRows = useMemo(() => {
+    let result = [...rows, ...newRows];
+
+    // Apply column filters
+    for (const [colKey, allowedValues] of columnFilters) {
+      result = result.filter((row) => {
+        const v = (row as any)[colKey];
+        return v != null && allowedValues.has(String(v));
+      });
+    }
+
+    // Apply sort
+    return sortRows(result, sortKey, sortDir);
+  }, [rows, newRows, columnFilters, sortKey, sortDir]);
 
   const virtualizer = useVirtualizer({
-    count: allRows.length,
+    count: processedRows.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => ROW_HEIGHT,
     overscan: 30,
@@ -47,8 +87,13 @@ export function ScheduleGrid({ rows, onSave, onAddFlight, onDeleteFlight }: Sche
       style={{ contain: "strict" }}
     >
       <div style={{ minWidth: TOTAL_WIDTH + 40 }}>
-        {/* Frozen header */}
-        <GridHeader scrollLeft={0} />
+        {/* Frozen header with sort + filter */}
+        <GridHeader
+          scrollLeft={0}
+          rows={rows}
+          columnFilters={columnFilters}
+          onApplyFilter={handleApplyFilter}
+        />
 
         {/* Virtualized body */}
         <div
@@ -59,7 +104,7 @@ export function ScheduleGrid({ rows, onSave, onAddFlight, onDeleteFlight }: Sche
           }}
         >
           {virtualizer.getVirtualItems().map((vRow) => {
-            const row = allRows[vRow.index];
+            const row = processedRows[vRow.index];
             if (!row) return null;
             return (
               <GridRow

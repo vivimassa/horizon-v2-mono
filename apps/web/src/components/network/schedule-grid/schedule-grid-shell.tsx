@@ -7,6 +7,8 @@ import { useScheduleRefStore } from "@/stores/use-schedule-ref-store";
 import { ScheduleGrid } from "./schedule-grid";
 import { FloatingSaveBar } from "./floating-save-bar";
 import { RibbonToolbar } from "./ribbon/ribbon-toolbar";
+import { FilterPanel, type FilterParams } from "./filter-panel";
+import { FindReplaceDialog } from "./find-replace-dialog";
 import { Plus, RefreshCw } from "lucide-react";
 
 setApiBaseUrl("http://localhost:3002");
@@ -27,6 +29,8 @@ export function ScheduleGridShell() {
   const addNewRow = useScheduleGridStore((s) => s.addNewRow);
   const clearNewRows = useScheduleGridStore((s) => s.clearNewRows);
   const selectedCell = useScheduleGridStore((s) => s.selectedCell);
+  const [showFind, setShowFind] = useState(false);
+  const [showReplace, setShowReplace] = useState(false);
 
   const fetchFlights = useCallback(async () => {
     setLoading(true);
@@ -114,7 +118,29 @@ export function ScheduleGridShell() {
   }, [seasonCode, addNewRow]);
 
   return (
-    <div className="flex flex-col h-full overflow-hidden px-4 pt-3 pb-4 gap-3">
+    <div className="flex h-full overflow-hidden">
+      {/* Left filter panel */}
+      <FilterPanel
+        seasonCode={seasonCode}
+        onSeasonChange={setSeasonCode}
+        onApplyFilters={(filters) => {
+          setSeasonCode(filters.seasonCode);
+          fetchFlights();
+        }}
+      />
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col overflow-hidden px-4 pt-3 pb-4 gap-3 relative">
+
+      {/* Find/Replace dialog */}
+      {(showFind || showReplace) && (
+        <FindReplaceDialog
+          rows={[...rows, ...newRows]}
+          onClose={() => { setShowFind(false); setShowReplace(false); }}
+          showReplace={showReplace}
+        />
+      )}
+
       {/* Top bar — season selector + actions */}
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
@@ -194,6 +220,7 @@ export function ScheduleGridShell() {
         onSave={handleSave}
         onDiscard={handleDiscard}
       />
+    </div>
     </div>
   );
 }

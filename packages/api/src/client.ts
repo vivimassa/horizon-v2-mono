@@ -1058,6 +1058,40 @@ export const api = {
   deleteScheduledFlightsBulk: (ids: string[]) =>
     request<{ deletedCount: number }>('/scheduled-flights/bulk', { method: 'DELETE', body: JSON.stringify({ ids }) }),
 
+  // ─── Scenarios ──────────────────────────────────────────
+  getScenarios: (params: { operatorId?: string; seasonCode?: string } = {}) => {
+    const p = new URLSearchParams()
+    if (params.operatorId) p.set('operatorId', params.operatorId)
+    if (params.seasonCode) p.set('seasonCode', params.seasonCode)
+    return request<ScenarioRef[]>(`/scenarios?${p.toString()}`)
+  },
+
+  createScenario: (data: Partial<ScenarioRef>) =>
+    request<ScenarioRef>('/scenarios', { method: 'POST', body: JSON.stringify(data) }),
+
+  cloneScenario: (id: string, name: string, createdBy: string) =>
+    request<{ id: string; flightCount: number }>(`/scenarios/${id}/clone`, { method: 'POST', body: JSON.stringify({ name, createdBy }) }),
+
+  updateScenario: (id: string, data: Partial<ScenarioRef>) =>
+    request<ScenarioRef>(`/scenarios/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  publishScenario: (id: string, publishedBy?: string) =>
+    request<{ scenario: ScenarioRef; activatedFlights: number }>(`/scenarios/${id}/publish`, { method: 'POST', body: JSON.stringify({ publishedBy }) }),
+
+  deleteScenario: (id: string) =>
+    request<{ success: boolean }>(`/scenarios/${id}`, { method: 'DELETE' }),
+
+  // ─── SSIM Import/Export ────────────────────────────────
+  exportSsim: (params: { operatorId: string; seasonCode: string; scenarioId?: string }) => {
+    const p = new URLSearchParams({ operatorId: params.operatorId, seasonCode: params.seasonCode })
+    if (params.scenarioId) p.set('scenarioId', params.scenarioId)
+    return fetch(`${getApiBaseUrl()}/ssim/export?${p.toString()}`).then(r => r.blob())
+  },
+
+  // ─── Schedule Messages ────────────────────────────────
+  generateScheduleMessages: (params: { operatorId: string; seasonCode: string; baseScenarioId?: string; targetScenarioId?: string }) =>
+    request<{ messages: any[]; baseCount: number; targetCount: number }>('/schedule-messages/generate', { method: 'POST', body: JSON.stringify(params) }),
+
   // ─── FDTL ───────────────────────────────────────────────
   getFdtlFrameworks: () =>
     request<FdtlFrameworkRef[]>('/fdtl/frameworks'),

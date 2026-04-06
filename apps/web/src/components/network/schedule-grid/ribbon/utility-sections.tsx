@@ -5,18 +5,23 @@ import { RibbonButton } from "./ribbon-button";
 
 interface Props {
   onSave: () => void;
+  onImport?: () => void;
+  onExport?: () => void;
+  onScenario?: () => void;
+  onMessage?: () => void;
+  onFind?: () => void;
   hasDirty: boolean;
   saving: boolean;
 }
 
-export function UtilitySections({ onSave, hasDirty, saving }: Props) {
+export function UtilitySections({ onSave, onImport, onExport, onScenario, onMessage, onFind, hasDirty, saving }: Props) {
   return (
     <>
-      {/* Sort & Filter */}
+      {/* Sort & Filter + Find */}
       <div className="flex flex-col items-center px-2 py-1.5 gap-0.5">
         <div className="flex items-center gap-0.5">
           <RibbonButton icon={ArrowUpDown} label="Sort" small />
-          <RibbonButton icon={Search} label="Find" shortcut="Ctrl+F" small />
+          <RibbonButton icon={Search} label="Find" shortcut="Ctrl+F" onClick={onFind} small />
         </div>
         <span className="text-[10px] text-hz-text-tertiary font-medium">Editing</span>
       </div>
@@ -26,8 +31,8 @@ export function UtilitySections({ onSave, hasDirty, saving }: Props) {
       {/* Import & Export */}
       <div className="flex flex-col items-center px-2 py-1.5 gap-0.5">
         <div className="flex items-center gap-0.5">
-          <RibbonButton icon={Upload} label="Upload" small />
-          <RibbonButton icon={Download} label="Download" small />
+          <RibbonButton icon={Upload} label="Upload" onClick={onImport} small />
+          <RibbonButton icon={Download} label="Download" onClick={onExport} small />
         </div>
         <span className="text-[10px] text-hz-text-tertiary font-medium">Import</span>
       </div>
@@ -37,14 +42,7 @@ export function UtilitySections({ onSave, hasDirty, saving }: Props) {
       {/* Record */}
       <div className="flex flex-col items-center px-2 py-1.5 gap-0.5">
         <div className="flex items-center gap-0.5">
-          <RibbonButton
-            icon={Save}
-            label="Save"
-            onClick={onSave}
-            disabled={!hasDirty || saving}
-            shortcut="Ctrl+S"
-            small
-          />
+          <RibbonButton icon={Save} label="Save" onClick={onSave} disabled={!hasDirty || saving} shortcut="Ctrl+S" small />
           <RibbonButton icon={SaveAll} label="Save As" shortcut="F12" small />
         </div>
         <span className="text-[10px] text-hz-text-tertiary font-medium">Record</span>
@@ -55,7 +53,7 @@ export function UtilitySections({ onSave, hasDirty, saving }: Props) {
       {/* Scenario */}
       <div className="flex flex-col items-center px-2 py-1.5 gap-0.5">
         <div className="flex items-center gap-0.5">
-          <RibbonButton icon={GitBranch} label="Scenario" small />
+          <RibbonButton icon={GitBranch} label="Scenario" onClick={onScenario} small />
         </div>
         <span className="text-[10px] text-hz-text-tertiary font-medium">Scenario</span>
       </div>
@@ -65,7 +63,7 @@ export function UtilitySections({ onSave, hasDirty, saving }: Props) {
       {/* Message */}
       <div className="flex flex-col items-center px-2 py-1.5 gap-0.5">
         <div className="flex items-center gap-0.5">
-          <RibbonButton icon={MessageSquare} label="ASM" small />
+          <RibbonButton icon={MessageSquare} label="ASM" onClick={onMessage} small />
         </div>
         <span className="text-[10px] text-hz-text-tertiary font-medium">Message</span>
       </div>

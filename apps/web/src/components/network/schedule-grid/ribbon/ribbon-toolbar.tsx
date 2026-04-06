@@ -10,39 +10,41 @@ interface RibbonToolbarProps {
   onAddFlight: () => void;
   onDeleteFlight: () => void;
   onSave: () => void;
+  onImport?: () => void;
+  onExport?: () => void;
+  onScenario?: () => void;
+  onMessage?: () => void;
+  onFind?: () => void;
   hasDirty: boolean;
   hasSelection: boolean;
   saving: boolean;
 }
 
 export function RibbonToolbar({
-  onAddFlight,
-  onDeleteFlight,
-  onSave,
-  hasDirty,
-  hasSelection,
-  saving,
+  onAddFlight, onDeleteFlight, onSave,
+  onImport, onExport, onScenario, onMessage, onFind,
+  hasDirty, hasSelection, saving,
 }: RibbonToolbarProps) {
   return (
     <div className="flex items-stretch gap-0 border border-hz-border rounded-xl bg-hz-card overflow-hidden shrink-0">
-      {/* Flight */}
       <FlightSection onAdd={onAddFlight} onRemove={onDeleteFlight} hasSelection={hasSelection} />
       <Divider />
-
-      {/* Clipboard */}
       <ClipboardSection hasSelection={hasSelection} />
       <Divider />
-
-      {/* Font & Alignment */}
       <FontSection hasSelection={hasSelection} />
       <Divider />
-
-      {/* Cells */}
       <CellsSection onInsert={onAddFlight} onDelete={onDeleteFlight} hasSelection={hasSelection} />
       <Divider />
-
-      {/* Utility sections */}
-      <UtilitySections onSave={onSave} hasDirty={hasDirty} saving={saving} />
+      <UtilitySections
+        onSave={onSave}
+        onImport={onImport}
+        onExport={onExport}
+        onScenario={onScenario}
+        onMessage={onMessage}
+        onFind={onFind}
+        hasDirty={hasDirty}
+        saving={saving}
+      />
     </div>
   );
 }

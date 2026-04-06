@@ -9,6 +9,10 @@ import { FloatingSaveBar } from "./floating-save-bar";
 import { RibbonToolbar } from "./ribbon/ribbon-toolbar";
 import { FilterPanel, type FilterParams } from "./filter-panel";
 import { FindReplaceDialog } from "./find-replace-dialog";
+import { ImportDialog } from "./import-dialog";
+import { ExportDialog } from "./export-dialog";
+import { ScenarioPanel } from "./scenario-panel";
+import { MessageDialog } from "./message-dialog";
 import { Plus, RefreshCw } from "lucide-react";
 
 setApiBaseUrl("http://localhost:3002");
@@ -31,6 +35,11 @@ export function ScheduleGridShell() {
   const selectedCell = useScheduleGridStore((s) => s.selectedCell);
   const [showFind, setShowFind] = useState(false);
   const [showReplace, setShowReplace] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [showScenarios, setShowScenarios] = useState(false);
+  const [showMessages, setShowMessages] = useState(false);
+  const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
 
   const fetchFlights = useCallback(async () => {
     setLoading(true);
@@ -141,6 +150,26 @@ export function ScheduleGridShell() {
         />
       )}
 
+      {/* Import dialog */}
+      {showImport && (
+        <ImportDialog seasonCode={seasonCode} scenarioId={activeScenarioId ?? undefined} onClose={() => setShowImport(false)} onImported={fetchFlights} />
+      )}
+
+      {/* Export dialog */}
+      {showExport && (
+        <ExportDialog seasonCode={seasonCode} scenarioId={activeScenarioId ?? undefined} flightCount={rows.length} onClose={() => setShowExport(false)} />
+      )}
+
+      {/* Scenario panel */}
+      {showScenarios && (
+        <ScenarioPanel seasonCode={seasonCode} activeScenarioId={activeScenarioId} onSelectScenario={setActiveScenarioId} onClose={() => setShowScenarios(false)} />
+      )}
+
+      {/* Message dialog */}
+      {showMessages && (
+        <MessageDialog seasonCode={seasonCode} targetScenarioId={activeScenarioId ?? undefined} onClose={() => setShowMessages(false)} />
+      )}
+
       {/* Top bar — season selector + actions */}
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
@@ -193,6 +222,11 @@ export function ScheduleGridShell() {
           if (row) api.deleteScheduledFlight(row._id).then(fetchFlights).catch(console.error);
         }}
         onSave={handleSave}
+        onImport={() => setShowImport(true)}
+        onExport={() => setShowExport(true)}
+        onScenario={() => setShowScenarios(true)}
+        onMessage={() => setShowMessages(true)}
+        onFind={() => setShowFind(true)}
         hasDirty={dirtyMap.size > 0 || newRows.length > 0}
         hasSelection={selectedCell !== null}
         saving={saving}

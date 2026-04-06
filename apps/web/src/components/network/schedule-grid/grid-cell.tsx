@@ -5,6 +5,8 @@ import type { GridColumn } from "./grid-columns";
 import type { CellFormat } from "./types";
 import { useScheduleRefStore } from "@/stores/use-schedule-ref-store";
 import { useScheduleGridStore } from "@/stores/use-schedule-grid-store";
+import { getConditionalFormat } from "./conditional-format-rules";
+import type { ScheduledFlightRef } from "@skyhub/api";
 
 interface GridCellProps {
   column: GridColumn;
@@ -14,6 +16,8 @@ interface GridCellProps {
   editValue: string;
   rowIdx: number;
   rowId: string;
+  row: ScheduledFlightRef;
+  onContextMenu?: (e: React.MouseEvent) => void;
   onSelect: () => void;
   onStartEdit: () => void;
   onEditChange: (value: string) => void;
@@ -31,6 +35,8 @@ export const GridCell = React.memo(function GridCell({
   isEditing,
   editValue,
   rowId,
+  row,
+  onContextMenu,
   onSelect,
   onStartEdit,
   onEditChange,
@@ -47,6 +53,7 @@ export const GridCell = React.memo(function GridCell({
   const svcOptions = useScheduleRefStore((s) => s.getSvcOptions);
   const getCellFormat = useScheduleGridStore((s) => s.getCellFormat);
   const fmt: CellFormat | undefined = getCellFormat(rowId, column.key);
+  const condFmt = getConditionalFormat(row, column.key);
 
   useEffect(() => {
     if (isEditing) {
@@ -169,14 +176,15 @@ export const GridCell = React.memo(function GridCell({
       style={cellStyle}
       onClick={onSelect}
       onDoubleClick={() => column.editable && onStartEdit()}
+      onContextMenu={onContextMenu}
     >
       <span
         className="w-full truncate"
         style={{
-          color: fmt?.textColor ?? (column.key === "flightNumber" ? "#E63535" : statusColor),
-          fontWeight: fmt?.bold ? 700 : (column.key === "flightNumber" || statusColor ? 600 : undefined),
-          fontStyle: fmt?.italic ? "italic" : undefined,
-          textDecoration: fmt?.underline ? "underline" : undefined,
+          color: fmt?.textColor ?? condFmt?.textColor ?? (column.key === "flightNumber" ? "#E63535" : statusColor),
+          fontWeight: fmt?.bold || condFmt?.bold ? 700 : (column.key === "flightNumber" || statusColor ? 600 : undefined),
+          fontStyle: fmt?.italic || condFmt?.italic ? "italic" : undefined,
+          textDecoration: fmt?.underline || condFmt?.underline ? "underline" : undefined,
           fontFamily: fmt?.fontFamily ? (fmt.fontFamily === "Mono" ? cellStyle.fontFamily : fmt.fontFamily) : undefined,
           fontSize: fmt?.fontSize ? `${fmt.fontSize}px` : undefined,
           textTransform: column.key === "status" ? "capitalize" : undefined,

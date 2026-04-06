@@ -116,6 +116,11 @@ export const GridRow = React.memo(function GridRow({ row, rowIdx, style }: GridR
             editValue={isEditing ? editValue : ""}
             rowIdx={rowIdx}
             rowId={row._id}
+            row={row}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              // Context menu handled at shell level
+            }}
             onSelect={() => selectCell({ rowIdx, colKey: col.key })}
             onStartEdit={() => startEditing({ rowIdx, colKey: col.key })}
             onEditChange={setEditValue}

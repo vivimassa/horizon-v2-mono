@@ -127,7 +127,7 @@ export function ScheduleGridShell() {
   }, [seasonCode, addNewRow]);
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden gap-3 p-3">
       {/* Left filter panel */}
       <FilterPanel
         seasonCode={seasonCode}
@@ -136,10 +136,11 @@ export function ScheduleGridShell() {
           setSeasonCode(filters.seasonCode);
           fetchFlights();
         }}
+        loading={loading}
       />
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden px-4 pt-3 pb-4 gap-3 relative">
+      <div className="flex-1 flex flex-col overflow-hidden gap-3 min-w-0 relative">
 
       {/* Find/Replace dialog */}
       {(showFind || showReplace) && (
@@ -170,48 +171,6 @@ export function ScheduleGridShell() {
         <MessageDialog seasonCode={seasonCode} targetScenarioId={activeScenarioId ?? undefined} onClose={() => setShowMessages(false)} />
       )}
 
-      {/* Top bar — season selector + actions */}
-      <div className="flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <h1 className="text-[16px] font-bold">Network Scheduling XL</h1>
-          <div className="flex items-center gap-1.5">
-            <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Season</label>
-            <select
-              value={seasonCode}
-              onChange={(e) => setSeasonCode(e.target.value)}
-              className="px-2 py-1 rounded-lg text-[13px] font-medium border border-hz-border bg-hz-bg text-hz-text outline-none focus:ring-2 focus:ring-module-accent/30"
-            >
-              <option value="S25">S25</option>
-              <option value="W25">W25</option>
-              <option value="S26">S26</option>
-              <option value="W26">W26</option>
-            </select>
-          </div>
-          <span className="text-[13px] text-hz-text-tertiary">
-            {loading ? "Loading..." : `${rows.length} flights`}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={fetchFlights}
-            disabled={loading}
-            className="p-2 rounded-lg text-hz-text-secondary hover:bg-hz-border/30 transition-colors"
-            title="Refresh"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          </button>
-          <button
-            onClick={handleAddFlight}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-white bg-module-accent hover:opacity-90 transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add Flight
-          </button>
-        </div>
-      </div>
-
-      {/* Grid */}
       {/* Ribbon toolbar */}
       <RibbonToolbar
         onAddFlight={handleAddFlight}

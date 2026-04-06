@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useCallback } from "react";
+import { ChevronLeft, ChevronRight, Filter, Search, Loader2, CalendarDays, Plane, MapPin } from "lucide-react";
+import { useTheme } from "@/components/theme-provider";
 
 interface FilterPanelProps {
   seasonCode: string;
   onSeasonChange: (code: string) => void;
   onApplyFilters: (filters: FilterParams) => void;
+  loading?: boolean;
 }
 
 export interface FilterParams {
@@ -19,7 +21,16 @@ export interface FilterParams {
   status: string;
 }
 
-export function FilterPanel({ seasonCode, onSeasonChange, onApplyFilters }: FilterPanelProps) {
+const SEASONS = ["S25", "W25", "S26", "W26", "S27", "W27"];
+const STATUSES = [
+  { value: "", label: "All Statuses" },
+  { value: "draft", label: "Draft" },
+  { value: "active", label: "Active" },
+  { value: "suspended", label: "Suspended" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+export function FilterPanel({ seasonCode, onSeasonChange, onApplyFilters, loading }: FilterPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -27,103 +38,203 @@ export function FilterPanel({ seasonCode, onSeasonChange, onApplyFilters }: Filt
   const [arrStation, setArrStation] = useState("");
   const [aircraftType, setAircraftType] = useState("");
   const [status, setStatus] = useState("");
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
 
-  const inputClass = "w-full px-2 py-1.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-1 focus:ring-module-accent/30 focus:border-module-accent text-hz-text transition-colors";
+  const glassBg = isDark ? "rgba(25,25,33,0.85)" : "rgba(255,255,255,0.85)";
+  const glassBorder = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)";
+  const sectionBorder = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)";
 
-  const handleGo = () => {
+  const handleGo = useCallback(() => {
     onApplyFilters({ seasonCode, dateFrom, dateTo, depStation, arrStation, aircraftType, status });
-  };
+  }, [seasonCode, dateFrom, dateTo, depStation, arrStation, aircraftType, status, onApplyFilters]);
 
+  const activeCount = [dateFrom, dateTo, depStation, arrStation, aircraftType, status].filter(Boolean).length;
+
+  // ── Collapsed state ──
   if (collapsed) {
     return (
-      <div className="flex flex-col items-center py-4">
-        <button onClick={() => setCollapsed(false)} className="p-1.5 rounded-lg hover:bg-hz-border/30 transition-colors" title="Expand filters">
-          <ChevronRight size={14} className="text-hz-text-secondary" />
+      <div
+        className="shrink-0 flex flex-col items-center rounded-2xl overflow-hidden"
+        style={{ width: 44, background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: "blur(20px)" }}
+      >
+        <button
+          onClick={() => setCollapsed(false)}
+          className="h-12 w-full flex items-center justify-center hover:bg-hz-border/20 transition-colors"
+        >
+          <ChevronRight size={16} className="text-hz-text-secondary" />
         </button>
-        <div className="mt-2 -rotate-90 whitespace-nowrap text-[11px] font-medium text-hz-text-tertiary uppercase tracking-wider">
-          Filters
+        <div
+          className="flex-1 flex items-center justify-center"
+          style={{ writingMode: "vertical-lr", transform: "rotate(180deg)" }}
+        >
+          <span className="text-[12px] font-semibold uppercase tracking-wider text-hz-text-tertiary whitespace-nowrap">
+            Filters
+          </span>
         </div>
       </div>
     );
   }
 
+  // ── Expanded state ──
   return (
-    <div className="w-56 shrink-0 border-r border-hz-border bg-hz-card flex flex-col overflow-hidden">
+    <div
+      className="shrink-0 flex flex-col rounded-2xl overflow-hidden"
+      style={{ width: 300, background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: "blur(20px)" }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-hz-border">
-        <div className="flex items-center gap-1.5">
-          <Filter size={13} className="text-module-accent" />
-          <span className="text-[13px] font-semibold">Filters</span>
+      <div
+        className="flex items-center justify-between px-5 shrink-0"
+        style={{ minHeight: 48, borderBottom: `1px solid ${sectionBorder}` }}
+      >
+        <div className="flex items-center gap-2">
+          <Filter size={14} className="text-module-accent" />
+          <span className="text-[15px] font-bold">Filters</span>
+          {activeCount > 0 && (
+            <span className="px-2 py-0.5 rounded-full bg-module-accent text-white text-[11px] font-bold">{activeCount}</span>
+          )}
         </div>
-        <button onClick={() => setCollapsed(true)} className="p-1 rounded hover:bg-hz-border/30 transition-colors">
-          <ChevronLeft size={13} className="text-hz-text-tertiary" />
+        <button onClick={() => setCollapsed(true)} className="p-1 rounded-md hover:bg-hz-border/30 transition-colors">
+          <ChevronLeft size={16} className="text-hz-text-tertiary" />
         </button>
       </div>
 
-      {/* Filter fields */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
-        {/* Season */}
-        <div>
-          <label className="text-[11px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1 block">Season</label>
-          <select value={seasonCode} onChange={(e) => onSeasonChange(e.target.value)} className={inputClass}>
-            <option value="S25">S25</option>
-            <option value="W25">W25</option>
-            <option value="S26">S26</option>
-            <option value="W26">W26</option>
-          </select>
-        </div>
+      {/* Body */}
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
 
-        {/* Date range */}
-        <div>
-          <label className="text-[11px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1 block">From</label>
-          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={inputClass} />
-        </div>
-        <div>
-          <label className="text-[11px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1 block">To</label>
-          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={inputClass} />
-        </div>
+        {/* Season */}
+        <FilterSection label="Season">
+          <FilterSelect
+            value={seasonCode}
+            options={SEASONS.map(s => ({ value: s, label: s }))}
+            onChange={onSeasonChange}
+            isDark={isDark}
+          />
+        </FilterSection>
+
+        {/* Date Range */}
+        <FilterSection label="Period">
+          <div className="grid grid-cols-2 gap-1.5">
+            <DateInput label="From" value={dateFrom} onChange={setDateFrom} isDark={isDark} />
+            <DateInput label="To" value={dateTo} onChange={setDateTo} isDark={isDark} />
+          </div>
+        </FilterSection>
 
         {/* Departure */}
-        <div>
-          <label className="text-[11px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1 block">Departure</label>
-          <input type="text" value={depStation} onChange={(e) => setDepStation(e.target.value.toUpperCase())} placeholder="ICAO/IATA" maxLength={4} className={inputClass} />
-        </div>
+        <FilterSection label="Departure">
+          <StationInput value={depStation} onChange={setDepStation} placeholder="ICAO code" isDark={isDark} />
+        </FilterSection>
 
         {/* Arrival */}
-        <div>
-          <label className="text-[11px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1 block">Arrival</label>
-          <input type="text" value={arrStation} onChange={(e) => setArrStation(e.target.value.toUpperCase())} placeholder="ICAO/IATA" maxLength={4} className={inputClass} />
-        </div>
+        <FilterSection label="Arrival">
+          <StationInput value={arrStation} onChange={setArrStation} placeholder="ICAO code" isDark={isDark} />
+        </FilterSection>
 
-        {/* Aircraft Type */}
-        <div>
-          <label className="text-[11px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1 block">AC Type</label>
-          <input type="text" value={aircraftType} onChange={(e) => setAircraftType(e.target.value.toUpperCase())} placeholder="e.g. A321" maxLength={4} className={inputClass} />
-        </div>
+        {/* AC Type */}
+        <FilterSection label="AC Type">
+          <StationInput value={aircraftType} onChange={setAircraftType} placeholder="e.g. A321" isDark={isDark} />
+        </FilterSection>
 
         {/* Status */}
-        <div>
-          <label className="text-[11px] text-hz-text-secondary uppercase tracking-wider font-medium mb-1 block">Status</label>
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass}>
-            <option value="">All</option>
-            <option value="draft">Draft</option>
-            <option value="active">Active</option>
-            <option value="suspended">Suspended</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-        </div>
+        <FilterSection label="Status">
+          <FilterSelect
+            value={status}
+            options={STATUSES}
+            onChange={setStatus}
+            isDark={isDark}
+          />
+        </FilterSection>
       </div>
 
-      {/* Go button */}
-      <div className="px-3 py-3 border-t border-hz-border">
+      {/* Go Button */}
+      <div className="px-5 py-4 shrink-0" style={{ borderTop: `1px solid ${sectionBorder}` }}>
         <button
           onClick={handleGo}
-          className="w-full py-2 rounded-lg text-[13px] font-semibold text-white bg-module-accent hover:opacity-90 transition-colors"
+          disabled={loading}
+          className="w-full h-9 flex items-center justify-center gap-2 rounded-xl text-[13px] font-semibold text-white bg-module-accent hover:opacity-90 transition-opacity disabled:opacity-50"
         >
-          <Search size={13} className="inline mr-1.5 -mt-0.5" />
-          Go
+          {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+          {loading ? "Loading..." : "Go"}
         </button>
       </div>
     </div>
+  );
+}
+
+/* ── Sub-components ── */
+
+function FilterSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <label className="text-[12px] font-semibold uppercase tracking-wider text-hz-text-tertiary block">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function FilterSelect({ value, options, onChange, isDark }: {
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+  isDark: boolean;
+}) {
+  const bg = isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.7)";
+  const border = isDark ? "rgba(255,255,255,0.20)" : "rgba(0,0,0,0.20)";
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full px-2.5 py-2 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text transition-colors"
+      style={{ background: bg, border: `1px solid ${border}`, minHeight: 36 }}
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>{o.label}</option>
+      ))}
+    </select>
+  );
+}
+
+function DateInput({ label, value, onChange, isDark }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  isDark: boolean;
+}) {
+  const bg = isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.7)";
+  const border = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)";
+  const activeBorder = value ? "rgba(62,123,250,0.40)" : border;
+  const activeBg = value ? (isDark ? "rgba(62,123,250,0.10)" : "rgba(62,123,250,0.05)") : bg;
+  return (
+    <div>
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={label}
+        className="w-full px-2 py-1.5 rounded-lg text-[12px] font-mono font-medium text-center outline-none focus:ring-1 focus:ring-module-accent/20 text-hz-text transition-all"
+        style={{ background: activeBg, border: `1px solid ${activeBorder}` }}
+      />
+    </div>
+  );
+}
+
+function StationInput({ value, onChange, placeholder, isDark }: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  isDark: boolean;
+}) {
+  const bg = isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.7)";
+  const border = isDark ? "rgba(255,255,255,0.20)" : "rgba(0,0,0,0.20)";
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value.toUpperCase())}
+      placeholder={placeholder}
+      maxLength={4}
+      className="w-full px-2.5 py-2 rounded-xl text-[13px] font-mono outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text transition-colors placeholder:text-hz-text-tertiary"
+      style={{ background: bg, border: `1px solid ${border}`, minHeight: 36 }}
+    />
   );
 }

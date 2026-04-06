@@ -1,5 +1,6 @@
 "use client";
 
+import { useTheme } from "@/components/theme-provider";
 import { FlightSection } from "./flight-section";
 import { ClipboardSection } from "./clipboard-section";
 import { FontSection } from "./font-section";
@@ -25,30 +26,38 @@ export function RibbonToolbar({
   onImport, onExport, onScenario, onMessage, onFind,
   hasDirty, hasSelection, saving,
 }: RibbonToolbarProps) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const glassBg = isDark ? "rgba(25,25,33,0.85)" : "rgba(255,255,255,0.85)";
+  const glassBorder = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)";
+
   return (
-    <div className="flex items-stretch gap-0 border border-hz-border rounded-xl bg-hz-card overflow-hidden shrink-0">
+    <div
+      className="flex items-center gap-2.5 px-3 py-2 rounded-2xl shrink-0 overflow-x-auto"
+      style={{ background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: "blur(20px)", minHeight: 68 }}
+    >
       <FlightSection onAdd={onAddFlight} onRemove={onDeleteFlight} hasSelection={hasSelection} />
-      <Divider />
+      <Divider isDark={isDark} />
       <ClipboardSection hasSelection={hasSelection} />
-      <Divider />
+      <Divider isDark={isDark} />
       <FontSection hasSelection={hasSelection} />
-      <Divider />
+      <Divider isDark={isDark} />
       <CellsSection onInsert={onAddFlight} onDelete={onDeleteFlight} hasSelection={hasSelection} />
-      <Divider />
+      <Divider isDark={isDark} />
       <UtilitySections
-        onSave={onSave}
-        onImport={onImport}
-        onExport={onExport}
-        onScenario={onScenario}
-        onMessage={onMessage}
-        onFind={onFind}
-        hasDirty={hasDirty}
-        saving={saving}
+        onSave={onSave} onImport={onImport} onExport={onExport}
+        onScenario={onScenario} onMessage={onMessage} onFind={onFind}
+        hasDirty={hasDirty} saving={saving}
       />
     </div>
   );
 }
 
-function Divider() {
-  return <div className="w-px bg-hz-border/50 self-stretch" />;
+function Divider({ isDark }: { isDark: boolean }) {
+  return (
+    <div
+      className="self-stretch mx-1 my-1 shrink-0"
+      style={{ width: 1, background: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)" }}
+    />
+  );
 }

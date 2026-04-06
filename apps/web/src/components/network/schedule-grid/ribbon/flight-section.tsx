@@ -11,12 +11,20 @@ interface Props {
 
 export function FlightSection({ onAdd, onRemove, hasSelection }: Props) {
   return (
-    <div className="flex flex-col items-center px-3 py-1.5 gap-0.5">
-      <div className="flex items-center gap-1">
-        <RibbonButton icon={PlaneTakeoff} label="Add" onClick={onAdd} shortcut="Ctrl+N" />
-        <RibbonButton icon={Trash2} label="Remove" onClick={onRemove} disabled={!hasSelection} shortcut="Ctrl+Del" />
+    <RibbonSection label="Flight">
+      <RibbonButton icon={PlaneTakeoff} label="Add" onClick={onAdd} shortcut="Ctrl+N" />
+      <RibbonButton icon={Trash2} label="Remove" onClick={onRemove} disabled={!hasSelection} shortcut="Ctrl+Del" />
+    </RibbonSection>
+  );
+}
+
+export function RibbonSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="relative flex flex-col items-center">
+      <div className="flex items-center gap-0.5">
+        {children}
       </div>
-      <span className="text-[10px] text-hz-text-tertiary font-medium">Flight</span>
+      <span className="text-[10px] text-hz-text-tertiary/50 font-medium mt-0.5 leading-none">{label}</span>
     </div>
   );
 }

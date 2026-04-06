@@ -1,6 +1,7 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
+import { useTheme } from "@/components/theme-provider";
 
 interface RibbonButtonProps {
   icon: LucideIcon;
@@ -9,27 +10,57 @@ interface RibbonButtonProps {
   disabled?: boolean;
   active?: boolean;
   shortcut?: string;
+  /** Small = 32x32 icon-only. Large (default) = 58x52 icon+label */
   small?: boolean;
 }
 
 export function RibbonButton({ icon: Icon, label, onClick, disabled, active, shortcut, small }: RibbonButtonProps) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+
+  const hoverBg = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)";
+  const activeBg = isDark ? "rgba(62,123,250,0.20)" : "rgba(30,64,175,0.12)";
+
+  if (small) {
+    return (
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        title={shortcut ? `${label} (${shortcut})` : label}
+        className={`flex items-center justify-center rounded transition-all duration-150 ${
+          disabled ? "opacity-30 pointer-events-none" : ""
+        }`}
+        style={{
+          width: 32, height: 32,
+          background: active ? activeBg : undefined,
+          color: active ? (isDark ? "#5B8DEF" : "#1e40af") : undefined,
+        }}
+        onMouseEnter={(e) => { if (!active && !disabled) e.currentTarget.style.background = hoverBg; }}
+        onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = active ? activeBg : "transparent"; }}
+      >
+        <Icon size={16} strokeWidth={1.8} />
+      </button>
+    );
+  }
+
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       title={shortcut ? `${label} (${shortcut})` : label}
-      className={`flex flex-col items-center justify-center rounded-lg transition-all duration-100 select-none ${
-        small ? "w-8 h-8" : "w-12 h-12"
-      } ${
-        active
-          ? "bg-module-accent/15 text-module-accent"
-          : disabled
-            ? "text-hz-text-tertiary/40 cursor-not-allowed"
-            : "text-hz-text-secondary hover:bg-hz-border/30 hover:text-hz-text active:scale-95"
+      className={`flex flex-col items-center justify-center gap-1 rounded-lg transition-all duration-150 ${
+        disabled ? "opacity-30 pointer-events-none" : ""
       }`}
+      style={{
+        width: 58, height: 52,
+        background: active ? activeBg : undefined,
+        color: active ? (isDark ? "#5B8DEF" : "#1e40af") : undefined,
+      }}
+      onMouseEnter={(e) => { if (!active && !disabled) e.currentTarget.style.background = hoverBg; }}
+      onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = active ? activeBg : "transparent"; }}
     >
-      <Icon size={small ? 14 : 16} strokeWidth={1.8} />
-      {!small && <span className="text-[10px] font-medium mt-0.5 leading-none">{label}</span>}
+      <Icon size={18} strokeWidth={1.8} />
+      <span className="text-[10px] font-medium leading-none">{label}</span>
     </button>
   );
 }

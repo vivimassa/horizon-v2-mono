@@ -1,14 +1,16 @@
 "use client";
 
 import { useRef, useEffect, useState, useMemo, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ScheduledFlightRef } from "@skyhub/api";
 import { useScheduleGridStore } from "@/stores/use-schedule-grid-store";
 import { GridHeader } from "./grid-header";
 import { GridRow } from "./grid-row";
-import { ROW_HEIGHT } from "./grid-columns";
+import { GRID_COLUMNS, ROW_HEIGHT } from "./grid-columns";
 import { useGridKeyboard } from "./use-grid-keyboard";
 import { useGridSortStore, sortRows } from "./use-grid-sort";
+import { GridContextMenu, type ContextMenuState } from "./context-menu";
 import { useTheme } from "@/components/theme-provider";
 
 interface ScheduleGridProps {
@@ -16,15 +18,31 @@ interface ScheduleGridProps {
   onSave: () => void;
   onAddFlight: () => void;
   onDeleteFlight: (rowIdx: number) => void;
+  onOpenFind?: () => void;
+  onOpenReplace?: () => void;
 }
 
-export function ScheduleGrid({ rows, onSave, onAddFlight, onDeleteFlight }: ScheduleGridProps) {
+const SEPARATOR_HEIGHT = 12;
+
+export function ScheduleGrid({
+  rows, onSave, onAddFlight, onDeleteFlight, onOpenFind, onOpenReplace,
+}: ScheduleGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedCell = useScheduleGridStore((s) => s.selectedCell);
   const newRows = useScheduleGridStore((s) => s.newRows);
-  const handleKeyDown = useGridKeyboard({ onSave, onAddFlight, onDeleteFlight });
+  const separatorAfter = useScheduleGridStore((s) => s.separatorAfter);
+  const addSeparator = useScheduleGridStore((s) => s.addSeparator);
+  const removeSeparator = useScheduleGridStore((s) => s.removeSeparator);
+  const copyCell = useScheduleGridStore((s) => s.copyCell);
+  const cutCell = useScheduleGridStore((s) => s.cutCell);
+  const pasteCell = useScheduleGridStore((s) => s.pasteCell);
   const { theme } = useTheme();
   const isDark = theme === "dark";
+
+  const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
+
+  // Global capture-phase keyboard handler
+  useGridKeyboard({ onSave, onAddFlight, onDeleteFlight, onOpenFind, onOpenReplace });
 
   // Sorting + column filters
   const sortKey = useGridSortStore((s) => s.sortKey);
@@ -56,69 +74,108 @@ export function ScheduleGrid({ rows, onSave, onAddFlight, onDeleteFlight }: Sche
     return sortRows(result, sortKey, sortDir);
   }, [rows, newRows, columnFilters, sortKey, sortDir]);
 
+  // Build virtual list with separator rows injected
+  type VirtualItem = { type: "data"; rowIdx: number } | { type: "separator"; afterRowIdx: number };
+  const virtualItems = useMemo<VirtualItem[]>(() => {
+    const items: VirtualItem[] = [];
+    for (let i = 0; i < processedRows.length; i++) {
+      items.push({ type: "data", rowIdx: i });
+      if (separatorAfter.has(i)) {
+        items.push({ type: "separator", afterRowIdx: i });
+      }
+    }
+    return items;
+  }, [processedRows, separatorAfter]);
+
   // Virtualization
   const virtualizer = useVirtualizer({
-    count: processedRows.length,
+    count: virtualItems.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: (i) => virtualItems[i].type === "separator" ? SEPARATOR_HEIGHT : ROW_HEIGHT,
     overscan: 50,
   });
 
   useEffect(() => {
-    if (selectedCell) virtualizer.scrollToIndex(selectedCell.rowIdx, { align: "auto" });
-  }, [selectedCell, virtualizer]);
+    if (selectedCell) {
+      // Find the virtual index for this data row
+      const vIdx = virtualItems.findIndex((v) => v.type === "data" && v.rowIdx === selectedCell.rowIdx);
+      if (vIdx >= 0) virtualizer.scrollToIndex(vIdx, { align: "auto" });
+    }
+  }, [selectedCell, virtualizer, virtualItems]);
 
-  // Intercept browser shortcuts globally on this page (capture phase, no focus check)
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const ctrl = e.ctrlKey || e.metaKey;
-      if (!ctrl) return;
-      const key = e.key.toLowerCase();
-      if (["s", "f", "h"].includes(key)) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (key === "s") onSave();
-      }
-    };
-    window.addEventListener("keydown", handler, { capture: true });
-    return () => window.removeEventListener("keydown", handler, { capture: true });
-  }, [onSave, onAddFlight]);
+  const handleContextMenu = useCallback((e: React.MouseEvent, rowIdx: number, colKey: string) => {
+    e.preventDefault();
+    setCtxMenu({ x: e.clientX, y: e.clientY, rowIdx, colKey });
+  }, []);
 
   const glassBg = isDark ? "rgba(25,25,33,0.85)" : "rgba(255,255,255,0.85)";
   const glassBorder = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)";
+  const sepColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
+  const totalColSpan = GRID_COLUMNS.length + 1; // +1 for row number column
 
   return (
-    <div
-      ref={scrollRef}
-      className="flex-1 overflow-auto select-none focus:outline-none rounded-2xl"
-      style={{ background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: "blur(20px)" }}
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
-    >
-      <table
-        className="w-full text-[13px] font-mono"
-        style={{ borderCollapse: "collapse", tableLayout: "fixed" }}
+    <>
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-auto select-none focus:outline-none rounded-2xl"
+        style={{ background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: "blur(20px)" }}
+        tabIndex={0}
       >
-        <GridHeader
-          scrollLeft={0}
-          rows={rows}
-          columnFilters={columnFilters}
-          onApplyFilter={handleApplyFilter}
-        />
-        <tbody>
-          {virtualizer.getVirtualItems().map((vRow) => {
-            const row = processedRows[vRow.index];
-            if (!row) return null;
-            return (
-              <GridRow
-                key={row._id}
-                row={row}
-                rowIdx={vRow.index}
-              />
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+        <table
+          className="w-full text-[13px] font-mono"
+          style={{ borderCollapse: "collapse", tableLayout: "fixed" }}
+        >
+          <GridHeader
+            scrollLeft={0}
+            rows={rows}
+            columnFilters={columnFilters}
+            onApplyFilter={handleApplyFilter}
+          />
+          <tbody>
+            {virtualizer.getVirtualItems().map((vRow) => {
+              const item = virtualItems[vRow.index];
+              if (!item) return null;
+
+              if (item.type === "separator") {
+                return (
+                  <tr key={`sep-${item.afterRowIdx}`} style={{ height: SEPARATOR_HEIGHT }}>
+                    <td colSpan={totalColSpan} style={{ background: sepColor, padding: 0, border: "none" }} />
+                  </tr>
+                );
+              }
+
+              const row = processedRows[item.rowIdx];
+              if (!row) return null;
+              return (
+                <GridRow
+                  key={row._id}
+                  row={row}
+                  rowIdx={item.rowIdx}
+                  onContextMenu={handleContextMenu}
+                />
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Context menu — portalled to document.body so scroll/stacking context doesn't offset it */}
+      {ctxMenu && createPortal(
+        <GridContextMenu
+          state={ctxMenu}
+          onClose={() => setCtxMenu(null)}
+          onInsertRow={onAddFlight}
+          onDeleteRow={() => onDeleteFlight(ctxMenu.rowIdx)}
+          onSeparateCycle={() => addSeparator(ctxMenu.rowIdx)}
+          onRemoveSeparator={() => removeSeparator(ctxMenu.rowIdx)}
+          hasSeparator={separatorAfter.has(ctxMenu.rowIdx)}
+          onCopy={copyCell}
+          onCut={cutCell}
+          onPaste={() => pasteCell()}
+          hasSelection={!!selectedCell}
+        />,
+        document.body
+      )}
+    </>
   );
 }

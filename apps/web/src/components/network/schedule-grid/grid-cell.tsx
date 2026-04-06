@@ -17,8 +17,10 @@ interface GridCellProps {
   value: string;
   isSelected: boolean;
   isEditing: boolean;
+  isInRange?: boolean;
   editValue: string;
   rowIdx: number;
+  colIdx: number;
   rowId: string;
   row: ScheduledFlightRef;
   onContextMenu?: (e: React.MouseEvent) => void;
@@ -29,12 +31,15 @@ interface GridCellProps {
   onCancel: () => void;
   onNavigate: (dir: "up" | "down" | "left" | "right") => void;
   onFieldWire?: (field: string, value: string) => void;
+  onDragStart?: () => void;
+  onDragEnter?: () => void;
   isDirty: boolean;
 }
 
 export const GridCell = React.memo(function GridCell({
-  column, value, isSelected, isEditing, editValue, rowId, row,
-  onContextMenu, onSelect, onStartEdit, onEditChange, onCommit, onCancel, onNavigate, onFieldWire, isDirty,
+  column, value, isSelected, isEditing, isInRange, editValue, rowId, row,
+  onContextMenu, onSelect, onStartEdit, onEditChange, onCommit, onCancel, onNavigate, onFieldWire,
+  onDragStart, onDragEnter, isDirty,
 }: GridCellProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const selectRef = useRef<HTMLSelectElement>(null);
@@ -59,9 +64,12 @@ export const GridCell = React.memo(function GridCell({
   const normFrom = normalizeToIso(filterDateFrom, opDateFormat);
   const normTo = normalizeToIso(filterDateTo, opDateFormat);
 
+  const newRows = useScheduleGridStore((s) => s.newRows);
+  const isNewRow = newRows.some((r) => r._id === rowId);
+
   const isOutOfPeriod = isDateCol && normValue && normFrom && normTo &&
     (normValue < normFrom || normValue > normTo);
-  const isSuggested = isDateCol && value && !isDirty && row.status === "draft";
+  const isSuggested = isDateCol && value && !isDirty && isNewRow;
 
   useEffect(() => {
     if (isEditing) {
@@ -93,12 +101,14 @@ export const GridCell = React.memo(function GridCell({
     cursor: column.editable ? "cell" : "default",
   };
 
-  // Selection / dirty styling
+  // Selection / range / dirty styling
   const selectionStyle: React.CSSProperties = isSelected
     ? { outline: `2px solid ${SELECTION_COLOR}`, outlineOffset: -2 }
-    : isDirty
-      ? { backgroundColor: isDark ? "rgba(245,158,11,0.15)" : "rgba(245,158,11,0.08)" }
-      : {};
+    : isInRange
+      ? { backgroundColor: isDark ? "rgba(33,115,70,0.20)" : "rgba(33,115,70,0.10)" }
+      : isDirty
+        ? { backgroundColor: isDark ? "rgba(245,158,11,0.15)" : "rgba(245,158,11,0.08)" }
+        : {};
 
   // Status colors
   const statusColor = column.key === "status" ? {
@@ -183,6 +193,17 @@ export const GridCell = React.memo(function GridCell({
       onClick={onSelect}
       onDoubleClick={() => column.editable && onStartEdit()}
       onContextMenu={onContextMenu}
+      onMouseDown={(ev) => {
+        if (ev.button === 0 && ev.shiftKey) {
+          // Shift+Click extends selection to this cell
+          ev.preventDefault();
+        } else if (ev.button === 0) {
+          onDragStart?.();
+        }
+      }}
+      onMouseEnter={(ev) => {
+        if (ev.buttons === 1) onDragEnter?.();
+      }}
     >
       <span
         className="block w-full truncate"

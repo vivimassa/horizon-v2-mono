@@ -13,9 +13,10 @@ import { useTheme } from "@/components/theme-provider";
 interface GridRowProps {
   row: ScheduledFlightRef;
   rowIdx: number;
+  onContextMenu?: (e: React.MouseEvent, rowIdx: number, colKey: string) => void;
 }
 
-export const GridRow = React.memo(function GridRow({ row, rowIdx }: GridRowProps) {
+export const GridRow = React.memo(function GridRow({ row, rowIdx, onContextMenu }: GridRowProps) {
   const selectedCell = useScheduleGridStore((s) => s.selectedCell);
   const editingCell = useScheduleGridStore((s) => s.editingCell);
   const editValue = useScheduleGridStore((s) => s.editValue);
@@ -32,8 +33,19 @@ export const GridRow = React.memo(function GridRow({ row, rowIdx }: GridRowProps
   const isDark = theme === "dark";
   const border = isDark ? CELL_BORDER_DARK : CELL_BORDER;
 
+  const selectionRange = useScheduleGridStore((s) => s.selectionRange);
+  const setSelectionRange = useScheduleGridStore((s) => s.setSelectionRange);
+
   const isRowDirty = dirtyMap.has(row._id);
   const isCancelled = row.status === "cancelled";
+
+  // Normalize selection range for hit testing
+  const normRange = selectionRange ? {
+    r1: Math.min(selectionRange.startRow, selectionRange.endRow),
+    r2: Math.max(selectionRange.startRow, selectionRange.endRow),
+    c1: Math.min(selectionRange.startCol, selectionRange.endCol),
+    c2: Math.max(selectionRange.startCol, selectionRange.endCol),
+  } : null;
 
   const operatorDateFormat = useOperatorStore((s) => s.dateFormat);
 
@@ -49,11 +61,10 @@ export const GridRow = React.memo(function GridRow({ row, rowIdx }: GridRowProps
     // Computed columns always go through their formatter regardless of dirty state
     if (colKey === "ac") return row.rotationLabel ?? (row.aircraftTypeIcao ? `${row.aircraftTypeIcao}` : "—");
     if (colKey === "blockMinutes") {
-      const dirtyBlock = getDirtyValue(row._id, "blockMinutes") as number | undefined;
+      // BLOCK is always derived: STA minus STD. Never use stored/dirty values.
       const std = (getDirtyValue(row._id, "stdUtc") as string) ?? row.stdUtc;
       const sta = (getDirtyValue(row._id, "staUtc") as string) ?? row.staUtc;
-      const block = dirtyBlock ?? row.blockMinutes ?? calcBlockMinutes(std, sta);
-      return fmtMinutes(block);
+      return fmtMinutes(calcBlockMinutes(std, sta));
     }
 
     const dirty = getDirtyValue(row._id, colKey);
@@ -130,11 +141,14 @@ export const GridRow = React.memo(function GridRow({ row, rowIdx }: GridRowProps
         {rowIdx + 1}
       </td>
 
-      {GRID_COLUMNS.map((col) => {
+      {GRID_COLUMNS.map((col, colIndex) => {
         const isSelected = selectedCell?.rowIdx === rowIdx && selectedCell?.colKey === col.key;
         const isEditing = editingCell?.rowIdx === rowIdx && editingCell?.colKey === col.key;
         const cellValue = getCellValue(col.key);
         const cellDirty = dirtyMap.has(row._id) && col.key in (dirtyMap.get(row._id) ?? {});
+        const isInRange = normRange !== null
+          && rowIdx >= normRange.r1 && rowIdx <= normRange.r2
+          && colIndex >= normRange.c1 && colIndex <= normRange.c2;
 
         return (
           <GridCell
@@ -143,11 +157,16 @@ export const GridRow = React.memo(function GridRow({ row, rowIdx }: GridRowProps
             value={cellValue}
             isSelected={isSelected}
             isEditing={isEditing}
+            isInRange={isInRange}
             editValue={isEditing ? editValue : ""}
             rowIdx={rowIdx}
+            colIdx={colIndex}
             rowId={row._id}
             row={row}
-            onContextMenu={(e) => e.preventDefault()}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              onContextMenu?.(e, rowIdx, col.key);
+            }}
             onSelect={() => selectCell({ rowIdx, colKey: col.key })}
             onStartEdit={() => startEditing({ rowIdx, colKey: col.key })}
             onEditChange={setEditValue}
@@ -155,6 +174,13 @@ export const GridRow = React.memo(function GridRow({ row, rowIdx }: GridRowProps
             onCancel={cancelEdit}
             onNavigate={handleNavigate}
             onFieldWire={handleFieldWire}
+            onDragStart={() => {
+              setSelectionRange({ startRow: rowIdx, startCol: colIndex, endRow: rowIdx, endCol: colIndex });
+            }}
+            onDragEnter={() => {
+              const sr = useScheduleGridStore.getState().selectionRange;
+              if (sr) setSelectionRange({ ...sr, endRow: rowIdx, endCol: colIndex });
+            }}
             isDirty={cellDirty}
           />
         );

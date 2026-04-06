@@ -63,15 +63,26 @@ export function ScheduleGridShell() {
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
-      // Save modified rows
-      if (dirtyMap.size > 0) {
-        const updates = Array.from(dirtyMap.entries()).map(([id, changes]) => ({ id, changes }));
-        await api.updateScheduledFlightsBulk(updates);
+      // Separate dirty entries: existing rows (updates) vs new rows (creates)
+      const newRowIds = new Set(newRows.map((r) => r._id));
+
+      // Update existing rows — only dirty entries whose ID is NOT a new row
+      const existingUpdates = Array.from(dirtyMap.entries())
+        .filter(([id]) => !newRowIds.has(id))
+        .map(([id, changes]) => ({ id, changes }));
+      if (existingUpdates.length > 0) {
+        await api.updateScheduledFlightsBulk(existingUpdates);
       }
-      // Save new rows
+
+      // Create new rows — merge dirty edits onto the blank template before sending
       if (newRows.length > 0) {
-        await api.createScheduledFlightsBulk(newRows);
+        const mergedNewRows = newRows.map((row) => {
+          const dirty = dirtyMap.get(row._id);
+          return dirty ? { ...row, ...dirty } : row;
+        });
+        await api.createScheduledFlightsBulk(mergedNewRows);
       }
+
       clearDirty();
       clearNewRows();
       await fetchFlights();
@@ -137,7 +148,7 @@ export function ScheduleGridShell() {
       createdAt: null,
       updatedAt: null,
     });
-  }, [seasonCode, addNewRow]);
+  }, [seasonCode, addNewRow, rows, newRows, dirtyMap, filterDateFrom, filterDateTo]);
 
   return (
     <div className="flex h-full overflow-hidden gap-3 p-3">
@@ -217,6 +228,8 @@ export function ScheduleGridShell() {
             api.deleteScheduledFlight(row._id).then(fetchFlights).catch(console.error);
           }
         }}
+        onOpenFind={() => setShowFind(true)}
+        onOpenReplace={() => setShowReplace(true)}
       />
 
       {/* Floating save bar */}

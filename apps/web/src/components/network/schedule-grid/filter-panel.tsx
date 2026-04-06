@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, Filter, Search, Loader2, CalendarDays, Plane, MapPin } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 
@@ -47,6 +47,7 @@ export function FilterPanel({ seasonCode, onSeasonChange, onApplyFilters, loadin
 
   const handleGo = useCallback(() => {
     onApplyFilters({ seasonCode, dateFrom, dateTo, depStation, arrStation, aircraftType, status });
+    setCollapsed(true);
   }, [seasonCode, dateFrom, dateTo, depStation, arrStation, aircraftType, status, onApplyFilters]);
 
   const activeCount = [dateFrom, dateTo, depStation, arrStation, aircraftType, status].filter(Boolean).length;
@@ -200,23 +201,33 @@ function DateInput({ label, value, onChange, isDark }: {
     ? value.split("-").reverse().join("/")
     : "";
 
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleClick = () => {
+    try { inputRef.current?.showPicker(); }
+    catch { inputRef.current?.focus(); }
+  };
+
   return (
-    <div className="relative">
+    <div className="relative cursor-pointer" onClick={handleClick}>
       {/* Visible display */}
       <div
-        className="w-full px-2 py-1.5 rounded-lg text-[12px] font-mono font-medium text-center transition-all cursor-pointer"
-        style={{ background: activeBg, border: `1px solid ${activeBorder}`, minHeight: 30, lineHeight: "18px",
+        className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[12px] font-mono font-medium transition-all"
+        style={{ background: activeBg, border: `1px solid ${activeBorder}`, minHeight: 32,
           color: value ? undefined : (isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.25)"),
         }}
       >
-        {displayValue || label.toUpperCase()}
+        <CalendarDays size={12} className={value ? "text-module-accent" : "opacity-40"} />
+        <span>{displayValue || label.toUpperCase()}</span>
       </div>
       {/* Hidden native date input */}
       <input
+        ref={inputRef}
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"
+        tabIndex={-1}
       />
     </div>
   );

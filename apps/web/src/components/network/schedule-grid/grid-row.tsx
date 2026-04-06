@@ -6,6 +6,8 @@ import { GRID_COLUMNS, ROW_HEIGHT, fmtMinutes, calcBlockMinutes, CELL_BORDER, CE
 import { GridCell } from "./grid-cell";
 import { useScheduleGridStore } from "@/stores/use-schedule-grid-store";
 import { useScheduleRefStore } from "@/stores/use-schedule-ref-store";
+import { useOperatorStore } from "@/stores/use-operator-store";
+import { formatDate } from "@/lib/date-format";
 import { useTheme } from "@/components/theme-provider";
 
 interface GridRowProps {
@@ -33,15 +35,25 @@ export const GridRow = React.memo(function GridRow({ row, rowIdx }: GridRowProps
   const isRowDirty = dirtyMap.has(row._id);
   const isCancelled = row.status === "cancelled";
 
+  const operatorDateFormat = useOperatorStore((s) => s.dateFormat);
+
   function getCellValue(colKey: string): string {
     const dirty = getDirtyValue(row._id, colKey);
-    if (dirty !== undefined) return String(dirty);
+    if (dirty !== undefined) {
+      const v = String(dirty);
+      if (colKey === "effectiveFrom" || colKey === "effectiveUntil") return formatDate(v, operatorDateFormat);
+      return v;
+    }
     if (colKey === "ac") return row.rotationLabel ?? (row.aircraftTypeIcao ? `${row.aircraftTypeIcao}` : "—");
     if (colKey === "blockMinutes") {
       const block = row.blockMinutes ?? calcBlockMinutes(row.stdUtc, row.staUtc);
       return fmtMinutes(block);
     }
     if (colKey === "tat") return "";
+    if (colKey === "effectiveFrom" || colKey === "effectiveUntil") {
+      const val = (row as any)[colKey];
+      return val ? formatDate(String(val), operatorDateFormat) : "";
+    }
     const val = (row as any)[colKey];
     return val != null ? String(val) : "";
   }

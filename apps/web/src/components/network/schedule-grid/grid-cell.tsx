@@ -6,6 +6,8 @@ import { SELECTION_COLOR, CELL_BORDER, CELL_BORDER_DARK } from "./grid-columns";
 import type { CellFormat } from "./types";
 import { useScheduleRefStore } from "@/stores/use-schedule-ref-store";
 import { useScheduleGridStore } from "@/stores/use-schedule-grid-store";
+import { useOperatorStore } from "@/stores/use-operator-store";
+import { normalizeToIso } from "@/lib/date-format";
 import { getConditionalFormat } from "./conditional-format-rules";
 import { useTheme } from "@/components/theme-provider";
 import type { ScheduledFlightRef } from "@skyhub/api";
@@ -51,8 +53,14 @@ export const GridCell = React.memo(function GridCell({
 
   // Date validation: check if FROM/TO falls outside filter period
   const isDateCol = column.key === "effectiveFrom" || column.key === "effectiveUntil";
-  const isOutOfPeriod = isDateCol && value && filterDateFrom && filterDateTo &&
-    (value < filterDateFrom || value > filterDateTo);
+  const opDateFormat = useOperatorStore((s) => s.dateFormat);
+
+  const normValue = isDateCol ? normalizeToIso(value, opDateFormat) : "";
+  const normFrom = normalizeToIso(filterDateFrom, opDateFormat);
+  const normTo = normalizeToIso(filterDateTo, opDateFormat);
+
+  const isOutOfPeriod = isDateCol && normValue && normFrom && normTo &&
+    (normValue < normFrom || normValue > normTo);
   const isSuggested = isDateCol && value && !isDirty && row.status === "draft";
 
   useEffect(() => {
@@ -172,7 +180,6 @@ export const GridCell = React.memo(function GridCell({
   return (
     <td
       style={{ ...cellStyle, ...selectionStyle, ...periodWarningStyle }}
-      title={isOutOfPeriod ? `Date falls outside the designated period (${filterDateFrom} to ${filterDateTo}). Please adjust to stay within the selected period.` : undefined}
       onClick={onSelect}
       onDoubleClick={() => column.editable && onStartEdit()}
       onContextMenu={onContextMenu}

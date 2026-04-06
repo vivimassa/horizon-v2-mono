@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { api, setApiBaseUrl } from "@skyhub/api";
 import { useScheduleGridStore } from "@/stores/use-schedule-grid-store";
 import { useScheduleRefStore } from "@/stores/use-schedule-ref-store";
+import { useOperatorStore } from "@/stores/use-operator-store";
 import { ScheduleGrid } from "./schedule-grid";
 import { FloatingSaveBar } from "./floating-save-bar";
 import { RibbonToolbar } from "./ribbon/ribbon-toolbar";
@@ -22,9 +23,10 @@ export function ScheduleGridShell() {
   const [saving, setSaving] = useState(false);
   const [seasonCode, setSeasonCode] = useState("S26");
   const loadRefData = useScheduleRefStore((s) => s.loadAll);
+  const loadOperator = useOperatorStore((s) => s.loadOperator);
 
-  // Load reference data (AC types, service types, citypairs) once
-  useEffect(() => { loadRefData(); }, [loadRefData]);
+  // Load reference data + operator config once
+  useEffect(() => { loadRefData(); loadOperator(); }, [loadRefData, loadOperator]);
   const rows = useScheduleGridStore((s) => s.rows);
   const setRows = useScheduleGridStore((s) => s.setRows);
   const dirtyMap = useScheduleGridStore((s) => s.dirtyMap);

@@ -260,6 +260,26 @@ function OperatorCenter({
               hint="Fatigue & duty time regulation set" />
             <FormField label="Currency Code" value={getVal("currencyCode")} fieldKey="currencyCode" onChange={onChange} palette={palette} isDark={isDark}
               hint="e.g. USD, EUR, VND" maxLength={3} uppercase />
+            <div>
+              <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium block mb-1">Date Format *</label>
+              <select
+                value={getVal("dateFormat") ?? "DD-MMM-YY"}
+                onChange={(e) => onChange("dateFormat", e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl text-[14px] border outline-none focus:ring-2 focus:ring-module-accent/30 focus:border-module-accent transition-colors"
+                style={{
+                  background: isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.7)",
+                  borderColor: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)",
+                  color: palette.text,
+                }}
+              >
+                <option value="DD-MMM-YY">DD-MMM-YY (01-Apr-26)</option>
+                <option value="DD/MM/YYYY">DD/MM/YYYY (01/04/2026)</option>
+                <option value="MM/DD/YYYY">MM/DD/YYYY (04/01/2026)</option>
+                <option value="YYYY-MM-DD">YYYY-MM-DD (2026-04-01)</option>
+                <option value="DD.MM.YYYY">DD.MM.YYYY (01.04.2026)</option>
+              </select>
+              <p className="text-[12px] mt-1" style={{ color: palette.textTertiary }}>How dates appear across the system</p>
+            </div>
           </div>
         )}
         {activeSection === "branding" && (

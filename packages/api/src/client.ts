@@ -626,6 +626,7 @@ export interface OperatorRef {
   mainBaseIcao: string | null
   currencyCode: string | null
   currencySymbol: string | null
+  dateFormat: 'DD-MMM-YY' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD' | 'DD.MM.YYYY'
   enabledModules: string[]
   accentColor: string
   logoUrl: string | null

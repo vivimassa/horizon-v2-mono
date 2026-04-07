@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Plane, Clock, Radio } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
+import { colors } from '@skyhub/ui/theme'
 import { useGanttStore } from '@/stores/use-gantt-store'
 
 function formatUtcClock(): string {
@@ -24,7 +25,8 @@ function formatPeriodShort(from: string, to: string): string {
 export function GanttStatusBar() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
-  const layout = useGanttStore(s => s.layout)
+  const palette = isDark ? colors.dark : colors.light
+
   const zoomLevel = useGanttStore(s => s.zoomLevel)
   const periodFrom = useGanttStore(s => s.periodFrom)
   const periodTo = useGanttStore(s => s.periodTo)
@@ -38,43 +40,28 @@ export function GanttStatusBar() {
     return () => clearInterval(id)
   }, [])
 
-  const flightCount = flights.length
-  const acCount = aircraft.length
-  const bg = isDark ? '#0a0a0f' : '#eeeef1'
-  const textColor = isDark ? '#8C90A2' : '#6b7280'
-  const dotColor = '#06C270'
-
   return (
-    <div
-      className="h-6 shrink-0 flex items-center justify-between px-3 select-none"
-      style={{ background: bg, color: textColor, fontSize: 10 }}
+    <div className="h-6 shrink-0 flex items-center justify-between px-3 select-none"
+      style={{ background: palette.backgroundSecondary, color: palette.textTertiary, fontSize: 11 }}
     >
       <div className="flex items-center gap-3 font-mono">
         <span className="flex items-center gap-1">
-          <Plane size={10} />
-          {flightCount} flights
+          <Plane size={11} /> {flights.length} flights
         </span>
-        <span className="opacity-30">·</span>
+        <span style={{ opacity: 0.3 }}>·</span>
         <span className="flex items-center gap-1">
-          <Plane size={10} style={{ transform: 'scaleX(-1)' }} />
-          {acCount} aircraft
+          <Plane size={11} style={{ transform: 'scaleX(-1)' }} /> {aircraft.length} aircraft
         </span>
-        <span className="opacity-30">·</span>
+        <span style={{ opacity: 0.3 }}>·</span>
         <span className="font-semibold">{zoomLevel} view</span>
       </div>
 
       <div className="flex items-center gap-3 font-mono">
-        <span className="flex items-center gap-1">
-          <Clock size={10} />
-          UTC {utcTime}
-        </span>
-        <span className="opacity-30">·</span>
+        <span className="flex items-center gap-1"><Clock size={11} /> UTC {utcTime}</span>
+        <span style={{ opacity: 0.3 }}>·</span>
         <span>Period: {formatPeriodShort(periodFrom, periodTo)}</span>
-        <span className="opacity-30">·</span>
-        <span className="flex items-center gap-1">
-          <Radio size={8} color={dotColor} />
-          Sync Active
-        </span>
+        <span style={{ opacity: 0.3 }}>·</span>
+        <span className="flex items-center gap-1"><Radio size={9} color="#06C270" /> Sync Active</span>
       </div>
     </div>
   )

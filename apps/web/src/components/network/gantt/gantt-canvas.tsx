@@ -3,6 +3,7 @@
 import { useRef, useCallback, useEffect } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
+import { colors, glass } from '@skyhub/ui/theme'
 import { useGanttStore } from '@/stores/use-gantt-store'
 import { computePixelsPerHour, computeNowLineX, dateToMs } from '@/lib/gantt/time-axis'
 import { hitTestBars } from '@/lib/gantt/hit-testing'
@@ -149,32 +150,29 @@ export function GanttCanvas() {
   }, [])
 
   // ── Theme ──
-  const border = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
-  const headerBg = isDark ? 'rgba(25,25,33,0.90)' : 'rgba(255,255,255,0.90)'
-  const labelBg = isDark ? 'rgba(20,20,28,0.95)' : 'rgba(248,248,250,0.95)'
-  const txtP = isDark ? '#E4E1EA' : '#1f2937'
-  const txtS = isDark ? '#8C90A2' : '#6b7280'
-  const txtT = isDark ? '#5a5e70' : '#9ca3af'
+  const palette = isDark ? colors.dark : colors.light
+  const headerBg = isDark ? glass.panel : 'rgba(255,255,255,0.90)'
+  const labelBg = isDark ? palette.backgroundSecondary : palette.card
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
       {/* ── Time header ── */}
-      <div className="shrink-0 flex" style={{ height: 44, borderBottom: `1px solid ${border}`, background: headerBg }}>
-        <div className="shrink-0 flex items-end justify-center pb-1" style={{ width: ROW_LABEL_W, borderRight: `1px solid ${border}` }}>
-          <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: txtT }}>Aircraft</span>
+      <div className="shrink-0 flex" style={{ height: 44, borderBottom: `1px solid ${palette.border}`, background: headerBg }}>
+        <div className="shrink-0 flex items-end justify-center pb-1" style={{ width: ROW_LABEL_W, borderRight: `1px solid ${palette.border}` }}>
+          <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: palette.textTertiary }}>Aircraft</span>
         </div>
         <div className="flex-1 overflow-hidden relative">
           <div ref={headerRef} className="absolute left-0 top-0 h-full" style={{ width: totalWidth || '100%' }}>
             <div className="h-6 relative">
               {ticks.filter(t => t.isMajor).map(t => (
-                <span key={t.x} className="absolute top-1 text-[10px] font-bold font-mono whitespace-nowrap"
-                  style={{ left: t.x + 4, color: txtP }}>{t.label}</span>
+                <span key={t.x} className="absolute top-1 text-[11px] font-bold font-mono whitespace-nowrap"
+                  style={{ left: t.x + 4, color: palette.text }}>{t.label}</span>
               ))}
             </div>
             <div className="h-[18px] relative">
               {ticks.filter(t => !t.isMajor).map(t => (
-                <span key={t.x} className="absolute top-0 text-[9px] font-mono"
-                  style={{ left: t.x + 2, color: txtT }}>{t.label}</span>
+                <span key={t.x} className="absolute top-0 text-[11px] font-mono"
+                  style={{ left: t.x + 2, color: palette.textTertiary }}>{t.label}</span>
               ))}
             </div>
           </div>
@@ -184,34 +182,36 @@ export function GanttCanvas() {
       {/* ── Body ── */}
       <div className="flex-1 min-h-0 flex">
         {/* Row labels */}
-        <div className="shrink-0 overflow-hidden" style={{ width: ROW_LABEL_W, background: labelBg, borderRight: `1px solid ${border}` }}>
+        <div className="shrink-0 overflow-hidden" style={{ width: ROW_LABEL_W, background: labelBg, borderRight: `1px solid ${palette.border}` }}>
           <div ref={rowLabelsRef} style={{ height: totalHeight }}>
             {rows.map((row, i) => {
               if (row.type === 'group_header') {
-                const collapsed = collapsedTypes.has(row.aircraftTypeIcao!)
+                const isCollapsed = collapsedTypes.has(row.aircraftTypeIcao!)
                 return (
                   <div key={`g${i}`}
-                    className="flex items-center gap-1.5 px-2 cursor-pointer select-none hover:bg-white/5 transition-colors"
+                    className="flex items-center gap-1.5 px-2 cursor-pointer select-none transition-colors duration-150"
                     style={{ height: row.height, borderLeft: `3px solid ${row.color ?? 'transparent'}`, background: row.color ? `${row.color}08` : undefined }}
+                    onMouseEnter={e => (e.currentTarget.style.background = palette.backgroundHover)}
+                    onMouseLeave={e => (e.currentTarget.style.background = row.color ? `${row.color}08` : 'transparent')}
                     onClick={() => toggleTypeCollapse(row.aircraftTypeIcao!)}>
-                    <ChevronDown size={12} className={`shrink-0 transition-transform duration-150 ${collapsed ? '-rotate-90' : ''}`} style={{ color: txtS }} />
-                    <span className="text-[10px] font-bold truncate" style={{ color: txtP }}>{row.label}</span>
+                    <ChevronDown size={12} className={`shrink-0 transition-transform duration-150 ${isCollapsed ? '-rotate-90' : ''}`} style={{ color: palette.textSecondary }} />
+                    <span className="text-[11px] font-bold truncate" style={{ color: palette.text }}>{row.label}</span>
                   </div>
                 )
               }
               if (row.type === 'unassigned') {
                 return (
                   <div key={`u${i}`} className="flex items-center px-3 select-none"
-                    style={{ height: row.height, borderLeft: '3px solid #6b7280' }}>
-                    <span className="text-[10px] font-medium truncate" style={{ color: txtS }}>{row.label}</span>
+                    style={{ height: row.height, borderLeft: `3px solid ${palette.textTertiary}` }}>
+                    <span className="text-[11px] font-medium truncate" style={{ color: palette.textSecondary }}>{row.label}</span>
                   </div>
                 )
               }
               return (
                 <div key={`a${i}`} className="flex flex-col justify-center px-3"
                   style={{ height: row.height, borderLeft: `3px solid ${row.color ?? 'transparent'}` }}>
-                  <span className="text-[11px] font-mono font-bold leading-tight" style={{ color: txtP }}>{row.registration}</span>
-                  <span className="text-[9px] font-mono leading-tight" style={{ color: txtT }}>{row.aircraftTypeName}</span>
+                  <span className="text-[11px] font-mono font-bold leading-tight" style={{ color: palette.text }}>{row.registration}</span>
+                  <span className="text-[11px] font-mono leading-tight" style={{ color: palette.textTertiary }}>{row.aircraftTypeName}</span>
                 </div>
               )
             })}

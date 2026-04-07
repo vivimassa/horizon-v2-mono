@@ -64,7 +64,7 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       effectiveFrom: { $lte: to },
       effectiveUntil: { $gte: from },
     }
-    sfFilter.scenarioId = scenarioId ?? null
+    if (scenarioId) sfFilter.scenarioId = scenarioId
     sfFilter.status = statusFilter
       ? { $in: statusFilter.split(',') }
       : { $ne: 'cancelled' }

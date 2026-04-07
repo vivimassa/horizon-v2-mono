@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Filter, Loader2 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
+import { colors, glass } from '@skyhub/ui/theme'
 import { useGanttStore } from '@/stores/use-gantt-store'
 import { AC_TYPE_COLOR_PALETTE } from '@/lib/gantt/colors'
 
@@ -20,12 +21,14 @@ const SCHEDULE_STATUSES = [
 ] as const
 
 export function GanttFilterPanel() {
-  const { theme } = useTheme()
+  const { theme, moduleTheme } = useTheme()
   const isDark = theme === 'dark'
+  const palette = isDark ? colors.dark : colors.light
+  const accent = moduleTheme?.accent ?? colors.defaultAccent
 
   const [collapsed, setCollapsed] = useState(false)
   const [enabledStatuses, setEnabledStatuses] = useState<Set<string>>(new Set(['active', 'finalized', 'draft']))
-  const [enabledTypes, setEnabledTypes] = useState<Set<string> | null>(null) // null = all enabled
+  const [enabledTypes, setEnabledTypes] = useState<Set<string> | null>(null)
 
   const periodFrom = useGanttStore(s => s.periodFrom)
   const periodTo = useGanttStore(s => s.periodTo)
@@ -37,17 +40,9 @@ export function GanttFilterPanel() {
   const commitPeriod = useGanttStore(s => s.commitPeriod)
   const setColorMode = useGanttStore(s => s.setColorMode)
 
-  const glassBg = isDark ? 'rgba(25,25,33,0.85)' : 'rgba(255,255,255,0.85)'
-  const glassBorder = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
-  const sectionBorder = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'
-  const inputBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'
-  const inputBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'
-  const textPrimary = isDark ? '#E4E1EA' : '#1f2937'
-  const textSecondary = isDark ? '#8C90A2' : '#6b7280'
+  const glassBg = isDark ? glass.panel : 'rgba(255,255,255,0.90)'
+  const glassBorder = isDark ? glass.panelBorder : palette.cardBorder
 
-  const sectionLabel = 'text-[10px] font-semibold uppercase tracking-widest mb-2'
-
-  // Count aircraft per type
   const acCountByType = new Map<string, number>()
   for (const ac of aircraft) {
     const key = ac.aircraftTypeIcao ?? 'Unknown'
@@ -56,8 +51,7 @@ export function GanttFilterPanel() {
 
   function toggleStatus(key: string) {
     const next = new Set(enabledStatuses)
-    if (next.has(key)) next.delete(key)
-    else next.add(key)
+    if (next.has(key)) next.delete(key); else next.add(key)
     setEnabledStatuses(next)
   }
 
@@ -65,8 +59,7 @@ export function GanttFilterPanel() {
     const all = aircraftTypes.map(t => t.icaoType)
     const current = enabledTypes ?? new Set(all)
     const next = new Set(current)
-    if (next.has(icao)) next.delete(icao)
-    else next.add(icao)
+    if (next.has(icao)) next.delete(icao); else next.add(icao)
     setEnabledTypes(next)
   }
 
@@ -74,17 +67,18 @@ export function GanttFilterPanel() {
   if (collapsed) {
     return (
       <div
-        className="shrink-0 flex flex-col items-center rounded-2xl overflow-hidden"
-        style={{ width: 44, background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: 'blur(20px)' }}
+        className="shrink-0 flex flex-col items-center rounded-2xl overflow-hidden shadow-sm"
+        style={{ width: 44, background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: 'blur(24px)' }}
       >
         <button
           onClick={() => setCollapsed(false)}
-          className="h-12 w-full flex items-center justify-center hover:bg-white/5 transition-colors duration-150"
+          className="h-12 w-full flex items-center justify-center transition-colors duration-150"
+          style={{ color: palette.textSecondary }}
         >
-          <ChevronRight size={16} style={{ color: textSecondary }} />
+          <ChevronRight size={16} />
         </button>
         <div className="flex-1 flex items-center justify-center" style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)' }}>
-          <span className="text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: textSecondary }}>
+          <span className="text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: palette.textTertiary }}>
             Filters
           </span>
         </div>
@@ -95,13 +89,13 @@ export function GanttFilterPanel() {
   // ── Expanded ──
   return (
     <div
-      className="shrink-0 flex flex-col rounded-2xl overflow-hidden transition-all duration-200"
-      style={{ width: 300, background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: 'blur(20px)' }}
+      className="shrink-0 flex flex-col rounded-2xl overflow-hidden transition-all duration-200 shadow-sm"
+      style={{ width: 300, background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: 'blur(24px)' }}
     >
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 h-11 shrink-0" style={{ borderBottom: `1px solid ${sectionBorder}` }}>
-        <Filter size={14} color="#0061FF" />
-        <span className="text-[14px] font-bold" style={{ color: textPrimary }}>Filters</span>
+      <div className="flex items-center gap-2 px-4 h-11 shrink-0" style={{ borderBottom: `1px solid ${palette.border}` }}>
+        <Filter size={14} className="text-module-accent" />
+        <span className="text-[14px] font-bold" style={{ color: palette.text }}>Filters</span>
       </div>
 
       {/* Scrollable body */}
@@ -109,28 +103,27 @@ export function GanttFilterPanel() {
 
         {/* Period */}
         <section>
-          <div className={sectionLabel} style={{ color: textSecondary }}>Period</div>
+          <div className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: palette.textTertiary }}>Period</div>
           <div className="space-y-1.5">
             <input
               type="date"
               value={periodFrom}
               onChange={e => setPeriod(e.target.value, periodTo)}
-              className="w-full h-8 rounded-md px-2 text-[12px] font-mono outline-none transition-colors"
-              style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: textPrimary }}
+              className="w-full h-10 rounded-lg px-3 text-[13px] font-mono outline-none transition-colors focus:ring-2 focus:ring-module-accent"
+              style={{ background: palette.backgroundHover, border: `1px solid ${palette.border}`, color: palette.text }}
             />
             <input
               type="date"
               value={periodTo}
               onChange={e => setPeriod(periodFrom, e.target.value)}
-              className="w-full h-8 rounded-md px-2 text-[12px] font-mono outline-none transition-colors"
-              style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: textPrimary }}
+              className="w-full h-10 rounded-lg px-3 text-[13px] font-mono outline-none transition-colors focus:ring-2 focus:ring-module-accent"
+              style={{ background: palette.backgroundHover, border: `1px solid ${palette.border}`, color: palette.text }}
             />
           </div>
           <button
             onClick={() => commitPeriod()}
             disabled={loading || !periodFrom || !periodTo}
-            className="mt-2 w-full h-9 rounded-lg text-[13px] font-semibold text-white transition-colors duration-150 flex items-center justify-center gap-2 disabled:opacity-40"
-            style={{ background: '#0061FF' }}
+            className="mt-2 w-full h-10 rounded-lg text-[13px] font-semibold text-white transition-colors duration-150 flex items-center justify-center gap-2 disabled:opacity-40 bg-module-accent"
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : null}
             {loading ? 'Loading…' : 'Go'}
@@ -139,32 +132,24 @@ export function GanttFilterPanel() {
 
         {/* Aircraft Type */}
         {aircraftTypes.length > 0 && (
-          <section style={{ borderTop: `1px solid ${sectionBorder}`, paddingTop: 12 }}>
-            <div className={sectionLabel} style={{ color: textSecondary }}>Aircraft Type</div>
-            <div className="space-y-1">
+          <section style={{ borderTop: `1px solid ${palette.border}`, paddingTop: 12 }}>
+            <div className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: palette.textTertiary }}>Aircraft Type</div>
+            <div className="space-y-0.5">
               {aircraftTypes.map((t, i) => {
                 const color = t.color ?? AC_TYPE_COLOR_PALETTE[i % AC_TYPE_COLOR_PALETTE.length]
                 const checked = enabledTypes === null || enabledTypes.has(t.icaoType)
                 const count = acCountByType.get(t.icaoType) ?? 0
                 return (
-                  <label
-                    key={t.id}
-                    className="flex items-center gap-2 h-7 px-1 rounded cursor-pointer hover:bg-white/5 transition-colors duration-150"
+                  <label key={t.id} className="flex items-center gap-2 h-8 px-1 rounded-md cursor-pointer transition-colors duration-150"
+                    style={{ ['--tw-bg-opacity' as string]: 0 }}
+                    onMouseEnter={e => (e.currentTarget.style.background = palette.backgroundHover)}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleAcType(t.icaoType)}
-                      className="accent-[#0061FF] w-3.5 h-3.5"
-                    />
-                    <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ background: color, boxShadow: `0 0 6px ${color}40` }}
-                    />
-                    <span className="text-[11px] font-mono font-medium flex-1" style={{ color: textPrimary }}>
-                      {t.icaoType}
-                    </span>
-                    <span className="text-[10px] font-mono" style={{ color: textSecondary }}>{count}</span>
+                    <input type="checkbox" checked={checked} onChange={() => toggleAcType(t.icaoType)}
+                      className="w-3.5 h-3.5 rounded accent-module-accent" />
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color, boxShadow: `0 0 6px ${color}40` }} />
+                    <span className="text-[12px] font-mono font-medium flex-1" style={{ color: palette.text }}>{t.icaoType}</span>
+                    <span className="text-[11px] font-mono" style={{ color: palette.textTertiary }}>{count}</span>
                   </label>
                 )
               })}
@@ -173,46 +158,31 @@ export function GanttFilterPanel() {
         )}
 
         {/* Schedule Status */}
-        <section style={{ borderTop: `1px solid ${sectionBorder}`, paddingTop: 12 }}>
-          <div className={sectionLabel} style={{ color: textSecondary }}>Schedule Status</div>
-          <div className="space-y-1">
-            {SCHEDULE_STATUSES.map(s => {
-              const checked = enabledStatuses.has(s.key)
-              return (
-                <label
-                  key={s.key}
-                  className="flex items-center gap-2 h-7 px-1 rounded cursor-pointer hover:bg-white/5 transition-colors duration-150"
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleStatus(s.key)}
-                    className="accent-[#0061FF] w-3.5 h-3.5"
-                  />
-                  <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ background: s.color, boxShadow: `0 0 6px ${s.color}40` }}
-                  />
-                  <span className="text-[11px] font-medium" style={{ color: textPrimary }}>{s.label}</span>
-                </label>
-              )
-            })}
+        <section style={{ borderTop: `1px solid ${palette.border}`, paddingTop: 12 }}>
+          <div className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: palette.textTertiary }}>Schedule Status</div>
+          <div className="space-y-0.5">
+            {SCHEDULE_STATUSES.map(s => (
+              <label key={s.key} className="flex items-center gap-2 h-8 px-1 rounded-md cursor-pointer transition-colors duration-150"
+                onMouseEnter={e => (e.currentTarget.style.background = palette.backgroundHover)}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                <input type="checkbox" checked={enabledStatuses.has(s.key)} onChange={() => toggleStatus(s.key)}
+                  className="w-3.5 h-3.5 rounded accent-module-accent" />
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color, boxShadow: `0 0 6px ${s.color}40` }} />
+                <span className="text-[12px] font-medium" style={{ color: palette.text }}>{s.label}</span>
+              </label>
+            ))}
           </div>
         </section>
 
         {/* Color Mode */}
-        <section style={{ borderTop: `1px solid ${sectionBorder}`, paddingTop: 12 }}>
-          <div className={sectionLabel} style={{ color: textSecondary }}>Color Mode</div>
-          <div className="flex rounded-lg overflow-hidden" style={{ border: `1px solid ${inputBorder}` }}>
+        <section style={{ borderTop: `1px solid ${palette.border}`, paddingTop: 12 }}>
+          <div className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: palette.textTertiary }}>Color Mode</div>
+          <div className="flex rounded-lg overflow-hidden" style={{ border: `1px solid ${palette.border}` }}>
             {(['status', 'ac_type'] as const).map(mode => (
-              <button
-                key={mode}
-                onClick={() => setColorMode(mode)}
-                className="flex-1 h-7 text-[11px] font-semibold transition-colors duration-150"
-                style={{
-                  background: colorMode === mode ? '#0061FF' : 'transparent',
-                  color: colorMode === mode ? '#fff' : textSecondary,
-                }}
+              <button key={mode} onClick={() => setColorMode(mode)}
+                className={`flex-1 h-8 text-[12px] font-semibold transition-colors duration-150 ${colorMode === mode ? 'bg-module-accent text-white' : ''}`}
+                style={colorMode !== mode ? { color: palette.textSecondary } : undefined}
               >
                 {mode === 'status' ? 'Status' : 'AC Type'}
               </button>
@@ -221,16 +191,13 @@ export function GanttFilterPanel() {
         </section>
 
         {/* Legend */}
-        <section style={{ borderTop: `1px solid ${sectionBorder}`, paddingTop: 12 }}>
-          <div className={sectionLabel} style={{ color: textSecondary }}>Legend</div>
+        <section style={{ borderTop: `1px solid ${palette.border}`, paddingTop: 12 }}>
+          <div className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: palette.textTertiary }}>Legend</div>
           <div className="space-y-1.5">
             {STATUS_LEGEND.map(item => (
               <div key={item.label} className="flex items-center gap-2">
-                <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ background: item.color, boxShadow: `0 0 6px ${item.color}` }}
-                />
-                <span className="text-[10px]" style={{ color: textSecondary }}>{item.label}</span>
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: item.color, boxShadow: `0 0 6px ${item.color}` }} />
+                <span className="text-[11px]" style={{ color: palette.textSecondary }}>{item.label}</span>
               </div>
             ))}
           </div>
@@ -238,13 +205,12 @@ export function GanttFilterPanel() {
       </div>
 
       {/* Collapse button */}
-      <button
-        onClick={() => setCollapsed(true)}
-        className="h-9 shrink-0 flex items-center justify-center gap-1.5 hover:bg-white/5 transition-colors duration-150"
-        style={{ borderTop: `1px solid ${sectionBorder}` }}
+      <button onClick={() => setCollapsed(true)}
+        className="h-10 shrink-0 flex items-center justify-center gap-1.5 transition-colors duration-150"
+        style={{ borderTop: `1px solid ${palette.border}`, color: palette.textSecondary }}
       >
-        <ChevronLeft size={14} style={{ color: textSecondary }} />
-        <span className="text-[11px] font-medium" style={{ color: textSecondary }}>Minimize</span>
+        <ChevronLeft size={14} />
+        <span className="text-[12px] font-medium">Minimize</span>
       </button>
     </div>
   )

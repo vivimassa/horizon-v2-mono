@@ -5,25 +5,24 @@ import {
   Wand2, BarChart3, Search, Settings, Maximize2,
 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
+import { colors, glass } from '@skyhub/ui/theme'
 import { useGanttStore } from '@/stores/use-gantt-store'
 import type { ZoomLevel } from '@/lib/gantt/types'
 
 const ZOOMS: ZoomLevel[] = ['1D', '2D', '3D', '4D', '5D', '7D', '14D', '28D']
-
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const
 
 function formatRange(from: string, to: string): string {
   const f = new Date(from + 'T12:00:00Z')
   const t = new Date(to + 'T12:00:00Z')
-  const fd = `${DOW[f.getUTCDay()]} ${String(f.getUTCDate()).padStart(2, '0')} ${MON[f.getUTCMonth()]}`
-  const td = `${DOW[t.getUTCDay()]} ${String(t.getUTCDate()).padStart(2, '0')} ${MON[t.getUTCMonth()]} ${t.getUTCFullYear()}`
-  return `${fd} — ${td}`
+  return `${DOW[f.getUTCDay()]} ${String(f.getUTCDate()).padStart(2, '0')} ${MON[f.getUTCMonth()]} — ${DOW[t.getUTCDay()]} ${String(t.getUTCDate()).padStart(2, '0')} ${MON[t.getUTCMonth()]} ${t.getUTCFullYear()}`
 }
 
 export function GanttToolbar() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+  const palette = isDark ? colors.dark : colors.light
 
   const zoomLevel = useGanttStore(s => s.zoomLevel)
   const barLabelMode = useGanttStore(s => s.barLabelMode)
@@ -36,104 +35,84 @@ export function GanttToolbar() {
   const goToToday = useGanttStore(s => s.goToToday)
   const setBarLabelMode = useGanttStore(s => s.setBarLabelMode)
 
-  const glassBg = isDark ? 'rgba(25,25,33,0.80)' : 'rgba(255,255,255,0.80)'
-  const border = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
-  const mutedText = isDark ? '#8C90A2' : '#6b7280'
-  const pillBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'
-
-  const iconBtn = 'h-7 w-7 flex items-center justify-center rounded-md transition-colors duration-150 hover:bg-white/5'
-  const ghostBtn = 'h-7 px-2.5 flex items-center gap-1.5 rounded-md text-[11px] font-medium transition-colors duration-150 border opacity-40 cursor-default'
+  const glassBg = isDark ? glass.panel : 'rgba(255,255,255,0.90)'
 
   return (
     <div
       className="h-11 shrink-0 flex items-center justify-between px-3 gap-3"
-      style={{ background: glassBg, borderBottom: `1px solid ${border}`, backdropFilter: 'blur(20px)' }}
+      style={{ background: glassBg, borderBottom: `1px solid ${palette.border}`, backdropFilter: 'blur(24px)' }}
     >
-      {/* ── Left: Zoom + Row height + Action buttons ── */}
+      {/* ── Left: Zoom + Row height + Actions ── */}
       <div className="flex items-center gap-2">
-        {/* Zoom pills */}
-        <div className="flex rounded-lg overflow-hidden" style={{ border: `1px solid ${pillBorder}` }}>
+        <div className="flex rounded-lg overflow-hidden" style={{ border: `1px solid ${palette.border}` }}>
           {ZOOMS.map(z => (
-            <button
-              key={z}
-              onClick={() => setZoom(z)}
-              className="px-2 h-6 text-[10px] font-bold transition-colors duration-150"
-              style={{
-                background: z === zoomLevel ? '#0061FF' : 'transparent',
-                color: z === zoomLevel ? '#fff' : mutedText,
-              }}
-            >
-              {z}
-            </button>
+            <button key={z} onClick={() => setZoom(z)}
+              className={`px-2 h-7 text-[11px] font-bold transition-colors duration-150 ${z === zoomLevel ? 'bg-module-accent text-white' : ''}`}
+              style={z !== zoomLevel ? { color: palette.textTertiary } : undefined}
+            >{z}</button>
           ))}
         </div>
 
-        {/* Separator */}
-        <div className="w-px h-4" style={{ background: border }} />
+        <div className="w-px h-4" style={{ background: palette.border }} />
 
-        {/* Row height */}
-        <button onClick={zoomRowOut} className={iconBtn} title="Decrease row height">
-          <Minus size={14} color={mutedText} />
+        <button onClick={zoomRowOut} className="h-8 w-8 flex items-center justify-center rounded-lg transition-colors duration-150"
+          title="Decrease row height" style={{ color: palette.textSecondary }}>
+          <Minus size={14} />
         </button>
-        <button onClick={zoomRowIn} className={iconBtn} title="Increase row height">
-          <Plus size={14} color={mutedText} />
+        <button onClick={zoomRowIn} className="h-8 w-8 flex items-center justify-center rounded-lg transition-colors duration-150"
+          title="Increase row height" style={{ color: palette.textSecondary }}>
+          <Plus size={14} />
         </button>
 
-        <div className="w-px h-4" style={{ background: border }} />
+        <div className="w-px h-4" style={{ background: palette.border }} />
 
-        {/* Optimizer (disabled placeholder) */}
-        <button className={ghostBtn} style={{ borderColor: border, color: mutedText }} disabled>
+        <button className="h-8 px-2.5 flex items-center gap-1.5 rounded-lg text-[11px] font-medium opacity-40 cursor-default"
+          style={{ border: `1px solid ${palette.border}`, color: palette.textTertiary }} disabled>
           <Wand2 size={13} /> Optimizer
         </button>
-        <button className={ghostBtn} style={{ borderColor: border, color: mutedText }} disabled>
+        <button className="h-8 px-2.5 flex items-center gap-1.5 rounded-lg text-[11px] font-medium opacity-40 cursor-default"
+          style={{ border: `1px solid ${palette.border}`, color: palette.textTertiary }} disabled>
           <BarChart3 size={13} /> Compare
         </button>
       </div>
 
       {/* ── Center: Date navigation ── */}
       <div className="flex items-center gap-1.5">
-        <button onClick={() => navigateDate('prev')} className={iconBtn}>
-          <ChevronLeft size={16} color={mutedText} />
+        <button onClick={() => navigateDate('prev')} className="h-8 w-8 flex items-center justify-center rounded-lg transition-colors duration-150"
+          style={{ color: palette.textSecondary }}>
+          <ChevronLeft size={16} />
         </button>
-
-        <span className="font-mono text-[11px] px-2 select-none" style={{ color: isDark ? '#C2C6D9' : '#374151' }}>
+        <span className="font-mono text-[11px] px-2 select-none" style={{ color: palette.text }}>
           {formatRange(periodFrom, periodTo)}
         </span>
-
-        <button onClick={() => navigateDate('next')} className={iconBtn}>
-          <ChevronRight size={16} color={mutedText} />
+        <button onClick={() => navigateDate('next')} className="h-8 w-8 flex items-center justify-center rounded-lg transition-colors duration-150"
+          style={{ color: palette.textSecondary }}>
+          <ChevronRight size={16} />
         </button>
-
-        <button
-          onClick={goToToday}
-          className="h-5 px-2 rounded text-[10px] font-semibold transition-colors duration-150"
-          style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)', color: isDark ? '#C2C6D9' : '#374151' }}
-        >
-          Today
-        </button>
+        <button onClick={goToToday}
+          className="h-7 px-3 rounded-lg text-[11px] font-semibold transition-colors duration-150"
+          style={{ background: palette.backgroundHover, color: palette.text }}
+        >Today</button>
       </div>
 
       {/* ── Right: Tools ── */}
       <div className="flex items-center gap-1">
-        <button className={iconBtn} title="Search flights">
-          <Search size={14} color={mutedText} />
+        <button className="h-8 w-8 flex items-center justify-center rounded-lg transition-colors duration-150"
+          style={{ color: palette.textSecondary }} title="Search flights">
+          <Search size={14} />
         </button>
-
-        {/* Label mode toggle */}
-        <button
-          onClick={() => setBarLabelMode(barLabelMode === 'flightNo' ? 'sector' : 'flightNo')}
-          className="h-6 px-2 rounded text-[9px] font-bold tracking-wide transition-colors duration-150"
-          style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)', color: mutedText }}
+        <button onClick={() => setBarLabelMode(barLabelMode === 'flightNo' ? 'sector' : 'flightNo')}
+          className="h-7 px-2.5 rounded-lg text-[11px] font-bold tracking-wide transition-colors duration-150"
+          style={{ background: palette.backgroundHover, color: palette.textSecondary }}
           title={barLabelMode === 'flightNo' ? 'Showing flight numbers' : 'Showing sectors'}
-        >
-          {barLabelMode === 'flightNo' ? 'FLT' : 'SEC'}
+        >{barLabelMode === 'flightNo' ? 'FLT' : 'SEC'}</button>
+        <button className="h-8 w-8 flex items-center justify-center rounded-lg transition-colors duration-150"
+          style={{ color: palette.textSecondary }} title="Settings">
+          <Settings size={14} />
         </button>
-
-        <button className={iconBtn} title="Settings">
-          <Settings size={14} color={mutedText} />
-        </button>
-        <button className={iconBtn} title="Fullscreen">
-          <Maximize2 size={14} color={mutedText} />
+        <button className="h-8 w-8 flex items-center justify-center rounded-lg transition-colors duration-150"
+          style={{ color: palette.textSecondary }} title="Fullscreen">
+          <Maximize2 size={14} />
         </button>
       </div>
     </div>

@@ -29,9 +29,9 @@ export function CrewComplementsShell() {
     setLoading(true);
     try {
       const [types, comps, pos] = await Promise.all([
-        api.getAircraftTypes("horizon"),
-        api.getCrewComplements("horizon"),
-        api.getCrewPositions("horizon"),
+        api.getAircraftTypes(getOperatorId()),
+        api.getCrewComplements(getOperatorId()),
+        api.getCrewPositions(getOperatorId()),
       ]);
       setAircraftTypes(types.filter((t) => t.isActive));
       setComplements(comps);
@@ -130,7 +130,7 @@ export function CrewComplementsShell() {
   const handleSeedForType = useCallback(
     async (icaoType: string) => {
       try {
-        await api.seedCrewComplementDefaults("horizon", icaoType);
+        await api.seedCrewComplementDefaults(getOperatorId(), icaoType);
         fetchData();
       } catch (err) {
         console.error("Failed to seed:", err);
@@ -141,7 +141,7 @@ export function CrewComplementsShell() {
 
   const handleSeedAll = useCallback(async () => {
     try {
-      await api.seedCrewComplementDefaults("horizon");
+      await api.seedCrewComplementDefaults(getOperatorId());
       fetchData();
     } catch (err) {
       console.error("Failed to seed all:", err);
@@ -152,7 +152,7 @@ export function CrewComplementsShell() {
     async (icaoType: string, templateKey: string) => {
       try {
         await api.createCrewComplement({
-          operatorId: "horizon",
+          operatorId: getOperatorId(),
           aircraftTypeIcao: icaoType,
           templateKey,
           counts: {},
@@ -316,4 +316,5 @@ function EmptyState({ onSeedAll }: { onSeedAll: () => void }) {
       </button>
     </div>
   );
+import { getOperatorId } from "@/stores/use-operator-store"
 }

@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { Upload, X, FileSpreadsheet, AlertCircle, Check, Download } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
+import { getOperatorId } from "@/stores/use-operator-store";
 
 interface ImportDialogProps {
   seasonCode: string;
@@ -30,7 +31,7 @@ export function ImportDialog({ seasonCode, scenarioId, onClose, onImported }: Im
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const url = `http://localhost:3002/ssim/import?operatorId=horizon&seasonCode=${seasonCode}${scenarioId ? `&scenarioId=${scenarioId}` : ""}`;
+      const url = `http://localhost:3002/ssim/import?operatorId=${getOperatorId()}&seasonCode=${seasonCode}${scenarioId ? `&scenarioId=${scenarioId}` : ""}`;
       const res = await fetch(url, { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Import failed");
@@ -95,7 +96,7 @@ export function ImportDialog({ seasonCode, scenarioId, onClose, onImported }: Im
                     onClick={async (e) => {
                       e.stopPropagation();
                       // Download .xlsx template from server
-                      const res = await fetch("http://localhost:3002/ssim/template?operatorId=horizon");
+                      const res = await fetch(`http://localhost:3002/ssim/template?operatorId=${getOperatorId()}`);
                       const blob = await res.blob();
                       const url = URL.createObjectURL(blob);
                       const a = document.createElement("a");

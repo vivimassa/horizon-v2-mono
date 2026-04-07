@@ -67,7 +67,7 @@ function CreatePanel({ onCreate, onCancel, categories }: {
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
-    api.getCrewPositions("horizon", true).then(setPositions).catch(console.error);
+    api.getCrewPositions(getOperatorId(), true).then(setPositions).catch(console.error);
   }, []);
 
   const set = (key: string, value: unknown) => setForm((p) => ({ ...p, [key]: value }));
@@ -209,7 +209,7 @@ function ViewEditPanel({ code, categories, onSave, onDelete, onDeactivate }: {
   const [positions, setPositions] = useState<CrewPositionRef[]>([]);
 
   useEffect(() => {
-    api.getCrewPositions("horizon", true).then(setPositions).catch(console.error);
+    api.getCrewPositions(getOperatorId(), true).then(setPositions).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -760,4 +760,5 @@ function friendlyError(err: any): string {
     if (m) { const p = JSON.parse(m[2]); return p.error || p.details?.join(", ") || msg; }
   } catch {}
   return msg;
+import { getOperatorId } from "@/stores/use-operator-store"
 }

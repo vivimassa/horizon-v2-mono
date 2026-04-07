@@ -21,7 +21,7 @@ export function CrewGroupsShell() {
 
   const fetchData = useCallback(() => {
     setLoading(true);
-    api.getCrewGroups("horizon", true)
+    api.getCrewGroups(getOperatorId(), true)
       .then((data) => {
         setGroups(data);
         setSelected((prev) => {
@@ -36,7 +36,7 @@ export function CrewGroupsShell() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleCreate = useCallback(async (data: Partial<CrewGroupRef>) => {
-    await api.createCrewGroup({ ...data, operatorId: "horizon" });
+    await api.createCrewGroup({ ...data, operatorId: getOperatorId() });
     setShowCreate(false);
     fetchData();
   }, [fetchData]);
@@ -53,7 +53,7 @@ export function CrewGroupsShell() {
   }, [fetchData]);
 
   const handleSeed = useCallback(async () => {
-    await api.seedCrewGroups("horizon");
+    await api.seedCrewGroups(getOperatorId());
     fetchData();
   }, [fetchData]);
 
@@ -140,4 +140,5 @@ function EmptyState({ onSeed, onAdd }: { onSeed: () => void; onAdd: () => void }
       </div>
     </div>
   );
+import { getOperatorId } from "@/stores/use-operator-store"
 }

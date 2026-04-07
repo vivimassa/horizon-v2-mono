@@ -67,7 +67,7 @@ export function MppGroupDetail({
   const handleCreateGroup = useCallback(async () => {
     if (!createForm.label || !createForm.code) { setCreateError("Label and code are required"); return; }
     try {
-      await onCreateGroup({ operatorId: "horizon", ...createForm });
+      await onCreateGroup({ operatorId: getOperatorId(), ...createForm });
       setShowCreateGroup(false);
       setCreateForm({ label: "", description: "", code: "", color: "#7c3aed", crewType: "cockpit" });
       setCreateError("");
@@ -78,7 +78,7 @@ export function MppGroupDetail({
     if (!newItem.label) return;
     try {
       await onCreateItem({
-        operatorId: "horizon",
+        operatorId: getOperatorId(),
         groupId: group._id,
         label: newItem.label,
         valueMonths: newItem.valueMonths,
@@ -398,4 +398,5 @@ function LeadTimeRow({
       )}
     </div>
   );
+import { getOperatorId } from "@/stores/use-operator-store"
 }

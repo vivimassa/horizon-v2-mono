@@ -38,7 +38,7 @@ export function MessageDialog({ seasonCode, baseScenarioId, targetScenarioId, on
     setLoading(true);
     try {
       const result = await api.generateScheduleMessages({
-        operatorId: "horizon",
+        operatorId: getOperatorId(),
         seasonCode,
         baseScenarioId,
         targetScenarioId,
@@ -106,4 +106,5 @@ export function MessageDialog({ seasonCode, baseScenarioId, targetScenarioId, on
       </div>
     </div>
   );
+import { getOperatorId } from "@/stores/use-operator-store"
 }

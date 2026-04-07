@@ -23,8 +23,8 @@ export function ExpiryCodesShell() {
   const fetchData = useCallback(() => {
     setLoading(true);
     Promise.all([
-      api.getExpiryCodes("horizon"),
-      api.getExpiryCodeCategories("horizon"),
+      api.getExpiryCodes(getOperatorId()),
+      api.getExpiryCodeCategories(getOperatorId()),
     ])
       .then(([codesData, catsData]) => {
         setCodes(codesData);
@@ -41,7 +41,7 @@ export function ExpiryCodesShell() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleCreate = useCallback(async (data: Partial<ExpiryCodeRef>) => {
-    await api.createExpiryCode({ ...data, operatorId: "horizon" });
+    await api.createExpiryCode({ ...data, operatorId: getOperatorId() });
     setShowCreate(false);
     fetchData();
   }, [fetchData]);
@@ -63,7 +63,7 @@ export function ExpiryCodesShell() {
   }, [fetchData]);
 
   const handleSeed = useCallback(async () => {
-    await api.seedExpiryCodes("horizon");
+    await api.seedExpiryCodes(getOperatorId());
     fetchData();
   }, [fetchData]);
 
@@ -183,4 +183,5 @@ function EmptyState({ onSeed, onAdd }: { onSeed: () => void; onAdd: () => void }
       </div>
     </div>
   );
+import { getOperatorId } from "@/stores/use-operator-store"
 }

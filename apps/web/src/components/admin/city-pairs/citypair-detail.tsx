@@ -28,6 +28,26 @@ function fmtBlock(min: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+/** Parse HH:MM or HHMM string into total minutes. Falls back to treating as minutes if no separator and ≤2 digits. */
+function parseBlockInput(raw: string): number {
+  const trimmed = raw.trim();
+  if (!trimmed) return 0;
+  // If contains ":", split on it
+  if (trimmed.includes(":")) {
+    const [hStr, mStr] = trimmed.split(":");
+    return (parseInt(hStr, 10) || 0) * 60 + (parseInt(mStr, 10) || 0);
+  }
+  // Pure digits: if 3+ digits, treat as HHMM (e.g. "0210" → 2h10m, "130" → 1h30m)
+  const num = trimmed.replace(/\D/g, "");
+  if (num.length >= 3) {
+    const mins = parseInt(num.slice(-2), 10);
+    const hrs = parseInt(num.slice(0, -2), 10);
+    return hrs * 60 + mins;
+  }
+  // 1-2 digits: treat as hours (e.g. "2" → 2:00, "12" → 12:00)
+  return (parseInt(num, 10) || 0) * 60;
+}
+
 const TABS = [
   { key: "general", label: "General", icon: Info },
   { key: "block-hours", label: "Block Hours", icon: Clock },
@@ -407,10 +427,10 @@ function BlockHoursTab({ cityPair, onRefresh, mode }: { cityPair: CityPairRef; o
   const formToPayload = (f: typeof emptyForm) => ({
     aircraftTypeIcao: f.aircraftTypeIcao || null,
     seasonType: f.seasonType,
-    dir1BlockMinutes: Number(f.dir1Block) || 0,
-    dir2BlockMinutes: Number(f.dir2Block) || 0,
-    dir1FlightMinutes: f.dir1Flight ? Number(f.dir1Flight) : null,
-    dir2FlightMinutes: f.dir2Flight ? Number(f.dir2Flight) : null,
+    dir1BlockMinutes: parseBlockInput(f.dir1Block),
+    dir2BlockMinutes: parseBlockInput(f.dir2Block),
+    dir1FlightMinutes: f.dir1Flight ? parseBlockInput(f.dir1Flight) : null,
+    dir2FlightMinutes: f.dir2Flight ? parseBlockInput(f.dir2Flight) : null,
     dir1FuelKg: f.dir1Fuel ? Number(f.dir1Fuel) : null,
     dir2FuelKg: f.dir2Fuel ? Number(f.dir2Fuel) : null,
     notes: f.notes || null,
@@ -444,10 +464,10 @@ function BlockHoursTab({ cityPair, onRefresh, mode }: { cityPair: CityPairRef; o
     setEditForm({
       aircraftTypeIcao: bh.aircraftTypeIcao ?? "",
       seasonType: bh.seasonType,
-      dir1Block: bh.dir1BlockMinutes.toString(),
-      dir2Block: bh.dir2BlockMinutes.toString(),
-      dir1Flight: bh.dir1FlightMinutes?.toString() ?? "",
-      dir2Flight: bh.dir2FlightMinutes?.toString() ?? "",
+      dir1Block: fmtBlock(bh.dir1BlockMinutes),
+      dir2Block: fmtBlock(bh.dir2BlockMinutes),
+      dir1Flight: bh.dir1FlightMinutes != null ? fmtBlock(bh.dir1FlightMinutes) : "",
+      dir2Flight: bh.dir2FlightMinutes != null ? fmtBlock(bh.dir2FlightMinutes) : "",
       dir1Fuel: bh.dir1FuelKg?.toString() ?? "",
       dir2Fuel: bh.dir2FuelKg?.toString() ?? "",
       notes: bh.notes ?? "",
@@ -542,7 +562,7 @@ function BlockHoursTab({ cityPair, onRefresh, mode }: { cityPair: CityPairRef; o
               </thead>
               <tbody className="divide-y divide-hz-border/50">
                 {blockHours.map((bh, i) => (
-                  <tr key={bh._id} className={`transition-colors hover:bg-hz-border/20 ${editId === bh._id ? "bg-module-accent/[0.04]" : i % 2 === 1 ? "bg-hz-border/[0.04]" : ""}`}>
+                  <tr key={bh._id} className={`group transition-colors hover:bg-hz-border/20 ${editId === bh._id ? "bg-module-accent/[0.04]" : i % 2 === 1 ? "bg-hz-border/[0.04]" : ""}`}>
                     <td className="px-4 py-2.5 font-bold">{bh.aircraftTypeIcao ?? "All"}</td>
                     <td className="px-4 py-2.5 text-hz-text-secondary capitalize">{bh.seasonType}</td>
                     {mode === "block" ? (
@@ -610,14 +630,14 @@ function BlockHourFormFields({ form, setForm, label1, label2, mode }: {
       {mode === "block" ? (
         <div className="flex gap-3">
           <div className="flex-1">
-            <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Block {label1}→{label2} (min) *</label>
-            <input type="number" value={form.dir1Block}
+            <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Block {label1}→{label2} (HH:MM) *</label>
+            <input type="text" value={form.dir1Block} placeholder="e.g. 02:10"
               onChange={(e) => setForm((p: any) => ({ ...p, dir1Block: e.target.value }))}
               className={inputClass} />
           </div>
           <div className="flex-1">
-            <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Block {label2}→{label1} (min) *</label>
-            <input type="number" value={form.dir2Block}
+            <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium">Block {label2}→{label1} (HH:MM) *</label>
+            <input type="text" value={form.dir2Block} placeholder="e.g. 02:10"
               onChange={(e) => setForm((p: any) => ({ ...p, dir2Block: e.target.value }))}
               className={inputClass} />
           </div>

@@ -42,7 +42,7 @@ export function GanttShell() {
 
         <GanttToolbar />
 
-        <div className="flex-1 min-h-0 overflow-hidden relative" style={{ background: palette.background }}>
+        <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col" style={{ background: palette.background }}>
           {layout ? (
             <GanttCanvas />
           ) : (

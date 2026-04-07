@@ -108,7 +108,7 @@ export function ScheduleGridShell() {
     const minDelay = new Promise((r) => setTimeout(r, 3000));
     try {
       const [data] = await Promise.all([
-        api.getScheduledFlights({ operatorId: "horizon", seasonCode }),
+        api.getScheduledFlights({ operatorId: getOperatorId(), seasonCode }),
         minDelay,
       ]);
       cancelAnimationFrame(rafRef.current);
@@ -304,7 +304,7 @@ export function ScheduleGridShell() {
       clearCellFormats();
       // Silent refresh — no runway animation, then hydrate formats
       try {
-        const data = await api.getScheduledFlights({ operatorId: "horizon", seasonCode });
+        const data = await api.getScheduledFlights({ operatorId: getOperatorId(), seasonCode });
         setRows(data);
         hydrateFormats(data);
       } catch (_) { /* grid already cleared, user can re-fetch via Go */ }
@@ -550,4 +550,5 @@ export function ScheduleGridShell() {
     </div>
     </div>
   );
+import { getOperatorId } from "@/stores/use-operator-store"
 }

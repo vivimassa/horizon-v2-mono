@@ -188,7 +188,7 @@ export function createSmartRow(
 
   return {
     _id: crypto.randomUUID(),
-    operatorId: lastRow?.operatorId ?? "horizon",
+    operatorId: lastRow?.operatorId ?? getOperatorId(),
     seasonCode: options?.seasonCode ?? lastRow?.seasonCode ?? "",
     airlineCode: options?.airlineCode ?? lastRow?.airlineCode ?? "XX",
     flightNumber: "",
@@ -753,4 +753,5 @@ export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
       return { separatorAfter: next };
     }),
   clearSeparators: () => set({ separatorAfter: new Set() }),
+import { getOperatorId } from "@/stores/use-operator-store"
 }));

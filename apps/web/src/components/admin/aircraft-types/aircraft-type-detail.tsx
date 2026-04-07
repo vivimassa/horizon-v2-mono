@@ -52,14 +52,31 @@ function minutesToHHMM(minutes: number | null | undefined): string {
   if (minutes == null) return "";
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  return `${h}:${String(m).padStart(2, "0")}`;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+/** Parse HH:MM, HHMM, or H:MM into minutes. Accepts "0210", "02:10", "2:10" → 130. */
 function hhmmToMinutes(str: string): number | null {
-  if (!str || !str.includes(":")) return null;
-  const [h, m] = str.split(":").map(Number);
-  if (isNaN(h) || isNaN(m)) return null;
-  return h * 60 + m;
+  const trimmed = str.trim();
+  if (!trimmed) return null;
+  // If contains ":", split on it
+  if (trimmed.includes(":")) {
+    const [hStr, mStr] = trimmed.split(":");
+    const h = parseInt(hStr, 10);
+    const m = parseInt(mStr, 10);
+    if (isNaN(h) || isNaN(m)) return null;
+    return h * 60 + m;
+  }
+  // Pure digits: 3+ digits → HHMM (e.g. "0210" → 2h10m, "130" → 1h30m)
+  const num = trimmed.replace(/\D/g, "");
+  if (!num) return null;
+  if (num.length >= 3) {
+    const mins = parseInt(num.slice(-2), 10);
+    const hrs = parseInt(num.slice(0, -2), 10);
+    return hrs * 60 + mins;
+  }
+  // 1-2 digits: treat as hours (e.g. "2" → 120min)
+  return (parseInt(num, 10) || 0) * 60;
 }
 
 // ── Props ──
@@ -93,8 +110,8 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
 
   useEffect(() => {
     if (!aircraftType) return;
-    api.getLopaConfigs("horizon", aircraftType.icaoType).then(setLopaConfigs).catch(() => {});
-    api.getCabinClasses("horizon").then(setCabinClasses).catch(() => {});
+    api.getLopaConfigs(getOperatorId(), aircraftType.icaoType).then(setLopaConfigs).catch(() => {});
+    api.getCabinClasses(getOperatorId()).then(setCabinClasses).catch(() => {});
   }, [aircraftType]);
 
   const friendlyError = useCallback((err: any) => {
@@ -116,7 +133,7 @@ export function AircraftTypeDetail({ aircraftType, onSave, onDelete, onCreate, o
     setCreating(true); setCreateError("");
     try {
       await onCreate({
-        operatorId: "horizon",
+        operatorId: getOperatorId(),
         icaoType: createForm.icaoType.toUpperCase(),
         name: createForm.name,
         manufacturer: createForm.manufacturer || null,
@@ -699,14 +716,27 @@ function TATCell({ field, type, draft, editing, onChange }: {
     ? draftParent[child] as number | null
     : (type[parent as keyof AircraftTypeRef] as Record<string, unknown> | null)?.[child] as number | null ?? null;
 
+  // Local text state so typing isn't clobbered by parse→format on every keystroke
+  const [localText, setLocalText] = useState(() => minutesToHHMM(minutes));
+
+  // Sync local text when external minutes change (e.g. entering/leaving edit mode)
+  useEffect(() => {
+    setLocalText(minutesToHHMM(minutes));
+  }, [minutes, editing]);
+
   if (editing) {
     return (
       <td className="py-3 px-3 text-center">
         <input
           type="text"
-          value={minutesToHHMM(minutes)}
-          onChange={(e) => onChange(field, hhmmToMinutes(e.target.value))}
-          placeholder="H:MM"
+          value={localText}
+          onChange={(e) => setLocalText(e.target.value)}
+          onBlur={() => {
+            const parsed = hhmmToMinutes(localText);
+            onChange(field, parsed);
+            setLocalText(minutesToHHMM(parsed));
+          }}
+          placeholder="HH:MM"
           className="w-20 text-center text-[13px] font-mono font-medium bg-transparent border-b border-hz-accent/30 outline-none focus:border-hz-accent py-0.5 text-hz-text mx-auto"
         />
       </td>
@@ -731,4 +761,5 @@ function MiniInput({ label, value, onChange, maxLength, mono, type = "text" }: {
         className={`w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text ${mono ? "font-mono" : ""}`} />
     </div>
   );
+import { getOperatorId } from "@/stores/use-operator-store"
 }

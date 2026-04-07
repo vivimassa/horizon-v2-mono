@@ -192,6 +192,7 @@ export function computeLayout(input: LayoutInput): LayoutResult {
 
   const sortedTypes = [...typeGroups.entries()].sort((a, b) => a[0].localeCompare(b[0]))
 
+
   for (const [typeIcao, acList] of sortedTypes) {
     const typeInfo = aircraftTypes.find(t => t.icaoType === typeIcao)
     const typeColor = acTypeColorMap.get(typeIcao) ?? '#6b7280'

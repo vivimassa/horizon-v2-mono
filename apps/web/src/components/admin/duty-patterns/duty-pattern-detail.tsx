@@ -68,7 +68,7 @@ export function DutyPatternDetail({ pattern, onSave, onDelete, onCreate }: DutyP
     setCreating(true); setCreateError("");
     try {
       await onCreate({
-        operatorId: "horizon",
+        operatorId: getOperatorId(),
         code: createForm.code.toUpperCase(),
         description: createForm.description || null,
         sequence: createForm.sequence,
@@ -409,4 +409,5 @@ function SequenceEditor({ sequence, onChange }: { sequence: number[]; onChange: 
       )}
     </div>
   );
+import { getOperatorId } from "@/stores/use-operator-store"
 }

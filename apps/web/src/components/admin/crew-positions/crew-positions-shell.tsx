@@ -21,7 +21,7 @@ export function CrewPositionsShell() {
 
   const fetchData = useCallback(() => {
     setLoading(true);
-    api.getCrewPositions("horizon", true)
+    api.getCrewPositions(getOperatorId(), true)
       .then((data) => {
         setPositions(data);
         setSelected((prev) => {
@@ -36,7 +36,7 @@ export function CrewPositionsShell() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleCreate = useCallback(async (data: Partial<CrewPositionRef>) => {
-    await api.createCrewPosition({ ...data, operatorId: "horizon" });
+    await api.createCrewPosition({ ...data, operatorId: getOperatorId() });
     setShowCreate(false);
     fetchData();
   }, [fetchData]);
@@ -58,7 +58,7 @@ export function CrewPositionsShell() {
   }, [fetchData]);
 
   const handleSeed = useCallback(async () => {
-    await api.seedCrewPositions("horizon");
+    await api.seedCrewPositions(getOperatorId());
     fetchData();
   }, [fetchData]);
 
@@ -165,4 +165,5 @@ function EmptyState({ onSeed, onAdd }: { onSeed: () => void; onAdd: () => void }
       </div>
     </div>
   );
+import { getOperatorId } from "@/stores/use-operator-store"
 }

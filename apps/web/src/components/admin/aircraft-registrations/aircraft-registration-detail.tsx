@@ -111,9 +111,9 @@ export function AircraftRegistrationDetail({
     if (!regAcTypeId) return;
     const acType = typeMap.get(regAcTypeId);
     if (acType) {
-      api.getLopaConfigs("horizon", acType.icaoType).then(setLopaConfigs).catch(() => {});
+      api.getLopaConfigs(getOperatorId(), acType.icaoType).then(setLopaConfigs).catch(() => {});
     }
-    api.getCabinClasses("horizon").then(setCabinClasses).catch(() => {});
+    api.getCabinClasses(getOperatorId()).then(setCabinClasses).catch(() => {});
   }, [regId, regAcTypeId, typeMap]);
 
   // Set default aircraftTypeId for create form
@@ -144,7 +144,7 @@ export function AircraftRegistrationDetail({
     setCreating(true); setCreateError("");
     try {
       await onCreate({
-        operatorId: "horizon",
+        operatorId: getOperatorId(),
         registration: createForm.registration.toUpperCase(),
         aircraftTypeId: createForm.aircraftTypeId,
         serialNumber: createForm.serialNumber || null,
@@ -777,4 +777,5 @@ function MiniInput({ label, value, onChange, maxLength, mono, type = "text" }: {
 
     </div>
   );
+import { getOperatorId } from "@/stores/use-operator-store"
 }

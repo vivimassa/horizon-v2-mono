@@ -61,11 +61,11 @@ export function FdtRulesShell() {
       setTabGroups(tg);
 
       try {
-        const s = await api.getFdtlScheme("horizon");
+        const s = await api.getFdtlScheme(getOperatorId());
         setScheme(s);
         const [r, t] = await Promise.all([
-          api.getFdtlRules("horizon", s.frameworkCode),
-          api.getFdtlTables("horizon", s.frameworkCode),
+          api.getFdtlRules(getOperatorId(), s.frameworkCode),
+          api.getFdtlTables(getOperatorId(), s.frameworkCode),
         ]);
         setRules(r);
         setTables(t);
@@ -87,7 +87,7 @@ export function FdtRulesShell() {
   const handleSeed = useCallback(async (frameworkCode: string) => {
     setSeeding(true); setErrorMsg("");
     try {
-      await api.seedFdtl("horizon", frameworkCode);
+      await api.seedFdtl(getOperatorId(), frameworkCode);
       await fetchData();
     } catch { setErrorMsg("Failed to seed framework"); }
     finally { setSeeding(false); }
@@ -384,4 +384,5 @@ function FrameworkSetup({
       </button>
     </div>
   );
+import { getOperatorId } from "@/stores/use-operator-store"
 }

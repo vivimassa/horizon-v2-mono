@@ -19,7 +19,7 @@ export const useOperatorStore = create<OperatorState>((set, get) => ({
   dateFormat: "DD-MMM-YY",
   loaded: false,
 
-  loadOperator: async (operatorId = "horizon") => {
+  loadOperator: async (operatorId?: string) => {
     if (get().loaded) return;
     try {
       const operators = await api.getOperators();
@@ -36,3 +36,8 @@ export const useOperatorStore = create<OperatorState>((set, get) => ({
     }
   },
 }));
+
+/** Get the current operator's _id. Use this instead of hardcoding "horizon". */
+export function getOperatorId(): string {
+  return useOperatorStore.getState().operator?._id ?? '';
+}

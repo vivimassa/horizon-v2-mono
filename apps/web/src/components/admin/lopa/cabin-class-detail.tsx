@@ -142,7 +142,7 @@ export function CabinClassDetail({ cabinClass, lopaConfigs = [], onSave, onDelet
     setCreating(true); setCreateError("");
     try {
       await onCreate({
-        operatorId: "horizon",
+        operatorId: getOperatorId(),
         code: createForm.code.toUpperCase(),
         name: createForm.name,
         color: createForm.color || null,
@@ -597,4 +597,5 @@ function MiniInput({ label, value, onChange, maxLength, mono, type = "text" }: {
         className={`w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 focus:border-module-accent transition-colors text-hz-text ${mono ? "font-mono" : ""}`} />
     </div>
   );
+import { getOperatorId } from "@/stores/use-operator-store"
 }

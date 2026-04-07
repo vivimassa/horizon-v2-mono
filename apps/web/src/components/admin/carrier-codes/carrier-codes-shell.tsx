@@ -275,7 +275,7 @@ function CarrierDetail({ carrier, onSave, onDelete, onCreate, onCancelCreate }: 
       if (!d.iataCode || !d.name) { setErrorMsg("IATA code and name are required"); return; }
       setSaving(true); setErrorMsg("");
       try {
-        const payload: Record<string, any> = { operatorId: "horizon" };
+        const payload: Record<string, any> = { operatorId: getOperatorId() };
         for (const [k, v] of Object.entries(d)) {
           payload[k] = (v === "" || v === undefined) ? null : v;
         }
@@ -612,4 +612,5 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </div>
   );
 }
+import { getOperatorId } from "@/stores/use-operator-store"
 

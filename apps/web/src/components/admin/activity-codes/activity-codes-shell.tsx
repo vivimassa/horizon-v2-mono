@@ -47,7 +47,7 @@ export function ActivityCodesShell() {
   // ── Group CRUD ──
   const handleCreateGroup = useCallback(
     async (data: Partial<ActivityCodeGroupRef>) => {
-      await api.createActivityCodeGroup({ operatorId: "horizon", ...data });
+      await api.createActivityCodeGroup({ operatorId: getOperatorId(), ...data });
       fetchData();
     },
     [fetchData]
@@ -78,7 +78,7 @@ export function ActivityCodesShell() {
   const handleCreateCode = useCallback(
     async (data: Partial<ActivityCodeRef>) => {
       const created = await api.createActivityCode({
-        operatorId: "horizon",
+        operatorId: getOperatorId(),
         ...data,
       });
       setCreating(false);
@@ -188,4 +188,5 @@ export function ActivityCodesShell() {
       }
     />
   );
+import { getOperatorId } from "@/stores/use-operator-store"
 }

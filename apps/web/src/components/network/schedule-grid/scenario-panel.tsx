@@ -36,7 +36,7 @@ export function ScenarioPanel({ seasonCode, activeScenarioId, onSelectScenario, 
   const fetchScenarios = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api.getScenarios({ operatorId: "horizon", seasonCode });
+      const data = await api.getScenarios({ operatorId: getOperatorId(), seasonCode });
       setScenarios(data);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
@@ -54,14 +54,14 @@ export function ScenarioPanel({ seasonCode, activeScenarioId, onSelectScenario, 
       } else if (copyFlights) {
         // Create scenario then copy default flights into it
         const scenario = await api.createScenario({
-          operatorId: "horizon", seasonCode, name: createName.trim(),
+          operatorId: getOperatorId(), seasonCode, name: createName.trim(),
           description: createDesc.trim() || null, createdBy: "admin",
         });
         // Clone from production (null scenario) by copying flights
         await api.cloneScenario(scenario._id, createName.trim(), "admin").catch(() => {});
       } else {
         await api.createScenario({
-          operatorId: "horizon", seasonCode, name: createName.trim(),
+          operatorId: getOperatorId(), seasonCode, name: createName.trim(),
           description: createDesc.trim() || null, createdBy: "admin",
         });
       }
@@ -329,4 +329,5 @@ export function ScenarioPanel({ seasonCode, activeScenarioId, onSelectScenario, 
       </div>
     </div>
   );
+import { getOperatorId } from "@/stores/use-operator-store"
 }

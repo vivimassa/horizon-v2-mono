@@ -231,9 +231,9 @@ export function GanttCanvas() {
         </div>
 
         {/* Canvas + scroll sentinel */}
-        <div ref={containerRef} className="flex-1 relative" style={{ minHeight: 0, minWidth: 0 }}>
-          <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />
-          <div ref={scrollRef} className="gantt-scroll" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'scroll' }}
+        <div ref={containerRef} className="flex-1 min-h-0 min-w-0 overflow-hidden relative">
+          <canvas ref={canvasRef} className="absolute inset-0" style={{ pointerEvents: 'none', zIndex: 0 }} />
+          <div ref={scrollRef} className="gantt-scroll absolute inset-0" style={{ overflow: 'scroll', zIndex: 1 }}
             onScroll={handleScroll} onMouseMove={handleMouseMove} onClick={handleClick}>
             <div style={{ width: totalWidth, height: totalHeight }} />
           </div>

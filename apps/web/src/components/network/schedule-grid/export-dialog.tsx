@@ -26,7 +26,7 @@ export function ExportDialog({ seasonCode, scenarioId, flightCount, dateFrom, da
   const handleExport = useCallback(async () => {
     setExporting(true);
     try {
-      const blob = await api.exportSsim({ operatorId: "horizon", seasonCode, scenarioId });
+      const blob = await api.exportSsim({ operatorId: getOperatorId(), seasonCode, scenarioId });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -112,4 +112,5 @@ export function ExportDialog({ seasonCode, scenarioId, flightCount, dateFrom, da
       </div>
     </div>
   );
+import { getOperatorId } from "@/stores/use-operator-store"
 }

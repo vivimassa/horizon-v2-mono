@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Type, Palette } from "lucide-react";
 import { RibbonButton } from "./ribbon-button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useTheme } from "@/components/theme-provider";
 import { useScheduleGridStore } from "@/stores/use-schedule-grid-store";
 import { GRID_COLUMNS } from "../grid-columns";
@@ -24,13 +25,13 @@ export function FontSection({ hasSelection }: Props) {
   const setCellFormat = useScheduleGridStore((s) => s.setCellFormat);
   const selectedCell = useScheduleGridStore((s) => s.selectedCell);
   const rows = useScheduleGridStore((s) => s.rows);
-  const newRows = useScheduleGridStore((s) => s.newRows);
+  const newRowIds = useScheduleGridStore((s) => s.newRowIds);
 
   const deletedIds = useScheduleGridStore((s) => s.deletedIds);
   const selectionRange = useScheduleGridStore((s) => s.selectionRange);
 
   const forEachCell = (fn: (rowId: string, colKey: string) => void) => {
-    const allRows = [...rows, ...newRows].filter((r) => !deletedIds.has(r._id));
+    const allRows = rows.filter((r) => !deletedIds.has(r._id));
     if (selectionRange) {
       const r1 = Math.min(selectionRange.startRow, selectionRange.endRow);
       const r2 = Math.max(selectionRange.startRow, selectionRange.endRow);
@@ -74,16 +75,18 @@ export function FontSection({ hasSelection }: Props) {
             disabled={!hasSelection}
             onChange={(e) => handleFontFamily(e.target.value)}
           >
-            <option value="Mono">Mono</option>
-            <option value="System">System</option>
+            <option value="Mono">JetBrains Mono</option>
+            <option value="Inter">Inter</option>
+            <option value="SF Pro">SF Pro</option>
+            <option value="Roboto">Roboto</option>
+            <option value="Helvetica Neue">Helvetica Neue</option>
             <option value="Arial">Arial</option>
-            <option value="Georgia">Georgia</option>
-            <option value="Verdana">Verdana</option>
+            <option value="Segoe UI">Segoe UI</option>
           </select>
           <select
             className="h-8 px-2 rounded-lg text-[12px] outline-none w-16"
             style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
-            defaultValue="11"
+            defaultValue="13"
             disabled={!hasSelection}
             onChange={(e) => handleFontSize(Number(e.target.value))}
           >
@@ -179,17 +182,18 @@ function ColorPickerButton({ icon: Icon, label, disabled, isDark, onPick }: Colo
 
   return (
     <>
-      <button
-        ref={btnRef}
-        onClick={() => !disabled && setOpen((o) => !o)}
-        className={`flex items-center justify-center rounded transition-all duration-150 ${disabled ? "opacity-30 pointer-events-none" : ""}`}
-        style={{ width: 40, height: 40 }}
-        onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = hoverBg; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-        title={label}
-      >
-        <Icon size={20} strokeWidth={1.6} />
-      </button>
+      <Tooltip content={label}>
+        <button
+          ref={btnRef}
+          onClick={() => !disabled && setOpen((o) => !o)}
+          className={`flex items-center justify-center rounded transition-all duration-150 ${disabled ? "opacity-30 pointer-events-none" : ""}`}
+          style={{ width: 40, height: 40 }}
+          onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = hoverBg; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+        >
+          <Icon size={20} strokeWidth={1.6} />
+        </button>
+      </Tooltip>
       {open && createPortal(
         <div
           ref={dropRef}

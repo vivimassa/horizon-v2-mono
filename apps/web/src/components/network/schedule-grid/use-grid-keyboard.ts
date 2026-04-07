@@ -3,12 +3,12 @@
 // Matches Excel behavior: Ctrl+C/V/X/Z/Y/S/B/I/U/F/H, Tab, Enter, Arrow keys, F2, F12, Delete
 
 import { useEffect, useRef } from "react";
-import { useScheduleGridStore } from "@/stores/use-schedule-grid-store";
+import { useScheduleGridStore, EMPTY_BUFFER_ROWS } from "@/stores/use-schedule-grid-store";
 import { GRID_COLUMNS } from "./grid-columns";
 
 interface UseGridKeyboardOptions {
   onSave: () => void;
-  onAddFlight: () => void;
+  onAddFlight: (insertAtIdx?: number) => void;
   onDeleteFlight: (rowIdx: number) => void;
   onTabWrapDown?: () => void;
   onOpenFind?: () => void;
@@ -51,22 +51,14 @@ export function useGridKeyboard({
 
       // ── While typing in an input: intercept navigation + global shortcuts ──
       if (isTyping) {
-        // Tab: let the cell's own handleKeyDown handle it (it has commitAcType, autoBlock, etc.)
-        // Only intercept here if the cell won't handle it (shouldn't happen, but safety net)
+        // Tab and Enter: let the cell's own handleKeyDown handle it
+        // (it has commitAcType, autoBlock, flight number parsing, etc.)
         if (e.key === "Tab") {
           return;
         }
-        // Enter: commit edit and move down one row
         if (e.key === "Enter") {
-          e.preventDefault();
-          e.stopPropagation();
-          state.commitEdit();
-          const sc = state.selectedCell;
-          if (sc) {
-            const allRows = [...state.rows, ...state.newRows];
-            if (sc.rowIdx < allRows.length - 1) state.selectCell({ rowIdx: sc.rowIdx + 1, colKey: sc.colKey });
-            else state.selectCell(sc);
-          }
+          // Let the cell handle Enter (commitAcType, etc.), then move down
+          // The cell's onKeyDown calls onCommit() + onNavigate("down")
           return;
         }
         // Escape: cancel edit
@@ -92,28 +84,35 @@ export function useGridKeyboard({
           state.redo();
           return;
         }
-        // Ctrl+N or Insert — add flight (even while editing)
-        if ((mod && e.key.toLowerCase() === "n") || e.key === "Insert") {
+        // Ctrl+N — add flight at end (even while editing)
+        if (mod && e.key.toLowerCase() === "n") {
           e.preventDefault();
           e.stopPropagation();
           state.commitEdit();
           callbackRefs.current.onAddFlight();
           return;
         }
-        // Ctrl+Shift++ — add flight
-        if (mod && e.shiftKey && (e.key === "+" || e.key === "=")) {
+        // Insert or Ctrl+Shift++ — insert N rows at current position (N = selected row count)
+        if (e.key === "Insert" || (mod && e.shiftKey && (e.key === "+" || e.key === "="))) {
           e.preventDefault();
           e.stopPropagation();
           state.commitEdit();
-          callbackRefs.current.onAddFlight();
+          const sc = state.selectedCell;
+          const sr = state.selectionRange;
+          const count = sr ? Math.abs(sr.endRow - sr.startRow) + 1 : 1;
+          const startIdx = sr ? Math.min(sr.startRow, sr.endRow) : sc?.rowIdx;
+          for (let i = 0; i < count; i++) callbackRefs.current.onAddFlight(startIdx);
           return;
         }
-        // Ctrl+- — delete flight
+        // Ctrl+- — delete flight(s)
         if (mod && e.key === "-" && state.selectedCell) {
           e.preventDefault();
           e.stopPropagation();
           state.commitEdit();
-          callbackRefs.current.onDeleteFlight(state.selectedCell.rowIdx);
+          const sr = state.selectionRange;
+          const r1 = sr ? Math.min(sr.startRow, sr.endRow) : state.selectedCell.rowIdx;
+          const r2 = sr ? Math.max(sr.startRow, sr.endRow) : state.selectedCell.rowIdx;
+          for (let i = r2; i >= r1; i--) callbackRefs.current.onDeleteFlight(i);
           return;
         }
         // Let the input handle all other keys
@@ -209,9 +208,8 @@ export function useGridKeyboard({
           e.preventDefault();
           e.stopPropagation();
           if (selectedCell && selectedCell.rowIdx > 0) {
-            const allRows = [...state.rows, ...state.newRows];
-            const aboveRow = allRows[selectedCell.rowIdx - 1];
-            const currentRow = allRows[selectedCell.rowIdx];
+            const aboveRow = state.rows[selectedCell.rowIdx - 1];
+            const currentRow = state.rows[selectedCell.rowIdx];
             const col = GRID_COLUMNS.find((c) => c.key === selectedCell.colKey);
             if (aboveRow && currentRow && col?.editable) {
               const dirtyAbove = state.getDirtyValue(aboveRow._id, selectedCell.colKey);
@@ -226,10 +224,13 @@ export function useGridKeyboard({
       // ── Shortcuts requiring a selected cell ──
       if (!selectedCell) return;
 
-      // Ctrl+Delete — delete selected flight
+      // Ctrl+Delete — delete selected flight(s)
       if (mod && e.key === "Delete") {
         e.preventDefault();
-        callbackRefs.current.onDeleteFlight(selectedCell.rowIdx);
+        const sr = state.selectionRange;
+        const r1 = sr ? Math.min(sr.startRow, sr.endRow) : selectedCell.rowIdx;
+        const r2 = sr ? Math.max(sr.startRow, sr.endRow) : selectedCell.rowIdx;
+        for (let i = r2; i >= r1; i--) callbackRefs.current.onDeleteFlight(i);
         return;
       }
 
@@ -257,24 +258,23 @@ export function useGridKeyboard({
         return;
       }
 
-      // Insert — add flight
-      if (e.key === "Insert") {
+      // Insert or Ctrl+Shift++ — insert N rows at current position (N = selected row count)
+      if (e.key === "Insert" || (mod && e.shiftKey && (e.key === "+" || e.key === "="))) {
         e.preventDefault();
-        callbackRefs.current.onAddFlight();
+        const sr = state.selectionRange;
+        const count = sr ? Math.abs(sr.endRow - sr.startRow) + 1 : 1;
+        const startIdx = sr ? Math.min(sr.startRow, sr.endRow) : selectedCell?.rowIdx;
+        for (let i = 0; i < count; i++) callbackRefs.current.onAddFlight(startIdx);
         return;
       }
 
-      // Ctrl+Shift++ — add flight
-      if (mod && e.shiftKey && (e.key === "+" || e.key === "=")) {
-        e.preventDefault();
-        callbackRefs.current.onAddFlight();
-        return;
-      }
-
-      // Ctrl+- — delete flight
+      // Ctrl+- — delete flight(s)
       if (mod && e.key === "-" && selectedCell) {
         e.preventDefault();
-        callbackRefs.current.onDeleteFlight(selectedCell.rowIdx);
+        const sr = state.selectionRange;
+        const r1 = sr ? Math.min(sr.startRow, sr.endRow) : selectedCell.rowIdx;
+        const r2 = sr ? Math.max(sr.startRow, sr.endRow) : selectedCell.rowIdx;
+        for (let i = r2; i >= r1; i--) callbackRefs.current.onDeleteFlight(i);
         return;
       }
 
@@ -303,7 +303,8 @@ export function useGridKeyboard({
 
       // ── Navigation & editing keys ──
       const { rowIdx, colKey } = selectedCell;
-      const allRows = [...state.rows, ...state.newRows];
+      const allRows = state.rows;
+      const maxRowIdx = allRows.length + EMPTY_BUFFER_ROWS - 1;
       const colIdx = GRID_COLUMNS.findIndex((c) => c.key === colKey);
       const { selectionRange } = state;
 
@@ -315,7 +316,7 @@ export function useGridKeyboard({
         if (selectionRange && selectionRange.startCol === 0 && selectionRange.endCol >= GRID_COLUMNS.length - 1
             && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
           const dr = e.key === "ArrowDown" ? 1 : -1;
-          const newEnd = Math.max(0, Math.min(allRows.length - 1, selectionRange.endRow + dr));
+          const newEnd = Math.max(0, Math.min(maxRowIdx, selectionRange.endRow + dr));
           state.setSelectionRange({ ...selectionRange, endRow: newEnd });
           return;
         }
@@ -331,9 +332,9 @@ export function useGridKeyboard({
         case "ArrowDown":
           e.preventDefault();
           if (mod) {
-            // Ctrl+Down: jump to last row (Excel behavior)
-            state.selectCell({ rowIdx: allRows.length - 1, colKey });
-          } else if (rowIdx < allRows.length - 1) {
+            // Ctrl+Down: jump to last data row (Excel behavior)
+            state.selectCell({ rowIdx: Math.max(0, allRows.length - 1), colKey });
+          } else if (rowIdx < maxRowIdx) {
             state.selectCell({ rowIdx: rowIdx + 1, colKey });
           }
           break;
@@ -380,7 +381,7 @@ export function useGridKeyboard({
               state.startEditing({ rowIdx, colKey: editableCols[curIdx + 1].key });
             } else if (onTabWrapDown) {
               onTabWrapDown();
-            } else if (rowIdx < allRows.length - 1) {
+            } else if (rowIdx < maxRowIdx) {
               state.startEditing({ rowIdx: rowIdx + 1, colKey: editableCols[0].key });
             }
           }
@@ -388,6 +389,7 @@ export function useGridKeyboard({
         }
         case "Escape":
           e.preventDefault();
+          useScheduleGridStore.setState({ clipboard: null, formatPainterSource: null });
           state.selectCell(null);
           break;
         case "Delete":
@@ -422,7 +424,7 @@ export function useGridKeyboard({
           break;
         case "End":
           e.preventDefault();
-          if (mod) state.selectCell({ rowIdx: allRows.length - 1, colKey: GRID_COLUMNS[GRID_COLUMNS.length - 1].key });
+          if (mod) state.selectCell({ rowIdx: Math.max(0, allRows.length - 1), colKey: GRID_COLUMNS[GRID_COLUMNS.length - 1].key });
           else state.selectCell({ rowIdx, colKey: GRID_COLUMNS[GRID_COLUMNS.length - 1].key });
           break;
         default:

@@ -24,6 +24,9 @@ export interface SelectionRange {
 export interface ClipboardData {
   cells: { colKey: string; value: string }[];
   rowId: string;
+  /** All row IDs involved (for multi-cell dashed border) */
+  rowIds: string[];
+  colKeys: string[];
   mode: "copy" | "cut";
 }
 

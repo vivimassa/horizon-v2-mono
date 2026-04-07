@@ -382,7 +382,7 @@ function ViewEditPanel({ code, categories, onSave, onDelete, onDeactivate }: {
                 const val = code.formulaParams?.[field.key];
                 return (
                   <FieldRow key={field.key} label={field.label} value={
-                    val != null ? <span className="font-mono">{val}{field.unit ? ` ${field.unit}` : ""}</span>
+                    val != null ? <span className="font-mono">{String(val)}{field.unit ? ` ${field.unit}` : ""}</span>
                     : <span className="text-hz-text-secondary">Not set</span>
                   } />
                 );

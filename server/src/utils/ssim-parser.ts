@@ -14,6 +14,8 @@ export interface ParsedFlight {
   effectiveFrom: string
   effectiveUntil: string
   blockMinutes: number | null
+  departureDayOffset: number
+  separatorBelow: boolean
 }
 
 export interface ParseResult {
@@ -48,6 +50,7 @@ const COLUMN_MAP: Record<string, string> = {
   'period end': 'effectiveUntil',
   'block': 'blockMinutes',
   'block time': 'blockMinutes',
+  'offset': 'departureDayOffset',
 }
 
 export async function parseSsimExcel(buffer: Buffer): Promise<ParseResult> {
@@ -74,7 +77,14 @@ export async function parseSsimExcel(buffer: Buffer): Promise<ParseResult> {
 
   for (let r = 2; r <= sheet.rowCount; r++) {
     const row = sheet.getRow(r)
-    if (!row.hasValues) continue
+
+    // Detect blank rows — mark previous flight as separator
+    if (!row.hasValues) {
+      if (flights.length > 0) {
+        flights[flights.length - 1].separatorBelow = true
+      }
+      continue
+    }
 
     const data: Record<string, string> = {}
     for (const [colNum, field] of Object.entries(colMapping)) {
@@ -82,15 +92,20 @@ export async function parseSsimExcel(buffer: Buffer): Promise<ParseResult> {
       data[field] = val != null ? String(val).trim() : ''
     }
 
-    // Validate required fields
-    if (!data.flightNumber && !data.depStation && !data.arrStation) continue // skip empty rows
+    // Skip rows with no meaningful data
+    if (!data.flightNumber && !data.depStation && !data.arrStation) {
+      if (flights.length > 0) {
+        flights[flights.length - 1].separatorBelow = true
+      }
+      continue
+    }
     if (!data.depStation || !data.arrStation) {
       errors.push({ row: r, message: 'Missing DEP or ARR station' })
       continue
     }
 
     // Parse flight number — extract airline code if present
-    let airlineCode = 'HZ'
+    let airlineCode = ''
     let flightNum = data.flightNumber ?? ''
     const match = flightNum.match(/^([A-Z]{2,3})(.+)$/i)
     if (match) {
@@ -111,6 +126,8 @@ export async function parseSsimExcel(buffer: Buffer): Promise<ParseResult> {
       effectiveFrom: data.effectiveFrom || '',
       effectiveUntil: data.effectiveUntil || '',
       blockMinutes: data.blockMinutes ? parseInt(data.blockMinutes) || null : null,
+      departureDayOffset: data.departureDayOffset ? parseInt(data.departureDayOffset) || 1 : 1,
+      separatorBelow: false,
     })
   }
 

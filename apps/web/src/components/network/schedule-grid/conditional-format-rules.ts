@@ -12,20 +12,6 @@ interface ConditionalRule {
 }
 
 export const CONDITIONAL_RULES: ConditionalRule[] = [
-  // Cancelled flights — strikethrough + gray
-  {
-    name: "Cancelled flight",
-    condition: (row) => row.status === "cancelled",
-    format: { textColor: "#8F90A6" },
-  },
-
-  // Suspended flights — muted orange
-  {
-    name: "Suspended flight",
-    condition: (row) => row.status === "suspended",
-    format: { textColor: "#E67A00" },
-  },
-
   // ETOPS flights — blue highlight on DEP/ARR
   {
     name: "ETOPS route",
@@ -34,22 +20,12 @@ export const CONDITIONAL_RULES: ConditionalRule[] = [
     format: { textColor: "#0063F7", bold: true },
   },
 
-  // Short TAT warning (< 45 min) — orange background
-  // Note: TAT is computed, not stored. This rule would need TAT passed in.
-  // For now, it highlights overwater flights as a proxy.
+  // Overwater flights — teal highlight on DEP/ARR
   {
     name: "Overwater route",
     condition: (row) => row.isOverwater,
     columns: ["depStation", "arrStation"],
     format: { textColor: "#00B7C4" },
-  },
-
-  // Draft status — italic
-  {
-    name: "Draft flight",
-    condition: (row) => row.status === "draft",
-    columns: ["status"],
-    format: { italic: true },
   },
 ];
 

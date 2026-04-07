@@ -28,6 +28,8 @@ export type {
   ExpiryCodeCategoryRef,
   ExpiryCodeRef,
   FlightServiceTypeRef,
+  ReportDebriefTimes,
+  CarrierCodeRef,
   CabinClassRef,
   CabinEntry,
   LopaConfigRef,
@@ -39,4 +41,6 @@ export type {
   UserPreferences,
   UserNotifications,
   UserDisplay,
+  ActivityCodeRef,
+  ActivityCodeGroupRef,
 } from './client'

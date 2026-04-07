@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpDown, Search, Upload, Download, Save, SaveAll, GitBranch, MessageSquare } from "lucide-react";
+import { Search, Replace, Upload, Download, Save, SaveAll, GitBranch, MessageSquare } from "lucide-react";
 import { RibbonButton } from "./ribbon-button";
 import { RibbonSection } from "./flight-section";
 
@@ -11,16 +11,18 @@ interface Props {
   onScenario?: () => void;
   onMessage?: () => void;
   onFind?: () => void;
+  onReplace?: () => void;
+  onSaveAs?: () => void;
   hasDirty: boolean;
   saving: boolean;
 }
 
-export function UtilitySections({ onSave, onImport, onExport, onScenario, onMessage, onFind, hasDirty, saving }: Props) {
+export function UtilitySections({ onSave, onImport, onExport, onScenario, onMessage, onFind, onReplace, onSaveAs, hasDirty, saving }: Props) {
   return (
     <>
       <RibbonSection label="Editing">
-        <RibbonButton icon={ArrowUpDown} label="Sort" small />
         <RibbonButton icon={Search} label="Find" shortcut="Ctrl+F" onClick={onFind} small />
+        <RibbonButton icon={Replace} label="Replace" shortcut="Ctrl+H" onClick={onReplace} small />
       </RibbonSection>
 
       <div className="w-px self-stretch bg-hz-border/30 shrink-0" />
@@ -34,7 +36,7 @@ export function UtilitySections({ onSave, onImport, onExport, onScenario, onMess
 
       <RibbonSection label="Record">
         <RibbonButton icon={Save} label="Save" onClick={onSave} disabled={!hasDirty || saving} shortcut="Ctrl+S" />
-        <RibbonButton icon={SaveAll} label="Save As" shortcut="F12" />
+        <RibbonButton icon={SaveAll} label="Save As" shortcut="F12" onClick={onSaveAs} />
       </RibbonSection>
 
       <div className="w-px self-stretch bg-hz-border/30 shrink-0" />

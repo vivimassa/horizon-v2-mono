@@ -282,6 +282,7 @@ export interface ScheduledFlightRef {
   stdLocal: string | null
   staLocal: string | null
   blockMinutes: number | null
+  departureDayOffset: number
   arrivalDayOffset: number
   daysOfWeek: string
   aircraftTypeId: string | null
@@ -302,6 +303,7 @@ export interface ScheduledFlightRef {
   rotationSequence: number | null
   rotationLabel: string | null
   source: string
+  sortOrder: number
   formatting: Record<string, unknown>
   createdAt: string | null
   updatedAt: string | null
@@ -377,6 +379,7 @@ export interface CrewPositionRef {
   category: 'cockpit' | 'cabin'
   rankOrder: number
   isPic: boolean
+  canDownrank: boolean
   color: string | null
   description: string | null
   isActive: boolean
@@ -400,9 +403,14 @@ export interface ExpiryCodeRef {
   name: string
   description: string | null
   crewCategory: 'both' | 'cockpit' | 'cabin'
+  applicablePositions: string[]
   formula: string
+  formulaParams: Record<string, unknown>
   acTypeScope: 'none' | 'family' | 'variant'
+  linkedTrainingCode: string | null
   warningDays: number | null
+  severity: string[]
+  notes: string | null
   isActive: boolean
   sortOrder: number
 }
@@ -571,6 +579,32 @@ export interface FlightServiceTypeRef {
   name: string
   description: string | null
   color: string | null
+  isActive: boolean
+}
+
+export interface ReportDebriefTimes {
+  reportMinutes: number | null
+  debriefMinutes: number | null
+}
+
+export interface CarrierCodeRef {
+  _id: string
+  operatorId: string
+  iataCode: string
+  icaoCode: string | null
+  name: string
+  category: 'Air' | 'Ground' | 'Other'
+  vendorNumber: string | null
+  contactName: string | null
+  contactPosition: string | null
+  phone: string | null
+  email: string | null
+  sita: string | null
+  website: string | null
+  defaultCurrency: string | null
+  capacity: number | null
+  cockpitTimes: ReportDebriefTimes | null
+  cabinTimes: ReportDebriefTimes | null
   isActive: boolean
 }
 
@@ -1161,6 +1195,18 @@ export const api = {
 
   deleteFlightServiceType: (id: string) =>
     request<{ success: boolean }>(`/flight-service-types/${id}`, { method: 'DELETE' }),
+
+  getCarrierCodes: (operatorId = 'horizon') =>
+    request<CarrierCodeRef[]>(`/carrier-codes?operatorId=${operatorId}`),
+
+  createCarrierCode: (data: Partial<CarrierCodeRef>) =>
+    request<CarrierCodeRef>('/carrier-codes', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateCarrierCode: (id: string, data: Partial<CarrierCodeRef>) =>
+    request<CarrierCodeRef>(`/carrier-codes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  deleteCarrierCode: (id: string) =>
+    request<{ success: boolean }>(`/carrier-codes/${id}`, { method: 'DELETE' }),
 
   getOperators: () => request<OperatorRef[]>('/operators'),
 

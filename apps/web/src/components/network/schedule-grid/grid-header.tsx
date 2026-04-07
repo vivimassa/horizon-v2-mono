@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import { ChevronUp, ChevronDown, Filter } from "lucide-react";
 import { GRID_COLUMNS, HEADER_HEIGHT, CELL_BORDER, CELL_BORDER_DARK } from "./grid-columns";
 import { useGridSortStore } from "./use-grid-sort";
-import { ColumnFilterDropdown } from "./column-filter-dropdown";
+import { ColumnFilterDropdown, type ColorFilter } from "./column-filter-dropdown";
 import { useTheme } from "@/components/theme-provider";
 import type { ScheduledFlightRef } from "@skyhub/api";
 
@@ -12,10 +12,12 @@ interface GridHeaderProps {
   scrollLeft: number;
   rows: ScheduledFlightRef[];
   columnFilters: Map<string, Set<string>>;
+  colorFilters: Map<string, ColorFilter>;
   onApplyFilter: (colKey: string, values: Set<string>) => void;
+  onApplyColorFilter: (colKey: string, filter: ColorFilter | null) => void;
 }
 
-export function GridHeader({ scrollLeft, rows, columnFilters, onApplyFilter }: GridHeaderProps) {
+export function GridHeader({ scrollLeft, rows, columnFilters, colorFilters, onApplyFilter, onApplyColorFilter }: GridHeaderProps) {
   const { sortKey, sortDir, setSortKey } = useGridSortStore();
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const { theme } = useTheme();
@@ -24,7 +26,7 @@ export function GridHeader({ scrollLeft, rows, columnFilters, onApplyFilter }: G
 
   return (
     <thead className="sticky top-0 z-10">
-      <tr style={{ height: HEADER_HEIGHT }}>
+      <tr style={{ height: HEADER_HEIGHT, backgroundColor: isDark ? "#1C1C28" : "#FAFAFC" }}>
         {/* Row number column */}
         <th
           className="text-[11px] font-medium text-hz-text-tertiary bg-hz-bg select-none"
@@ -32,7 +34,7 @@ export function GridHeader({ scrollLeft, rows, columnFilters, onApplyFilter }: G
         />
         {GRID_COLUMNS.map((col) => {
           const isSorted = sortKey === col.key;
-          const hasFilter = columnFilters.has(col.key);
+          const hasFilter = columnFilters.has(col.key) || colorFilters.has(col.key);
           return (
             <th
               key={col.key}
@@ -49,27 +51,24 @@ export function GridHeader({ scrollLeft, rows, columnFilters, onApplyFilter }: G
               }}
               onClick={() => setSortKey(col.key)}
             >
-              {col.label}
-              {isSorted && (
-                <span className="ml-0.5 inline-block align-middle">
-                  {sortDir === "asc" ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-                </span>
-              )}
-              {/* Filter icon */}
+              <span className="truncate">{col.label}</span>
+              {/* Sort/filter indicator — right-aligned */}
               <button
                 onClick={(e) => { e.stopPropagation(); setOpenFilter(openFilter === col.key ? null : col.key); }}
                 className={`absolute right-0.5 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors ${
-                  hasFilter ? "text-module-accent" : "text-hz-text-tertiary/20 hover:text-hz-text-tertiary"
+                  hasFilter ? "text-module-accent" : "text-hz-text-tertiary/30 hover:text-hz-text-tertiary"
                 }`}
               >
-                <Filter size={8} />
+                {hasFilter ? <Filter size={9} /> : isSorted ? (sortDir === "asc" ? <ChevronUp size={10} /> : <ChevronDown size={10} />) : <Filter size={9} />}
               </button>
               {openFilter === col.key && (
                 <ColumnFilterDropdown
                   colKey={col.key}
                   rows={rows}
                   activeFilters={columnFilters.get(col.key) ?? new Set()}
+                  activeColorFilter={colorFilters.get(col.key) ?? null}
                   onApply={onApplyFilter}
+                  onApplyColor={onApplyColorFilter}
                   onClose={() => setOpenFilter(null)}
                 />
               )}

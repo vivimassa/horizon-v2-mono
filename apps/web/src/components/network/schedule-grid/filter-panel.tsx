@@ -161,7 +161,7 @@ export function FilterPanel({ seasonCode, onSeasonChange, onApplyFilters, loadin
 function FilterSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      <label className="text-[12px] font-semibold uppercase tracking-wider text-hz-text-tertiary block">{label}</label>
+      <label className="text-[13px] font-semibold uppercase tracking-wider text-hz-text-tertiary block">{label}</label>
       {children}
     </div>
   );

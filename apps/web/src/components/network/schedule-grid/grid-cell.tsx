@@ -12,6 +12,18 @@ import { getConditionalFormat } from "./conditional-format-rules";
 import { useTheme } from "@/components/theme-provider";
 import type { ScheduledFlightRef } from "@skyhub/api";
 
+const FONT_STACKS: Record<string, string> = {
+  "Mono": "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+  "Inter": "Inter, system-ui, sans-serif",
+  "SF Pro": "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif",
+  "Roboto": "Roboto, 'Helvetica Neue', Arial, sans-serif",
+  "Helvetica Neue": "'Helvetica Neue', Helvetica, Arial, sans-serif",
+  "Segoe UI": "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+};
+function resolveFontFamily(name: string): string {
+  return FONT_STACKS[name] ?? name;
+}
+
 interface GridCellProps {
   column: GridColumn;
   value: string;
@@ -34,12 +46,14 @@ interface GridCellProps {
   onDragStart?: () => void;
   onDragEnter?: () => void;
   isDirty: boolean;
+  clipboardMode?: "copy" | "cut";
+  forcedTextColor?: string;
 }
 
 export const GridCell = React.memo(function GridCell({
   column, value, isSelected, isEditing, isInRange, editValue, rowId, row,
   onContextMenu, onSelect, onStartEdit, onEditChange, onCommit, onCancel, onNavigate, onFieldWire,
-  onDragStart, onDragEnter, isDirty,
+  onDragStart, onDragEnter, isDirty, clipboardMode, forcedTextColor,
 }: GridCellProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const selectRef = useRef<HTMLSelectElement>(null);
@@ -64,8 +78,8 @@ export const GridCell = React.memo(function GridCell({
   const normFrom = normalizeToIso(filterDateFrom, opDateFormat);
   const normTo = normalizeToIso(filterDateTo, opDateFormat);
 
-  const newRows = useScheduleGridStore((s) => s.newRows);
-  const isNewRow = newRows.some((r) => r._id === rowId);
+  const newRowIds = useScheduleGridStore((s) => s.newRowIds);
+  const isNewRow = newRowIds.has(rowId);
 
   const isOutOfPeriod = isDateCol && normValue && normFrom && normTo &&
     (normValue < normFrom || normValue > normTo);
@@ -89,26 +103,36 @@ export const GridCell = React.memo(function GridCell({
     else if (e.key === "Escape") { e.preventDefault(); onCancel(); }
   };
 
-  const monoFont = "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace";
+  const monoFont = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
 
   const cellStyle: React.CSSProperties = {
     width: column.width,
-    textAlign: column.align,
-    fontFamily: column.mono ? monoFont : undefined,
+    textAlign: fmt?.textAlign ?? column.align,
+    fontFamily: column.key === "status" ? "Inter, system-ui, sans-serif" : column.mono ? monoFont : undefined,
     fontSize: 13,
     border,
     padding: "0 4px",
     cursor: column.editable ? "cell" : "default",
   };
 
+  // Clipboard marching-ants dashed border
+  const clipboardStyle: React.CSSProperties = clipboardMode
+    ? {
+        outline: `2px dashed ${clipboardMode === "cut" ? "#E63535" : SELECTION_COLOR}`,
+        outlineOffset: -2,
+      }
+    : {};
+
   // Selection / range / dirty styling
   const selectionStyle: React.CSSProperties = isSelected
     ? { outline: `2px solid ${SELECTION_COLOR}`, outlineOffset: -2 }
     : isInRange
       ? { backgroundColor: isDark ? "rgba(33,115,70,0.20)" : "rgba(33,115,70,0.10)" }
-      : isDirty
-        ? { backgroundColor: isDark ? "rgba(245,158,11,0.15)" : "rgba(245,158,11,0.08)" }
-        : {};
+      : clipboardMode
+        ? clipboardStyle
+        : isDirty
+          ? { backgroundColor: isDark ? "rgba(245,158,11,0.15)" : "rgba(245,158,11,0.08)" }
+          : {};
 
   // Status colors
   const statusColor = column.key === "status" ? {
@@ -231,12 +255,12 @@ export const GridCell = React.memo(function GridCell({
       <span
         className="block w-full truncate"
         style={{
-          color: isOutOfPeriod ? "#E63535" : isSuggested ? "#8F90A6" : fmt?.textColor ?? condFmt?.textColor ?? (column.key === "flightNumber" ? "#3E7BFA" : statusColor),
-          fontWeight: fmt?.bold || condFmt?.bold ? 700 : (column.key === "flightNumber" || statusColor ? 600 : undefined),
+          color: forcedTextColor ?? (isOutOfPeriod ? "#E63535" : isSuggested ? "#8F90A6" : fmt?.textColor ?? condFmt?.textColor ?? statusColor ?? undefined),
+          fontWeight: fmt?.bold || condFmt?.bold ? 700 : (statusColor ? 600 : undefined),
           fontStyle: fmt?.italic || condFmt?.italic || isSuggested ? "italic" : undefined,
           textDecoration: fmt?.underline || condFmt?.underline ? "underline" : undefined,
-          fontFamily: fmt?.fontFamily ? (fmt.fontFamily === "Mono" ? monoFont : fmt.fontFamily) : undefined,
-          fontSize: fmt?.fontSize ? `${fmt.fontSize}px` : column.key === "status" ? "11px" : undefined,
+          fontFamily: fmt?.fontFamily ? resolveFontFamily(fmt.fontFamily) : undefined,
+          fontSize: fmt?.fontSize ? `${fmt.fontSize}px` : undefined,
           textTransform: column.key === "status" ? "capitalize" : undefined,
           backgroundColor: fmt?.bgColor ?? undefined,
           lineHeight: "30px",

@@ -3,29 +3,28 @@
 // Appears on hover with 400ms delay, positioned above the trigger
 
 import React, { useState, useRef, useCallback, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 interface TooltipProps {
   content: string
-  children: React.ReactNode
+  children: React.ReactElement<{ onMouseEnter?: React.MouseEventHandler; onMouseLeave?: React.MouseEventHandler }>
   delay?: number
 }
 
 export function Tooltip({ content, children, delay = 400 }: TooltipProps) {
   const [visible, setVisible] = useState(false)
   const [coords, setCoords] = useState({ x: 0, y: 0 })
-  const triggerRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const show = useCallback(() => {
+  const show = useCallback((e: React.MouseEvent) => {
+    const el = e.currentTarget as HTMLElement
     timerRef.current = setTimeout(() => {
-      if (triggerRef.current) {
-        const rect = triggerRef.current.getBoundingClientRect()
-        setCoords({
-          x: rect.left + rect.width / 2,
-          y: rect.top - 6,
-        })
-        setVisible(true)
-      }
+      const rect = el.getBoundingClientRect()
+      setCoords({
+        x: rect.left + rect.width / 2,
+        y: rect.top - 6,
+      })
+      setVisible(true)
     }, delay)
   }, [delay])
 
@@ -38,33 +37,27 @@ export function Tooltip({ content, children, delay = 400 }: TooltipProps) {
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
   }, [])
 
-  if (!content) return <>{children}</>
+  if (!content) return children
 
   return (
     <>
-      <div
-        ref={triggerRef}
-        onMouseEnter={show}
-        onMouseLeave={hide}
-        style={{ display: 'contents' }}
-      >
-        {children}
-      </div>
-      {visible && <TooltipPortal x={coords.x} y={coords.y} content={content} />}
+      {React.cloneElement(children, {
+        onMouseEnter: (e: React.MouseEvent) => {
+          show(e)
+          children.props.onMouseEnter?.(e)
+        },
+        onMouseLeave: (e: React.MouseEvent) => {
+          hide()
+          children.props.onMouseLeave?.(e)
+        },
+      })}
+      {visible && createPortal(<TooltipPortal x={coords.x} y={coords.y} content={content} />, document.body)}
     </>
   )
 }
 
 function TooltipPortal({ x, y, content }: { x: number; y: number; content: string }) {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => { setMounted(true) }, [])
-
-  if (!mounted || typeof document === 'undefined') return null
-
   const isDark = document.documentElement.classList.contains('dark')
-
-  const el = document.createElement('div')
 
   return (
     <div
@@ -84,6 +77,7 @@ function TooltipPortal({ x, y, content }: { x: number; y: number; content: strin
           borderRadius: 8,
           fontSize: 12,
           fontWeight: 500,
+          fontFamily: 'Inter, system-ui, sans-serif',
           whiteSpace: 'nowrap',
           boxShadow: isDark
             ? '0 4px 16px rgba(0,0,0,0.4)'

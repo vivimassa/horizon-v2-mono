@@ -4,41 +4,49 @@ import { useRef, useEffect, useState, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ScheduledFlightRef } from "@skyhub/api";
-import { useScheduleGridStore } from "@/stores/use-schedule-grid-store";
+import { useScheduleGridStore, EMPTY_BUFFER_ROWS } from "@/stores/use-schedule-grid-store";
 import { GridHeader } from "./grid-header";
 import { GridRow } from "./grid-row";
 import { GRID_COLUMNS, ROW_HEIGHT } from "./grid-columns";
 import { useGridKeyboard } from "./use-grid-keyboard";
 import { useGridSortStore, sortRows } from "./use-grid-sort";
 import { GridContextMenu, type ContextMenuState } from "./context-menu";
+import { FindReplaceDialog } from "./find-replace-dialog";
 import { useTheme } from "@/components/theme-provider";
 
 interface ScheduleGridProps {
   rows: ScheduledFlightRef[];
   onSave: () => void;
-  onAddFlight: () => void;
+  onAddFlight: (insertAtIdx?: number) => void;
   onDeleteFlight: (rowIdx: number) => void;
   onTabWrapDown?: () => void;
   onOpenFind?: () => void;
   onOpenReplace?: () => void;
+  onClickEmptyRow?: (colKey: string) => void;
+  rowHeight?: number;
+  showFind?: boolean;
+  showReplace?: boolean;
+  onCloseFind?: () => void;
 }
 
 const SEPARATOR_HEIGHT = 12;
 
 export function ScheduleGrid({
-  rows, onSave, onAddFlight, onDeleteFlight, onTabWrapDown, onOpenFind, onOpenReplace,
+  rows, onSave, onAddFlight, onDeleteFlight, onTabWrapDown, onOpenFind, onOpenReplace, onClickEmptyRow,
+  rowHeight: rowHeightProp, showFind, showReplace, onCloseFind,
 }: ScheduleGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedCell = useScheduleGridStore((s) => s.selectedCell);
-  const newRows = useScheduleGridStore((s) => s.newRows);
   const separatorAfter = useScheduleGridStore((s) => s.separatorAfter);
   const addSeparator = useScheduleGridStore((s) => s.addSeparator);
   const removeSeparator = useScheduleGridStore((s) => s.removeSeparator);
   const copyCell = useScheduleGridStore((s) => s.copyCell);
   const cutCell = useScheduleGridStore((s) => s.cutCell);
   const pasteCell = useScheduleGridStore((s) => s.pasteCell);
+  const selectCell = useScheduleGridStore((s) => s.selectCell);
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const activeRowHeight = rowHeightProp ?? ROW_HEIGHT;
 
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
 
@@ -49,6 +57,8 @@ export function ScheduleGrid({
   const sortKey = useGridSortStore((s) => s.sortKey);
   const sortDir = useGridSortStore((s) => s.sortDir);
   const [columnFilters, setColumnFilters] = useState<Map<string, Set<string>>>(new Map());
+  const [colorFilters, setColorFilters] = useState<Map<string, import("./column-filter-dropdown").ColorFilter>>(new Map());
+  const cellFormats = useScheduleGridStore((s) => s.cellFormats);
 
   const handleApplyFilter = useCallback((colKey: string, values: Set<string>) => {
     setColumnFilters((prev) => {
@@ -64,31 +74,40 @@ export function ScheduleGrid({
     });
   }, [rows]);
 
+  const handleApplyColorFilter = useCallback((colKey: string, filter: import("./column-filter-dropdown").ColorFilter | null) => {
+    setColorFilters((prev) => {
+      const next = new Map(prev);
+      if (filter) next.set(colKey, filter);
+      else next.delete(colKey);
+      return next;
+    });
+  }, []);
+
   const deletedIds = useScheduleGridStore((s) => s.deletedIds);
 
   const processedRows = useMemo(() => {
-    let result = [...rows, ...newRows].filter((r) => !deletedIds.has(r._id));
+    let result = rows.filter((r) => !deletedIds.has(r._id));
     for (const [colKey, allowedValues] of columnFilters) {
       result = result.filter((row) => {
         const v = (row as any)[colKey];
         return v != null && allowedValues.has(String(v));
       });
     }
+    // Color filters
+    for (const [colKey, cf] of colorFilters) {
+      result = result.filter((row) => {
+        const fmt = cellFormats.get(`${row._id}:${colKey}`);
+        if (cf.type === "bg") {
+          return cf.color === "" ? !fmt?.bgColor : fmt?.bgColor === cf.color;
+        }
+        return fmt?.textColor === cf.color;
+      });
+    }
     return sortRows(result, sortKey, sortDir);
-  }, [rows, newRows, deletedIds, columnFilters, sortKey, sortDir]);
+  }, [rows, deletedIds, columnFilters, colorFilters, cellFormats, sortKey, sortDir]);
 
-  // Pad with empty placeholder rows to fill viewport (Excel-like)
-  const [viewportHeight, setViewportHeight] = useState(600);
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const obs = new ResizeObserver(([entry]) => setViewportHeight(entry.contentRect.height));
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
-  const headerHeight = 36; // approximate header row height
-  const minRows = Math.max(1, Math.ceil((viewportHeight - headerHeight) / ROW_HEIGHT));
-  const emptyRowCount = Math.max(0, minRows - processedRows.length);
+  // Pad with empty buffer rows below data (Excel-like)
+  const emptyRowCount = EMPTY_BUFFER_ROWS;
 
   // Build virtual list with separator rows + empty padding injected
   type VirtualItem = { type: "data"; rowIdx: number } | { type: "separator"; afterRowIdx: number } | { type: "empty"; emptyIdx: number };
@@ -96,7 +115,7 @@ export function ScheduleGrid({
     const items: VirtualItem[] = [];
     for (let i = 0; i < processedRows.length; i++) {
       items.push({ type: "data", rowIdx: i });
-      if (separatorAfter.has(i)) {
+      if (separatorAfter.has(processedRows[i]._id)) {
         items.push({ type: "separator", afterRowIdx: i });
       }
     }
@@ -110,7 +129,7 @@ export function ScheduleGrid({
   const virtualizer = useVirtualizer({
     count: virtualItems.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: (i) => virtualItems[i].type === "separator" ? SEPARATOR_HEIGHT : ROW_HEIGHT,
+    estimateSize: (i) => virtualItems[i].type === "separator" ? SEPARATOR_HEIGHT : activeRowHeight,
     overscan: 50,
   });
 
@@ -134,21 +153,32 @@ export function ScheduleGrid({
 
   return (
     <>
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-auto select-none focus:outline-none rounded-2xl"
-        style={{ background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: "blur(20px)" }}
-        tabIndex={0}
-      >
+      <div className="flex-1 relative min-h-0">
+        {/* Find/Replace — positioned inside the grid area */}
+        {showFind && onCloseFind && (
+          <FindReplaceDialog
+            rows={rows}
+            onClose={onCloseFind}
+            showReplace={showReplace}
+          />
+        )}
+        <div
+          ref={scrollRef}
+          className="h-full overflow-auto select-none focus:outline-none rounded-2xl"
+          style={{ background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: "blur(20px)" }}
+          tabIndex={0}
+        >
         <table
-          className="w-full text-[13px] font-mono"
-          style={{ borderCollapse: "collapse", tableLayout: "fixed" }}
+          className="w-full text-[13px]"
+          style={{ borderCollapse: "collapse", tableLayout: "fixed", fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" }}
         >
           <GridHeader
             scrollLeft={0}
             rows={rows}
             columnFilters={columnFilters}
+            colorFilters={colorFilters}
             onApplyFilter={handleApplyFilter}
+            onApplyColorFilter={handleApplyColorFilter}
           />
           <tbody>
             {virtualizer.getVirtualItems().map((vRow) => {
@@ -164,15 +194,32 @@ export function ScheduleGrid({
               }
 
               if (item.type === "empty") {
+                const emptyAbsIdx = processedRows.length + item.emptyIdx;
+                const emptyBorder = `1px solid ${isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)"}`;
                 return (
-                  <tr key={`empty-${item.emptyIdx}`} style={{ height: ROW_HEIGHT }}>
-                    <td
-                      colSpan={totalColSpan}
-                      style={{
-                        borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)"}`,
-                        padding: 0,
-                      }}
-                    />
+                  <tr key={`empty-${item.emptyIdx}`} style={{ height: activeRowHeight }}>
+                    {/* Row number cell */}
+                    <td style={{ borderBottom: emptyBorder, padding: 0 }} />
+                    {GRID_COLUMNS.map((col, ci) => {
+                      const isSel = selectedCell?.rowIdx === emptyAbsIdx && selectedCell?.colKey === col.key;
+                      return (
+                        <td
+                          key={col.key}
+                          style={{
+                            borderBottom: emptyBorder,
+                            borderRight: emptyBorder,
+                            padding: 0,
+                            cursor: "cell",
+                            outline: isSel ? `2px solid #217346` : undefined,
+                            outlineOffset: isSel ? -2 : undefined,
+                          }}
+                          onClick={() => {
+                            if (onClickEmptyRow) onClickEmptyRow(col.key);
+                            else selectCell({ rowIdx: emptyAbsIdx, colKey: col.key });
+                          }}
+                        />
+                      );
+                    })}
                   </tr>
                 );
               }
@@ -187,11 +234,13 @@ export function ScheduleGrid({
                   prevRow={item.rowIdx > 0 ? processedRows[item.rowIdx - 1] : null}
                   onContextMenu={handleContextMenu}
                   onTabWrapDown={onTabWrapDown}
+                  rowHeight={activeRowHeight}
                 />
               );
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Context menu — portalled to document.body so scroll/stacking context doesn't offset it */}
@@ -199,15 +248,31 @@ export function ScheduleGrid({
         <GridContextMenu
           state={ctxMenu}
           onClose={() => setCtxMenu(null)}
-          onInsertRow={onAddFlight}
+          onInsertRow={() => onAddFlight(ctxMenu.rowIdx)}
           onDeleteRow={() => onDeleteFlight(ctxMenu.rowIdx)}
-          onSeparateCycle={() => addSeparator(ctxMenu.rowIdx)}
-          onRemoveSeparator={() => removeSeparator(ctxMenu.rowIdx)}
-          hasSeparator={separatorAfter.has(ctxMenu.rowIdx)}
+          onSeparateCycle={() => { const r = processedRows[ctxMenu.rowIdx]; if (r) addSeparator(r._id); }}
+          onRemoveSeparator={() => { const r = processedRows[ctxMenu.rowIdx]; if (r) removeSeparator(r._id); }}
+          hasSeparator={!!processedRows[ctxMenu.rowIdx] && separatorAfter.has(processedRows[ctxMenu.rowIdx]._id)}
           onCopy={copyCell}
           onCut={cutCell}
           onPaste={() => pasteCell()}
           hasSelection={!!selectedCell}
+          currentStatus={processedRows[ctxMenu.rowIdx]?.status}
+          onChangeStatus={(status) => {
+            const markDirty = useScheduleGridStore.getState().markDirty;
+            const range = useScheduleGridStore.getState().selectionRange;
+            if (range) {
+              const r1 = Math.min(range.startRow, range.endRow);
+              const r2 = Math.max(range.startRow, range.endRow);
+              for (let i = r1; i <= r2; i++) {
+                const row = processedRows[i];
+                if (row) markDirty(row._id, { status } as any);
+              }
+            } else {
+              const row = processedRows[ctxMenu.rowIdx];
+              if (row) markDirty(row._id, { status } as any);
+            }
+          }}
         />,
         document.body
       )}

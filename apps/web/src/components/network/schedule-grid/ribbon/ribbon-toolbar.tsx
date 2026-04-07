@@ -9,6 +9,7 @@ import { UtilitySections } from "./utility-sections";
 
 interface RibbonToolbarProps {
   onAddFlight: () => void;
+  onInsertFlight: () => void;
   onDeleteFlight: () => void;
   onSave: () => void;
   onImport?: () => void;
@@ -16,15 +17,19 @@ interface RibbonToolbarProps {
   onScenario?: () => void;
   onMessage?: () => void;
   onFind?: () => void;
+  onReplace?: () => void;
+  onSaveAs?: () => void;
   hasDirty: boolean;
   hasSelection: boolean;
   saving: boolean;
+  rowHeight: number;
+  onRowHeightChange: (h: number) => void;
 }
 
 export function RibbonToolbar({
-  onAddFlight, onDeleteFlight, onSave,
-  onImport, onExport, onScenario, onMessage, onFind,
-  hasDirty, hasSelection, saving,
+  onAddFlight, onInsertFlight, onDeleteFlight, onSave,
+  onImport, onExport, onScenario, onMessage, onFind, onReplace, onSaveAs,
+  hasDirty, hasSelection, saving, rowHeight, onRowHeightChange,
 }: RibbonToolbarProps) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -42,11 +47,11 @@ export function RibbonToolbar({
       <Divider isDark={isDark} />
       <FontSection hasSelection={hasSelection} />
       <Divider isDark={isDark} />
-      <CellsSection onInsert={onAddFlight} onDelete={onDeleteFlight} hasSelection={hasSelection} />
+      <CellsSection onInsert={onInsertFlight} onDelete={onDeleteFlight} hasSelection={hasSelection} rowHeight={rowHeight} onRowHeightChange={onRowHeightChange} />
       <Divider isDark={isDark} />
       <UtilitySections
         onSave={onSave} onImport={onImport} onExport={onExport}
-        onScenario={onScenario} onMessage={onMessage} onFind={onFind}
+        onScenario={onScenario} onMessage={onMessage} onFind={onFind} onReplace={onReplace} onSaveAs={onSaveAs}
         hasDirty={hasDirty} saving={saving}
       />
     </div>

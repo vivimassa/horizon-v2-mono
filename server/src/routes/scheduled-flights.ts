@@ -54,7 +54,7 @@ export async function scheduledFlightRoutes(app: FastifyInstance): Promise<void>
 
     const sort: Record<string, 1 | -1> = {}
     if (q.sortBy) sort[q.sortBy] = q.sortDir === 'desc' ? -1 : 1
-    else { sort.rotationId = 1; sort.rotationSequence = 1; sort.stdUtc = 1 }
+    else { sort.sortOrder = 1; sort.stdUtc = 1 }
 
     return ScheduledFlight.find(filter).sort(sort).lean()
   })

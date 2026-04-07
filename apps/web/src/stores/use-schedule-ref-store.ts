@@ -2,7 +2,8 @@
 
 import { create } from "zustand";
 import { api, setApiBaseUrl } from "@skyhub/api";
-import type { AircraftTypeRef, FlightServiceTypeRef, CityPairRef } from "@skyhub/api";
+import type { AircraftTypeRef, FlightServiceTypeRef, CityPairRef, CarrierCodeRef } from "@skyhub/api";
+import { useOperatorStore } from "./use-operator-store";
 
 setApiBaseUrl("http://localhost:3002");
 
@@ -10,9 +11,19 @@ interface ScheduleRefState {
   aircraftTypes: AircraftTypeRef[];
   serviceTypes: FlightServiceTypeRef[];
   cityPairs: CityPairRef[];
+  carrierCodes: CarrierCodeRef[];
   loaded: boolean;
   loading: boolean;
   loadAll: () => Promise<void>;
+
+  /** Get valid carrier IATA codes (operator + defined carriers) */
+  getValidCarrierCodes: () => string[];
+
+  /** Check if a 2-letter carrier code is valid */
+  isValidCarrier: (code: string) => boolean;
+
+  /** Parse flight input: extract carrier prefix + numeric part. Returns { airlineCode, flightNum } */
+  parseFlightInput: (input: string) => { airlineCode: string | null; flightNum: string };
 
   /** Get block minutes for a DEP→ARR pair */
   getBlockMinutes: (dep: string, arr: string) => number | null;
@@ -34,6 +45,7 @@ export const useScheduleRefStore = create<ScheduleRefState>((set, get) => ({
   aircraftTypes: [],
   serviceTypes: [],
   cityPairs: [],
+  carrierCodes: [],
   loaded: false,
   loading: false,
 
@@ -41,15 +53,17 @@ export const useScheduleRefStore = create<ScheduleRefState>((set, get) => ({
     if (get().loaded || get().loading) return;
     set({ loading: true });
     try {
-      const [acTypes, svcTypes, cpPairs] = await Promise.all([
+      const [acTypes, svcTypes, cpPairs, carriers] = await Promise.all([
         api.getAircraftTypes(),
         api.getFlightServiceTypes(),
         api.getCityPairs(),
+        api.getCarrierCodes(),
       ]);
       set({
         aircraftTypes: acTypes,
         serviceTypes: svcTypes,
         cityPairs: cpPairs,
+        carrierCodes: carriers,
         loaded: true,
       });
     } catch (e) {
@@ -149,5 +163,28 @@ export const useScheduleRefStore = create<ScheduleRefState>((set, get) => ({
 
     // Fallback: domDom → defaultMinutes
     return tat.domDom ?? tat.defaultMinutes ?? null;
+  },
+
+  getValidCarrierCodes: () => {
+    const opIata = useOperatorStore.getState().operator?.iataCode;
+    const carriers = get().carrierCodes.filter((c) => c.isActive).map((c) => c.iataCode.toUpperCase());
+    if (opIata) carriers.push(opIata.toUpperCase());
+    return [...new Set(carriers)];
+  },
+
+  isValidCarrier: (code: string) => {
+    return get().getValidCarrierCodes().includes(code.toUpperCase());
+  },
+
+  parseFlightInput: (input: string) => {
+    const s = input.toUpperCase().trim();
+    if (!s) return { airlineCode: null, flightNum: "" };
+    // Try to match a 2-letter alpha prefix followed by digits (e.g., "EK123", "SH456")
+    const match = s.match(/^([A-Z]{2})(\d+.*)$/);
+    if (match) {
+      return { airlineCode: match[1], flightNum: match[2] };
+    }
+    // No alpha prefix — pure numeric or other format
+    return { airlineCode: null, flightNum: s };
   },
 }));

@@ -53,10 +53,9 @@ export const NAV_TREE: NavModuleData[] = [
         key: 'schedule', label: 'Schedule', num: '1.1', iconName: 'Calendar',
         pages: [
           { key: 'schedule-grid', label: 'Scheduling XL', num: '1.1.1', route: '/network/control/schedule-grid', iconName: 'LayoutGrid', desc: 'Excel-style flight schedule editor' },
-          { key: 'text-schedule', label: 'Text Schedule', num: '1.1.2', route: '/network/schedule/text-schedule', iconName: 'FileText', desc: 'Tabular schedule view' },
-          { key: 'gantt', label: 'Gantt View', num: '1.1.3', route: '/network/schedule/gantt', iconName: 'GanttChart', desc: 'Visual timeline' },
-          { key: 'flight-patterns', label: 'Flight Patterns', num: '1.1.4', route: '/network/schedule/flight-patterns', iconName: 'Repeat', desc: 'Build & edit patterns' },
-          { key: 'season-manager', label: 'Season Manager', num: '1.1.5', route: '/network/schedule/season-manager', iconName: 'CalendarRange', desc: 'Seasonal schedule management' },
+          { key: 'gantt', label: 'Gantt Chart', num: '1.1.2', route: '/network/schedule/gantt', iconName: 'GanttChart', desc: 'Visual timeline' },
+          { key: 'flight-patterns', label: 'Flight Patterns', num: '1.1.3', route: '/network/schedule/flight-patterns', iconName: 'Repeat', desc: 'Build & edit patterns' },
+          { key: 'season-manager', label: 'Season Manager', num: '1.1.4', route: '/network/schedule/season-manager', iconName: 'CalendarRange', desc: 'Seasonal schedule management' },
         ],
       },
       {

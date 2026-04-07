@@ -30,14 +30,13 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
 
   // 1.1 Control
   { code: '1.1', name: 'Control', description: 'Schedule planning, administration, and distribution', icon: 'Settings', route: '/network/control', parent_code: '1', module: 'network', level: 1 },
-  { code: '1.1.1', name: 'Schedule Builder', description: 'Create and manage aircraft routes with flight legs, frequencies, and seasonal periods', icon: 'PenLine', route: '/network/control/schedule-builder', parent_code: '1.1', module: 'network', level: 2 },
-  { code: '1.1.2', name: 'Schedule Grid', description: 'Tabular view of all scheduled flights with inline editing and bulk operations', icon: 'LayoutGrid', route: '/network/control/schedule-grid', parent_code: '1.1', module: 'network', level: 2 },
-  { code: '1.1.3', name: 'Gantt Chart', description: 'Aircraft rotation timeline showing fleet utilization and tail assignment', icon: 'GanttChart', route: '/network/control/schedule-gantt', parent_code: '1.1', module: 'network', level: 2 },
-  { code: '1.1.4', name: 'Schedule Publish', description: 'Review, approve, and publish planning scenarios to the active schedule', icon: 'SendHorizonal', route: '/network/control/schedule-publish', parent_code: '1.1', module: 'network', level: 2 },
-  { code: '1.1.5', name: 'Codeshare Manager', description: 'Manage codeshare agreements and partner flight designators', icon: 'Link2', route: '/network/control/codeshare-manager', parent_code: '1.1', module: 'network', level: 2 },
-  { code: '1.1.6', name: 'Slot Manager', description: 'Track airport slot allocations and IATA 80/20 utilization', icon: 'CalendarClock', route: '/network/control/slot-manager', parent_code: '1.1', module: 'network', level: 2 },
-  { code: '1.1.7', name: 'Charter Manager', description: 'Manage ad-hoc and charter flight operations', icon: 'PlaneTakeoff', route: '/network/control/charter-manager', parent_code: '1.1', module: 'network', level: 2 },
-  { code: '1.1.8', name: 'Schedule Messaging', description: 'Generate and process ASM and SSM messages for schedule distribution', icon: 'MessageSquareShare', route: '/network/control/schedule-messaging', parent_code: '1.1', module: 'network', level: 2 },
+  { code: '1.1.1', name: 'Scheduling XL', description: 'Excel-style flight schedule editor with inline editing and bulk operations', icon: 'LayoutGrid', route: '/network/control/schedule-grid', parent_code: '1.1', module: 'network', level: 2 },
+  { code: '1.1.2', name: 'Gantt Chart', description: 'Aircraft rotation timeline showing fleet utilization and tail assignment', icon: 'GanttChart', route: '/network/control/schedule-gantt', parent_code: '1.1', module: 'network', level: 2 },
+  { code: '1.1.3', name: 'Schedule Publish', description: 'Review, approve, and publish planning scenarios to the active schedule', icon: 'SendHorizonal', route: '/network/control/schedule-publish', parent_code: '1.1', module: 'network', level: 2 },
+  { code: '1.1.4', name: 'Codeshare Manager', description: 'Manage codeshare agreements and partner flight designators', icon: 'Link2', route: '/network/control/codeshare-manager', parent_code: '1.1', module: 'network', level: 2 },
+  { code: '1.1.5', name: 'Slot Manager', description: 'Track airport slot allocations and IATA 80/20 utilization', icon: 'CalendarClock', route: '/network/control/slot-manager', parent_code: '1.1', module: 'network', level: 2 },
+  { code: '1.1.6', name: 'Charter Manager', description: 'Manage ad-hoc and charter flight operations', icon: 'PlaneTakeoff', route: '/network/control/charter-manager', parent_code: '1.1', module: 'network', level: 2 },
+  { code: '1.1.7', name: 'Schedule Messaging', description: 'Generate and process ASM and SSM messages for schedule distribution', icon: 'MessageSquareShare', route: '/network/control/schedule-messaging', parent_code: '1.1', module: 'network', level: 2 },
 
   // 1.2 Tools
   { code: '1.2', name: 'Tools', description: 'Network tools and utilities', icon: 'Wrench', route: '/network/tools', parent_code: '1', module: 'network', level: 1 },

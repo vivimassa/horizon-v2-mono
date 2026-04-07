@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Filter, Search, Loader2 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { useGanttStore } from '@/stores/use-gantt-store'
 import { AC_TYPE_COLOR_PALETTE } from '@/lib/gantt/colors'
 
@@ -115,28 +116,14 @@ export function GanttFilterPanel() {
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
 
-        {/* Period */}
+        {/* Period — same DateRangePicker as 1.1.1 */}
         <FilterSection label="Period">
-          <div className="flex gap-2">
-            <div className="flex-1 relative">
-              <input
-                type="date"
-                value={periodFrom}
-                onChange={e => setPeriod(e.target.value, periodTo)}
-                className="w-full px-2.5 py-2 rounded-xl text-[13px] font-mono outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text transition-colors"
-                style={{ background: inputBg, border: `1px solid ${inputBorder}`, minHeight: 36 }}
-              />
-            </div>
-            <div className="flex-1 relative">
-              <input
-                type="date"
-                value={periodTo}
-                onChange={e => setPeriod(periodFrom, e.target.value)}
-                className="w-full px-2.5 py-2 rounded-xl text-[13px] font-mono outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text transition-colors"
-                style={{ background: inputBg, border: `1px solid ${inputBorder}`, minHeight: 36 }}
-              />
-            </div>
-          </div>
+          <DateRangePicker
+            from={periodFrom}
+            to={periodTo}
+            onChangeFrom={(v) => setPeriod(v, periodTo)}
+            onChangeTo={(v) => setPeriod(periodFrom, v)}
+          />
         </FilterSection>
 
         {/* Aircraft Type */}

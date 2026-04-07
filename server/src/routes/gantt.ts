@@ -38,9 +38,18 @@ function timeStringToMs(time: string): number {
   return (h * 60 + m) * 60_000
 }
 
-/** ISO date string → UTC epoch ms at midnight */
+/** Normalize date: "01/04/2026" (DD/MM/YYYY) or "2026-04-01" (ISO) → "2026-04-01" */
+function normalizeDate(d: string): string {
+  if (d.includes('/')) {
+    const [day, month, year] = d.split('/')
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+  }
+  return d
+}
+
+/** Date string (ISO or DD/MM/YYYY) → UTC epoch ms at midnight */
 function dateToDayMs(dateStr: string): number {
-  return new Date(dateStr + 'T00:00:00Z').getTime()
+  return new Date(normalizeDate(dateStr) + 'T00:00:00Z').getTime()
 }
 
 // ── Routes ──
@@ -58,11 +67,10 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     const { operatorId, from, to, scenarioId, acTypeFilter, statusFilter } = parsed.data
 
     // Build ScheduledFlight filter
+    // Date range filtering done in JS expansion loop (DB stores DD/MM/YYYY and ISO inconsistently)
     const sfFilter: Record<string, unknown> = {
       operatorId,
       isActive: { $ne: false },
-      effectiveFrom: { $lte: to },
-      effectiveUntil: { $gte: from },
     }
     if (scenarioId) sfFilter.scenarioId = scenarioId
     sfFilter.status = statusFilter

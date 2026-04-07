@@ -33,8 +33,10 @@ export function GanttCanvas() {
   const containerWidth = useGanttStore(s => s.containerWidth)
   const zoomLevel = useGanttStore(s => s.zoomLevel)
   const collapsedTypes = useGanttStore(s => s.collapsedTypes)
+  const scrollTargetMs = useGanttStore(s => s.scrollTargetMs)
   const toggleTypeCollapse = useGanttStore(s => s.toggleTypeCollapse)
   const setContainerWidth = useGanttStore(s => s.setContainerWidth)
+  const consumeScrollTarget = useGanttStore(s => s.consumeScrollTarget)
 
   const rows = layout?.rows ?? []
   const ticks = layout?.ticks ?? []
@@ -149,6 +151,16 @@ export function GanttCanvas() {
     return () => clearInterval(id)
   }, [])
 
+  // Scroll to target (nav arrows / Today button)
+  useEffect(() => {
+    if (scrollTargetMs === null || !scrollRef.current) return
+    const startMs = new Date(periodFrom + 'T00:00:00Z').getTime()
+    const pph = computePixelsPerHour(containerWidth, zoomLevel)
+    const targetX = ((scrollTargetMs - startMs) / 3_600_000) * pph
+    scrollRef.current.scrollLeft = Math.max(0, targetX)
+    consumeScrollTarget()
+  }, [scrollTargetMs, periodFrom, containerWidth, zoomLevel, consumeScrollTarget])
+
   // ── Theme ──
   const palette = isDark ? colors.dark : colors.light
   const headerBg = isDark ? glass.panel : 'rgba(255,255,255,0.90)'
@@ -165,7 +177,7 @@ export function GanttCanvas() {
           <div ref={headerRef} className="absolute left-0 top-0 h-full" style={{ width: totalWidth || '100%' }}>
             <div className="h-6 relative">
               {ticks.filter(t => t.isMajor).map(t => (
-                <span key={t.x} className="absolute top-1 text-[11px] font-bold font-mono whitespace-nowrap"
+                <span key={t.x} className="absolute top-1 text-[13px] font-bold font-mono whitespace-nowrap"
                   style={{ left: t.x + 4, color: palette.text }}>{t.label}</span>
               ))}
             </div>
@@ -180,7 +192,7 @@ export function GanttCanvas() {
       </div>
 
       {/* ── Body ── */}
-      <div className="flex-1 min-h-0 flex">
+      <div className="flex-1 min-h-0 flex overflow-hidden">
         {/* Row labels */}
         <div className="shrink-0 overflow-hidden" style={{ width: ROW_LABEL_W, background: labelBg, borderRight: `1px solid ${palette.border}` }}>
           <div ref={rowLabelsRef} style={{ height: totalHeight }}>
@@ -210,7 +222,7 @@ export function GanttCanvas() {
               return (
                 <div key={`a${i}`} className="flex flex-col justify-center px-3"
                   style={{ height: row.height, borderLeft: `3px solid ${row.color ?? 'transparent'}` }}>
-                  <span className="text-[11px] font-mono font-bold leading-tight" style={{ color: palette.text }}>{row.registration}</span>
+                  <span className="text-[13px] font-mono font-bold leading-tight" style={{ color: palette.text }}>{row.registration}</span>
                   <span className="text-[11px] font-mono leading-tight" style={{ color: palette.textTertiary }}>{row.aircraftTypeName}</span>
                 </div>
               )
@@ -219,11 +231,11 @@ export function GanttCanvas() {
         </div>
 
         {/* Canvas + scroll sentinel */}
-        <div ref={containerRef} className="flex-1 relative">
-          <canvas ref={canvasRef} className="absolute inset-0" style={{ pointerEvents: 'none' }} />
-          <div ref={scrollRef} className="absolute inset-0 overflow-auto"
+        <div ref={containerRef} className="flex-1 relative" style={{ minHeight: 0, minWidth: 0 }}>
+          <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />
+          <div ref={scrollRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'auto' }}
             onScroll={handleScroll} onMouseMove={handleMouseMove} onClick={handleClick}>
-            <div style={{ width: totalWidth, height: totalHeight, minWidth: '100%', minHeight: '100%' }} />
+            <div style={{ width: totalWidth, height: totalHeight }} />
           </div>
         </div>
       </div>

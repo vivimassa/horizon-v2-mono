@@ -9,8 +9,6 @@ import { useOperatorStore } from '@/stores/use-operator-store'
 import { GanttFilterPanel } from './gantt-filter-panel'
 import { GanttToolbar } from './gantt-toolbar'
 import { GanttCanvas } from './gantt-canvas'
-import { GanttHistogram } from './gantt-histogram'
-import { GanttStatusBar } from './gantt-status-bar'
 
 export function GanttShell() {
   const { theme } = useTheme()
@@ -24,20 +22,24 @@ export function GanttShell() {
   const flights = useGanttStore(s => s.flights)
 
   useEffect(() => {
-    const ops = useOperatorStore.getState()
-    if (!ops.loaded) ops.loadOperator()
-    useGanttStore.getState().commitPeriod()
+    async function init() {
+      const ops = useOperatorStore.getState()
+      if (!ops.loaded) await ops.loadOperator()
+      useGanttStore.getState().commitPeriod()
+    }
+    init()
   }, [])
 
   const glassBg = isDark ? glass.panel : 'rgba(255,255,255,0.90)'
 
   return (
-    <div className="h-full flex gap-2 p-2">
-      <GanttFilterPanel />
+    <div className="h-full flex">
+      <div className="shrink-0 p-2 pr-0">
+        <GanttFilterPanel />
+      </div>
 
-      <div className="flex-1 min-w-0 flex flex-col rounded-2xl overflow-hidden shadow-sm"
-        style={{ background: glassBg, border: `1px solid ${isDark ? glass.panelBorder : palette.cardBorder}` }}
-      >
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+
         <GanttToolbar />
 
         <div className="flex-1 min-h-0 overflow-hidden relative" style={{ background: palette.background }}>
@@ -70,8 +72,6 @@ export function GanttShell() {
           )}
         </div>
 
-        <GanttHistogram />
-        <GanttStatusBar />
       </div>
     </div>
   )

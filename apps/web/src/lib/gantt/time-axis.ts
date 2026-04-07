@@ -69,7 +69,9 @@ export function computeTicks(
       const dow = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][d.getUTCDay()]
       const day = String(d.getUTCDate()).padStart(2, '0')
       const mon = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][d.getUTCMonth()]
-      label = `${dow} ${day} ${mon}`
+      // < 7D: "MON 13 APR", >= 7D: "13 APR"
+      const { days } = ZOOM_CONFIG[zoom]
+      label = days < 7 ? `${dow} ${day} ${mon}` : `${day} ${mon}`
     } else {
       label = String(hour).padStart(2, '0')
     }

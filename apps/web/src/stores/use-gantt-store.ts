@@ -49,6 +49,9 @@ interface GanttState {
   // Computed layout
   layout: LayoutResult | null
 
+  // Scroll target (epoch ms) — canvas scrolls to this position
+  scrollTargetMs: number | null
+
   // Actions
   setPeriod: (from: string, to: string) => void
   commitPeriod: () => Promise<void>
@@ -64,6 +67,7 @@ interface GanttState {
   setHovered: (id: string | null) => void
   navigateDate: (direction: 'prev' | 'next') => void
   goToToday: () => void
+  consumeScrollTarget: () => void
   assignToAircraft: (flightIds: string[], registration: string) => Promise<void>
   unassignFromAircraft: (flightIds: string[]) => Promise<void>
   _recomputeLayout: () => void
@@ -101,7 +105,7 @@ export const useGanttStore = create<GanttState>((set, get) => {
 
   async function fetchFlights() {
     const s = get()
-    const operatorId = useOperatorStore.getState().operator?.code ?? 'horizon'
+    const operatorId = useOperatorStore.getState().operator?._id ?? ''
     set({ loading: true, error: null })
     try {
       const data = await fetchGanttFlights({
@@ -144,6 +148,7 @@ export const useGanttStore = create<GanttState>((set, get) => {
     selectedFlightIds: new Set(),
     hoveredFlightId: null,
     layout: null,
+    scrollTargetMs: null,
 
     setPeriod: (from, to) => set({ periodFrom: from, periodTo: to }),
 
@@ -203,22 +208,21 @@ export const useGanttStore = create<GanttState>((set, get) => {
     setHovered: (id) => set({ hoveredFlightId: id }),
 
     navigateDate: (direction) => {
-      const { periodFrom, periodTo, zoomLevel } = get()
+      const { zoomLevel, scrollTargetMs, periodFrom } = get()
       const days = ZOOM_CONFIG[zoomLevel].days
-      const shift = direction === 'next' ? days : -days
-      set({ periodFrom: addDaysISO(periodFrom, shift), periodTo: addDaysISO(periodTo, shift) })
-      fetchFlights()
+      const shiftMs = days * 86_400_000 * (direction === 'next' ? 1 : -1)
+      const current = scrollTargetMs ?? new Date(periodFrom + 'T00:00:00Z').getTime()
+      set({ scrollTargetMs: current + shiftMs })
     },
 
     goToToday: () => {
-      const days = ZOOM_CONFIG[get().zoomLevel].days
-      const from = todayISO()
-      set({ periodFrom: from, periodTo: addDaysISO(from, days - 1) })
-      fetchFlights()
+      set({ scrollTargetMs: Date.now() })
     },
 
+    consumeScrollTarget: () => set({ scrollTargetMs: null }),
+
     assignToAircraft: async (flightIds, registration) => {
-      const operatorId = useOperatorStore.getState().operator?.code ?? 'horizon'
+      const operatorId = useOperatorStore.getState().operator?._id ?? ''
       const flights = get().flights.map(f =>
         flightIds.includes(f.id) ? { ...f, aircraftReg: registration } : f
       )
@@ -233,7 +237,7 @@ export const useGanttStore = create<GanttState>((set, get) => {
     },
 
     unassignFromAircraft: async (flightIds) => {
-      const operatorId = useOperatorStore.getState().operator?.code ?? 'horizon'
+      const operatorId = useOperatorStore.getState().operator?._id ?? ''
       const flights = get().flights.map(f =>
         flightIds.includes(f.id) ? { ...f, aircraftReg: null } : f
       )

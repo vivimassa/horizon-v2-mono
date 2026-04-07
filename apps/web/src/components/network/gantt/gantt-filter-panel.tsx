@@ -96,7 +96,7 @@ export function GanttFilterPanel() {
   return (
     <div
       className="shrink-0 flex flex-col rounded-2xl overflow-hidden transition-all duration-200"
-      style={{ width: 280, background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: 'blur(20px)' }}
+      style={{ width: 300, background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: 'blur(20px)' }}
     >
       {/* Header */}
       <div className="flex items-center gap-2 px-4 h-11 shrink-0" style={{ borderBottom: `1px solid ${sectionBorder}` }}>

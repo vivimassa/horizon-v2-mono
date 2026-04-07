@@ -22,6 +22,7 @@ import { CrewComplement } from '../models/CrewComplement.js'
 import { CrewGroup } from '../models/CrewGroup.js'
 import { DutyPattern } from '../models/DutyPattern.js'
 import { MppLeadTimeGroup, MppLeadTimeItem } from '../models/MppLeadTime.js'
+import { CarrierCode } from '../models/CarrierCode.js'
 import { lookupByIcao, getStats, loadOurAirportsData } from '../data/ourairports-cache.js'
 
 // ─── Zod schemas for airport validation ───────────────────
@@ -2351,6 +2352,116 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     await MppLeadTimeItem.insertMany(itemDocs)
 
     return { success: true, groupCount: groupDocs.length, itemCount: itemDocs.length }
+  })
+
+  // ─── Carrier Codes ─────────────────────────────────────────
+
+  const reportDebriefSchema = z.object({
+    reportMinutes: z.number().nullable().optional().default(null),
+    debriefMinutes: z.number().nullable().optional().default(null),
+  })
+
+  const carrierCreateSchema = z.object({
+    operatorId: z.string().min(1),
+    iataCode: z.string().min(1).max(2),
+    icaoCode: z.string().max(3).nullable().optional().default(null),
+    name: z.string().min(1),
+    category: z.enum(['Air', 'Ground', 'Other']).optional().default('Air'),
+    vendorNumber: z.string().nullable().optional().default(null),
+    contactName: z.string().nullable().optional().default(null),
+    contactPosition: z.string().nullable().optional().default(null),
+    phone: z.string().nullable().optional().default(null),
+    email: z.string().nullable().optional().default(null),
+    sita: z.string().nullable().optional().default(null),
+    website: z.string().nullable().optional().default(null),
+    defaultCurrency: z.string().nullable().optional().default(null),
+    capacity: z.number().nullable().optional().default(null),
+    cockpitTimes: reportDebriefSchema.nullable().optional().default(null),
+    cabinTimes: reportDebriefSchema.nullable().optional().default(null),
+    isActive: z.boolean().optional().default(true),
+  }).strict()
+
+  const carrierUpdateSchema = z.object({
+    iataCode: z.string().min(1).max(2),
+    icaoCode: z.string().max(3).nullable(),
+    name: z.string().min(1),
+    category: z.enum(['Air', 'Ground', 'Other']),
+    vendorNumber: z.string().nullable(),
+    contactName: z.string().nullable(),
+    contactPosition: z.string().nullable(),
+    phone: z.string().nullable(),
+    email: z.string().nullable(),
+    sita: z.string().nullable(),
+    website: z.string().nullable(),
+    defaultCurrency: z.string().nullable(),
+    capacity: z.number().nullable(),
+    cockpitTimes: reportDebriefSchema.nullable(),
+    cabinTimes: reportDebriefSchema.nullable(),
+    isActive: z.boolean(),
+  }).partial().strict()
+
+  app.get('/carrier-codes', async (req) => {
+    const { operatorId } = req.query as { operatorId?: string }
+    const filter: Record<string, unknown> = {}
+    if (operatorId) filter.operatorId = operatorId
+    return CarrierCode.find(filter).sort({ iataCode: 1 }).lean()
+  })
+
+  app.get('/carrier-codes/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await CarrierCode.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Carrier code not found' })
+    return doc
+  })
+
+  app.post('/carrier-codes', async (req, reply) => {
+    const raw = req.body as Record<string, unknown>
+    if (raw.icaoCode) raw.icaoCode = (raw.icaoCode as string).toUpperCase()
+    if (raw.iataCode) raw.iataCode = (raw.iataCode as string).toUpperCase()
+
+    const parsed = carrierCreateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+
+    const body = parsed.data
+    const existing = await CarrierCode.findOne({ operatorId: body.operatorId, iataCode: body.iataCode }).lean()
+    if (existing) return reply.code(409).send({ error: `Carrier "${body.iataCode}" already exists` })
+
+    try {
+      const id = crypto.randomUUID()
+      const doc = await CarrierCode.create({ _id: id, ...body, createdAt: new Date().toISOString() })
+      return reply.code(201).send(doc.toObject())
+    } catch (err: any) {
+      return reply.code(500).send({ error: err.message || 'Failed to create carrier code' })
+    }
+  })
+
+  app.patch('/carrier-codes/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const raw = req.body as Record<string, unknown>
+    if (raw.icaoCode) raw.icaoCode = (raw.icaoCode as string).toUpperCase()
+    if (raw.iataCode) raw.iataCode = (raw.iataCode as string).toUpperCase()
+
+    const parsed = carrierUpdateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+
+    const body = { ...parsed.data, updatedAt: new Date().toISOString() }
+    const doc = await CarrierCode.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'Carrier code not found' })
+    return doc
+  })
+
+  app.delete('/carrier-codes/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await CarrierCode.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Carrier code not found' })
+    await CarrierCode.findByIdAndDelete(id)
+    return { success: true }
   })
 }
 

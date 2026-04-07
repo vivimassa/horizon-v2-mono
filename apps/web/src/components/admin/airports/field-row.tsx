@@ -9,8 +9,10 @@ interface FieldRowProps {
   editValue?: string | number | boolean | null;
   /** Called with (fieldKey, newValue) when user changes value */
   onChange?: (key: string, value: string | number | boolean | null) => void;
-  /** Input type: text, number, or toggle */
-  inputType?: "text" | "number" | "toggle";
+  /** Input type: text, number, toggle, or select */
+  inputType?: "text" | "number" | "toggle" | "select";
+  /** Options for select input type */
+  selectOptions?: string[];
 }
 
 export function FieldRow({
@@ -21,6 +23,7 @@ export function FieldRow({
   editValue,
   onChange,
   inputType = "text",
+  selectOptions,
 }: FieldRowProps) {
   if (editing && fieldKey && onChange) {
     return (
@@ -39,6 +42,14 @@ export function FieldRow({
           >
             {editValue ? "Yes" : "No"}
           </button>
+        ) : inputType === "select" && selectOptions ? (
+          <select
+            value={editValue != null ? String(editValue) : ""}
+            onChange={(e) => onChange(fieldKey, e.target.value)}
+            className="w-full text-[13px] font-medium bg-transparent border-b border-hz-accent/30 outline-none focus:border-hz-accent py-0.5 text-hz-text"
+          >
+            {selectOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
         ) : (
           <input
             type={inputType}

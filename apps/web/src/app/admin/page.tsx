@@ -59,6 +59,7 @@ const SECTIONS: SectionDef[] = [
       { code: "5.1.3", label: "Citypairs", desc: "Routes, distances, block times", icon: ArrowLeftRight, href: "/admin/city-pairs" },
       { code: "5.1.4", label: "LOPA", desc: "Cabin classes and seat configurations", icon: Armchair, href: "/admin/lopa" },
       { code: "5.1.5", label: "Flight Service Types", desc: "Define flight service types for your operation", icon: Tag, href: "/admin/service-types" },
+      { code: "5.1.6", label: "Carrier Codes", desc: "Codeshare & wetlease carrier definitions", icon: Building2, href: "/admin/carrier-codes" },
     ],
   },
   {

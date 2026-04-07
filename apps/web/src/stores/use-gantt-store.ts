@@ -99,6 +99,7 @@ export const useGanttStore = create<GanttState>((set, get) => {
       colorMode: s.colorMode,
       barLabelMode: s.barLabelMode,
       isDark,
+      containerWidth: s.containerWidth || 1200,
     })
     set({ layout })
   }

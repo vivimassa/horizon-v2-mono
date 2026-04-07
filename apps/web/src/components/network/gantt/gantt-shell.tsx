@@ -34,7 +34,7 @@ export function GanttShell() {
 
   return (
     <div className="h-full flex">
-      <div className="shrink-0 p-2 pr-0">
+      <div className="shrink-0 h-full p-2 pr-0">
         <GanttFilterPanel />
       </div>
 

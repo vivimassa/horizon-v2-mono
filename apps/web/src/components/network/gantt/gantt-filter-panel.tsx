@@ -72,7 +72,7 @@ export function GanttFilterPanel() {
   if (collapsed) {
     return (
       <div
-        className="shrink-0 flex flex-col items-center rounded-2xl overflow-hidden"
+        className="shrink-0 h-full flex flex-col items-center rounded-2xl overflow-hidden"
         style={{ width: 44, background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: 'blur(24px)' }}
       >
         <button
@@ -93,7 +93,7 @@ export function GanttFilterPanel() {
   // ── Expanded ──
   return (
     <div
-      className="shrink-0 flex flex-col rounded-2xl overflow-hidden"
+      className="shrink-0 h-full flex flex-col rounded-2xl overflow-hidden"
       style={{ width: 300, background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: 'blur(24px)' }}
     >
       {/* Header — matches 1.1.1 exactly */}

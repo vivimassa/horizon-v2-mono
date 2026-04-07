@@ -20,6 +20,7 @@ export interface LayoutInput {
   colorMode: ColorMode
   barLabelMode: BarLabelMode
   isDark: boolean
+  containerWidth: number
 }
 
 const GROUP_HEADER_HEIGHT = 28
@@ -258,7 +259,8 @@ export function computeLayout(input: LayoutInput): LayoutResult {
   }
 
   const ticks = computeTicks(startMs, periodDays, pph, zoom)
-  const totalWidth = periodDays * 24 * pph
+  const rawWidth = periodDays * 24 * pph
+  const totalWidth = Math.max(rawWidth, input.containerWidth)
 
   return { rows, bars, ticks, totalWidth, totalHeight: y }
 }

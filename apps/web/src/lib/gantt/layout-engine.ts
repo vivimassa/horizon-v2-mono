@@ -38,6 +38,60 @@ interface AircraftSlot {
   lastEnd: number
 }
 
+/** A rotation block: one or more flights that must be assigned to the same aircraft */
+interface FlightBlock {
+  flights: GanttFlight[]   // sorted by stdUtc
+  depStation: string       // first flight's departure
+  arrStation: string       // last flight's arrival
+  startMs: number          // earliest STD
+  endMs: number            // latest STA
+}
+
+/** Group flights into atomic blocks by rotationId, then sort blocks chronologically */
+function buildBlocks(flights: GanttFlight[]): FlightBlock[] {
+  const rotationMap = new Map<string, GanttFlight[]>()
+  const singles: GanttFlight[] = []
+
+  for (const f of flights) {
+    if (f.rotationId) {
+      const list = rotationMap.get(f.rotationId) ?? []
+      list.push(f)
+      rotationMap.set(f.rotationId, list)
+    } else {
+      singles.push(f)
+    }
+  }
+
+  const blocks: FlightBlock[] = []
+
+  // Rotation blocks — sort legs within each block by sequence then time
+  for (const legs of rotationMap.values()) {
+    legs.sort((a, b) => (a.rotationSequence ?? 0) - (b.rotationSequence ?? 0) || a.stdUtc - b.stdUtc)
+    blocks.push({
+      flights: legs,
+      depStation: legs[0].depStation,
+      arrStation: legs[legs.length - 1].arrStation,
+      startMs: legs[0].stdUtc,
+      endMs: legs[legs.length - 1].staUtc,
+    })
+  }
+
+  // Single-flight blocks
+  for (const f of singles) {
+    blocks.push({
+      flights: [f],
+      depStation: f.depStation,
+      arrStation: f.arrStation,
+      startMs: f.stdUtc,
+      endMs: f.staUtc,
+    })
+  }
+
+  // Sort blocks by earliest departure
+  blocks.sort((a, b) => a.startMs - b.startMs)
+  return blocks
+}
+
 function computeVirtualPlacements(
   unassigned: GanttFlight[],
   aircraft: GanttAircraft[],
@@ -67,8 +121,8 @@ function computeVirtualPlacements(
     const acList = acByType.get(icaoType)
     if (!acList || acList.length === 0) continue
 
-    // Sort flights chronologically
-    const sorted = [...flights].sort((a, b) => a.stdUtc - b.stdUtc)
+    // Build rotation-aware blocks
+    const blocks = buildBlocks(flights)
 
     // Init slots from already-assigned flights
     const slots: AircraftSlot[] = acList.map(ac => {
@@ -82,48 +136,54 @@ function computeVirtualPlacements(
       return { registration: ac.registration, windows, lastArr, lastEnd }
     })
 
-    // Greedy forward pass with station continuity
-    for (const f of sorted) {
+    // Greedy forward pass — assign entire blocks atomically
+    for (const block of blocks) {
       let bestIdx = -1
       let bestScore = -Infinity
+      let bestLoad = Infinity
 
       for (let i = 0; i < slots.length; i++) {
         const s = slots[i]
-        // Check time overlap
-        const hasOverlap = s.windows.some(w =>
-          f.stdUtc < w.end + TAT_MS && w.start < f.staUtc + TAT_MS
-        )
-        if (hasOverlap) continue
 
-        let score = 0
-        // Station continuity: last arrival matches this departure
-        if (s.lastArr && s.lastArr === f.depStation) score += 1000
-        // Prefer idle aircraft
-        if (s.windows.length === 0) score += 500
-        // Prefer aircraft with earlier last end (spread load)
-        else score += 100
-
-        if (score > bestScore) { bestScore = score; bestIdx = i }
-      }
-
-      // Fallback: any non-overlapping slot (least loaded)
-      if (bestIdx < 0) {
-        let minLoad = Infinity
-        for (let i = 0; i < slots.length; i++) {
-          const s = slots[i]
+        // ALL flights in the block must fit without overlap
+        let blockFits = true
+        for (const f of block.flights) {
           const hasOverlap = s.windows.some(w =>
             f.stdUtc < w.end + TAT_MS && w.start < f.staUtc + TAT_MS
           )
-          if (hasOverlap) continue
-          if (s.windows.length < minLoad) { minLoad = s.windows.length; bestIdx = i }
+          if (hasOverlap) { blockFits = false; break }
+        }
+        if (!blockFits) continue
+
+        let score = 0
+
+        // Station continuity: last arrival matches block's first departure
+        if (s.lastArr && s.lastArr === block.depStation) {
+          score += 500
+          const gap = block.startMs - s.lastEnd
+          if (gap > 0 && gap < 3 * 3_600_000) score += 300
+        }
+
+        // Load penalty
+        score -= s.windows.length * 200
+
+        if (score > bestScore || (score === bestScore && s.windows.length < bestLoad)) {
+          bestScore = score
+          bestIdx = i
+          bestLoad = s.windows.length
         }
       }
 
       if (bestIdx >= 0) {
-        placements.set(f.id, slots[bestIdx].registration)
-        slots[bestIdx].windows.push({ start: f.stdUtc, end: f.staUtc })
-        slots[bestIdx].lastArr = f.arrStation
-        slots[bestIdx].lastEnd = f.staUtc
+        const s = slots[bestIdx]
+        for (const f of block.flights) {
+          placements.set(f.id, s.registration)
+          s.windows.push({ start: f.stdUtc, end: f.staUtc })
+        }
+        // Update slot tracking from the last flight in the block
+        const lastFlight = block.flights[block.flights.length - 1]
+        s.lastArr = lastFlight.arrStation
+        s.lastEnd = lastFlight.staUtc
       }
     }
   }

@@ -4,16 +4,14 @@ import { useState, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Filter, Search, Loader2 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { Dropdown } from "@/components/ui/dropdown";
 
 interface FilterPanelProps {
-  seasonCode: string;
-  onSeasonChange: (code: string) => void;
   onApplyFilters: (filters: FilterParams) => void;
   loading?: boolean;
 }
 
 export interface FilterParams {
-  seasonCode: string;
   dateFrom: string;
   dateTo: string;
   depStation: string;
@@ -21,8 +19,6 @@ export interface FilterParams {
   aircraftType: string;
   status: string;
 }
-
-const SEASONS = ["S25", "W25", "S26", "W26", "S27", "W27"];
 const STATUSES = [
   { value: "", label: "All Statuses" },
   { value: "draft", label: "Draft" },
@@ -31,7 +27,7 @@ const STATUSES = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
-export function FilterPanel({ seasonCode, onSeasonChange, onApplyFilters, loading }: FilterPanelProps) {
+export function FilterPanel({ onApplyFilters, loading }: FilterPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -50,18 +46,32 @@ export function FilterPanel({ seasonCode, onSeasonChange, onApplyFilters, loadin
 
   const handleGo = useCallback(() => {
     if (periodMissing) return;
-    onApplyFilters({ seasonCode, dateFrom, dateTo, depStation, arrStation, aircraftType, status });
+    onApplyFilters({ dateFrom, dateTo, depStation, arrStation, aircraftType, status });
     setCollapsed(true);
-  }, [periodMissing, seasonCode, dateFrom, dateTo, depStation, arrStation, aircraftType, status, onApplyFilters]);
+  }, [periodMissing, dateFrom, dateTo, depStation, arrStation, aircraftType, status, onApplyFilters]);
 
   const activeCount = [dateFrom, dateTo, depStation, arrStation, aircraftType, status].filter(Boolean).length;
 
   // ── Collapsed state ──
-  if (collapsed) {
-    return (
+  return (
+    <div
+      className="shrink-0 flex flex-col rounded-2xl overflow-hidden relative"
+      style={{
+        width: collapsed ? 44 : 300,
+        transition: "width 250ms cubic-bezier(0.4, 0, 0.2, 1)",
+        background: glassBg,
+        border: `1px solid ${glassBorder}`,
+        backdropFilter: "blur(20px)",
+      }}
+    >
+      {/* Collapsed view */}
       <div
-        className="shrink-0 flex flex-col items-center rounded-2xl overflow-hidden"
-        style={{ width: 44, background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: "blur(20px)" }}
+        className="absolute inset-0 flex flex-col items-center"
+        style={{
+          opacity: collapsed ? 1 : 0,
+          pointerEvents: collapsed ? "auto" : "none",
+          transition: "opacity 200ms ease",
+        }}
       >
         <button
           onClick={() => setCollapsed(false)}
@@ -78,79 +88,81 @@ export function FilterPanel({ seasonCode, onSeasonChange, onApplyFilters, loadin
           </span>
         </div>
       </div>
-    );
-  }
 
-  // ── Expanded state ──
-  return (
-    <div
-      className="shrink-0 flex flex-col rounded-2xl overflow-hidden"
-      style={{ width: 300, background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: "blur(20px)" }}
-    >
-      {/* Header */}
+      {/* Expanded view */}
       <div
-        className="flex items-center justify-between px-5 shrink-0"
-        style={{ minHeight: 48, borderBottom: `1px solid ${sectionBorder}` }}
+        className="flex flex-col h-full min-w-[300px]"
+        style={{
+          opacity: collapsed ? 0 : 1,
+          pointerEvents: collapsed ? "none" : "auto",
+          transition: "opacity 200ms ease",
+        }}
       >
-        <div className="flex items-center gap-2">
-          <Filter size={14} className="text-module-accent" />
-          <span className="text-[15px] font-bold">Filters</span>
-          {activeCount > 0 && (
-            <span className="px-2 py-0.5 rounded-full bg-module-accent text-white text-[11px] font-bold">{activeCount}</span>
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-5 shrink-0"
+          style={{ minHeight: 48, borderBottom: `1px solid ${sectionBorder}` }}
+        >
+          <div className="flex items-center gap-2">
+            <Filter size={14} className="text-module-accent" />
+            <span className="text-[15px] font-bold">Filters</span>
+            {activeCount > 0 && (
+              <span className="px-2 py-0.5 rounded-full bg-module-accent text-white text-[11px] font-bold">{activeCount}</span>
+            )}
+          </div>
+          <button onClick={() => setCollapsed(true)} className="p-1 rounded-md hover:bg-hz-border/30 transition-colors">
+            <ChevronLeft size={16} className="text-hz-text-tertiary" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
+
+          {/* Date Range */}
+          <FilterSection label="Period">
+            <DateRangePicker from={dateFrom} to={dateTo} onChangeFrom={setDateFrom} onChangeTo={setDateTo} inline />
+          </FilterSection>
+
+          {/* Departure */}
+          <FilterSection label="Departure">
+            <StationInput value={depStation} onChange={setDepStation} placeholder="ICAO code" isDark={isDark} />
+          </FilterSection>
+
+          {/* Arrival */}
+          <FilterSection label="Arrival">
+            <StationInput value={arrStation} onChange={setArrStation} placeholder="ICAO code" isDark={isDark} />
+          </FilterSection>
+
+          {/* AC Type */}
+          <FilterSection label="AC Type">
+            <StationInput value={aircraftType} onChange={setAircraftType} placeholder="e.g. A321" isDark={isDark} />
+          </FilterSection>
+
+          {/* Status */}
+          <FilterSection label="Status">
+            <Dropdown
+              value={status || null}
+              options={STATUSES}
+              onChange={setStatus}
+              placeholder="All Statuses"
+            />
+          </FilterSection>
+        </div>
+
+        {/* Go Button */}
+        <div className="px-5 py-4 shrink-0" style={{ borderTop: `1px solid ${sectionBorder}` }}>
+          <button
+            onClick={handleGo}
+            disabled={loading || periodMissing}
+            className="w-full h-9 flex items-center justify-center gap-2 rounded-xl text-[13px] font-semibold text-white bg-module-accent hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+            {loading ? "Loading..." : "Go"}
+          </button>
+          {periodMissing && (
+            <p className="text-[11px] text-hz-text-secondary mt-1.5 text-center">Select the period to continue</p>
           )}
         </div>
-        <button onClick={() => setCollapsed(true)} className="p-1 rounded-md hover:bg-hz-border/30 transition-colors">
-          <ChevronLeft size={16} className="text-hz-text-tertiary" />
-        </button>
-      </div>
-
-      {/* Body */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
-
-        {/* Date Range */}
-        <FilterSection label="Period">
-          <DateRangePicker from={dateFrom} to={dateTo} onChangeFrom={setDateFrom} onChangeTo={setDateTo} />
-        </FilterSection>
-
-        {/* Departure */}
-        <FilterSection label="Departure">
-          <StationInput value={depStation} onChange={setDepStation} placeholder="ICAO code" isDark={isDark} />
-        </FilterSection>
-
-        {/* Arrival */}
-        <FilterSection label="Arrival">
-          <StationInput value={arrStation} onChange={setArrStation} placeholder="ICAO code" isDark={isDark} />
-        </FilterSection>
-
-        {/* AC Type */}
-        <FilterSection label="AC Type">
-          <StationInput value={aircraftType} onChange={setAircraftType} placeholder="e.g. A321" isDark={isDark} />
-        </FilterSection>
-
-        {/* Status */}
-        <FilterSection label="Status">
-          <FilterSelect
-            value={status}
-            options={STATUSES}
-            onChange={setStatus}
-            isDark={isDark}
-          />
-        </FilterSection>
-      </div>
-
-      {/* Go Button */}
-      <div className="px-5 py-4 shrink-0" style={{ borderTop: `1px solid ${sectionBorder}` }}>
-        <button
-          onClick={handleGo}
-          disabled={loading || periodMissing}
-          className="w-full h-9 flex items-center justify-center gap-2 rounded-xl text-[13px] font-semibold text-white bg-module-accent hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-          {loading ? "Loading..." : "Go"}
-        </button>
-        {periodMissing && (
-          <p className="text-[11px] text-hz-text-secondary mt-1.5 text-center">Select the period to continue</p>
-        )}
       </div>
     </div>
   );
@@ -164,28 +176,6 @@ function FilterSection({ label, children }: { label: string; children: React.Rea
       <label className="text-[13px] font-semibold uppercase tracking-wider text-hz-text-tertiary block">{label}</label>
       {children}
     </div>
-  );
-}
-
-function FilterSelect({ value, options, onChange, isDark }: {
-  value: string;
-  options: { value: string; label: string }[];
-  onChange: (v: string) => void;
-  isDark: boolean;
-}) {
-  const bg = isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.7)";
-  const border = isDark ? "rgba(255,255,255,0.20)" : "rgba(0,0,0,0.20)";
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full px-2.5 py-2 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text transition-colors"
-      style={{ background: bg, border: `1px solid ${border}`, minHeight: 36 }}
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
-      ))}
-    </select>
   );
 }
 

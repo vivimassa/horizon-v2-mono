@@ -71,19 +71,19 @@ export function CellsSection({ onInsert, onDelete, hasSelection, rowHeight, onRo
           ref={dropRef}
           className="fixed z-[9999] rounded-xl p-3 select-none"
           style={{
-            top: pos.top, left: pos.left, width: 160,
+            top: pos.top, left: pos.left, width: 200,
             background: panelBg, border: `1px solid ${panelBorder}`,
             boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.5)" : "0 8px 32px rgba(96,97,112,0.14)",
             fontFamily: "Inter, system-ui, sans-serif",
           }}
         >
-          <div className="text-[11px] font-medium text-hz-text-secondary mb-2">Row Height</div>
-          <div className="flex items-center gap-0">
+          <div className="text-[13px] font-medium text-hz-text-secondary mb-2 text-center">Row Height</div>
+          <div className="flex items-center justify-center gap-0">
             <button
               onClick={() => onRowHeightChange(Math.max(MIN_HEIGHT, rowHeight - STEP))}
               disabled={rowHeight <= MIN_HEIGHT}
               className="flex items-center justify-center rounded-l-lg text-[14px] font-bold transition-colors disabled:opacity-30"
-              style={{ width: 32, height: 32, border: `1px solid ${panelBorder}` }}
+              style={{ width: 40, height: 36, border: `1px solid ${panelBorder}` }}
               onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
             >
@@ -91,7 +91,7 @@ export function CellsSection({ onInsert, onDelete, hasSelection, rowHeight, onRo
             </button>
             <div
               className="flex items-center justify-center text-[13px] font-mono font-medium text-hz-text"
-              style={{ width: 40, height: 32, borderTop: `1px solid ${panelBorder}`, borderBottom: `1px solid ${panelBorder}` }}
+              style={{ width: 56, height: 36, borderTop: `1px solid ${panelBorder}`, borderBottom: `1px solid ${panelBorder}` }}
             >
               {rowHeight}
             </div>
@@ -99,7 +99,7 @@ export function CellsSection({ onInsert, onDelete, hasSelection, rowHeight, onRo
               onClick={() => onRowHeightChange(Math.min(MAX_HEIGHT, rowHeight + STEP))}
               disabled={rowHeight >= MAX_HEIGHT}
               className="flex items-center justify-center rounded-r-lg text-[14px] font-bold transition-colors disabled:opacity-30"
-              style={{ width: 32, height: 32, border: `1px solid ${panelBorder}` }}
+              style={{ width: 40, height: 36, border: `1px solid ${panelBorder}` }}
               onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
             >

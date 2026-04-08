@@ -1,42 +1,48 @@
 "use client"
 
-import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Filter, Search, Loader2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ChevronLeft, ChevronRight, ChevronDown, Filter, Search, Loader2 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { useGanttStore } from '@/stores/use-gantt-store'
-import { AC_TYPE_COLOR_PALETTE } from '@/lib/gantt/colors'
-
-const STATUS_LEGEND = [
-  { label: 'Published / Assigned', color: 'rgba(16,185,129,0.8)' },
-  { label: 'Published / Unassigned', color: 'rgba(245,158,11,0.8)' },
-  { label: 'Draft / Assigned', color: 'rgba(59,130,246,0.8)' },
-  { label: 'Draft / Unassigned', color: 'rgba(100,116,139,0.7)' },
-] as const
+import { useScheduleRefStore } from '@/stores/use-schedule-ref-store'
+import { useOperatorStore } from '@/stores/use-operator-store'
 
 const SCHEDULE_STATUSES = [
-  { key: 'active', label: 'Published', color: '#06C270' },
-  { key: 'finalized', label: 'Finalized', color: '#0d9488' },
   { key: 'draft', label: 'Draft', color: '#3B82F6' },
+  { key: 'active', label: 'Active', color: '#06C270' },
+  { key: 'suspended', label: 'Suspended', color: '#FF8800' },
+  { key: 'cancelled', label: 'Cancelled', color: '#FF3B3B' },
 ] as const
 
-export function GanttFilterPanel() {
+export function GanttFilterPanel({ forceCollapsed = false, onGo }: { forceCollapsed?: boolean; onGo?: () => void }) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
   const [collapsed, setCollapsed] = useState(false)
-  const [enabledStatuses, setEnabledStatuses] = useState<Set<string>>(new Set(['active', 'finalized', 'draft']))
+  const [enabledStatuses, setEnabledStatuses] = useState<Set<string>>(new Set(['draft', 'active', 'suspended', 'cancelled']))
   const [enabledTypes, setEnabledTypes] = useState<Set<string> | null>(null)
 
   const periodFrom = useGanttStore(s => s.periodFrom)
   const periodTo = useGanttStore(s => s.periodTo)
   const loading = useGanttStore(s => s.loading)
-  const aircraftTypes = useGanttStore(s => s.aircraftTypes)
   const aircraft = useGanttStore(s => s.aircraft)
   const colorMode = useGanttStore(s => s.colorMode)
   const setPeriod = useGanttStore(s => s.setPeriod)
   const commitPeriod = useGanttStore(s => s.commitPeriod)
   const setColorMode = useGanttStore(s => s.setColorMode)
+  const setAcTypeFilter = useGanttStore(s => s.setAcTypeFilter)
+  const setStatusFilter = useGanttStore(s => s.setStatusFilter)
+
+  // AC types from ref store — always available, loaded independently of flights
+  const refAcTypes = useScheduleRefStore(s => s.aircraftTypes)
+  const loadRefData = useScheduleRefStore(s => s.loadAll)
+  const refLoaded = useScheduleRefStore(s => s.loaded)
+  const operatorLoaded = useOperatorStore(s => s.loaded)
+  useEffect(() => {
+    if (operatorLoaded && !refLoaded) loadRefData()
+  }, [operatorLoaded, refLoaded, loadRefData])
+  const acTypeIcaos = refAcTypes.filter(t => t.isActive).map(t => t.icaoType)
 
   const glassBg = isDark ? 'rgba(25,25,33,0.85)' : 'rgba(255,255,255,0.85)'
   const glassBorder = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)'
@@ -50,30 +56,34 @@ export function GanttFilterPanel() {
     acCountByType.set(key, (acCountByType.get(key) ?? 0) + 1)
   }
 
-  const activeCount = [periodFrom, periodTo].filter(Boolean).length
-    + (enabledTypes !== null ? 1 : 0)
-    + (enabledStatuses.size < 3 ? 1 : 0)
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
 
-  function toggleStatus(key: string) {
-    const next = new Set(enabledStatuses)
-    if (next.has(key)) next.delete(key); else next.add(key)
-    setEnabledStatuses(next)
-  }
+  const activeCount = mounted
+    ? [periodFrom, periodTo].filter(Boolean).length
+      + (enabledTypes !== null ? 1 : 0)
+      + (enabledStatuses.size < SCHEDULE_STATUSES.length ? 1 : 0)
+    : 0
 
-  function toggleAcType(icao: string) {
-    const all = aircraftTypes.map(t => t.icaoType)
-    const current = enabledTypes ?? new Set(all)
-    const next = new Set(current)
-    if (next.has(icao)) next.delete(icao); else next.add(icao)
-    setEnabledTypes(next)
-  }
-
-  // ── Collapsed ──
-  if (collapsed) {
-    return (
+  return (
+    <div
+      className="shrink-0 h-full flex flex-col rounded-2xl overflow-hidden"
+      style={{
+        width: collapsed ? 44 : 300,
+        transition: 'width 250ms cubic-bezier(0.4, 0, 0.2, 1)',
+        background: glassBg,
+        border: `1px solid ${glassBorder}`,
+        backdropFilter: 'blur(24px)',
+      }}
+    >
+      {/* Collapsed view */}
       <div
-        className="shrink-0 h-full flex flex-col items-center rounded-2xl overflow-hidden"
-        style={{ width: 44, background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: 'blur(24px)' }}
+        className="absolute inset-0 flex flex-col items-center"
+        style={{
+          opacity: collapsed ? 1 : 0,
+          pointerEvents: collapsed ? 'auto' : 'none',
+          transition: 'opacity 200ms ease',
+        }}
       >
         <button
           onClick={() => setCollapsed(false)}
@@ -87,127 +97,265 @@ export function GanttFilterPanel() {
           </span>
         </div>
       </div>
-    )
-  }
 
-  // ── Expanded ──
-  return (
-    <div
-      className="shrink-0 h-full flex flex-col rounded-2xl overflow-hidden"
-      style={{ width: 300, background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: 'blur(24px)' }}
-    >
-      {/* Header — matches 1.1.1 exactly */}
+      {/* Expanded view */}
       <div
-        className="flex items-center justify-between px-5 shrink-0"
-        style={{ minHeight: 48, borderBottom: `1px solid ${sectionBorder}` }}
+        className="flex flex-col h-full min-w-[300px]"
+        style={{
+          opacity: collapsed ? 0 : 1,
+          pointerEvents: collapsed ? 'none' : 'auto',
+          transition: 'opacity 200ms ease',
+        }}
       >
-        <div className="flex items-center gap-2">
-          <Filter size={14} className="text-module-accent" />
-          <span className="text-[15px] font-bold">Filters</span>
-          {activeCount > 0 && (
-            <span className="px-2 py-0.5 rounded-full bg-module-accent text-white text-[11px] font-bold">{activeCount}</span>
-          )}
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-5 shrink-0"
+          style={{ minHeight: 48, borderBottom: `1px solid ${sectionBorder}` }}
+        >
+          <div className="flex items-center gap-2">
+            <Filter size={14} className="text-module-accent" />
+            <span className="text-[15px] font-bold">Filters</span>
+            {activeCount > 0 && (
+              <span className="px-2 py-0.5 rounded-full bg-module-accent text-white text-[11px] font-bold">{activeCount}</span>
+            )}
+          </div>
+          <button onClick={() => setCollapsed(true)} className="p-1 rounded-md hover:bg-hz-border/30 transition-colors">
+            <ChevronLeft size={16} className="text-hz-text-tertiary" />
+          </button>
         </div>
-        <button onClick={() => setCollapsed(true)} className="p-1 rounded-md hover:bg-hz-border/30 transition-colors">
-          <ChevronLeft size={16} className="text-hz-text-tertiary" />
-        </button>
-      </div>
 
-      {/* Body */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
 
-        {/* Period — same DateRangePicker as 1.1.1 */}
-        <FilterSection label="Period">
-          <DateRangePicker
-            from={periodFrom}
-            to={periodTo}
-            onChangeFrom={(v) => setPeriod(v, periodTo)}
-            onChangeTo={(v) => setPeriod(periodFrom, v)}
-          />
-        </FilterSection>
+          {/* Period */}
+          <FilterSection label="Period">
+            <DateRangePicker
+              from={periodFrom}
+              to={periodTo}
+              onChangeFrom={(v) => setPeriod(v, useGanttStore.getState().periodTo)}
+              onChangeTo={(v) => setPeriod(useGanttStore.getState().periodFrom, v)}
+              inline
+            />
+          </FilterSection>
 
-        {/* Aircraft Type */}
-        {aircraftTypes.length > 0 && (
+          {/* Aircraft Type */}
           <FilterSection label="Aircraft Type">
-            <div className="space-y-0.5">
-              {aircraftTypes.map((t, i) => {
-                const color = t.color ?? AC_TYPE_COLOR_PALETTE[i % AC_TYPE_COLOR_PALETTE.length]
-                const checked = enabledTypes === null || enabledTypes.has(t.icaoType)
-                const count = acCountByType.get(t.icaoType) ?? 0
-                return (
-                  <label key={t.id} className="flex items-center gap-2 h-8 px-1.5 rounded-lg cursor-pointer hover:bg-hz-border/20 transition-colors duration-150">
-                    <input type="checkbox" checked={checked} onChange={() => toggleAcType(t.icaoType)}
-                      className="w-3.5 h-3.5 rounded accent-[var(--module-accent)]" />
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color, boxShadow: `0 0 6px ${color}40` }} />
-                    <span className="text-[13px] font-mono font-medium flex-1 text-hz-text">{t.icaoType}</span>
-                    <span className="text-[11px] font-mono text-hz-text-tertiary">{count}</span>
-                  </label>
-                )
-              })}
+            <AcTypeDropdown
+              types={acTypeIcaos}
+              value={enabledTypes}
+              onChange={setEnabledTypes}
+              isDark={isDark}
+              inputBg={inputBg}
+              inputBorder={inputBorder}
+            />
+          </FilterSection>
+
+          {/* Schedule Status */}
+          <FilterSection label="Schedule Status">
+            <StatusDropdown
+              value={enabledStatuses}
+              onChange={setEnabledStatuses}
+              isDark={isDark}
+              inputBg={inputBg}
+              inputBorder={inputBorder}
+            />
+          </FilterSection>
+
+          {/* Color Mode */}
+          <FilterSection label="Color Mode">
+            <div className="flex rounded-xl overflow-hidden" style={{ border: `1px solid ${inputBorder}` }}>
+              {(['status', 'ac_type'] as const).map(mode => (
+                <button key={mode} onClick={() => setColorMode(mode)}
+                  className={`flex-1 py-2 text-[13px] font-semibold transition-colors duration-150 ${colorMode === mode ? 'bg-module-accent text-white' : 'text-hz-text-secondary'}`}
+                >{mode === 'status' ? 'Status' : 'AC Type'}</button>
+              ))}
             </div>
           </FilterSection>
-        )}
 
-        {/* Schedule Status */}
-        <FilterSection label="Schedule Status">
-          <div className="space-y-0.5">
-            {SCHEDULE_STATUSES.map(s => (
-              <label key={s.key} className="flex items-center gap-2 h-8 px-1.5 rounded-lg cursor-pointer hover:bg-hz-border/20 transition-colors duration-150">
-                <input type="checkbox" checked={enabledStatuses.has(s.key)} onChange={() => toggleStatus(s.key)}
-                  className="w-3.5 h-3.5 rounded accent-[var(--module-accent)]" />
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color, boxShadow: `0 0 6px ${s.color}40` }} />
-                <span className="text-[13px] font-medium text-hz-text">{s.label}</span>
-              </label>
-            ))}
-          </div>
-        </FilterSection>
+        </div>
 
-        {/* Color Mode */}
-        <FilterSection label="Color Mode">
-          <div className="flex rounded-xl overflow-hidden" style={{ border: `1px solid ${inputBorder}` }}>
-            {(['status', 'ac_type'] as const).map(mode => (
-              <button key={mode} onClick={() => setColorMode(mode)}
-                className={`flex-1 py-2 text-[13px] font-semibold transition-colors duration-150 ${colorMode === mode ? 'bg-module-accent text-white' : 'text-hz-text-secondary'}`}
-              >{mode === 'status' ? 'Status' : 'AC Type'}</button>
-            ))}
-          </div>
-        </FilterSection>
-
-        {/* Legend */}
-        <FilterSection label="Legend">
-          <div className="space-y-1.5">
-            {STATUS_LEGEND.map(item => (
-              <div key={item.label} className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: item.color, boxShadow: `0 0 6px ${item.color}` }} />
-                <span className="text-[11px] text-hz-text-secondary">{item.label}</span>
-              </div>
-            ))}
-          </div>
-        </FilterSection>
-      </div>
-
-      {/* Go Button — pinned at bottom, matches 1.1.1 */}
-      <div className="px-5 py-4 shrink-0" style={{ borderTop: `1px solid ${sectionBorder}` }}>
-        <button
-          onClick={() => commitPeriod()}
-          disabled={loading || !periodFrom || !periodTo}
-          className="w-full h-9 flex items-center justify-center gap-2 rounded-xl text-[13px] font-semibold text-white bg-module-accent hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-          {loading ? 'Loading...' : 'Go'}
-        </button>
+        {/* Go Button */}
+        <div className="px-5 py-4 shrink-0" style={{ borderTop: `1px solid ${sectionBorder}` }}>
+          <button
+            onClick={() => {
+              // Sync filters to store before fetching
+              setAcTypeFilter(enabledTypes ? Array.from(enabledTypes) : null)
+              const allStatuses = SCHEDULE_STATUSES.map(s => s.key)
+              const allSelected = allStatuses.every(k => enabledStatuses.has(k))
+              setStatusFilter(allSelected ? null : Array.from(enabledStatuses))
+              ;(onGo ?? commitPeriod)()
+              setCollapsed(true)
+            }}
+            disabled={loading || !periodFrom || !periodTo}
+            className="w-full h-9 flex items-center justify-center gap-2 rounded-xl text-[13px] font-semibold text-white bg-module-accent hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+            {loading ? 'Loading...' : 'Go'}
+          </button>
+        </div>
       </div>
     </div>
   )
 }
 
-/* ── Sub-component matching 1.1.1 pattern ── */
+/* ── Sub-components ── */
 
 function FilterSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
       <label className="text-[13px] font-semibold uppercase tracking-wider text-hz-text-tertiary block">{label}</label>
       {children}
+    </div>
+  )
+}
+
+function StatusDropdown({
+  value, onChange, isDark, inputBg, inputBorder,
+}: {
+  value: Set<string>
+  onChange: (v: Set<string>) => void
+  isDark: boolean
+  inputBg: string
+  inputBorder: string
+}) {
+  const [open, setOpen] = useState(false)
+  const allKeys = SCHEDULE_STATUSES.map(s => s.key)
+  const allSelected = allKeys.every(k => value.has(k))
+
+  const label = allSelected
+    ? 'All Statuses'
+    : SCHEDULE_STATUSES.filter(s => value.has(s.key)).map(s => s.label).join(', ') || 'None'
+
+  function toggle(key: string) {
+    const next = new Set(value)
+    if (next.has(key)) next.delete(key); else next.add(key)
+    onChange(next)
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full h-9 flex items-center justify-between px-3 rounded-xl text-[13px] font-medium transition-colors"
+        style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
+      >
+        <span className="truncate text-hz-text">{label}</span>
+        <ChevronDown size={14} className={`text-hz-text-tertiary shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div
+          className="absolute z-50 mt-1 w-full rounded-xl overflow-hidden py-1"
+          style={{
+            background: isDark ? 'rgba(25,25,33,0.95)' : 'rgba(255,255,255,0.98)',
+            border: `1px solid ${inputBorder}`,
+            boxShadow: isDark
+              ? '0 8px 24px rgba(0,0,0,0.4)'
+              : '0 8px 24px rgba(96,97,112,0.12)',
+          }}
+        >
+          {SCHEDULE_STATUSES.map(s => (
+            <button
+              key={s.key}
+              onClick={() => toggle(s.key)}
+              className="w-full flex items-center gap-2.5 h-8 px-3 hover:bg-hz-border/20 transition-colors"
+            >
+              <span
+                className="w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0"
+                style={{
+                  borderColor: value.has(s.key) ? s.color : (isDark ? 'rgba(255,255,255,0.20)' : 'rgba(0,0,0,0.20)'),
+                  background: value.has(s.key) ? s.color : 'transparent',
+                }}
+              >
+                {value.has(s.key) && (
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                )}
+              </span>
+              <span className="text-[13px] font-medium text-hz-text">{s.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AcTypeDropdown({
+  types, value, onChange, isDark, inputBg, inputBorder,
+}: {
+  types: string[]
+  value: Set<string> | null
+  onChange: (v: Set<string> | null) => void
+  isDark: boolean
+  inputBg: string
+  inputBorder: string
+}) {
+  const [open, setOpen] = useState(false)
+  const allSelected = value === null || types.every(t => value.has(t))
+
+  const label = allSelected
+    ? 'All Types'
+    : types.filter(t => value?.has(t)).join(', ') || 'None'
+
+  function toggle(icao: string) {
+    const all = new Set(types)
+    if (value === null) {
+      all.delete(icao)
+      onChange(all)
+    } else {
+      const next = new Set(value)
+      if (next.has(icao)) next.delete(icao); else next.add(icao)
+      if (types.every(t => next.has(t))) onChange(null)
+      else onChange(next)
+    }
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full h-9 flex items-center justify-between px-3 rounded-xl text-[13px] font-medium transition-colors"
+        style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
+      >
+        <span className="truncate text-hz-text font-mono">{label}</span>
+        <ChevronDown size={14} className={`text-hz-text-tertiary shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div
+          className="absolute z-50 mt-1 w-full rounded-xl overflow-hidden py-1"
+          style={{
+            background: isDark ? 'rgba(25,25,33,0.95)' : 'rgba(255,255,255,0.98)',
+            border: `1px solid ${inputBorder}`,
+            boxShadow: isDark
+              ? '0 8px 24px rgba(0,0,0,0.4)'
+              : '0 8px 24px rgba(96,97,112,0.12)',
+          }}
+        >
+          {types.map(icao => {
+            const checked = value === null || value.has(icao)
+            const accentColor = 'var(--module-accent, #1e40af)'
+            return (
+              <button
+                key={icao}
+                onClick={() => toggle(icao)}
+                className="w-full flex items-center gap-2.5 h-8 px-3 hover:bg-hz-border/20 transition-colors"
+              >
+                <span
+                  className="w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0"
+                  style={{
+                    borderColor: checked ? accentColor : (isDark ? 'rgba(255,255,255,0.20)' : 'rgba(0,0,0,0.20)'),
+                    background: checked ? accentColor : 'transparent',
+                  }}
+                >
+                  {checked && (
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  )}
+                </span>
+                <span className="text-[13px] font-mono font-medium text-hz-text">{icao}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

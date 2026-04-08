@@ -16,6 +16,7 @@ export interface GanttFlight {
   serviceType: string
   scenarioId: string | null
   rotationId: string | null
+  rotationSequence: number | null
   rotationLabel: string | null
 }
 
@@ -56,7 +57,7 @@ export interface GanttApiResponse {
 
 // ── View State Types ──
 
-export type ZoomLevel = '1D' | '2D' | '3D' | '4D' | '5D' | '7D' | '14D' | '28D'
+export type ZoomLevel = '1D' | '2D' | '3D' | '4D' | '5D' | '6D' | '7D' | '14D' | '21D' | '28D'
 export type ColorMode = 'status' | 'ac_type' | 'service_type' | 'route_type'
 export type BarLabelMode = 'flightNo' | 'sector'
 
@@ -66,8 +67,10 @@ export const ZOOM_CONFIG: Record<ZoomLevel, { days: number; hoursPerTick: number
   '3D':  { days: 3,  hoursPerTick: 2 },
   '4D':  { days: 4,  hoursPerTick: 3 },
   '5D':  { days: 5,  hoursPerTick: 4 },
+  '6D':  { days: 6,  hoursPerTick: 4 },
   '7D':  { days: 7,  hoursPerTick: 6 },
   '14D': { days: 14, hoursPerTick: 12 },
+  '21D': { days: 21, hoursPerTick: 24 },
   '28D': { days: 28, hoursPerTick: 24 },
 }
 

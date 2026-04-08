@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useCallback, useEffect } from 'react'
+import { useRef, useCallback, useEffect, useMemo } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { colors, glass } from '@skyhub/ui/theme'
@@ -8,6 +8,8 @@ import { useGanttStore } from '@/stores/use-gantt-store'
 import { computePixelsPerHour, computeNowLineX, dateToMs } from '@/lib/gantt/time-axis'
 import { hitTestBars } from '@/lib/gantt/hit-testing'
 import { drawGrid, drawGroupHeaders, drawBars, drawTatLabels, drawNowLine } from '@/lib/gantt/draw-helpers'
+import { FlightTooltip } from './gantt-flight-tooltip'
+import { GanttContextMenu } from './gantt-context-menu'
 
 const ROW_LABEL_W = 160
 
@@ -22,10 +24,12 @@ export function GanttCanvas() {
   const rowLabelsRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLDivElement>(null)
   const scrollState = useRef({ left: 0, top: 0 })
+  const mousePosRef = useRef({ x: 0, y: 0 })
   const rafId = useRef(0)
 
   // Store
   const layout = useGanttStore(s => s.layout)
+  const flights = useGanttStore(s => s.flights)
   const selectedFlightIds = useGanttStore(s => s.selectedFlightIds)
   const hoveredFlightId = useGanttStore(s => s.hoveredFlightId)
   const periodFrom = useGanttStore(s => s.periodFrom)
@@ -114,6 +118,7 @@ export function GanttCanvas() {
 
   // ── Mouse events ──
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    mousePosRef.current = { x: e.clientX, y: e.clientY }
     if (!layout) return
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const x = e.clientX - rect.left + scrollState.current.left
@@ -123,12 +128,27 @@ export function GanttCanvas() {
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     if (!layout) return
+    // Close context menu on left click anywhere
+    useGanttStore.getState().closeContextMenu()
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const x = e.clientX - rect.left + scrollState.current.left
     const y = e.clientY - rect.top + scrollState.current.top
     const hit = hitTestBars(x, y, layout.bars)
     if (hit) useGanttStore.getState().selectFlight(hit, e.ctrlKey || e.metaKey)
     else useGanttStore.getState().clearSelection()
+  }, [layout])
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    if (!layout) return
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const x = e.clientX - rect.left + scrollState.current.left
+    const y = e.clientY - rect.top + scrollState.current.top
+    const hit = hitTestBars(x, y, layout.bars)
+    if (hit) {
+      useGanttStore.getState().selectFlight(hit, false)
+      useGanttStore.getState().openContextMenu(e.clientX, e.clientY, hit)
+    }
   }, [layout])
 
   // Cursor
@@ -160,6 +180,14 @@ export function GanttCanvas() {
     scrollRef.current.scrollLeft = Math.max(0, targetX)
     consumeScrollTarget()
   }, [scrollTargetMs, periodFrom, containerWidth, zoomLevel, consumeScrollTarget])
+
+  // ── Hovered flight for tooltip (hide when context menu or dialog is open) ──
+  const contextMenu = useGanttStore(s => s.contextMenu)
+  const flightInfoDialogId = useGanttStore(s => s.flightInfoDialogId)
+  const hoveredFlight = useMemo(() => {
+    if (!hoveredFlightId || contextMenu || flightInfoDialogId) return null
+    return flights.find(f => f.id === hoveredFlightId) ?? null
+  }, [hoveredFlightId, flights, contextMenu, flightInfoDialogId])
 
   // ── Theme ──
   const palette = isDark ? colors.dark : colors.light
@@ -234,11 +262,17 @@ export function GanttCanvas() {
         <div ref={containerRef} className="flex-1 min-h-0 min-w-0 overflow-hidden relative">
           <canvas ref={canvasRef} className="absolute inset-0" style={{ pointerEvents: 'none', zIndex: 0 }} />
           <div ref={scrollRef} className="gantt-scroll absolute inset-0" style={{ overflow: 'scroll', zIndex: 1 }}
-            onScroll={handleScroll} onMouseMove={handleMouseMove} onClick={handleClick}>
+            onScroll={handleScroll} onMouseMove={handleMouseMove} onClick={handleClick} onContextMenu={handleContextMenu}>
             <div style={{ width: totalWidth, height: totalHeight }} />
           </div>
         </div>
       </div>
+
+      {/* Flight hover tooltip — portaled to body */}
+      <FlightTooltip flight={hoveredFlight} mousePosRef={mousePosRef} isDark={isDark} />
+
+      {/* Right-click context menu */}
+      <GanttContextMenu />
     </div>
   )
 }

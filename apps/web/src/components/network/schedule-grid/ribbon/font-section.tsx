@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Type, Palette } from "lucide-react";
 import { RibbonButton } from "./ribbon-button";
 import { Tooltip } from "@/components/ui/tooltip";
+import { Dropdown } from "@/components/ui/dropdown";
 import { useTheme } from "@/components/theme-provider";
 import { useScheduleGridStore } from "@/stores/use-schedule-grid-store";
 import { GRID_COLUMNS } from "../grid-columns";
@@ -55,45 +56,54 @@ export function FontSection({ hasSelection }: Props) {
     forEachCell((rowId, colKey) => setCellFormat(rowId, colKey, { textAlign: align }));
   };
 
+  const [fontFamily, setFontFamily] = useState("Mono");
+  const [fontSize, setFontSize] = useState("13");
+
   const handleFontFamily = (family: string) => {
+    setFontFamily(family);
     forEachCell((rowId, colKey) => setCellFormat(rowId, colKey, { fontFamily: family }));
   };
 
-  const handleFontSize = (size: number) => {
-    forEachCell((rowId, colKey) => setCellFormat(rowId, colKey, { fontSize: size }));
+  const handleFontSize = (sizeStr: string) => {
+    setFontSize(sizeStr);
+    forEachCell((rowId, colKey) => setCellFormat(rowId, colKey, { fontSize: Number(sizeStr) }));
   };
+
+  const FONT_OPTIONS = [
+    { value: "Mono", label: "JetBrains Mono" },
+    { value: "Inter", label: "Inter" },
+    { value: "SF Pro", label: "SF Pro" },
+    { value: "Roboto", label: "Roboto" },
+    { value: "Helvetica Neue", label: "Helvetica Neue" },
+    { value: "Arial", label: "Arial" },
+    { value: "Segoe UI", label: "Segoe UI" },
+  ];
+
+  const SIZE_OPTIONS = [8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24, 36].map(s => ({
+    value: String(s), label: String(s),
+  }));
 
   return (
     <div className="flex flex-col self-stretch justify-between py-2 px-4">
       <div className="flex flex-col gap-1.5 flex-1 justify-center">
         {/* Row 1: Font family + size (full width) */}
         <div className="flex items-center gap-1.5">
-          <select
-            className="h-8 px-2 rounded-lg text-[12px] outline-none flex-1"
-            style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
-            defaultValue="Mono"
+          <Dropdown
+            options={FONT_OPTIONS}
+            value={fontFamily}
+            onChange={handleFontFamily}
+            size="sm"
             disabled={!hasSelection}
-            onChange={(e) => handleFontFamily(e.target.value)}
-          >
-            <option value="Mono">JetBrains Mono</option>
-            <option value="Inter">Inter</option>
-            <option value="SF Pro">SF Pro</option>
-            <option value="Roboto">Roboto</option>
-            <option value="Helvetica Neue">Helvetica Neue</option>
-            <option value="Arial">Arial</option>
-            <option value="Segoe UI">Segoe UI</option>
-          </select>
-          <select
-            className="h-8 px-2 rounded-lg text-[12px] outline-none w-16"
-            style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
-            defaultValue="13"
+            className="flex-1"
+          />
+          <Dropdown
+            options={SIZE_OPTIONS}
+            value={fontSize}
+            onChange={handleFontSize}
+            size="sm"
             disabled={!hasSelection}
-            onChange={(e) => handleFontSize(Number(e.target.value))}
-          >
-            {[8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24, 36].map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
+            className="w-16"
+          />
         </div>
 
         {/* Row 2: B/I/U + Color + Fill + Alignment */}

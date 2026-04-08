@@ -4,7 +4,7 @@ const scheduledFlightSchema = new Schema(
   {
     _id: { type: String, required: true },
     operatorId: { type: String, required: true, index: true },
-    seasonCode: { type: String, required: true },
+    seasonCode: { type: String, default: '' },
     airlineCode: { type: String, required: true },
     flightNumber: { type: String, required: true },
     suffix: { type: String, default: null },

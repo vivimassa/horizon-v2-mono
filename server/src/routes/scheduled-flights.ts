@@ -5,7 +5,7 @@ import { ScheduledFlight } from '../models/ScheduledFlight.js'
 
 const createSchema = z.object({
   operatorId: z.string().min(1),
-  seasonCode: z.string().min(1).max(10),
+  seasonCode: z.string().max(10).default(''),
   airlineCode: z.string().min(2).max(3),
   flightNumber: z.string().min(1).max(8),
   suffix: z.string().nullable().optional(),
@@ -33,7 +33,7 @@ const createSchema = z.object({
   rotationId: z.string().nullable().optional(),
   rotationSequence: z.number().int().nullable().optional(),
   rotationLabel: z.string().nullable().optional(),
-  source: z.enum(['manual', 'ssim_import', 'migration']).optional().default('manual'),
+  source: z.string().optional().default('1.1.1 Scheduling XL'),
 }).strict()
 
 const updateSchema = createSchema.omit({ operatorId: true }).partial().strict()

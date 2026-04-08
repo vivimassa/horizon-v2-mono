@@ -222,7 +222,7 @@ export function createSmartRow(
     rotationId: null,
     rotationSequence: null,
     rotationLabel: null,
-    source: "manual",
+    source: "1.1.1 Scheduling XL",
     sortOrder: allRows.length,
     formatting: {},
     createdAt: null,
@@ -676,7 +676,10 @@ export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
       if (!targetRow) {
         const currentAll = get().rows;
         const getTat = useScheduleRefStore.getState().getTatMinutes;
-        const smart = createSmartRow(currentAll, get().dirtyMap, getTat);
+        const smart = createSmartRow(currentAll, get().dirtyMap, getTat, {
+          seasonCode: templateRow.seasonCode,
+          airlineCode: templateRow.airlineCode,
+        });
         addNewRow(smart);
         targetRow = smart;
       }

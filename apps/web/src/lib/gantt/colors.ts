@@ -24,27 +24,38 @@ export function getBarColor(
 
 function getStatusColor(flight: GanttFlight, isDark: boolean): BarColor {
   const isAssigned = !!flight.aircraftReg
-  const isActive = flight.status === 'active'
-  const isDraft = flight.status === 'draft'
 
-  if (isActive && isAssigned) {
+  if (flight.status === 'cancelled') {
+    return {
+      bg: isDark ? 'rgba(230,53,53,0.40)' : 'rgba(230,53,53,0.55)',
+      text: isDark ? 'rgba(255,255,255,0.85)' : '#ffffff',
+    }
+  }
+  if (flight.status === 'suspended') {
+    return {
+      bg: isDark ? 'rgba(143,144,166,0.30)' : 'rgba(143,144,166,0.40)',
+      text: isDark ? 'rgba(255,255,255,0.55)' : '#8F90A6',
+    }
+  }
+  if (flight.status === 'active' && isAssigned) {
     return {
       bg: isDark ? 'rgba(16,185,129,0.65)' : 'rgba(22,163,74,0.75)',
       text: '#ffffff',
     }
   }
-  if (isActive && !isAssigned) {
+  if (flight.status === 'active' && !isAssigned) {
     return {
       bg: isDark ? 'rgba(245,158,11,0.60)' : 'rgba(217,119,6,0.70)',
       text: '#ffffff',
     }
   }
-  if (isDraft && isAssigned) {
+  if (flight.status === 'draft' && isAssigned) {
     return {
       bg: isDark ? 'rgba(59,130,246,0.60)' : 'rgba(37,99,235,0.70)',
       text: '#ffffff',
     }
   }
+  // draft + unassigned (fallback)
   return {
     bg: isDark ? 'rgba(100,116,139,0.50)' : 'rgba(100,116,139,0.60)',
     text: isDark ? 'rgba(255,255,255,0.8)' : '#ffffff',

@@ -5,7 +5,9 @@ import { api, setApiBaseUrl, type ScheduledFlightRef } from "@skyhub/api";
 import { useScheduleGridStore, createSmartRow, EMPTY_BUFFER_ROWS } from "@/stores/use-schedule-grid-store";
 import { useScheduleRefStore } from "@/stores/use-schedule-ref-store";
 import { useOperatorStore, getOperatorId } from "@/stores/use-operator-store";
-import { RunwayBar } from "@/components/ui/global-runway-progress";
+import { RunwayLoadingPanel } from "@/components/ui/runway-loading-panel";
+import { EmptyPanel } from "@/components/ui/empty-panel";
+import { useRunwayLoading } from "@/hooks/use-runway-loading";
 import { useTheme } from "@/components/theme-provider";
 import { ScheduleGrid } from "./schedule-grid";
 import { FloatingSaveBar } from "./floating-save-bar";
@@ -21,19 +23,15 @@ import { Plus, RefreshCw } from "lucide-react";
 setApiBaseUrl("http://localhost:3002");
 
 export function ScheduleGridShell() {
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [runwayPercent, setRunwayPercent] = useState(0);
-  const [runwayLabel, setRunwayLabel] = useState("");
-  const [seasonCode, setSeasonCode] = useState("S26");
   const [rowHeight, setRowHeight] = useState(32);
+  const runway = useRunwayLoading();
   const loadRefData = useScheduleRefStore((s) => s.loadAll);
   const loadOperator = useOperatorStore((s) => s.loadOperator);
   const operator = useOperatorStore((s) => s.operator);
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const rafRef = useRef(0);
   const didSeedRow = useRef(false);
 
   // Load reference data + operator config once
@@ -89,45 +87,22 @@ export function ScheduleGridShell() {
   }, []);
 
   const fetchFlights = useCallback(async () => {
-    setLoading(true);
     didSeedRow.current = false;
-    setRunwayPercent(0);
-    setRunwayLabel("Loading schedule...");
-
-    // Auto-advance animation
-    const startTime = performance.now();
-    const estMs = 3000;
-    const advance = (now: number) => {
-      const t = Math.min((now - startTime) / estMs, 1);
-      const eased = 1 - Math.pow(1 - t, 2.5);
-      setRunwayPercent(eased * 90);
-      if (t < 1) rafRef.current = requestAnimationFrame(advance);
-    };
-    rafRef.current = requestAnimationFrame(advance);
-
-    const minDelay = new Promise((r) => setTimeout(r, 3000));
     try {
-      const [data] = await Promise.all([
-        api.getScheduledFlights({ operatorId: getOperatorId(), seasonCode }),
-        minDelay,
-      ]);
-      cancelAnimationFrame(rafRef.current);
-      setRows(data);
-      hydrateFormats(data);
-      setRunwayPercent(100);
-      setRunwayLabel("Schedule loaded");
-      setTimeout(() => {
-        setHasLoaded(true);
-        setLoading(false);
-      }, 800);
+      const data = await runway.run(
+        () => api.getScheduledFlights({ operatorId: getOperatorId() }),
+        "Loading schedule…",
+        "Schedule loaded",
+      );
+      if (data) {
+        setRows(data);
+        hydrateFormats(data);
+      }
+      setHasLoaded(true);
     } catch (e) {
       console.error("Failed to load flights:", e);
-      cancelAnimationFrame(rafRef.current);
-      setRunwayPercent(100);
-      setRunwayLabel("Load failed");
-      setTimeout(() => setLoading(false), 800);
     }
-  }, [seasonCode, setRows]);
+  }, [setRows, runway, hydrateFormats]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -304,7 +279,7 @@ export function ScheduleGridShell() {
       clearCellFormats();
       // Silent refresh — no runway animation, then hydrate formats
       try {
-        const data = await api.getScheduledFlights({ operatorId: getOperatorId(), seasonCode });
+        const data = await api.getScheduledFlights({ operatorId: getOperatorId() });
         setRows(data);
         hydrateFormats(data);
       } catch (_) { /* grid already cleared, user can re-fetch via Go */ }
@@ -313,7 +288,7 @@ export function ScheduleGridShell() {
     } finally {
       setSaving(false);
     }
-  }, [seasonCode, clearDirty, clearNewRows, clearDeleted, setRows]);
+  }, [clearDirty, clearNewRows, clearDeleted, setRows]);
 
   const handleDiscard = useCallback(() => {
     clearDirty();
@@ -328,7 +303,6 @@ export function ScheduleGridShell() {
     const opts: import("@/stores/use-schedule-grid-store").SmartRowOptions = {
       filterDateFrom: filterDateFrom || undefined,
       filterDateTo: filterDateTo || undefined,
-      seasonCode,
       airlineCode: operator?.iataCode || undefined,
     };
 
@@ -346,7 +320,7 @@ export function ScheduleGridShell() {
         selectCell({ rowIdx: newLen - 1, colKey: focusCol });
       });
     }
-  }, [seasonCode, addNewRow, insertRowAt, filterDateFrom, filterDateTo, selectCell, operator]);
+  }, [addNewRow, insertRowAt, filterDateFrom, filterDateTo, selectCell, operator]);
 
   const handleTabWrapDown = useCallback(() => {
     handleAddFlight("arrStation");
@@ -360,7 +334,7 @@ export function ScheduleGridShell() {
 
   // When grid first appears: ensure at least one row exists, then focus AC TYPE
   useEffect(() => {
-    if (!hasLoaded || loading || didSeedRow.current) return;
+    if (!hasLoaded || runway.active || didSeedRow.current) return;
     didSeedRow.current = true;
     const { rows: sr, deletedIds: sd } = useScheduleGridStore.getState();
     const visibleCount = sr.filter((r) => !sd.has(r._id)).length;
@@ -369,102 +343,53 @@ export function ScheduleGridShell() {
     }
     requestAnimationFrame(() => selectCell({ rowIdx: 0, colKey: "aircraftTypeIcao" }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasLoaded, loading]);
+  }, [hasLoaded, runway.active]);
 
   return (
     <div className="flex h-full overflow-hidden gap-3 p-3">
       {/* Left filter panel */}
       <FilterPanel
-        seasonCode={seasonCode}
-        onSeasonChange={setSeasonCode}
         onApplyFilters={(filters) => {
-          setSeasonCode(filters.seasonCode);
           setFilterPeriod(filters.dateFrom, filters.dateTo);
           fetchFlights();
         }}
-        loading={loading}
+        loading={runway.active}
       />
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden gap-3 min-w-0 relative">
 
       {/* ── Empty state: before first load ── */}
-      {!hasLoaded && !loading && (
-        <div className="flex-1 flex flex-col items-center justify-center rounded-2xl" style={{
-          background: isDark ? 'rgba(25,25,33,0.85)' : 'rgba(255,255,255,0.85)',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)'}`,
-          backdropFilter: 'blur(20px)',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-        }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/skyhub-logo.png"
-            alt=""
-            aria-hidden="true"
-            data-watermark
-            className="select-none mb-6"
-            style={{
-              width: 360,
-              filter: isDark ? 'brightness(10) grayscale(1)' : 'grayscale(1) brightness(0)',
-              opacity: isDark ? 0.051 : 0.038,
-            }}
-            draggable={false}
-          />
-          <p className="text-[14px] text-hz-text-secondary" style={{ opacity: 0.64 }}>Select a period and click Go to load the schedule</p>
-        </div>
+      {!hasLoaded && !runway.active && (
+        <EmptyPanel />
       )}
 
       {/* ── Loading: runway animation ── */}
-      {loading && (
-        <div className="flex-1 flex flex-col items-center justify-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/skyhub-logo.png"
-            alt=""
-            aria-hidden="true"
-            data-watermark
-            className="select-none mb-10"
-            style={{
-              width: 400,
-              filter: isDark ? 'brightness(10) grayscale(1)' : 'grayscale(1) brightness(0)',
-              opacity: isDark ? 0.051 : 0.038,
-              animation: 'grp-logo-breathe 3s ease-in-out infinite',
-            }}
-            draggable={false}
-          />
-          <div className="w-full max-w-2xl px-4" style={{ opacity: 0.8 }}>
-            <RunwayBar percent={runwayPercent} label={runwayLabel} />
-          </div>
-          <style dangerouslySetInnerHTML={{ __html: `
-            @keyframes grp-logo-breathe {
-              0%, 100% { opacity: 1; transform: scale(1); }
-              50% { opacity: 0.7; transform: scale(1.02); }
-            }
-          `}} />
-        </div>
+      {runway.active && (
+        <RunwayLoadingPanel percent={runway.percent} label={runway.label} />
       )}
 
       {/* ── Loaded: full grid UI ── */}
-      {hasLoaded && !loading && (
+      {hasLoaded && !runway.active && (
         <>
           {/* Import dialog */}
           {showImport && (
-            <ImportDialog seasonCode={seasonCode} scenarioId={activeScenarioId ?? undefined} onClose={() => setShowImport(false)} onImported={fetchFlights} />
+            <ImportDialog seasonCode="" scenarioId={activeScenarioId ?? undefined} onClose={() => setShowImport(false)} onImported={fetchFlights} />
           )}
 
           {/* Export dialog */}
           {showExport && (
-            <ExportDialog seasonCode={seasonCode} scenarioId={activeScenarioId ?? undefined} flightCount={rows.length} dateFrom={filterDateFrom} dateTo={filterDateTo} onClose={() => setShowExport(false)} />
+            <ExportDialog seasonCode="" scenarioId={activeScenarioId ?? undefined} flightCount={rows.length} dateFrom={filterDateFrom} dateTo={filterDateTo} onClose={() => setShowExport(false)} />
           )}
 
           {/* Scenario panel */}
           {showScenarios && (
-            <ScenarioPanel seasonCode={seasonCode} activeScenarioId={activeScenarioId} onSelectScenario={setActiveScenarioId} onClose={() => { setShowScenarios(false); setScenarioAutoCreate(false); }} autoCreate={scenarioAutoCreate} />
+            <ScenarioPanel seasonCode="" activeScenarioId={activeScenarioId} onSelectScenario={setActiveScenarioId} onClose={() => { setShowScenarios(false); setScenarioAutoCreate(false); }} autoCreate={scenarioAutoCreate} />
           )}
 
           {/* Message dialog */}
           {showMessages && (
-            <MessageDialog seasonCode={seasonCode} targetScenarioId={activeScenarioId ?? undefined} onClose={() => setShowMessages(false)} />
+            <MessageDialog seasonCode="" targetScenarioId={activeScenarioId ?? undefined} onClose={() => setShowMessages(false)} />
           )}
 
           {/* Ribbon toolbar */}

@@ -701,7 +701,7 @@ export interface ReferenceStats {
 
 export const api = {
   // Flights
-  getFlights: (operatorId = 'horizon', from?: string, to?: string) => {
+  getFlights: (operatorId = '', from?: string, to?: string) => {
     let path = `/flights?operatorId=${operatorId}`
     if (from) path += `&from=${from}`
     if (to) path += `&to=${to}`
@@ -758,7 +758,7 @@ export const api = {
       method: 'DELETE',
     }),
 
-  getAircraftTypes: (operatorId = 'horizon') =>
+  getAircraftTypes: (operatorId = '') =>
     request<AircraftTypeRef[]>(`/aircraft-types?operatorId=${operatorId}`),
 
   getAircraftType: (id: string) => request<AircraftTypeRef>(`/aircraft-types/${id}`),
@@ -781,7 +781,7 @@ export const api = {
     }),
 
   // ─── Aircraft Registrations ─────────────────────────────
-  getAircraftRegistrations: (operatorId = 'horizon') =>
+  getAircraftRegistrations: (operatorId = '') =>
     request<AircraftRegistrationRef[]>(`/aircraft-registrations?operatorId=${operatorId}`),
 
   getAircraftRegistration: (id: string) => request<AircraftRegistrationRef>(`/aircraft-registrations/${id}`),
@@ -885,7 +885,7 @@ export const api = {
     }),
 
   // ─── Activity Code Groups ────────────────────────────────
-  getActivityCodeGroups: (operatorId = 'horizon') =>
+  getActivityCodeGroups: (operatorId = '') =>
     request<ActivityCodeGroupRef[]>(`/activity-code-groups?operatorId=${operatorId}`),
 
   createActivityCodeGroup: (data: Partial<ActivityCodeGroupRef>) =>
@@ -898,7 +898,7 @@ export const api = {
     request<{ success: boolean }>(`/activity-code-groups/${id}`, { method: 'DELETE' }),
 
   // ─── Activity Codes ────────────────────────────────────
-  getActivityCodes: (operatorId = 'horizon') =>
+  getActivityCodes: (operatorId = '') =>
     request<ActivityCodeRef[]>(`/activity-codes?operatorId=${operatorId}`),
 
   createActivityCode: (data: Partial<ActivityCodeRef>) =>
@@ -916,13 +916,13 @@ export const api = {
   deleteActivityCode: (id: string) =>
     request<{ success: boolean }>(`/activity-codes/${id}`, { method: 'DELETE' }),
 
-  seedActivityCodeDefaults: (operatorId = 'horizon') =>
+  seedActivityCodeDefaults: (operatorId = '') =>
     request<{ success: boolean; groupCount: number; codeCount: number }>('/activity-codes/seed-defaults', {
       method: 'POST',
       body: JSON.stringify({ operatorId }),
     }),
 
-  getDelayCodes: (operatorId = 'horizon') =>
+  getDelayCodes: (operatorId = '') =>
     request<DelayCodeRef[]>(`/delay-codes?operatorId=${operatorId}`),
 
   createDelayCode: (data: Partial<DelayCodeRef>) =>
@@ -934,7 +934,7 @@ export const api = {
   deleteDelayCode: (id: string) =>
     request<{ success: boolean }>(`/delay-codes/${id}`, { method: 'DELETE' }),
 
-  getCrewPositions: (operatorId = 'horizon', includeInactive = false) => {
+  getCrewPositions: (operatorId = '', includeInactive = false) => {
     let path = `/crew-positions?operatorId=${operatorId}`
     if (includeInactive) path += '&includeInactive=true'
     return request<CrewPositionRef[]>(path)
@@ -952,14 +952,14 @@ export const api = {
   getCrewPositionReferences: (id: string) =>
     request<CrewPositionReferences>(`/crew-positions/${id}/references`),
 
-  seedCrewPositions: (operatorId = 'horizon') =>
+  seedCrewPositions: (operatorId = '') =>
     request<{ success: boolean }>('/crew-positions/seed-defaults', {
       method: 'POST',
       body: JSON.stringify({ operatorId }),
     }),
 
   // ─── Crew Complements ──────────────────────────────────
-  getCrewComplements: (operatorId = 'horizon', aircraftTypeIcao?: string) => {
+  getCrewComplements: (operatorId = '', aircraftTypeIcao?: string) => {
     let path = `/crew-complements?operatorId=${operatorId}`
     if (aircraftTypeIcao) path += `&aircraftTypeIcao=${encodeURIComponent(aircraftTypeIcao)}`
     return request<CrewComplementRef[]>(path)
@@ -974,7 +974,7 @@ export const api = {
   deleteCrewComplement: (id: string) =>
     request<{ success: boolean }>(`/crew-complements/${id}`, { method: 'DELETE' }),
 
-  seedCrewComplementDefaults: (operatorId = 'horizon', aircraftTypeIcao?: string) =>
+  seedCrewComplementDefaults: (operatorId = '', aircraftTypeIcao?: string) =>
     request<{ success: boolean; count: number }>('/crew-complements/seed-defaults', {
       method: 'POST',
       body: JSON.stringify({ operatorId, aircraftTypeIcao }),
@@ -986,7 +986,7 @@ export const api = {
     }),
 
   // ─── Crew Groups ─────────────────────────────────────────
-  getCrewGroups: (operatorId = 'horizon', includeInactive = false) => {
+  getCrewGroups: (operatorId = '', includeInactive = false) => {
     let path = `/crew-groups?operatorId=${operatorId}`
     if (includeInactive) path += '&includeInactive=true'
     return request<CrewGroupRef[]>(path)
@@ -1001,14 +1001,14 @@ export const api = {
   deleteCrewGroup: (id: string) =>
     request<{ success: boolean }>(`/crew-groups/${id}`, { method: 'DELETE' }),
 
-  seedCrewGroups: (operatorId = 'horizon') =>
+  seedCrewGroups: (operatorId = '') =>
     request<{ success: boolean; count: number }>('/crew-groups/seed-defaults', {
       method: 'POST',
       body: JSON.stringify({ operatorId }),
     }),
 
   // ─── Duty Patterns ──────────────────────────────────────
-  getDutyPatterns: (operatorId = 'horizon') =>
+  getDutyPatterns: (operatorId = '') =>
     request<DutyPatternRef[]>(`/duty-patterns?operatorId=${operatorId}`),
 
   createDutyPattern: (data: Partial<DutyPatternRef>) =>
@@ -1020,14 +1020,14 @@ export const api = {
   deleteDutyPattern: (id: string) =>
     request<{ success: boolean }>(`/duty-patterns/${id}`, { method: 'DELETE' }),
 
-  seedDutyPatterns: (operatorId = 'horizon') =>
+  seedDutyPatterns: (operatorId = '') =>
     request<{ success: boolean; count: number }>('/duty-patterns/seed-defaults', {
       method: 'POST',
       body: JSON.stringify({ operatorId }),
     }),
 
   // ─── MPP Lead Times ─────────────────────────────────────
-  getMppLeadTimeGroups: (operatorId = 'horizon') =>
+  getMppLeadTimeGroups: (operatorId = '') =>
     request<MppLeadTimeGroupRef[]>(`/mpp-lead-time-groups?operatorId=${operatorId}`),
 
   createMppLeadTimeGroup: (data: Partial<MppLeadTimeGroupRef>) =>
@@ -1039,7 +1039,7 @@ export const api = {
   deleteMppLeadTimeGroup: (id: string) =>
     request<{ success: boolean }>(`/mpp-lead-time-groups/${id}`, { method: 'DELETE' }),
 
-  getMppLeadTimeItems: (operatorId = 'horizon', groupId?: string) => {
+  getMppLeadTimeItems: (operatorId = '', groupId?: string) => {
     let path = `/mpp-lead-time-items?operatorId=${operatorId}`
     if (groupId) path += `&groupId=${groupId}`
     return request<MppLeadTimeItemRef[]>(path)
@@ -1054,7 +1054,7 @@ export const api = {
   deleteMppLeadTimeItem: (id: string) =>
     request<{ success: boolean }>(`/mpp-lead-time-items/${id}`, { method: 'DELETE' }),
 
-  seedMppLeadTimeDefaults: (operatorId = 'horizon') =>
+  seedMppLeadTimeDefaults: (operatorId = '') =>
     request<{ success: boolean; groupCount: number; itemCount: number }>('/mpp-lead-times/seed-defaults', {
       method: 'POST',
       body: JSON.stringify({ operatorId }),
@@ -1134,7 +1134,7 @@ export const api = {
   getFdtlTabGroups: () =>
     request<FdtlTabGroup[]>('/fdtl/tab-groups'),
 
-  getFdtlScheme: (operatorId = 'horizon') =>
+  getFdtlScheme: (operatorId = '') =>
     request<FdtlSchemeRef>(`/fdtl/schemes/${operatorId}`),
 
   createFdtlScheme: (data: Partial<FdtlSchemeRef>) =>
@@ -1143,7 +1143,7 @@ export const api = {
   updateFdtlScheme: (id: string, data: Partial<FdtlSchemeRef>) =>
     request<FdtlSchemeRef>(`/fdtl/schemes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 
-  getFdtlRules: (operatorId = 'horizon', frameworkCode?: string, tabKey?: string) => {
+  getFdtlRules: (operatorId = '', frameworkCode?: string, tabKey?: string) => {
     let path = `/fdtl/rules?operatorId=${operatorId}`
     if (frameworkCode) path += `&frameworkCode=${frameworkCode}`
     if (tabKey) path += `&tabKey=${tabKey}`
@@ -1156,7 +1156,7 @@ export const api = {
   resetFdtlRule: (id: string) =>
     request<FdtlRuleRef>(`/fdtl/rules/${id}/reset`, { method: 'POST' }),
 
-  getFdtlTables: (operatorId = 'horizon', frameworkCode?: string, tabKey?: string) => {
+  getFdtlTables: (operatorId = '', frameworkCode?: string, tabKey?: string) => {
     let path = `/fdtl/tables?operatorId=${operatorId}`
     if (frameworkCode) path += `&frameworkCode=${frameworkCode}`
     if (tabKey) path += `&tabKey=${tabKey}`
@@ -1172,19 +1172,19 @@ export const api = {
   resetFdtlTable: (tableId: string) =>
     request<FdtlTableRef>(`/fdtl/tables/${tableId}/reset`, { method: 'POST' }),
 
-  seedFdtl: (operatorId = 'horizon', frameworkCode: string) =>
+  seedFdtl: (operatorId = '', frameworkCode: string) =>
     request<{ success: boolean; frameworkCode: string; rulesSeeded: number; tablesSeeded: number }>('/fdtl/seed', {
       method: 'POST',
       body: JSON.stringify({ operatorId, frameworkCode }),
     }),
 
-  getExpiryCodeCategories: (operatorId = 'horizon') =>
+  getExpiryCodeCategories: (operatorId = '') =>
     request<ExpiryCodeCategoryRef[]>(`/expiry-code-categories?operatorId=${operatorId}`),
 
-  getExpiryCodes: (operatorId = 'horizon') =>
+  getExpiryCodes: (operatorId = '') =>
     request<ExpiryCodeRef[]>(`/expiry-codes?operatorId=${operatorId}`),
 
-  getFlightServiceTypes: (operatorId = 'horizon') =>
+  getFlightServiceTypes: (operatorId = '') =>
     request<FlightServiceTypeRef[]>(`/flight-service-types?operatorId=${operatorId}`),
 
   createFlightServiceType: (data: Partial<FlightServiceTypeRef>) =>
@@ -1196,7 +1196,7 @@ export const api = {
   deleteFlightServiceType: (id: string) =>
     request<{ success: boolean }>(`/flight-service-types/${id}`, { method: 'DELETE' }),
 
-  getCarrierCodes: (operatorId = 'horizon') =>
+  getCarrierCodes: (operatorId = '') =>
     request<CarrierCodeRef[]>(`/carrier-codes?operatorId=${operatorId}`),
 
   createCarrierCode: (data: Partial<CarrierCodeRef>) =>
@@ -1221,7 +1221,7 @@ export const api = {
   getReferenceStats: () => request<ReferenceStats>('/reference/stats'),
 
   // ─── Cabin Classes ──────────────────────────────────────
-  getCabinClasses: (operatorId = 'horizon') =>
+  getCabinClasses: (operatorId = '') =>
     request<CabinClassRef[]>(`/cabin-classes?operatorId=${operatorId}`),
 
   getCabinClass: (id: string) => request<CabinClassRef>(`/cabin-classes/${id}`),
@@ -1244,7 +1244,7 @@ export const api = {
     }),
 
   // ─── LOPA Configurations ────────────────────────────────
-  getLopaConfigs: (operatorId = 'horizon', aircraftType?: string) => {
+  getLopaConfigs: (operatorId = '', aircraftType?: string) => {
     let path = `/lopa-configs?operatorId=${operatorId}`
     if (aircraftType) path += `&aircraftType=${encodeURIComponent(aircraftType)}`
     return request<LopaConfigRef[]>(path)

@@ -11,16 +11,6 @@ import { computePixelsPerHour } from '@/lib/gantt/time-axis'
 import { computeLayout } from '@/lib/gantt/layout-engine'
 import { useOperatorStore } from './use-operator-store'
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function addDaysISO(dateStr: string, days: number): string {
-  const d = new Date(dateStr + 'T00:00:00Z')
-  d.setUTCDate(d.getUTCDate() + days)
-  return d.toISOString().slice(0, 10)
-}
-
 interface GanttState {
   // Data
   flights: GanttFlight[]
@@ -34,6 +24,10 @@ interface GanttState {
   periodTo: string
   periodCommitted: boolean
 
+  // Filters
+  acTypeFilter: string[] | null   // null = all types
+  statusFilter: string[] | null   // null = server default
+
   // View
   zoomLevel: ZoomLevel
   rowHeightLevel: number
@@ -46,6 +40,12 @@ interface GanttState {
   selectedFlightIds: Set<string>
   hoveredFlightId: string | null
 
+  // Context menu
+  contextMenu: { x: number; y: number; flightId: string } | null
+
+  // Flight info dialog
+  flightInfoDialogId: string | null
+
   // Computed layout
   layout: LayoutResult | null
 
@@ -54,6 +54,8 @@ interface GanttState {
 
   // Actions
   setPeriod: (from: string, to: string) => void
+  setAcTypeFilter: (types: string[] | null) => void
+  setStatusFilter: (statuses: string[] | null) => void
   commitPeriod: () => Promise<void>
   setZoom: (zoom: ZoomLevel) => void
   zoomRowIn: () => void
@@ -68,10 +70,16 @@ interface GanttState {
   navigateDate: (direction: 'prev' | 'next') => void
   goToToday: () => void
   consumeScrollTarget: () => void
+  openContextMenu: (x: number, y: number, flightId: string) => void
+  closeContextMenu: () => void
+  openFlightInfo: (flightId: string) => void
+  closeFlightInfo: () => void
   assignToAircraft: (flightIds: string[], registration: string) => Promise<void>
   unassignFromAircraft: (flightIds: string[]) => Promise<void>
   _recomputeLayout: () => void
   _fetchFlights: () => Promise<void>
+  /** Hydrate period from localStorage (call once on client mount) */
+  hydrate: () => void
 }
 
 export const useGanttStore = create<GanttState>((set, get) => {
@@ -113,6 +121,8 @@ export const useGanttStore = create<GanttState>((set, get) => {
         operatorId,
         from: s.periodFrom,
         to: s.periodTo,
+        acTypeFilter: s.acTypeFilter ?? undefined,
+        statusFilter: s.statusFilter ?? undefined,
       })
       set({
         flights: data.flights,
@@ -126,8 +136,6 @@ export const useGanttStore = create<GanttState>((set, get) => {
     }
   }
 
-  const today = todayISO()
-
   return {
     flights: [],
     aircraft: [],
@@ -135,9 +143,11 @@ export const useGanttStore = create<GanttState>((set, get) => {
     loading: false,
     error: null,
 
-    periodFrom: today,
-    periodTo: addDaysISO(today, 3),
+    periodFrom: '',
+    periodTo: '',
     periodCommitted: false,
+    acTypeFilter: null,
+    statusFilter: null,
 
     zoomLevel: '4D',
     rowHeightLevel: 1,
@@ -148,13 +158,21 @@ export const useGanttStore = create<GanttState>((set, get) => {
 
     selectedFlightIds: new Set(),
     hoveredFlightId: null,
+    contextMenu: null,
+    flightInfoDialogId: null,
     layout: null,
     scrollTargetMs: null,
 
     setPeriod: (from, to) => set({ periodFrom: from, periodTo: to }),
+    setAcTypeFilter: (types) => set({ acTypeFilter: types }),
+    setStatusFilter: (statuses) => set({ statusFilter: statuses }),
 
     commitPeriod: async () => {
+      const { periodFrom, periodTo } = get()
+      if (!periodFrom || !periodTo) return
       set({ periodCommitted: true })
+      localStorage.setItem('gantt.periodFrom', periodFrom)
+      localStorage.setItem('gantt.periodTo', periodTo)
       await fetchFlights()
     },
 
@@ -222,6 +240,11 @@ export const useGanttStore = create<GanttState>((set, get) => {
 
     consumeScrollTarget: () => set({ scrollTargetMs: null }),
 
+    openContextMenu: (x, y, flightId) => set({ contextMenu: { x, y, flightId } }),
+    closeContextMenu: () => set({ contextMenu: null }),
+    openFlightInfo: (flightId) => set({ flightInfoDialogId: flightId, contextMenu: null }),
+    closeFlightInfo: () => set({ flightInfoDialogId: null }),
+
     assignToAircraft: async (flightIds, registration) => {
       const operatorId = useOperatorStore.getState().operator?._id ?? ''
       const flights = get().flights.map(f =>
@@ -254,5 +277,11 @@ export const useGanttStore = create<GanttState>((set, get) => {
 
     _recomputeLayout: recompute,
     _fetchFlights: fetchFlights,
+
+    hydrate: () => {
+      const from = localStorage.getItem('gantt.periodFrom') ?? ''
+      const to = localStorage.getItem('gantt.periodTo') ?? ''
+      if (from && to) set({ periodFrom: from, periodTo: to })
+    },
   }
 })

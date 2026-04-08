@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { api, setApiBaseUrl } from "@skyhub/api";
 import type { AircraftTypeRef, FlightServiceTypeRef, CityPairRef, CarrierCodeRef } from "@skyhub/api";
-import { useOperatorStore } from "./use-operator-store";
+import { useOperatorStore, getOperatorId } from "./use-operator-store";
 
 setApiBaseUrl("http://localhost:3002");
 
@@ -53,11 +53,12 @@ export const useScheduleRefStore = create<ScheduleRefState>((set, get) => ({
     if (get().loaded || get().loading) return;
     set({ loading: true });
     try {
+      const opId = getOperatorId();
       const [acTypes, svcTypes, cpPairs, carriers] = await Promise.all([
-        api.getAircraftTypes(),
-        api.getFlightServiceTypes(),
-        api.getCityPairs(),
-        api.getCarrierCodes(),
+        api.getAircraftTypes(opId),
+        api.getFlightServiceTypes(opId),
+        api.getCityPairs(opId),
+        api.getCarrierCodes(opId),
       ]);
       set({
         aircraftTypes: acTypes,

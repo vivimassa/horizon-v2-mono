@@ -3,8 +3,103 @@ import ExcelJS from 'exceljs'
 import type { FastifyInstance } from 'fastify'
 import { ScheduledFlight } from '../models/ScheduledFlight.js'
 import { Operator } from '../models/Operator.js'
-import { parseSsimExcel } from '../utils/ssim-parser.js'
+import { parseSsimExcel, type ParsedFlight } from '../utils/ssim-parser.js'
 import { generateSsimExcel } from '../utils/ssim-exporter.js'
+
+// ── Rotation Grouping ────────────────────────────────────────────────────
+// Chain flights into rotation cycles based on station continuity:
+// Flight A (SGN→HAN) + Flight B (HAN→SGN) with same DOW/period = one cycle.
+// Uses greedy forward chaining from each unvisited flight.
+
+interface FlightDoc {
+  _id: string
+  flightNumber: string
+  depStation: string
+  arrStation: string
+  daysOfWeek: string
+  effectiveFrom: string
+  effectiveUntil: string
+  aircraftTypeIcao: string
+  stdUtc: string
+  staUtc: string
+  rotationId?: string | null
+  rotationSequence?: number | null
+  rotationLabel?: string | null
+  [key: string]: unknown
+}
+
+function assignRotations(docs: FlightDoc[]): void {
+  // Index flights by departure station + DOW + period + AC type for fast lookup
+  const byDepKey = new Map<string, FlightDoc[]>()
+  for (const d of docs) {
+    const key = `${d.depStation}|${d.daysOfWeek}|${d.effectiveFrom}|${d.effectiveUntil}|${d.aircraftTypeIcao}`
+    const list = byDepKey.get(key) ?? []
+    list.push(d)
+    byDepKey.set(key, list)
+  }
+
+  // Sort each bucket by STD so we pick the earliest available next flight
+  for (const list of byDepKey.values()) {
+    list.sort((a, b) => a.stdUtc.localeCompare(b.stdUtc))
+  }
+
+  const visited = new Set<string>()
+  let cycleNum = 0
+
+  // Time comparison: "0800" > "0600" means later in the day
+  function parseTime(hhmm: string): number {
+    const h = parseInt(hhmm.replace(':', '').slice(0, 2), 10) || 0
+    const m = parseInt(hhmm.replace(':', '').slice(2, 4), 10) || 0
+    return h * 60 + m
+  }
+
+  for (const doc of docs) {
+    if (visited.has(doc._id)) continue
+
+    // Start a new chain from this flight
+    const chain: FlightDoc[] = [doc]
+    visited.add(doc._id)
+
+    let current = doc
+    // Follow the chain: find next flight departing from current's arrival station
+    // with same DOW/period/AC type, departing after current arrives
+    for (let depth = 0; depth < 20; depth++) { // safety limit
+      const key = `${current.arrStation}|${current.daysOfWeek}|${current.effectiveFrom}|${current.effectiveUntil}|${current.aircraftTypeIcao}`
+      const candidates = byDepKey.get(key)
+      if (!candidates) break
+
+      const currentSta = parseTime(current.staUtc)
+      let next: FlightDoc | null = null
+      for (const c of candidates) {
+        if (visited.has(c._id)) continue
+        // Next flight must depart after current arrives (with reasonable TAT)
+        if (parseTime(c.stdUtc) >= currentSta) {
+          next = c
+          break
+        }
+      }
+      if (!next) break
+
+      chain.push(next)
+      visited.add(next._id)
+      current = next
+    }
+
+    // Only create a rotation if the chain has 2+ flights
+    if (chain.length < 2) continue
+
+    cycleNum++
+    const rotationId = crypto.randomUUID()
+    // Label: "57/58" or "57/58/59" from flight numbers
+    const label = chain.map(f => f.flightNumber).join('/')
+
+    for (let i = 0; i < chain.length; i++) {
+      chain[i].rotationId = rotationId
+      chain[i].rotationSequence = i + 1
+      chain[i].rotationLabel = label
+    }
+  }
+}
 
 export async function ssimRoutes(app: FastifyInstance): Promise<void> {
   // ── Import from Excel ──
@@ -27,7 +122,7 @@ export async function ssimRoutes(app: FastifyInstance): Promise<void> {
     const defaultAirlineCode = (op?.iataCode as string) ?? ''
 
     const now = new Date().toISOString()
-    const docs = flights.map((f, i) => {
+    const docs: FlightDoc[] = flights.map((f, i) => {
       const { separatorBelow, ...rest } = f
       return {
         _id: crypto.randomUUID(),
@@ -39,11 +134,17 @@ export async function ssimRoutes(app: FastifyInstance): Promise<void> {
         sortOrder: i,
         status: 'draft',
         isActive: true,
-        source: 'ssim_import',
+        source: '1.1.1 Scheduling XL (SSIM Import)',
         formatting: separatorBelow ? { separatorBelow: true } : {},
         createdAt: now,
+        rotationId: null,
+        rotationSequence: null,
+        rotationLabel: null,
       }
     })
+
+    // Auto-detect rotation cycles from station chains
+    assignRotations(docs)
 
     await ScheduledFlight.insertMany(docs)
 

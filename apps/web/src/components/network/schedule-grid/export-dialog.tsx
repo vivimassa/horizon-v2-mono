@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { Download, X, FileSpreadsheet } from "lucide-react";
 import { api } from "@skyhub/api";
+import { getOperatorId } from "@/stores/use-operator-store";
 import { useTheme } from "@/components/theme-provider";
 
 interface ExportDialogProps {
@@ -112,5 +113,4 @@ export function ExportDialog({ seasonCode, scenarioId, flightCount, dateFrom, da
       </div>
     </div>
   );
-import { getOperatorId } from "@/stores/use-operator-store"
 }

@@ -5,6 +5,7 @@ import type { CabinClassRef, LopaConfigRef } from "@skyhub/api";
 import { FieldRow } from "../airports/field-row";
 import { SeatRowPreview } from "./seat-row-preview";
 import { useTheme } from "@/components/theme-provider";
+import { getOperatorId } from "@/stores/use-operator-store";
 import { modeColor } from "@skyhub/ui/theme";
 import {
   Info,
@@ -597,5 +598,4 @@ function MiniInput({ label, value, onChange, maxLength, mono, type = "text" }: {
         className={`w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 focus:border-module-accent transition-colors text-hz-text ${mono ? "font-mono" : ""}`} />
     </div>
   );
-import { getOperatorId } from "@/stores/use-operator-store"
 }

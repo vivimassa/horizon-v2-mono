@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { api, setApiBaseUrl, type CarrierCodeRef } from "@skyhub/api";
 import { MasterDetailLayout } from "@/components/layout";
 import { FieldRow } from "../airports/field-row";
+import { getOperatorId } from "@/stores/use-operator-store";
 import {
   Search, Plus, Pencil, Save, X, Trash2, Building2,
   Info, Phone, Settings2, Clock,
@@ -612,5 +613,4 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </div>
   );
 }
-import { getOperatorId } from "@/stores/use-operator-store"
 

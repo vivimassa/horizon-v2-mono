@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api, type ScenarioRef } from "@skyhub/api";
 import { GitBranch, Plus, Copy, Trash2, X, Check, Upload, MoreHorizontal } from "lucide-react";
+import { getOperatorId } from "@/stores/use-operator-store";
 import { useTheme } from "@/components/theme-provider";
 
 interface ScenarioPanelProps {
@@ -329,5 +330,4 @@ export function ScenarioPanel({ seasonCode, activeScenarioId, onSelectScenario, 
       </div>
     </div>
   );
-import { getOperatorId } from "@/stores/use-operator-store"
 }

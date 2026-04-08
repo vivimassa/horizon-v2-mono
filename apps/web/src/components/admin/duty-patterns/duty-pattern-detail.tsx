@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import type { DutyPatternRef } from "@skyhub/api";
 import { useTheme } from "@/components/theme-provider";
+import { getOperatorId } from "@/stores/use-operator-store";
 import { Pencil, Save, X, Trash2, Plus, Minus } from "lucide-react";
 
 const ON_COLOR = "#06C270";
@@ -409,5 +410,4 @@ function SequenceEditor({ sequence, onChange }: { sequence: number[]; onChange: 
       )}
     </div>
   );
-import { getOperatorId } from "@/stores/use-operator-store"
 }

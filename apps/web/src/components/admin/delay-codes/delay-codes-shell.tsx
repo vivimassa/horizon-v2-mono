@@ -6,6 +6,7 @@ import { MasterDetailLayout } from "@/components/layout";
 import { useTheme } from "@/components/theme-provider";
 import { accentTint } from "@skyhub/ui/theme";
 import { FieldRow } from "../airports/field-row";
+import { getOperatorId } from "@/stores/use-operator-store";
 import {
   Search, Plus, Pencil, Save, X, Trash2, ChevronRight, Link, HelpCircle,
 } from "lucide-react";
@@ -683,5 +684,4 @@ function MiniInput({ label, value, onChange, maxLength, mono, type = "text" }: {
         className={`w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text ${mono ? "font-mono" : ""}`} />
     </div>
   );
-import { getOperatorId } from "@/stores/use-operator-store"
 }

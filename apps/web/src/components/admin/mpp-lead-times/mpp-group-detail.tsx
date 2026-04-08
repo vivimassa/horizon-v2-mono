@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import type { MppLeadTimeGroupRef, MppLeadTimeItemRef } from "@skyhub/api";
+import { getOperatorId } from "@/stores/use-operator-store";
 import {
   Pencil, Save, X, Trash2, Plus, Clock, FileText,
   PlaneTakeoff, UsersRound, Layers,
@@ -398,5 +399,4 @@ function LeadTimeRow({
       )}
     </div>
   );
-import { getOperatorId } from "@/stores/use-operator-store"
 }

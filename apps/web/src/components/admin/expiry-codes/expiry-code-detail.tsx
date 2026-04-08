@@ -8,6 +8,7 @@ import { useTheme } from "@/components/theme-provider";
 import { accentTint } from "@skyhub/ui/theme";
 import { FieldRow } from "../airports/field-row";
 import { ACCENT } from "./expiry-codes-shell";
+import { getOperatorId } from "@/stores/use-operator-store";
 import {
   Plus, Pencil, Save, X, Trash2, AlertTriangle, Settings, ShieldAlert, Users, Beaker,
 } from "lucide-react";
@@ -760,5 +761,4 @@ function friendlyError(err: any): string {
     if (m) { const p = JSON.parse(m[2]); return p.error || p.details?.join(", ") || msg; }
   } catch {}
   return msg;
-import { getOperatorId } from "@/stores/use-operator-store"
 }

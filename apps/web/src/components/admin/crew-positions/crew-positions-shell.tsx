@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { api, setApiBaseUrl, type CrewPositionRef } from "@skyhub/api";
 import { MasterDetailLayout } from "@/components/layout";
 import { accentTint } from "@skyhub/ui/theme";
+import { getOperatorId } from "@/stores/use-operator-store";
 import { Users, Plus, Sparkles } from "lucide-react";
 import { CrewPositionList } from "./crew-position-list";
 import { CrewPositionDetail } from "./crew-position-detail";
@@ -165,5 +166,4 @@ function EmptyState({ onSeed, onAdd }: { onSeed: () => void; onAdd: () => void }
       </div>
     </div>
   );
-import { getOperatorId } from "@/stores/use-operator-store"
 }

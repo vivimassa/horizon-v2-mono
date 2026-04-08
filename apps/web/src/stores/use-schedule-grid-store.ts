@@ -6,7 +6,7 @@ import type { CellFormat, ClipboardData } from "@/components/network/schedule-gr
 import { MAX_UNDO_DEPTH } from "@/components/network/schedule-grid/types";
 import { GRID_COLUMNS } from "@/components/network/schedule-grid/grid-columns";
 import { parseDate, formatDate } from "@/lib/date-format";
-import { useOperatorStore } from "./use-operator-store";
+import { useOperatorStore, getOperatorId } from "./use-operator-store";
 import { useScheduleRefStore } from "./use-schedule-ref-store";
 
 export interface CellAddress {
@@ -753,5 +753,4 @@ export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
       return { separatorAfter: next };
     }),
   clearSeparators: () => set({ separatorAfter: new Set() }),
-import { getOperatorId } from "@/stores/use-operator-store"
 }));

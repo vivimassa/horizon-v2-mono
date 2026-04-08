@@ -12,6 +12,7 @@ import { MasterDetailLayout } from "@/components/layout";
 import { CrewComplementTypeList } from "./crew-complement-type-list";
 import { CrewComplementTable } from "./crew-complement-table";
 import { accentTint } from "@skyhub/ui/theme";
+import { getOperatorId } from "@/stores/use-operator-store";
 import { Users, Sparkles, Plus } from "lucide-react";
 
 setApiBaseUrl("http://localhost:3002");
@@ -316,5 +317,4 @@ function EmptyState({ onSeedAll }: { onSeedAll: () => void }) {
       </button>
     </div>
   );
-import { getOperatorId } from "@/stores/use-operator-store"
 }

@@ -11,6 +11,7 @@ import {
   type FdtlTabGroup,
 } from "@skyhub/api";
 import { MasterDetailLayout } from "@/components/layout";
+import { getOperatorId } from "@/stores/use-operator-store";
 import { accentTint } from "@skyhub/ui/theme";
 import { useTheme } from "@/components/theme-provider";
 import { FdtMatrix } from "./fdt-matrix";
@@ -384,5 +385,4 @@ function FrameworkSetup({
       </button>
     </div>
   );
-import { getOperatorId } from "@/stores/use-operator-store"
 }

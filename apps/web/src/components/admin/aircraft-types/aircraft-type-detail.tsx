@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo, useEffect } from "react";
 import type { AircraftTypeRef, LopaConfigRef, CabinClassRef } from "@skyhub/api";
 import { api } from "@skyhub/api";
 import { FieldRow } from "../airports/field-row";
+import { getOperatorId } from "@/stores/use-operator-store";
 import {
   Info,
   Gauge,
@@ -761,5 +762,4 @@ function MiniInput({ label, value, onChange, maxLength, mono, type = "text" }: {
         className={`w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 text-hz-text ${mono ? "font-mono" : ""}`} />
     </div>
   );
-import { getOperatorId } from "@/stores/use-operator-store"
 }

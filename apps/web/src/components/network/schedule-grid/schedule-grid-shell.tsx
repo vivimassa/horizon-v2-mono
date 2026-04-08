@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { api, setApiBaseUrl, type ScheduledFlightRef } from "@skyhub/api";
 import { useScheduleGridStore, createSmartRow, EMPTY_BUFFER_ROWS } from "@/stores/use-schedule-grid-store";
 import { useScheduleRefStore } from "@/stores/use-schedule-ref-store";
-import { useOperatorStore } from "@/stores/use-operator-store";
+import { useOperatorStore, getOperatorId } from "@/stores/use-operator-store";
 import { RunwayBar } from "@/components/ui/global-runway-progress";
 import { useTheme } from "@/components/theme-provider";
 import { ScheduleGrid } from "./schedule-grid";
@@ -550,5 +550,4 @@ export function ScheduleGridShell() {
     </div>
     </div>
   );
-import { getOperatorId } from "@/stores/use-operator-store"
 }

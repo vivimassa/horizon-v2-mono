@@ -16,7 +16,7 @@ const createSchema = z.object({
   stdLocal: z.string().nullable().optional(),
   staLocal: z.string().nullable().optional(),
   blockMinutes: z.number().int().nullable().optional(),
-  arrivalDayOffset: z.number().int().optional().default(0),
+  arrivalDayOffset: z.number().int().optional().default(1),
   daysOfWeek: z.string().min(1).max(7),
   aircraftTypeId: z.string().nullable().optional(),
   aircraftTypeIcao: z.string().nullable().optional(),

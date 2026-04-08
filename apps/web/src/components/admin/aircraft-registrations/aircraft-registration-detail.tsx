@@ -5,6 +5,7 @@ import type { AircraftRegistrationRef, AircraftTypeRef, LopaConfigRef, CabinClas
 import { api } from "@skyhub/api";
 import { FieldRow } from "../airports/field-row";
 import { AircraftSeatMap } from "../lopa/aircraft-seat-map";
+import { getOperatorId } from "@/stores/use-operator-store";
 import {
   Info,
   Gauge,
@@ -777,5 +778,4 @@ function MiniInput({ label, value, onChange, maxLength, mono, type = "text" }: {
 
     </div>
   );
-import { getOperatorId } from "@/stores/use-operator-store"
 }

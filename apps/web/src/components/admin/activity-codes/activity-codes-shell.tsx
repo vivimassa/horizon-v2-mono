@@ -8,6 +8,7 @@ import {
   type ActivityCodeRef,
 } from "@skyhub/api";
 import { MasterDetailLayout } from "@/components/layout";
+import { getOperatorId } from "@/stores/use-operator-store";
 import { ActivityCodeList } from "./activity-code-list";
 import { ActivityCodeDetail } from "./activity-code-detail";
 
@@ -188,5 +189,4 @@ export function ActivityCodesShell() {
       }
     />
   );
-import { getOperatorId } from "@/stores/use-operator-store"
 }

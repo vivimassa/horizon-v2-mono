@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { MessageSquare, X, RefreshCw, Copy, Check } from "lucide-react";
+import { getOperatorId } from "@/stores/use-operator-store";
 import { api } from "@skyhub/api";
 
 interface MessageDialogProps {
@@ -106,5 +107,4 @@ export function MessageDialog({ seasonCode, baseScenarioId, targetScenarioId, on
       </div>
     </div>
   );
-import { getOperatorId } from "@/stores/use-operator-store"
 }

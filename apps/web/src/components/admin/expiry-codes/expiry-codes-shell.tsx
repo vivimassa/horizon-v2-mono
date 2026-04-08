@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { api, setApiBaseUrl, type ExpiryCodeRef, type ExpiryCodeCategoryRef } from "@skyhub/api";
 import { MasterDetailLayout } from "@/components/layout";
 import { accentTint } from "@skyhub/ui/theme";
+import { getOperatorId } from "@/stores/use-operator-store";
 import { FileCheck, Plus, Sparkles } from "lucide-react";
 import { ExpiryCodeList } from "./expiry-code-list";
 import { ExpiryCodeDetail } from "./expiry-code-detail";
@@ -183,5 +184,4 @@ function EmptyState({ onSeed, onAdd }: { onSeed: () => void; onAdd: () => void }
       </div>
     </div>
   );
-import { getOperatorId } from "@/stores/use-operator-store"
 }

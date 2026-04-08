@@ -102,7 +102,8 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       const rangeStart = Math.max(effFromMs, fromMs)
       const rangeEnd = Math.min(effUntilMs, toMs)
       const dow = sf.daysOfWeek
-      const arrOffset = sf.arrivalDayOffset ?? 0
+      const depOffset = sf.departureDayOffset ?? 1
+      const arrOffset = sf.arrivalDayOffset ?? 1
 
       for (let dayMs = rangeStart; dayMs <= rangeEnd; dayMs += DAY_MS) {
         const opDate = new Date(dayMs).toISOString().slice(0, 10)
@@ -110,8 +111,9 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
         const jsDay = new Date(opDate + 'T12:00:00Z').getUTCDay()
         const ssimDay = jsDay === 0 ? 7 : jsDay
         if (!dow.includes(String(ssimDay))) continue
-        const stdMs = dayMs + timeStringToMs(sf.stdUtc)
-        const staMs = dayMs + arrOffset * DAY_MS + timeStringToMs(sf.staUtc)
+        // SSIM offset 1 = operating date (same day), 2 = next day, etc.
+        const stdMs = dayMs + (depOffset - 1) * DAY_MS + timeStringToMs(sf.stdUtc)
+        const staMs = dayMs + (arrOffset - 1) * DAY_MS + timeStringToMs(sf.staUtc)
         const block = sf.blockMinutes ?? Math.round((staMs - stdMs) / 60_000)
 
         flights.push({

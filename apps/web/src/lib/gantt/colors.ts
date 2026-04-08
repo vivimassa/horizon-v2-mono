@@ -16,7 +16,7 @@ export function getBarColor(
 ): BarColor {
   if (colorMode === 'ac_type') {
     const typeColor = acTypeColors.get(flight.aircraftTypeIcao ?? '') ?? '#3B82F6'
-    return { bg: applyOpacity(typeColor, isDark ? 0.6 : 0.75), text: '#ffffff' }
+    return { bg: typeColor, text: '#ffffff' }
   }
   // 'status' is the default for all other modes
   return getStatusColor(flight, isDark)
@@ -27,38 +27,38 @@ function getStatusColor(flight: GanttFlight, isDark: boolean): BarColor {
 
   if (flight.status === 'cancelled') {
     return {
-      bg: isDark ? 'rgba(230,53,53,0.40)' : 'rgba(230,53,53,0.55)',
-      text: isDark ? 'rgba(255,255,255,0.85)' : '#ffffff',
+      bg: isDark ? '#7f1d1d' : '#dc2626',
+      text: '#ffffff',
     }
   }
   if (flight.status === 'suspended') {
     return {
-      bg: isDark ? 'rgba(143,144,166,0.30)' : 'rgba(143,144,166,0.40)',
-      text: isDark ? 'rgba(255,255,255,0.55)' : '#8F90A6',
+      bg: isDark ? '#4a4a5a' : '#8F90A6',
+      text: isDark ? 'rgba(255,255,255,0.7)' : '#ffffff',
     }
   }
   if (flight.status === 'active' && isAssigned) {
     return {
-      bg: isDark ? 'rgba(16,185,129,0.65)' : 'rgba(22,163,74,0.75)',
+      bg: isDark ? '#059669' : '#16a34a',
       text: '#ffffff',
     }
   }
   if (flight.status === 'active' && !isAssigned) {
     return {
-      bg: isDark ? 'rgba(245,158,11,0.60)' : 'rgba(217,119,6,0.70)',
+      bg: isDark ? '#d97706' : '#d97706',
       text: '#ffffff',
     }
   }
   if (flight.status === 'draft' && isAssigned) {
     return {
-      bg: isDark ? 'rgba(59,130,246,0.60)' : 'rgba(37,99,235,0.70)',
+      bg: isDark ? '#2563eb' : '#2563eb',
       text: '#ffffff',
     }
   }
   // draft + unassigned (fallback)
   return {
-    bg: isDark ? 'rgba(100,116,139,0.50)' : 'rgba(100,116,139,0.60)',
-    text: isDark ? 'rgba(255,255,255,0.8)' : '#ffffff',
+    bg: isDark ? '#64748b' : '#94a3b8',
+    text: '#ffffff',
   }
 }
 

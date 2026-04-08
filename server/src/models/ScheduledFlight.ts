@@ -44,7 +44,7 @@ const scheduledFlightSchema = new Schema(
     rotationLabel: { type: String, default: null },
     source: {
       type: String,
-      enum: ['manual', 'ssim_import', 'migration'],
+      enum: ['manual', 'ssim_import', 'migration', '1.1.1 Scheduling XL'],
       default: 'manual',
     },
     sortOrder: { type: Number, default: 0 },

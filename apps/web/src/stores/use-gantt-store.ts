@@ -40,11 +40,26 @@ interface GanttState {
   selectedFlightIds: Set<string>
   hoveredFlightId: string | null
 
-  // Context menu
+  // Context menus
   contextMenu: { x: number; y: number; flightId: string } | null
+  aircraftContextMenu: { x: number; y: number; registration: string; aircraftTypeIcao: string } | null
 
   // Flight info dialog
   flightInfoDialogId: string | null
+
+  // Aircraft popover
+  aircraftPopover: { x: number; y: number; registration: string; aircraftTypeIcao: string } | null
+
+  // Daily summary
+  dayContextMenu: { x: number; y: number; date: string } | null
+  dailySummaryPopover: { x: number; y: number; date: string } | null
+
+  // Daily rotation
+  rowContextMenu: { x: number; y: number; registration: string; aircraftTypeIcao: string; date: string } | null
+  rotationPopover: { x: number; y: number; registration: string; aircraftTypeIcao: string; date: string } | null
+
+  // Assign aircraft popover
+  assignPopover: { x: number; y: number; flightIds: string[]; aircraftTypeIcao: string } | null
 
   // Computed layout
   layout: LayoutResult | null
@@ -72,8 +87,22 @@ interface GanttState {
   consumeScrollTarget: () => void
   openContextMenu: (x: number, y: number, flightId: string) => void
   closeContextMenu: () => void
+  openAircraftContextMenu: (x: number, y: number, registration: string, aircraftTypeIcao: string) => void
+  closeAircraftContextMenu: () => void
   openFlightInfo: (flightId: string) => void
   closeFlightInfo: () => void
+  openAircraftPopover: (x: number, y: number, registration: string, aircraftTypeIcao: string) => void
+  closeAircraftPopover: () => void
+  openDayContextMenu: (x: number, y: number, date: string) => void
+  closeDayContextMenu: () => void
+  openDailySummary: (x: number, y: number, date: string) => void
+  closeDailySummary: () => void
+  openRowContextMenu: (x: number, y: number, registration: string, aircraftTypeIcao: string, date: string) => void
+  closeRowContextMenu: () => void
+  openRotationPopover: (x: number, y: number, registration: string, aircraftTypeIcao: string, date: string) => void
+  closeRotationPopover: () => void
+  openAssignPopover: (x: number, y: number, flightIds: string[], aircraftTypeIcao: string) => void
+  closeAssignPopover: () => void
   assignToAircraft: (flightIds: string[], registration: string) => Promise<void>
   unassignFromAircraft: (flightIds: string[]) => Promise<void>
   _recomputeLayout: () => void
@@ -159,7 +188,14 @@ export const useGanttStore = create<GanttState>((set, get) => {
     selectedFlightIds: new Set(),
     hoveredFlightId: null,
     contextMenu: null,
+    aircraftContextMenu: null,
     flightInfoDialogId: null,
+    aircraftPopover: null,
+    dayContextMenu: null,
+    dailySummaryPopover: null,
+    rowContextMenu: null,
+    rotationPopover: null,
+    assignPopover: null,
     layout: null,
     scrollTargetMs: null,
 
@@ -242,8 +278,22 @@ export const useGanttStore = create<GanttState>((set, get) => {
 
     openContextMenu: (x, y, flightId) => set({ contextMenu: { x, y, flightId } }),
     closeContextMenu: () => set({ contextMenu: null }),
+    openAircraftContextMenu: (x, y, registration, aircraftTypeIcao) => set({ aircraftContextMenu: { x, y, registration, aircraftTypeIcao }, contextMenu: null }),
+    closeAircraftContextMenu: () => set({ aircraftContextMenu: null }),
     openFlightInfo: (flightId) => set({ flightInfoDialogId: flightId, contextMenu: null }),
     closeFlightInfo: () => set({ flightInfoDialogId: null }),
+    openAircraftPopover: (x, y, registration, aircraftTypeIcao) => set({ aircraftPopover: { x, y, registration, aircraftTypeIcao }, contextMenu: null }),
+    closeAircraftPopover: () => set({ aircraftPopover: null }),
+    openDayContextMenu: (x, y, date) => set({ dayContextMenu: { x, y, date }, contextMenu: null, aircraftContextMenu: null }),
+    closeDayContextMenu: () => set({ dayContextMenu: null }),
+    openDailySummary: (x, y, date) => set({ dailySummaryPopover: { x, y, date }, dayContextMenu: null }),
+    closeDailySummary: () => set({ dailySummaryPopover: null }),
+    openRowContextMenu: (x, y, registration, aircraftTypeIcao, date) => set({ rowContextMenu: { x, y, registration, aircraftTypeIcao, date }, contextMenu: null, aircraftContextMenu: null, dayContextMenu: null }),
+    closeRowContextMenu: () => set({ rowContextMenu: null }),
+    openRotationPopover: (x, y, registration, aircraftTypeIcao, date) => set({ rotationPopover: { x, y, registration, aircraftTypeIcao, date }, rowContextMenu: null }),
+    closeRotationPopover: () => set({ rotationPopover: null }),
+    openAssignPopover: (x, y, flightIds, aircraftTypeIcao) => set({ assignPopover: { x, y, flightIds, aircraftTypeIcao }, contextMenu: null }),
+    closeAssignPopover: () => set({ assignPopover: null }),
 
     assignToAircraft: async (flightIds, registration) => {
       const operatorId = useOperatorStore.getState().operator?._id ?? ''

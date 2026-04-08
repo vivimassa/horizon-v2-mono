@@ -113,18 +113,24 @@ export function DateRangePicker({
   }, [open, inline]);
 
   const prevMonth = useCallback(() => {
-    setViewMonth((m) => {
-      if (m === 0) { setViewYear((y) => y - 1); return 11; }
-      return m - 1;
-    });
-  }, []);
+    const m = viewMonth
+    if (m === 0) {
+      setViewYear(y => y - 1)
+      setViewMonth(11)
+    } else {
+      setViewMonth(m - 1)
+    }
+  }, [viewMonth]);
 
   const nextMonth = useCallback(() => {
-    setViewMonth((m) => {
-      if (m === 11) { setViewYear((y) => y + 1); return 0; }
-      return m + 1;
-    });
-  }, []);
+    const m = viewMonth
+    if (m === 11) {
+      setViewYear(y => y + 1)
+      setViewMonth(0)
+    } else {
+      setViewMonth(m + 1)
+    }
+  }, [viewMonth]);
 
   const handleOpen = useCallback(() => {
     setPicking("from");

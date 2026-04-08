@@ -186,6 +186,21 @@ export interface AircraftRegistrationRef {
   dateOfDelivery: string | null
   leaseExpiryDate: string | null
   selcal: string | null
+  performance: {
+    mtowKg: number | null
+    mlwKg: number | null
+    mzfwKg: number | null
+    oewKg: number | null
+    maxFuelCapacityKg: number | null
+    maxRangeNm: number | null
+    cruisingSpeedKts: number | null
+    ceilingFl: number | null
+  } | null
+  fuelBurnRateKgPerHour: number | null
+  etopsCapable: boolean
+  etopsRatingMinutes: number | null
+  noiseCategory: string | null
+  emissionsCategory: string | null
   imageUrl: string | null
   notes: string | null
   isActive: boolean

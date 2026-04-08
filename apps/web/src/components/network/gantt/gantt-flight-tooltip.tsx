@@ -111,8 +111,8 @@ export const FlightTooltip = memo(function FlightTooltip({
   const bg = isDark ? 'rgba(244,244,245,0.92)' : 'rgba(24,24,27,0.88)'
   const border = isDark ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'
   const heading = isDark ? '#18181b' : '#fafafa'
-  const body = isDark ? 'rgba(24,24,27,0.55)' : 'rgba(250,250,250,0.55)'
-  const muted = isDark ? 'rgba(24,24,27,0.40)' : 'rgba(250,250,250,0.35)'
+  const body = isDark ? 'rgba(24,24,27,0.70)' : 'rgba(250,250,250,0.70)'
+  const muted = isDark ? 'rgba(24,24,27,0.55)' : 'rgba(250,250,250,0.50)'
 
   const content = (
     <div
@@ -174,11 +174,11 @@ export const FlightTooltip = memo(function FlightTooltip({
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12px]">
           <div className="flex justify-between">
             <span style={{ color: muted }}>STD (UTC)</span>
-            <span className="font-mono tabular-nums font-medium" style={{ color: heading }}>{fmtUtc(flight.stdUtc)}z</span>
+            <span className="tabular-nums font-normal text-[13px]" style={{ color: heading }}>{fmtUtc(flight.stdUtc)}z</span>
           </div>
           <div className="flex justify-between">
             <span style={{ color: muted }}>STA (UTC)</span>
-            <span className="font-mono tabular-nums font-medium" style={{ color: heading }}>{fmtUtc(flight.staUtc)}z</span>
+            <span className="tabular-nums font-normal text-[13px]" style={{ color: heading }}>{fmtUtc(flight.staUtc)}z</span>
           </div>
           <div className="flex justify-between">
             <span style={{ color: muted }}>Date</span>
@@ -186,7 +186,7 @@ export const FlightTooltip = memo(function FlightTooltip({
           </div>
           <div className="flex justify-between">
             <span style={{ color: muted }}>AC Type</span>
-            <span className="font-mono" style={{ color: heading }}>{flight.aircraftTypeIcao || '—'}</span>
+            <span className="tabular-nums" style={{ color: body }}>{flight.aircraftTypeIcao || '—'}</span>
           </div>
           {flight.aircraftReg && (
             <div className="flex justify-between">

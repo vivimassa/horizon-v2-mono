@@ -28,6 +28,29 @@ const aircraftRegistrationSchema = new Schema(
     // Comms
     selcal: { type: String, default: null },
 
+    // Performance
+    performance: {
+      mtowKg: { type: Number, default: null },
+      mlwKg: { type: Number, default: null },
+      mzfwKg: { type: Number, default: null },
+      oewKg: { type: Number, default: null },
+      maxFuelCapacityKg: { type: Number, default: null },
+      maxRangeNm: { type: Number, default: null },
+      cruisingSpeedKts: { type: Number, default: null },
+      ceilingFl: { type: Number, default: null },
+    },
+
+    // Fuel
+    fuelBurnRateKgPerHour: { type: Number, default: null },
+
+    // ETOPS
+    etopsCapable: { type: Boolean, default: false },
+    etopsRatingMinutes: { type: Number, default: null },
+
+    // Noise & emissions
+    noiseCategory: { type: String, default: null },
+    emissionsCategory: { type: String, default: null },
+
     // Media & notes
     imageUrl: { type: String, default: null },
     notes: { type: String, default: null },

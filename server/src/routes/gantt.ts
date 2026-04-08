@@ -7,6 +7,7 @@ import { AircraftType } from '../models/AircraftType.js'
 import { Airport } from '../models/Airport.js'
 import { FlightInstance } from '../models/FlightInstance.js'
 import { LopaConfig } from '../models/LopaConfig.js'
+import { CabinClass } from '../models/CabinClass.js'
 
 // ── Zod schemas ──
 
@@ -95,29 +96,39 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     const acTypeMap = new Map(acTypes.map(t => [t._id, t]))
 
     // Date expansion
+    // Each flight uses its own day offsets to determine the operating date range.
+    // A flight with departureDayOffset=3 actually departs 2 days after its operating date,
+    // so we look back (offset-1) days per flight to catch rotations starting before the view.
     const fromMs = dateToDayMs(from)
     const toMs = dateToDayMs(to)
+    const visibleEndMs = toMs + DAY_MS // inclusive of last day
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const flights: any[] = []
 
     for (const sf of scheduledFlights) {
       const effFromMs = dateToDayMs(sf.effectiveFrom)
       const effUntilMs = dateToDayMs(sf.effectiveUntil)
-      const rangeStart = Math.max(effFromMs, fromMs)
-      const rangeEnd = Math.min(effUntilMs, toMs)
       const dow = sf.daysOfWeek
       const depOffset = sf.departureDayOffset ?? 1
       const arrOffset = sf.arrivalDayOffset ?? 1
+      const maxOffset = Math.max(depOffset, arrOffset)
+
+      // Expand operating dates from (from - offset lookback) to (to)
+      const rangeStart = Math.max(effFromMs, fromMs - (maxOffset - 1) * DAY_MS)
+      const rangeEnd = Math.min(effUntilMs, toMs)
 
       for (let dayMs = rangeStart; dayMs <= rangeEnd; dayMs += DAY_MS) {
         const opDate = new Date(dayMs).toISOString().slice(0, 10)
-        // DOW from schedule date string, noon UTC to avoid parsing edge cases
         const jsDay = new Date(opDate + 'T12:00:00Z').getUTCDay()
         const ssimDay = jsDay === 0 ? 7 : jsDay
         if (!dow.includes(String(ssimDay))) continue
-        // SSIM offset 1 = operating date (same day), 2 = next day, etc.
+
         const stdMs = dayMs + (depOffset - 1) * DAY_MS + timeStringToMs(sf.stdUtc)
         const staMs = dayMs + (arrOffset - 1) * DAY_MS + timeStringToMs(sf.staUtc)
+
+        // Only include if the flight overlaps the visible window
+        if (staMs < fromMs || stdMs >= visibleEndMs) continue
+
         const block = sf.blockMinutes ?? Math.round((staMs - stdMs) / 60_000)
 
         flights.push({
@@ -419,5 +430,49 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     )
 
     return { success: true, id: compositeId }
+  })
+
+  // ── GET /gantt/aircraft-detail — aircraft info for popover ──
+  app.get('/gantt/aircraft-detail', async (req, reply) => {
+    const q = req.query as Record<string, string>
+    if (!q.operatorId || !q.registration) {
+      return reply.code(400).send({ error: 'operatorId and registration required' })
+    }
+
+    const acReg = await AircraftRegistration.findOne({ operatorId: q.operatorId, registration: q.registration }).lean()
+    if (!acReg) return reply.code(404).send({ error: 'Aircraft not found' })
+
+    const acType = await AircraftType.findOne({ _id: acReg.aircraftTypeId }).lean()
+    const lopa = acReg.lopaConfigId
+      ? await LopaConfig.findById(acReg.lopaConfigId).lean()
+      : acType?.icaoType
+        ? await LopaConfig.findOne({ operatorId: q.operatorId, aircraftType: acType.icaoType, isDefault: true, isActive: true }).lean()
+        : null
+
+    // Fetch cabin class definitions for colors + sort order
+    const cabinClasses = await CabinClass.find({ operatorId: q.operatorId, isActive: true }).lean()
+    const cabinClassMap = new Map(cabinClasses.map(c => [c.code, c]))
+
+    return {
+      registration: acReg.registration,
+      status: acReg.status,
+      aircraftTypeIcao: acType?.icaoType ?? null,
+      aircraftTypeName: acType?.name ?? null,
+      serialNumber: acReg.serialNumber ?? null,
+      selcal: acReg.selcal ?? null,
+      homeBaseIcao: acReg.homeBaseIcao ?? null,
+      variant: acReg.variant ?? null,
+      imageUrl: acReg.imageUrl ?? null,
+      lopa: lopa ? {
+        configName: lopa.configName,
+        totalSeats: lopa.totalSeats,
+        cabins: (lopa.cabins ?? [])
+          .map(c => {
+            const cls = cabinClassMap.get(c.classCode)
+            return { classCode: c.classCode, seats: c.seats, color: cls?.color ?? null, sortOrder: cls?.sortOrder ?? 99 }
+          })
+          .sort((a, b) => a.sortOrder - b.sortOrder),
+      } : null,
+    }
   })
 }

@@ -76,7 +76,7 @@ export function computeTicks(
       label = String(hour).padStart(2, '0')
     }
 
-    ticks.push({ x, label, isMajor })
+    ticks.push({ x, label, isMajor, date: isMajor ? d.toISOString().slice(0, 10) : undefined })
   }
 
   return ticks

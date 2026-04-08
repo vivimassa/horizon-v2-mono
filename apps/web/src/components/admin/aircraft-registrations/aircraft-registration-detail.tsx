@@ -512,57 +512,54 @@ export function AircraftRegistrationDetail({
             );
           })()}
 
-          {activeTab === "performance" && (
+          {activeTab === "performance" && (() => {
+            const perf = registration?.performance;
+            return (
             <div className="space-y-6">
-              {!acType?.performance ? (
+              {!perf ? (
                 <div className="text-[13px] text-hz-text-secondary py-4">
-                  No performance data available. Configure it in Aircraft Types Database for {acType?.icaoType || "this type"}.
+                  No performance data available for this aircraft.
                 </div>
               ) : (
                 <>
                   <TypeSection title="Weights">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8">
-                      <FieldRow label="MTOW (kg)" value={acType.performance.mtowKg?.toLocaleString() ?? null} />
-                      <FieldRow label="MLW (kg)" value={acType.performance.mlwKg?.toLocaleString() ?? null} />
-                      <FieldRow label="MZFW (kg)" value={acType.performance.mzfwKg?.toLocaleString() ?? null} />
-                      <FieldRow label="OEW (kg)" value={acType.performance.oewKg?.toLocaleString() ?? null} />
+                      <FieldRow label="MTOW (kg)" value={perf.mtowKg?.toLocaleString() ?? null} />
+                      <FieldRow label="MLW (kg)" value={perf.mlwKg?.toLocaleString() ?? null} />
+                      <FieldRow label="MZFW (kg)" value={perf.mzfwKg?.toLocaleString() ?? null} />
+                      <FieldRow label="OEW (kg)" value={perf.oewKg?.toLocaleString() ?? null} />
                     </div>
                   </TypeSection>
                   <TypeSection title="Fuel">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
-                      <FieldRow label="Max Fuel Capacity (kg)" value={acType.performance.maxFuelCapacityKg?.toLocaleString() ?? null} />
-                      <FieldRow label="Fuel Burn Rate (kg/hr)" value={acType.fuelBurnRateKgPerHour?.toLocaleString() ?? null} />
+                      <FieldRow label="Max Fuel Capacity (kg)" value={perf.maxFuelCapacityKg?.toLocaleString() ?? null} />
+                      <FieldRow label="Fuel Burn Rate (kg/hr)" value={registration.fuelBurnRateKgPerHour?.toLocaleString() ?? null} />
                     </div>
                   </TypeSection>
                   <TypeSection title="Speed & Range">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-8">
-                      <FieldRow label="Cruising Speed (kts)" value={acType.performance.cruisingSpeedKts ?? null} />
-                      <FieldRow label="Max Range (NM)" value={acType.performance.maxRangeNm?.toLocaleString() ?? null} />
-                      <FieldRow label="Ceiling (FL)" value={acType.performance.ceilingFl ?? null} />
+                      <FieldRow label="Cruising Speed (kts)" value={perf.cruisingSpeedKts ?? null} />
+                      <FieldRow label="Max Range (NM)" value={perf.maxRangeNm?.toLocaleString() ?? null} />
+                      <FieldRow label="Ceiling (FL)" value={perf.ceilingFl ?? null} />
                     </div>
                   </TypeSection>
                   <TypeSection title="ETOPS">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
-                      <FieldRow label="ETOPS Capable" value={acType.etopsCapable ? <span className="font-semibold" style={{ color: "#06C270" }}>Yes</span> : <span className="text-hz-text-secondary">No</span>} />
-                      <FieldRow label="ETOPS Rating (min)" value={acType.etopsRatingMinutes ?? null} />
+                      <FieldRow label="ETOPS Capable" value={registration.etopsCapable ? <span className="font-semibold" style={{ color: "#06C270" }}>Yes</span> : <span className="text-hz-text-secondary">No</span>} />
+                      <FieldRow label="ETOPS Rating (min)" value={registration.etopsRatingMinutes ?? null} />
                     </div>
                   </TypeSection>
                   <TypeSection title="Classifications">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
-                      <FieldRow label="Noise Category" value={acType.noiseCategory ?? null} />
-                      <FieldRow label="Emissions Category" value={acType.emissionsCategory ?? null} />
+                      <FieldRow label="Noise Category" value={registration.noiseCategory ?? null} />
+                      <FieldRow label="Emissions Category" value={registration.emissionsCategory ?? null} />
                     </div>
                   </TypeSection>
                 </>
               )}
-              <div className="px-4 py-3 rounded-xl bg-hz-border/10 border border-hz-border/30">
-                <p className="text-[12px] text-hz-text-secondary">
-                  <Gauge className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
-                  Performance data is inherited from the aircraft type ({acType?.icaoType}). Edit it in the Aircraft Types Database.
-                </p>
-              </div>
             </div>
-          )}
+            );
+          })()}
 
           {activeTab === "cargo" && (
             <div className="space-y-4">

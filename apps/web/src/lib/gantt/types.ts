@@ -112,6 +112,8 @@ export interface TickMark {
   x: number
   label: string
   isMajor: boolean
+  /** ISO date string (YYYY-MM-DD) for major (day boundary) ticks */
+  date?: string
 }
 
 export interface LayoutResult {

@@ -27,7 +27,23 @@ export function drawGrid(
   sx: number, sy: number,
   vw: number, vh: number,
   isDark: boolean,
+  accentColor?: string,
 ) {
+  // Weekend shading — faint accent-tinted columns for Saturday & Sunday
+  const majorTicks = ticks.filter(t => t.isMajor && t.date)
+  for (let i = 0; i < majorTicks.length; i++) {
+    const tick = majorTicks[i]
+    const jsDay = new Date(tick.date! + 'T12:00:00Z').getUTCDay()
+    if (jsDay !== 0 && jsDay !== 6) continue // only Sat (6) and Sun (0)
+    const nextX = i + 1 < majorTicks.length ? majorTicks[i + 1].x : tick.x + (majorTicks[1]?.x ?? tick.x + 200) - (majorTicks[0]?.x ?? 0)
+    const dayW = nextX - tick.x
+    if (tick.x + dayW < sx || tick.x > sx + vw) continue
+    ctx.fillStyle = accentColor
+      ? hexToRgba(accentColor, 0.15)
+      : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)')
+    ctx.fillRect(tick.x, sy, dayW, vh)
+  }
+
   // Horizontal row separators
   ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'
   ctx.lineWidth = 0.5
@@ -93,8 +109,6 @@ export function drawBars(
   const visR = sx + vw
   const visB = sy + vh
 
-  // Set font once for all bar labels
-  ctx.font = '700 10px "JetBrains Mono", ui-monospace, monospace'
   ctx.textBaseline = 'middle'
 
   for (const bar of bars) {
@@ -141,10 +155,11 @@ export function drawBars(
       ctx.fill()
     }
 
-    // Label (only if wide enough)
+    // Label (only if wide enough) — font scales with bar height
     if (bar.width >= 30) {
+      const fs = bar.height >= 48 ? 14 : bar.height >= 36 ? 12 : 11
       ctx.fillStyle = bar.textColor
-      ctx.font = '700 10px "JetBrains Mono", ui-monospace, monospace'
+      ctx.font = `700 ${fs}px "JetBrains Mono", ui-monospace, monospace`
       ctx.fillText(bar.label, bar.x + 6, bar.y + bar.height / 2)
     }
   }

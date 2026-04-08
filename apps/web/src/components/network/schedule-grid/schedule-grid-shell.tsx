@@ -198,8 +198,8 @@ export function ScheduleGridShell() {
           const staMin = parseHHMM(getVal(row, "staUtc"));
           const dirtyDepOffset = storeDirty.get(row._id)?.departureDayOffset;
           const depOffset = dirtyDepOffset != null ? Number(dirtyDepOffset) : (row.departureDayOffset || 1);
-          // Arrival offset: if STA <= STD, arrival crosses midnight → next day from departure
-          const arrOffset = staMin > 0 && staMin <= stdMin ? depOffset + 1 : depOffset;
+          // Arrival offset: if STA <= STD (including 00:00 midnight), arrival crosses into next day
+          const arrOffset = staMin <= stdMin ? depOffset + 1 : depOffset;
           return { row, depOffset, arrOffset, stdMin };
         });
 

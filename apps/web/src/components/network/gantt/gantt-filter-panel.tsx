@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, ChevronDown, Filter, Search, Loader2 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
@@ -28,9 +28,11 @@ export function GanttFilterPanel({ forceCollapsed = false, onGo }: { forceCollap
   const loading = useGanttStore(s => s.loading)
   const aircraft = useGanttStore(s => s.aircraft)
   const colorMode = useGanttStore(s => s.colorMode)
+  const fleetSortOrder = useGanttStore(s => s.fleetSortOrder)
   const setPeriod = useGanttStore(s => s.setPeriod)
   const commitPeriod = useGanttStore(s => s.commitPeriod)
   const setColorMode = useGanttStore(s => s.setColorMode)
+  const setFleetSortOrder = useGanttStore(s => s.setFleetSortOrder)
   const setAcTypeFilter = useGanttStore(s => s.setAcTypeFilter)
   const setStatusFilter = useGanttStore(s => s.setStatusFilter)
 
@@ -50,11 +52,14 @@ export function GanttFilterPanel({ forceCollapsed = false, onGo }: { forceCollap
   const inputBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)'
   const inputBorder = isDark ? 'rgba(255,255,255,0.20)' : 'rgba(0,0,0,0.20)'
 
-  const acCountByType = new Map<string, number>()
-  for (const ac of aircraft) {
-    const key = ac.aircraftTypeIcao ?? 'Unknown'
-    acCountByType.set(key, (acCountByType.get(key) ?? 0) + 1)
-  }
+  const acCountByType = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const ac of aircraft) {
+      const key = ac.aircraftTypeIcao ?? 'Unknown'
+      map.set(key, (map.get(key) ?? 0) + 1)
+    }
+    return map
+  }, [aircraft])
 
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
@@ -76,21 +81,19 @@ export function GanttFilterPanel({ forceCollapsed = false, onGo }: { forceCollap
         backdropFilter: 'blur(24px)',
       }}
     >
-      {/* Collapsed view */}
+      {/* Collapsed view — click anywhere to expand */}
       <div
-        className="absolute inset-0 flex flex-col items-center"
+        className="absolute inset-0 flex flex-col items-center cursor-pointer hover:bg-hz-border/20 transition-colors"
+        onClick={() => { if (collapsed) setCollapsed(false) }}
         style={{
           opacity: collapsed ? 1 : 0,
           pointerEvents: collapsed ? 'auto' : 'none',
           transition: 'opacity 200ms ease',
         }}
       >
-        <button
-          onClick={() => setCollapsed(false)}
-          className="h-12 w-full flex items-center justify-center hover:bg-hz-border/20 transition-colors"
-        >
+        <div className="h-12 w-full flex items-center justify-center">
           <ChevronRight size={16} className="text-hz-text-secondary" />
-        </button>
+        </div>
         <div className="flex-1 flex items-center justify-center" style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)' }}>
           <span className="text-[12px] font-semibold uppercase tracking-wider text-hz-text-tertiary whitespace-nowrap">
             Filters
@@ -161,12 +164,29 @@ export function GanttFilterPanel({ forceCollapsed = false, onGo }: { forceCollap
             />
           </FilterSection>
 
+          {/* Fleet Sort Order */}
+          <FilterSection label="Fleet Sort Order">
+            <div className="flex rounded-xl overflow-hidden" style={{ border: `1px solid ${inputBorder}` }}>
+              {(['type', 'registration', 'utilization'] as const).map(mode => (
+                <button key={mode} onClick={() => setFleetSortOrder(mode)}
+                  className={`flex-1 py-2 text-[12px] font-semibold transition-colors duration-150`}
+                  style={fleetSortOrder === mode
+                    ? { background: isDark ? 'rgba(62,123,250,0.15)' : 'rgba(30,64,175,0.10)', color: isDark ? '#5B8DEF' : '#1e40af' }
+                    : { color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}
+                >{mode === 'type' ? 'Type' : mode === 'registration' ? 'Reg' : 'Util'}</button>
+              ))}
+            </div>
+          </FilterSection>
+
           {/* Color Mode */}
           <FilterSection label="Color Mode">
             <div className="flex rounded-xl overflow-hidden" style={{ border: `1px solid ${inputBorder}` }}>
               {(['status', 'ac_type'] as const).map(mode => (
                 <button key={mode} onClick={() => setColorMode(mode)}
-                  className={`flex-1 py-2 text-[13px] font-semibold transition-colors duration-150 ${colorMode === mode ? 'bg-module-accent text-white' : 'text-hz-text-secondary'}`}
+                  className={`flex-1 py-2 text-[13px] font-semibold transition-colors duration-150`}
+                  style={colorMode === mode
+                    ? { background: isDark ? 'rgba(62,123,250,0.15)' : 'rgba(30,64,175,0.10)', color: isDark ? '#5B8DEF' : '#1e40af' }
+                    : { color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}
                 >{mode === 'status' ? 'Status' : 'AC Type'}</button>
               ))}
             </div>

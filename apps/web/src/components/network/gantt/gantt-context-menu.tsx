@@ -1,8 +1,8 @@
 "use client"
 
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Info, Link, Unlink, Scissors, ArrowLeftRight, Pencil, Trash2, ChevronRight } from 'lucide-react'
+import { Info, Link, Unlink, ArrowLeftRight, Trash2, ChevronRight } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { useGanttStore } from '@/stores/use-gantt-store'
 
@@ -18,9 +18,21 @@ export function GanttContextMenu() {
   const ref = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
   const [assignHover, setAssignHover] = useState(false)
+  const leaveTimer = useRef<number | null>(null)
+
+  const enterAssign = useCallback(() => {
+    if (leaveTimer.current) { clearTimeout(leaveTimer.current); leaveTimer.current = null }
+    setAssignHover(true)
+  }, [])
+
+  const leaveAssign = useCallback(() => {
+    leaveTimer.current = window.setTimeout(() => setAssignHover(false), 120)
+  }, [])
 
   useEffect(() => { setMounted(true) }, [])
-  useEffect(() => { if (!ctx) setAssignHover(false) }, [ctx])
+  useEffect(() => {
+    if (!ctx) { setAssignHover(false); if (leaveTimer.current) clearTimeout(leaveTimer.current) }
+  }, [ctx])
 
   useEffect(() => {
     if (!ctx) return
@@ -81,13 +93,19 @@ export function GanttContextMenu() {
     closeContextMenu()
   }
 
-  // Submenu position — flush against main menu edge, no gap
-  const subLeft = left + menuW
+  // Submenu position — 2px gap from main menu edge for visual cohesion
+  const menuVisualW = 264 // actual rendered width (~minWidth 260 + border)
+  const subGap = 0
+  const subLeft = left + menuVisualW + subGap
   const subFlip = subLeft + 240 > vpW
-  const subX = subFlip ? left - 240 : subLeft
+  const subX = subFlip ? left - 240 - subGap : subLeft
+
+  // Vertical alignment: "Assign Aircraft" row is the 3rd item (after FlightInfo + divider)
+  // Each item ~30px, divider ~10px → row top offset ~42px from menu top
+  const assignRowTop = top + 42
 
   return createPortal(
-    <div ref={ref}>
+    <div ref={ref} data-gantt-overlay>
       {/* Main menu */}
       <div
         className="fixed z-[9999] rounded-xl py-1.5 overflow-hidden"
@@ -105,11 +123,11 @@ export function GanttContextMenu() {
           textColor={textColor} textMuted={textMuted} hoverBg={hoverBg} />
         <Divider color={dividerColor} />
 
-        {/* Assign — with submenu on hover, bridge prevents hover gap */}
+        {/* Assign Aircraft — hover triggers submenu */}
         <div
           className="relative"
-          onMouseCtrl+A={() => setAssignHover(true)}
-          onMouseLeave={() => setAssignHover(false)}
+          onMouseEnter={enterAssign}
+          onMouseLeave={leaveAssign}
         >
           <div
             className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] cursor-pointer transition-colors"
@@ -119,63 +137,66 @@ export function GanttContextMenu() {
             <span className="flex-1 text-left font-medium">Assign Aircraft</span>
             <ChevronRight size={14} style={{ color: textMuted }} />
           </div>
-          {/* Invisible bridge extending to the right to keep hover alive */}
-          {assignHover && (
-            <div className="absolute top-0 h-full" style={{ left: '100%', width: 20 }} />
-          )}
         </div>
 
-        <MenuItem icon={Unlink} label="Unassign Aircraft" disabled={!hasAssigned}
+        <MenuItem icon={Unlink} label="Unassign Aircraft" shortcut="Alt+D" disabled={!hasAssigned}
           onClick={handleUnassign}
           textColor={textColor} textMuted={textMuted} hoverBg={hoverBg} />
         <Divider color={dividerColor} />
-        <MenuItem icon={Scissors} label="Cut" shortcut="Ctrl+X" disabled
-          onClick={() => {}} textColor={textColor} textMuted={textMuted} hoverBg={hoverBg} />
-        <MenuItem icon={ArrowLeftRight} label="Swap" shortcut="Ctrl+S" disabled
-          onClick={() => {}} textColor={textColor} textMuted={textMuted} hoverBg={hoverBg} />
+        <MenuItem icon={ArrowLeftRight} label="Swap" shortcut="Alt+S"
+          onClick={() => { useGanttStore.getState().enterSwapMode(); closeContextMenu() }}
+          textColor={textColor} textMuted={textMuted} hoverBg={hoverBg} />
         <Divider color={dividerColor} />
-        <MenuItem icon={Pencil} label="Edit schedule pattern" disabled
-          onClick={() => {}} textColor={textColor} textMuted={textMuted} hoverBg={hoverBg} />
-        <Divider color={dividerColor} />
-        <MenuItem icon={Trash2} label="Remove from Date" shortcut="Del" danger disabled
-          onClick={() => {}} textColor={textColor} textMuted={textMuted} hoverBg={hoverBg} />
+        <MenuItem icon={Trash2} label="Cancel Flight(s)" shortcut="Del" danger
+          onClick={() => { useGanttStore.getState().openCancelDialog([...selectedFlightIds]) }}
+          textColor={textColor} textMuted={textMuted} hoverBg={hoverBg} />
       </div>
 
-      {/* Assign submenu */}
+      {/* Assign submenu — outside main menu to avoid overflow clip, uses timer to bridge gap */}
       {assignHover && (
         <div
-          className="fixed z-[10000] rounded-xl py-1.5 overflow-hidden"
-          style={{
-            left: subX, top: top + 42, minWidth: 230,
-            background: bg, border: `1px solid ${border}`,
-            backdropFilter: 'blur(20px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)',
-          }}
-          onMouseCtrl+A={() => setAssignHover(true)}
-          onMouseLeave={() => setAssignHover(false)}
+          onMouseEnter={enterAssign}
+          onMouseLeave={leaveAssign}
         >
-          {rowReg && (
+          {/* Invisible bridge covering the 4px gap between menus */}
+          <div className="fixed z-[9999]" style={{
+            left: subFlip ? subX + 230 : left + menuVisualW,
+            top: assignRowTop,
+            width: subGap,
+            height: 60,
+          }} />
+          <div
+            className="fixed z-[10000] rounded-xl py-1.5 overflow-hidden"
+            style={{
+              left: subX, top: assignRowTop, minWidth: 230,
+              background: bg, border: `1px solid ${border}`,
+              backdropFilter: 'blur(20px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)',
+            }}
+          >
+            {rowReg && (
+              <button
+                onClick={handleAssignHere}
+                className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] font-medium transition-colors"
+                style={{ color: textColor }}
+                onMouseEnter={e => { e.currentTarget.style.background = hoverBg }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+              >
+                <span className="flex-1 text-left">Assign to <span className="font-mono font-bold">{rowReg}</span></span>
+                <span className="text-[11px] font-mono" style={{ color: textMuted }}>Alt+A</span>
+              </button>
+            )}
             <button
-              onClick={handleAssignHere}
+              onClick={handleAssignOther}
               className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] font-medium transition-colors"
               style={{ color: textColor }}
-              onMouseCtrl+A={e => { e.currentTarget.style.background = hoverBg }}
+              onMouseEnter={e => { e.currentTarget.style.background = hoverBg }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
             >
-              <span className="flex-1 text-left">Assign to <span className="font-mono font-bold">{rowReg}</span></span>
-              <span className="text-[11px] font-mono" style={{ color: textMuted }}>Ctrl+A</span>
+              <span className="flex-1 text-left">Assign to other aircraft...</span>
             </button>
-          )}
-          <button
-            onClick={handleAssignOther}
-            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] font-medium transition-colors"
-            style={{ color: textColor }}
-            onMouseCtrl+A={e => { e.currentTarget.style.background = hoverBg }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-          >
-            <span className="flex-1 text-left">Assign to other aircraft...</span>
-          </button>
+          </div>
         </div>
       )}
     </div>,
@@ -196,7 +217,7 @@ function MenuItem({ icon: Icon, label, shortcut, disabled, danger, onClick, text
         color: disabled ? `${textColor}30` : danger ? '#E63535' : textColor,
         cursor: disabled ? 'default' : 'pointer',
       }}
-      onMouseCtrl+A={e => { if (!disabled) e.currentTarget.style.background = danger ? 'rgba(255,59,59,0.10)' : hoverBg }}
+      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = danger ? 'rgba(255,59,59,0.10)' : hoverBg }}
       onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
     >
       <Icon size={14} className="shrink-0" strokeWidth={1.8} />

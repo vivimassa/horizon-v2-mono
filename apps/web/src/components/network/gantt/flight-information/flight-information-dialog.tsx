@@ -132,6 +132,7 @@ export function FlightInformationDialog() {
 
   const content = (
     <div
+      data-gantt-overlay
       className="fixed inset-0 z-[9998] flex items-center justify-center"
       style={{ backgroundColor: isDark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) closeFlightInfo() }}

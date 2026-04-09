@@ -2,13 +2,14 @@
 
 import { useState, useCallback } from "react";
 import { ChevronUp, ChevronDown, Filter } from "lucide-react";
-import { GRID_COLUMNS, HEADER_HEIGHT, CELL_BORDER, CELL_BORDER_DARK } from "./grid-columns";
+import { GRID_COLUMNS, HEADER_HEIGHT, CELL_BORDER, CELL_BORDER_DARK, type GridColumn } from "./grid-columns";
 import { useGridSortStore } from "./use-grid-sort";
 import { ColumnFilterDropdown, type ColorFilter } from "./column-filter-dropdown";
 import { useTheme } from "@/components/theme-provider";
 import type { ScheduledFlightRef } from "@skyhub/api";
 
 interface GridHeaderProps {
+  columns?: GridColumn[];
   scrollLeft: number;
   rows: ScheduledFlightRef[];
   columnFilters: Map<string, Set<string>>;
@@ -17,7 +18,8 @@ interface GridHeaderProps {
   onApplyColorFilter: (colKey: string, filter: ColorFilter | null) => void;
 }
 
-export function GridHeader({ scrollLeft, rows, columnFilters, colorFilters, onApplyFilter, onApplyColorFilter }: GridHeaderProps) {
+export function GridHeader({ columns: columnsProp, scrollLeft, rows, columnFilters, colorFilters, onApplyFilter, onApplyColorFilter }: GridHeaderProps) {
+  const columns = columnsProp ?? GRID_COLUMNS;
   const { sortKey, sortDir, setSortKey } = useGridSortStore();
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const { theme } = useTheme();
@@ -32,7 +34,7 @@ export function GridHeader({ scrollLeft, rows, columnFilters, colorFilters, onAp
           className="text-[11px] font-medium text-hz-text-tertiary bg-hz-bg select-none"
           style={{ width: "3%", border, textAlign: "center" }}
         />
-        {GRID_COLUMNS.map((col) => {
+        {columns.map((col) => {
           const isSorted = sortKey === col.key;
           const hasFilter = columnFilters.has(col.key) || colorFilters.has(col.key);
           return (

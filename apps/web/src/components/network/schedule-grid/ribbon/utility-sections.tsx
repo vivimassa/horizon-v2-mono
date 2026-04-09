@@ -3,6 +3,17 @@
 import { Search, Replace, Upload, Download, Save, SaveAll, GitBranch, MessageSquare } from "lucide-react";
 import { RibbonButton } from "./ribbon-button";
 import { RibbonSection } from "./flight-section";
+import { useTheme } from "@/components/theme-provider";
+
+function Divider() {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  return (
+    <div className="self-stretch shrink-0 flex items-center py-4">
+      <div style={{ width: 1, height: '60%', background: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)" }} />
+    </div>
+  );
+}
 
 interface Props {
   onSave: () => void;
@@ -25,30 +36,30 @@ export function UtilitySections({ onSave, onImport, onExport, onScenario, onMess
         <RibbonButton icon={Replace} label="Replace" shortcut="Ctrl+H" onClick={onReplace} small />
       </RibbonSection>
 
-      <div className="w-px self-stretch bg-hz-border/30 shrink-0" />
+      <Divider />
 
       <RibbonSection label="Import">
         <RibbonButton icon={Upload} label="Upload" onClick={onImport} />
         <RibbonButton icon={Download} label="Download" onClick={onExport} />
       </RibbonSection>
 
-      <div className="w-px self-stretch bg-hz-border/30 shrink-0" />
+      <Divider />
 
       <RibbonSection label="Record">
         <RibbonButton icon={Save} label="Save" onClick={onSave} disabled={!hasDirty || saving} shortcut="Ctrl+S" />
         <RibbonButton icon={SaveAll} label="Save As" shortcut="F12" onClick={onSaveAs} />
       </RibbonSection>
 
-      <div className="w-px self-stretch bg-hz-border/30 shrink-0" />
+      <Divider />
 
       <RibbonSection label="Scenario">
         <RibbonButton icon={GitBranch} label="Scenario" onClick={onScenario} />
       </RibbonSection>
 
-      <div className="w-px self-stretch bg-hz-border/30 shrink-0" />
+      <Divider />
 
       <RibbonSection label="Message">
-        <RibbonButton icon={MessageSquare} label="ASM" onClick={onMessage} />
+        <RibbonButton icon={MessageSquare} label="ASM/SSM" onClick={onMessage} />
       </RibbonSection>
     </>
   );

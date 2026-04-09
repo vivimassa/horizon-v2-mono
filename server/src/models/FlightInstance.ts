@@ -4,21 +4,26 @@ const flightInstanceSchema = new Schema(
   {
     _id: { type: String, required: true },
     operatorId: { type: String, required: true, index: true },
+    scheduledFlightId: { type: String, default: null, index: true },
     flightNumber: { type: String, required: true },
     operatingDate: { type: String, required: true, index: true },
 
     dep: {
-      icao: { type: String, required: true },
-      iata: { type: String, required: true },
+      icao: { type: String, default: null },
+      iata: { type: String, default: null },
     },
     arr: {
-      icao: { type: String, required: true },
-      iata: { type: String, required: true },
+      icao: { type: String, default: null },
+      iata: { type: String, default: null },
     },
 
     schedule: {
-      stdUtc: { type: Number, required: true },
-      staUtc: { type: Number, required: true },
+      stdUtc: { type: Number, default: null },
+      staUtc: { type: Number, default: null },
+    },
+    estimated: {
+      etdUtc: { type: Number, default: null },
+      etaUtc: { type: Number, default: null },
     },
     actual: {
       doorCloseUtc: { type: Number, default: null },
@@ -120,10 +125,13 @@ const flightInstanceSchema = new Schema(
 
     status: {
       type: String,
-      enum: ['scheduled', 'departed', 'onTime', 'delayed', 'cancelled', 'diverted'],
+      enum: ['scheduled', 'assigned', 'crewed', 'departed', 'onTime', 'delayed', 'cancelled', 'diverted', 'arrived', 'completed'],
       default: 'scheduled',
       index: true,
     },
+
+    /** Fields manually overridden — protected from re-materialization from ScheduledFlight pattern */
+    lockedFields: [{ type: String }],
 
     syncMeta: {
       updatedAt: { type: Number, default: () => Date.now() },
@@ -138,6 +146,7 @@ const flightInstanceSchema = new Schema(
 )
 
 flightInstanceSchema.index({ operatorId: 1, operatingDate: 1 })
+flightInstanceSchema.index({ operatorId: 1, scheduledFlightId: 1, operatingDate: 1 })
 
 export type FlightInstanceDoc = InferSchemaType<typeof flightInstanceSchema>
 export const FlightInstance = mongoose.model('FlightInstance', flightInstanceSchema)

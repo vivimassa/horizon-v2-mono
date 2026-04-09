@@ -9,6 +9,7 @@ import { RunwayLoadingPanel } from "@/components/ui/runway-loading-panel";
 import { EmptyPanel } from "@/components/ui/empty-panel";
 import { useRunwayLoading } from "@/hooks/use-runway-loading";
 import { useTheme } from "@/components/theme-provider";
+import { normalizeToIso } from "@/lib/date-format";
 import { ScheduleGrid } from "./schedule-grid";
 import { FloatingSaveBar } from "./floating-save-bar";
 import { RibbonToolbar } from "./ribbon/ribbon-toolbar";
@@ -61,7 +62,8 @@ export function ScheduleGridShell() {
   const [showScenarios, setShowScenarios] = useState(false);
   const [scenarioAutoCreate, setScenarioAutoCreate] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
-  const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
+  const activeScenarioId = useOperatorStore(s => s.activeScenarioId);
+  const setActiveScenarioId = useOperatorStore(s => s.setActiveScenarioId);
 
   // Hydrate cellFormats and separators from row formatting data
   const hydrateFormats = useCallback((data: ScheduledFlightRef[]) => {
@@ -90,7 +92,7 @@ export function ScheduleGridShell() {
     didSeedRow.current = false;
     try {
       const data = await runway.run(
-        () => api.getScheduledFlights({ operatorId: getOperatorId() }),
+        () => api.getScheduledFlights({ operatorId: getOperatorId(), scenarioId: activeScenarioId ?? '__production__' }),
         "Loading schedule…",
         "Schedule loaded",
       );
@@ -279,7 +281,7 @@ export function ScheduleGridShell() {
       clearCellFormats();
       // Silent refresh — no runway animation, then hydrate formats
       try {
-        const data = await api.getScheduledFlights({ operatorId: getOperatorId() });
+        const data = await api.getScheduledFlights({ operatorId: getOperatorId(), scenarioId: activeScenarioId ?? '__production__' });
         setRows(data);
         hydrateFormats(data);
       } catch (_) { /* grid already cleared, user can re-fetch via Go */ }

@@ -39,6 +39,8 @@ const scheduledFlightSchema = new Schema(
     isOverwater: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     scenarioId: { type: String, default: null, index: true },
+    /** Links a scenario flight back to the production flight it was copied from */
+    sourceFlightId: { type: String, default: null },
     rotationId: { type: String, default: null },
     rotationSequence: { type: Number, default: null },
     rotationLabel: { type: String, default: null },
@@ -62,6 +64,7 @@ const scheduledFlightSchema = new Schema(
 scheduledFlightSchema.index({ operatorId: 1, seasonCode: 1, scenarioId: 1 })
 scheduledFlightSchema.index({ operatorId: 1, flightNumber: 1, effectiveFrom: 1 })
 scheduledFlightSchema.index({ operatorId: 1, rotationId: 1 })
+scheduledFlightSchema.index({ operatorId: 1, scenarioId: 1, sourceFlightId: 1 })
 
 export type ScheduledFlightDoc = InferSchemaType<typeof scheduledFlightSchema>
 export const ScheduledFlight = mongoose.model('ScheduledFlight', scheduledFlightSchema)

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronDown } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 
@@ -33,13 +34,29 @@ export function Dropdown({
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [panelPos, setPanelPos] = useState({ top: 0, left: 0, width: 0 })
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => { setMounted(true) }, [])
+
+  // Position panel when opening
+  useEffect(() => {
+    if (!open || !triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    setPanelPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+  }, [open])
 
   // Close on outside click
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      if (
+        triggerRef.current && !triggerRef.current.contains(t) &&
+        panelRef.current && !panelRef.current.contains(t)
+      ) setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -55,7 +72,7 @@ export function Dropdown({
 
   const selected = options.find(o => o.value === value)
   const h = size === 'sm' ? 'h-8' : 'h-9'
-  const textSize = size === 'sm' ? 'text-[13px]' : 'text-[13px]'
+  const textSize = 'text-[13px]'
 
   // Theme colors
   const triggerBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)'
@@ -69,9 +86,10 @@ export function Dropdown({
   const accent = 'var(--module-accent, #1e40af)'
 
   return (
-    <div ref={ref} className={`relative ${className}`}>
+    <div className={`relative ${className}`}>
       {/* Trigger */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => { if (!disabled) setOpen(o => !o) }}
         disabled={disabled}
@@ -94,16 +112,19 @@ export function Dropdown({
         />
       </button>
 
-      {/* Panel */}
-      {open && (
+      {/* Panel — portaled to body to escape overflow:hidden containers */}
+      {open && mounted && createPortal(
         <div
-          className="absolute z-50 mt-1 w-full rounded-xl py-1"
+          ref={panelRef}
+          className="fixed z-[9999] rounded-xl py-1"
           style={{
+            top: panelPos.top,
+            left: panelPos.left,
+            minWidth: panelPos.width,
             background: panelBg,
             border: `1px solid ${panelBorder}`,
             boxShadow: panelShadow,
             backdropFilter: 'blur(20px)',
-            minWidth: '100%',
             maxHeight: maxVisible ? maxVisible * (size === 'sm' ? 32 : 36) + 8 : undefined,
             overflowY: maxVisible ? 'auto' : undefined,
           }}
@@ -131,7 +152,8 @@ export function Dropdown({
               </button>
             )
           })}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

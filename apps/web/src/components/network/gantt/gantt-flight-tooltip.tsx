@@ -8,6 +8,7 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { GanttFlight } from '@/lib/gantt/types'
+import { useGanttStore } from '@/stores/use-gantt-store'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -21,6 +22,19 @@ function fmtBlock(ms: number): string {
 function fmtUtc(epochMs: number): string {
   const d = new Date(epochMs)
   return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+}
+
+function fmtLocal(epochMs: number, offsetHours: number): string {
+  const localMs = epochMs + offsetHours * 3_600_000
+  const d = new Date(localMs)
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+}
+
+function fmtOffset(hours: number): string {
+  const sign = hours >= 0 ? '+' : ''
+  const h = Math.floor(Math.abs(hours))
+  const m = Math.round((Math.abs(hours) - h) * 60)
+  return `${sign}${hours < 0 ? '-' : ''}${h}${m > 0 ? `:${String(m).padStart(2, '0')}` : ''}`
 }
 
 function fmtDate(epochMs: number): string {
@@ -102,10 +116,16 @@ export const FlightTooltip = memo(function FlightTooltip({
     return () => document.removeEventListener('mousemove', onMove)
   }, [flight, mousePosRef])
 
-  if (!mounted || !flight) return null
+  // Hide tooltip when any modal/dialog/popover overlay is open
+  const hasOverlay = typeof document !== 'undefined' && document.querySelector('[data-gantt-overlay]') !== null
+  const swapMode = useGanttStore(s => s.swapMode)
+  const stationUtcOffsetMap = useGanttStore(s => s.stationUtcOffsetMap)
+  if (!mounted || !flight || swapMode || hasOverlay) return null
 
   const status = getStatusStyle(flight.status, isDark)
   const blockMs = flight.staUtc - flight.stdUtc
+  const depOffset = stationUtcOffsetMap[flight.depStation] ?? null
+  const arrOffset = stationUtcOffsetMap[flight.arrStation] ?? null
 
   // Inverted glass: dark bg in light mode, light bg in dark mode
   const bg = isDark ? 'rgba(244,244,245,0.92)' : 'rgba(24,24,27,0.88)'
@@ -124,7 +144,7 @@ export const FlightTooltip = memo(function FlightTooltip({
         visibility: 'hidden',
         zIndex: 9999,
         pointerEvents: 'none',
-        minWidth: 320,
+        minWidth: 380,
       }}
     >
       <div
@@ -143,7 +163,7 @@ export const FlightTooltip = memo(function FlightTooltip({
             className="font-bold text-[14px] px-2 py-0.5 rounded"
             style={{ background: status.bg, color: status.color }}
           >
-            {flight.flightNumber}
+            {flight.airlineCode ? `${flight.airlineCode} ${flight.flightNumber}` : flight.flightNumber}
           </span>
           <span
             className="text-[10px] font-medium tracking-wider uppercase"
@@ -180,6 +200,18 @@ export const FlightTooltip = memo(function FlightTooltip({
             <span style={{ color: muted }}>STA (UTC)</span>
             <span className="tabular-nums font-normal text-[13px]" style={{ color: heading }}>{fmtUtc(flight.staUtc)}z</span>
           </div>
+          {depOffset !== null && (
+            <div className="flex justify-between">
+              <span style={{ color: muted }}>STD (Local)</span>
+              <span className="tabular-nums text-[13px]" style={{ color: body }}>{fmtLocal(flight.stdUtc, depOffset)} <span style={{ color: muted, fontSize: 10 }}>UTC{fmtOffset(depOffset)}</span></span>
+            </div>
+          )}
+          {arrOffset !== null && (
+            <div className="flex justify-between">
+              <span style={{ color: muted }}>STA (Local)</span>
+              <span className="tabular-nums text-[13px]" style={{ color: body }}>{fmtLocal(flight.staUtc, arrOffset)} <span style={{ color: muted, fontSize: 10 }}>UTC{fmtOffset(arrOffset)}</span></span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span style={{ color: muted }}>Date</span>
             <span className="tabular-nums" style={{ color: body }}>{fmtDate(flight.stdUtc)}</span>

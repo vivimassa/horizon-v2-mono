@@ -32,6 +32,7 @@ export function GanttStatusBar() {
   const periodTo = useGanttStore(s => s.periodTo)
   const flights = useGanttStore(s => s.flights)
   const aircraft = useGanttStore(s => s.aircraft)
+  const swapMode = useGanttStore(s => s.swapMode)
 
   const [utcTime, setUtcTime] = useState(formatUtcClock)
 
@@ -45,6 +46,14 @@ export function GanttStatusBar() {
       style={{ background: palette.backgroundSecondary, color: palette.textTertiary, fontSize: 11 }}
     >
       <div className="flex items-center gap-3 font-mono">
+        {swapMode && (
+          <>
+            <span className="flex items-center gap-1 font-semibold" style={{ color: '#FF8800' }}>
+              SWAP MODE — Click a flight on another aircraft to swap, Escape to cancel
+            </span>
+            <span style={{ opacity: 0.3 }}>·</span>
+          </>
+        )}
         <span className="flex items-center gap-1">
           <Plane size={11} /> {flights.length} flights
         </span>

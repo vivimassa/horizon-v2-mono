@@ -1,7 +1,7 @@
 import type {
   GanttFlight, GanttAircraft, GanttAircraftType,
   BarLayout, RowLayout, LayoutResult,
-  ZoomLevel, ColorMode, BarLabelMode,
+  ZoomLevel, ColorMode, BarLabelMode, FleetSortOrder,
 } from './types'
 import { ROW_HEIGHT_LEVELS } from './types'
 import { utcToX, computeTicks, dateToMs } from './time-axis'
@@ -19,8 +19,13 @@ export interface LayoutInput {
   collapsedTypes: Set<string>
   colorMode: ColorMode
   barLabelMode: BarLabelMode
+  fleetSortOrder: FleetSortOrder
   isDark: boolean
   containerWidth: number
+  /** Previous virtual placements — used as affinity hints to keep unassigned flights stable */
+  previousVirtualPlacements?: Map<string, string>
+  /** Forced placements — override virtual placement for specific flights (from drag-drop rearrange) */
+  forcedPlacements?: Map<string, string>
 }
 
 const GROUP_HEADER_HEIGHT = 28
@@ -96,6 +101,7 @@ function computeVirtualPlacements(
   unassigned: GanttFlight[],
   aircraft: GanttAircraft[],
   assignedByReg: Map<string, GanttFlight[]>,
+  previousPlacements?: Map<string, string>,
 ): Map<string, string> {
   const placements = new Map<string, string>()
 
@@ -156,6 +162,14 @@ function computeVirtualPlacements(
         if (!blockFits) continue
 
         let score = 0
+
+        // Affinity: strongly prefer keeping flights on the same row as before
+        if (previousPlacements) {
+          const affinityCount = block.flights.filter(
+            f => previousPlacements.get(f.id) === s.registration
+          ).length
+          if (affinityCount > 0) score += 2000 + affinityCount * 500
+        }
 
         // Station continuity: last arrival matches block's first departure
         if (s.lastArr && s.lastArr === block.depStation) {
@@ -220,8 +234,35 @@ export function computeLayout(input: LayoutInput): LayoutResult {
     }
   }
 
-  // Virtual placement: auto-distribute unassigned flights to aircraft rows
-  const virtualPlacements = computeVirtualPlacements(unassignedFlights, aircraft, assignedByReg)
+  // Apply forced placements first (from drag-drop rearrange) — these skip the greedy algorithm
+  const forced = input.forcedPlacements
+  const forcedFlightIds = new Set(forced?.keys() ?? [])
+  const unassignedForGreedy = forced
+    ? unassignedFlights.filter(f => !forcedFlightIds.has(f.id))
+    : unassignedFlights
+
+  // Pre-place forced flights into assignedByReg so greedy sees them as occupied
+  const assignedByRegWithForced = new Map(assignedByReg)
+  if (forced) {
+    for (const f of unassignedFlights) {
+      const reg = forced.get(f.id)
+      if (reg) {
+        const list = assignedByRegWithForced.get(reg) ?? []
+        list.push(f)
+        assignedByRegWithForced.set(reg, list)
+      }
+    }
+  }
+
+  // Virtual placement: auto-distribute remaining unassigned flights to aircraft rows
+  const virtualPlacements = computeVirtualPlacements(
+    unassignedForGreedy, aircraft, assignedByRegWithForced, input.previousVirtualPlacements
+  )
+
+  // Merge forced placements into virtualPlacements map
+  if (forced) {
+    for (const [id, reg] of forced) virtualPlacements.set(id, reg)
+  }
 
   // Merge virtual placements into flightsByReg
   const flightsByReg = new Map(assignedByReg)
@@ -246,12 +287,30 @@ export function computeLayout(input: LayoutInput): LayoutResult {
     typeGroups.set(key, list)
   }
 
+  // Compute block hours per aircraft for utilization sort
+  const blockHrsByReg = new Map<string, number>()
+  if (input.fleetSortOrder === 'utilization') {
+    for (const [reg, fls] of flightsByReg) {
+      blockHrsByReg.set(reg, fls.reduce((s, f) => s + f.blockMinutes, 0) / 60)
+    }
+  }
+
+  // Sort aircraft within each type group
+  for (const [, acList] of typeGroups) {
+    if (input.fleetSortOrder === 'registration') {
+      acList.sort((a, b) => a.registration.localeCompare(b.registration))
+    } else if (input.fleetSortOrder === 'utilization') {
+      acList.sort((a, b) => (blockHrsByReg.get(b.registration) ?? 0) - (blockHrsByReg.get(a.registration) ?? 0))
+    } else {
+      acList.sort((a, b) => a.registration.localeCompare(b.registration))
+    }
+  }
+
   const rows: RowLayout[] = []
   const bars: BarLayout[] = []
   let y = 0
 
   const sortedTypes = [...typeGroups.entries()].sort((a, b) => a[0].localeCompare(b[0]))
-
 
   for (const [typeIcao, acList] of sortedTypes) {
     const typeInfo = aircraftTypes.find(t => t.icaoType === typeIcao)
@@ -273,6 +332,7 @@ export function computeLayout(input: LayoutInput): LayoutResult {
       rows.push({
         type: 'aircraft', registration: ac.registration,
         aircraftTypeIcao: typeIcao, aircraftTypeName: typeInfo?.name ?? typeIcao,
+        seatConfig: ac.seatConfig,
         label: ac.registration, y, height: rowH, color: typeColor,
       })
 
@@ -323,5 +383,5 @@ export function computeLayout(input: LayoutInput): LayoutResult {
   const rawWidth = periodDays * 24 * pph
   const totalWidth = Math.max(rawWidth, input.containerWidth)
 
-  return { rows, bars, ticks, totalWidth, totalHeight: y }
+  return { rows, bars, ticks, totalWidth, totalHeight: y, virtualPlacements }
 }

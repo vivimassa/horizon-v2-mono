@@ -64,21 +64,19 @@ export function FilterPanel({ onApplyFilters, loading }: FilterPanelProps) {
         backdropFilter: "blur(20px)",
       }}
     >
-      {/* Collapsed view */}
+      {/* Collapsed view — click anywhere to expand */}
       <div
-        className="absolute inset-0 flex flex-col items-center"
+        className="absolute inset-0 flex flex-col items-center cursor-pointer hover:bg-hz-border/20 transition-colors"
+        onClick={() => { if (collapsed) setCollapsed(false) }}
         style={{
           opacity: collapsed ? 1 : 0,
           pointerEvents: collapsed ? "auto" : "none",
           transition: "opacity 200ms ease",
         }}
       >
-        <button
-          onClick={() => setCollapsed(false)}
-          className="h-12 w-full flex items-center justify-center hover:bg-hz-border/20 transition-colors"
-        >
+        <div className="h-12 w-full flex items-center justify-center">
           <ChevronRight size={16} className="text-hz-text-secondary" />
-        </button>
+        </div>
         <div
           className="flex-1 flex items-center justify-center"
           style={{ writingMode: "vertical-lr", transform: "rotate(180deg)" }}

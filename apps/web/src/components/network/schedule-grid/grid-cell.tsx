@@ -7,7 +7,7 @@ import type { CellFormat } from "./types";
 import { useScheduleRefStore } from "@/stores/use-schedule-ref-store";
 import { useScheduleGridStore } from "@/stores/use-schedule-grid-store";
 import { useOperatorStore } from "@/stores/use-operator-store";
-import { normalizeToIso } from "@/lib/date-format";
+import { normalizeToIso, formatDate } from "@/lib/date-format";
 import { getConditionalFormat } from "./conditional-format-rules";
 import { useTheme } from "@/components/theme-provider";
 import type { ScheduledFlightRef } from "@skyhub/api";
@@ -84,6 +84,16 @@ export const GridCell = React.memo(function GridCell({
   const isOutOfPeriod = isDateCol && normValue && normFrom && normTo &&
     (normValue < normFrom || normValue > normTo);
   const isSuggested = isDateCol && value && !isDirty && isNewRow;
+
+  // Clamp FROM/TO display to the filter period intersection (always in operator date format)
+  let clampedDateDisplay: string | null = null;
+  if (isDateCol && normValue && normFrom && normTo && !isDirty) {
+    if (column.key === "effectiveFrom" && normValue < normFrom) {
+      clampedDateDisplay = formatDate(normFrom, opDateFormat);
+    } else if (column.key === "effectiveUntil" && normValue > normTo) {
+      clampedDateDisplay = formatDate(normTo, opDateFormat);
+    }
+  }
 
   useEffect(() => {
     if (isEditing) {
@@ -228,8 +238,8 @@ export const GridCell = React.memo(function GridCell({
     );
   }
 
-  // Out-of-period styling
-  const periodWarningStyle: React.CSSProperties = isOutOfPeriod
+  // Out-of-period styling — only warn if no clamp is applied (shouldn't happen now)
+  const periodWarningStyle: React.CSSProperties = (isOutOfPeriod && !clampedDateDisplay)
     ? { outline: "2px solid #E63535", outlineOffset: -2 }
     : {};
 
@@ -255,7 +265,7 @@ export const GridCell = React.memo(function GridCell({
       <span
         className="block w-full truncate"
         style={{
-          color: forcedTextColor ?? (isOutOfPeriod ? "#E63535" : isSuggested ? "#8F90A6" : fmt?.textColor ?? condFmt?.textColor ?? statusColor ?? undefined),
+          color: forcedTextColor ?? (isOutOfPeriod && !clampedDateDisplay ? "#E63535" : isSuggested ? "#8F90A6" : fmt?.textColor ?? condFmt?.textColor ?? statusColor ?? undefined),
           fontWeight: fmt?.bold || condFmt?.bold ? 700 : (statusColor ? 600 : undefined),
           fontStyle: fmt?.italic || condFmt?.italic || isSuggested ? "italic" : undefined,
           textDecoration: fmt?.underline || condFmt?.underline ? "underline" : undefined,
@@ -266,7 +276,7 @@ export const GridCell = React.memo(function GridCell({
           lineHeight: "30px",
         }}
       >
-        {value}
+        {clampedDateDisplay ?? value}
       </span>
     </td>
   );

@@ -2,7 +2,7 @@
 
 import React, { useCallback } from "react";
 import type { ScheduledFlightRef } from "@skyhub/api";
-import { GRID_COLUMNS, ROW_HEIGHT, fmtMinutes, calcBlockMinutes, CELL_BORDER, CELL_BORDER_DARK } from "./grid-columns";
+import { GRID_COLUMNS, ROW_HEIGHT, fmtMinutes, calcBlockMinutes, CELL_BORDER, CELL_BORDER_DARK, type GridColumn } from "./grid-columns";
 import { GridCell } from "./grid-cell";
 import { useScheduleGridStore } from "@/stores/use-schedule-grid-store";
 import { useScheduleRefStore } from "@/stores/use-schedule-ref-store";
@@ -11,6 +11,7 @@ import { formatDate } from "@/lib/date-format";
 import { useTheme } from "@/components/theme-provider";
 
 interface GridRowProps {
+  columns?: GridColumn[];
   row: ScheduledFlightRef;
   rowIdx: number;
   prevRow?: ScheduledFlightRef | null;
@@ -19,7 +20,8 @@ interface GridRowProps {
   rowHeight?: number;
 }
 
-export const GridRow = React.memo(function GridRow({ row, rowIdx, prevRow, onContextMenu, onTabWrapDown, rowHeight }: GridRowProps) {
+export const GridRow = React.memo(function GridRow({ columns: columnsProp, row, rowIdx, prevRow, onContextMenu, onTabWrapDown, rowHeight }: GridRowProps) {
+  const columns = columnsProp ?? GRID_COLUMNS;
   const selectedCell = useScheduleGridStore((s) => s.selectedCell);
   const editingCell = useScheduleGridStore((s) => s.editingCell);
   const editValue = useScheduleGridStore((s) => s.editValue);
@@ -177,12 +179,12 @@ export const GridRow = React.memo(function GridRow({ row, rowIdx, prevRow, onCon
 
   function handleNavigate(dir: "up" | "down" | "left" | "right") {
     if (!selectedCell) return;
-    const colIdx = GRID_COLUMNS.findIndex((c) => c.key === selectedCell.colKey);
-    const editableCols = GRID_COLUMNS.filter((c) => c.editable);
+    const colIdx = columns.findIndex((c) => c.key === selectedCell.colKey);
+    const editableCols = columns.filter((c) => c.editable);
     if (dir === "down") selectCell({ rowIdx: rowIdx + 1, colKey: selectedCell.colKey });
     else if (dir === "up") selectCell({ rowIdx: Math.max(0, rowIdx - 1), colKey: selectedCell.colKey });
     else if (dir === "right") {
-      const next = GRID_COLUMNS.slice(colIdx + 1).find((c) => c.editable);
+      const next = columns.slice(colIdx + 1).find((c) => c.editable);
       if (next) {
         startEditing({ rowIdx, colKey: next.key });
       } else {
@@ -194,7 +196,7 @@ export const GridRow = React.memo(function GridRow({ row, rowIdx, prevRow, onCon
         }
       }
     } else if (dir === "left") {
-      const prev = GRID_COLUMNS.slice(0, colIdx).reverse().find((c) => c.editable);
+      const prev = columns.slice(0, colIdx).reverse().find((c) => c.editable);
       if (prev) startEditing({ rowIdx, colKey: prev.key });
       else if (rowIdx > 0) startEditing({ rowIdx: rowIdx - 1, colKey: editableCols[editableCols.length - 1]?.key ?? selectedCell.colKey });
     }
@@ -231,7 +233,7 @@ export const GridRow = React.memo(function GridRow({ row, rowIdx, prevRow, onCon
         {rowIdx + 1}
       </td>
 
-      {GRID_COLUMNS.map((col, colIndex) => {
+      {columns.map((col, colIndex) => {
         const isSelected = selectedCell?.rowIdx === rowIdx && selectedCell?.colKey === col.key;
         const isEditing = editingCell?.rowIdx === rowIdx && editingCell?.colKey === col.key;
         const cellValue = getCellValue(col.key);

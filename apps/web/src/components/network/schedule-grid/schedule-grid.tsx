@@ -7,7 +7,7 @@ import type { ScheduledFlightRef } from "@skyhub/api";
 import { useScheduleGridStore, EMPTY_BUFFER_ROWS } from "@/stores/use-schedule-grid-store";
 import { GridHeader } from "./grid-header";
 import { GridRow } from "./grid-row";
-import { GRID_COLUMNS, ROW_HEIGHT } from "./grid-columns";
+import { GRID_COLUMNS, ROW_HEIGHT, type GridColumn } from "./grid-columns";
 import { useGridKeyboard } from "./use-grid-keyboard";
 import { useGridSortStore, sortRows } from "./use-grid-sort";
 import { GridContextMenu, type ContextMenuState } from "./context-menu";
@@ -16,6 +16,7 @@ import { useTheme } from "@/components/theme-provider";
 
 interface ScheduleGridProps {
   rows: ScheduledFlightRef[];
+  columns?: GridColumn[];
   onSave: () => void;
   onAddFlight: (insertAtIdx?: number) => void;
   onDeleteFlight: (rowIdx: number) => void;
@@ -24,6 +25,7 @@ interface ScheduleGridProps {
   onOpenReplace?: () => void;
   onClickEmptyRow?: (colKey: string) => void;
   rowHeight?: number;
+  emptyBufferRows?: number;
   showFind?: boolean;
   showReplace?: boolean;
   onCloseFind?: () => void;
@@ -32,9 +34,10 @@ interface ScheduleGridProps {
 const SEPARATOR_HEIGHT = 12;
 
 export function ScheduleGrid({
-  rows, onSave, onAddFlight, onDeleteFlight, onTabWrapDown, onOpenFind, onOpenReplace, onClickEmptyRow,
-  rowHeight: rowHeightProp, showFind, showReplace, onCloseFind,
+  rows, columns: columnsProp, onSave, onAddFlight, onDeleteFlight, onTabWrapDown, onOpenFind, onOpenReplace, onClickEmptyRow,
+  rowHeight: rowHeightProp, emptyBufferRows, showFind, showReplace, onCloseFind,
 }: ScheduleGridProps) {
+  const columns = columnsProp ?? GRID_COLUMNS;
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedCell = useScheduleGridStore((s) => s.selectedCell);
   const separatorAfter = useScheduleGridStore((s) => s.separatorAfter);
@@ -107,7 +110,7 @@ export function ScheduleGrid({
   }, [rows, deletedIds, columnFilters, colorFilters, cellFormats, sortKey, sortDir]);
 
   // Pad with empty buffer rows below data (Excel-like)
-  const emptyRowCount = EMPTY_BUFFER_ROWS;
+  const emptyRowCount = emptyBufferRows ?? EMPTY_BUFFER_ROWS;
 
   // Build virtual list with separator rows + empty padding injected
   type VirtualItem = { type: "data"; rowIdx: number } | { type: "separator"; afterRowIdx: number } | { type: "empty"; emptyIdx: number };
@@ -149,7 +152,7 @@ export function ScheduleGrid({
   const glassBg = isDark ? "rgba(25,25,33,0.85)" : "rgba(255,255,255,0.85)";
   const glassBorder = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)";
   const sepColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
-  const totalColSpan = GRID_COLUMNS.length + 1; // +1 for row number column
+  const totalColSpan = columns.length + 1; // +1 for row number column
 
   return (
     <>
@@ -173,6 +176,7 @@ export function ScheduleGrid({
           style={{ borderCollapse: "collapse", tableLayout: "fixed", fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" }}
         >
           <GridHeader
+            columns={columns}
             scrollLeft={0}
             rows={rows}
             columnFilters={columnFilters}
@@ -200,7 +204,7 @@ export function ScheduleGrid({
                   <tr key={`empty-${item.emptyIdx}`} style={{ height: activeRowHeight }}>
                     {/* Row number cell */}
                     <td style={{ borderBottom: emptyBorder, padding: 0 }} />
-                    {GRID_COLUMNS.map((col, ci) => {
+                    {columns.map((col, ci) => {
                       const isSel = selectedCell?.rowIdx === emptyAbsIdx && selectedCell?.colKey === col.key;
                       return (
                         <td
@@ -229,6 +233,7 @@ export function ScheduleGrid({
               return (
                 <GridRow
                   key={row._id}
+                  columns={columns}
                   row={row}
                   rowIdx={item.rowIdx}
                   prevRow={item.rowIdx > 0 ? processedRows[item.rowIdx - 1] : null}

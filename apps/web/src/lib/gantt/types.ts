@@ -3,6 +3,7 @@
 export interface GanttFlight {
   id: string
   scheduledFlightId: string
+  airlineCode: string | null
   flightNumber: string
   depStation: string
   arrStation: string
@@ -29,6 +30,9 @@ export interface GanttAircraft {
   status: string
   homeBaseIcao: string | null
   color: string | null
+  fuelBurnRateKgPerHour: number | null
+  /** Seat counts per cabin class, e.g. "0/0/230" (F/J/Y) */
+  seatConfig: string | null
 }
 
 export interface GanttAircraftType {
@@ -38,6 +42,11 @@ export interface GanttAircraftType {
   category: string
   color: string | null
   tatDefaultMinutes: number | null
+  tatDomDom: number | null
+  tatDomInt: number | null
+  tatIntDom: number | null
+  tatIntInt: number | null
+  fuelBurnRateKgPerHour: number | null
 }
 
 export interface GanttMeta {
@@ -52,6 +61,9 @@ export interface GanttApiResponse {
   flights: GanttFlight[]
   aircraft: GanttAircraft[]
   aircraftTypes: GanttAircraftType[]
+  operatorCountry: string | null
+  stationCountryMap: Record<string, string>
+  stationUtcOffsetMap: Record<string, number>
   meta: GanttMeta
 }
 
@@ -60,6 +72,7 @@ export interface GanttApiResponse {
 export type ZoomLevel = '1D' | '2D' | '3D' | '4D' | '5D' | '6D' | '7D' | '14D' | '21D' | '28D'
 export type ColorMode = 'status' | 'ac_type' | 'service_type' | 'route_type'
 export type BarLabelMode = 'flightNo' | 'sector'
+export type FleetSortOrder = 'type' | 'registration' | 'utilization'
 
 export const ZOOM_CONFIG: Record<ZoomLevel, { days: number; hoursPerTick: number }> = {
   '1D':  { days: 1,  hoursPerTick: 1 },
@@ -101,6 +114,7 @@ export interface RowLayout {
   registration?: string
   aircraftTypeIcao?: string
   aircraftTypeName?: string
+  seatConfig?: string | null
   label: string
   y: number
   height: number
@@ -122,4 +136,6 @@ export interface LayoutResult {
   ticks: TickMark[]
   totalWidth: number
   totalHeight: number
+  /** Virtual placement map (flightId → registration) for affinity on next recompute */
+  virtualPlacements: Map<string, string>
 }

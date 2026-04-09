@@ -1,20 +1,31 @@
 import { useEffect } from 'react'
 import { useGanttStore } from '@/stores/use-gantt-store'
 
+/** Set by GanttShell to toggle search panel */
+let _toggleSearch: (() => void) | null = null
+export function registerSearchToggle(fn: () => void) { _toggleSearch = fn }
+export function unregisterSearchToggle() { _toggleSearch = null }
+
 export function useGanttKeyboard() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Ctrl+F — open search (intercept before browser Find, even in inputs)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault()
+        _toggleSearch?.()
+        return
+      }
+
       // Don't intercept when typing in inputs
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
 
       const state = useGanttStore.getState()
 
-      // Ctrl+A — assign to this aircraft (prevent Chrome select-all)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+      // Alt+A — assign selected flights to this aircraft row
+      if (e.altKey && (e.key === 'a' || e.key === 'A' || e.code === 'KeyA')) {
         e.preventDefault()
         if (state.selectedFlightIds.size > 0 && state.layout) {
-          // Find the row registration of the first selected flight
           const [firstId] = state.selectedFlightIds
           const bar = state.layout.bars.find(b => b.flightId === firstId)
           const row = bar ? state.layout.rows[bar.row] : null
@@ -22,6 +33,34 @@ export function useGanttKeyboard() {
             const flightIds = [...state.selectedFlightIds]
             state.assignToAircraft(flightIds, row.registration)
           }
+        }
+        return
+      }
+
+      // Alt+D — unassign selected flights from aircraft
+      if (e.altKey && (e.key === 'd' || e.key === 'D' || e.code === 'KeyD')) {
+        e.preventDefault()
+        if (state.selectedFlightIds.size > 0) {
+          const flightIds = [...state.selectedFlightIds]
+          state.unassignFromAircraft(flightIds)
+        }
+        return
+      }
+
+      // Del — cancel selected flight(s) from date
+      if (e.key === 'Delete') {
+        e.preventDefault()
+        if (state.selectedFlightIds.size > 0) {
+          state.openCancelDialog([...state.selectedFlightIds])
+        }
+        return
+      }
+
+      // Alt+S — enter swap mode
+      if (e.altKey && (e.key === 's' || e.key === 'S' || e.code === 'KeyS')) {
+        e.preventDefault()
+        if (state.selectedFlightIds.size > 0 && !state.swapMode) {
+          state.enterSwapMode()
         }
         return
       }
@@ -68,6 +107,9 @@ export function useGanttKeyboard() {
       }
 
       if (e.key === 'Escape') {
+        if (state.cancelDialog) { state.closeCancelDialog(); return }
+        if (state.swapDialog) { state.closeSwapDialog(); state.exitSwapMode(); return }
+        if (state.swapMode) { state.exitSwapMode(); return }
         if (state.flightInfoDialogId) { state.closeFlightInfo(); return }
         if (state.rotationPopover) { state.closeRotationPopover(); return }
         if (state.dailySummaryPopover) { state.closeDailySummary(); return }

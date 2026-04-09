@@ -11,6 +11,9 @@ interface OperatorState {
   operator: OperatorRef | null;
   dateFormat: DateFormatType;
   loaded: boolean;
+  /** Shared scenario ID — null = production, string = viewing a scenario. Used by both 1.1.1 and 1.1.2. */
+  activeScenarioId: string | null;
+  setActiveScenarioId: (id: string | null) => void;
   loadOperator: (operatorId?: string) => Promise<void>;
 }
 
@@ -18,6 +21,8 @@ export const useOperatorStore = create<OperatorState>((set, get) => ({
   operator: null,
   dateFormat: "DD-MMM-YY",
   loaded: false,
+  activeScenarioId: null,
+  setActiveScenarioId: (id) => set({ activeScenarioId: id }),
 
   loadOperator: async (operatorId?: string) => {
     if (get().loaded) return;

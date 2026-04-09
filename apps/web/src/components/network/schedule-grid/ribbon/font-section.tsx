@@ -84,7 +84,7 @@ export function FontSection({ hasSelection }: Props) {
   }));
 
   return (
-    <div className="flex flex-col self-stretch justify-between py-2 px-4">
+    <div className="flex flex-col self-stretch justify-between pt-3 pb-1.5 px-4">
       <div className="flex flex-col gap-1.5 flex-1 justify-center">
         {/* Row 1: Font family + size (full width) */}
         <div className="flex items-center gap-1.5">
@@ -128,7 +128,7 @@ export function FontSection({ hasSelection }: Props) {
       </div>
 
       {/* Section label */}
-      <div className="w-full text-center border-t border-hz-border/20 pt-1.5 mt-1.5">
+      <div className="w-full text-center border-t border-hz-border/20 pt-1 mt-1">
         <span className="text-[11px] text-hz-text-tertiary/50 font-medium leading-none">Font & Alignment</span>
       </div>
     </div>

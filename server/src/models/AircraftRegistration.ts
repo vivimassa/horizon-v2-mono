@@ -47,6 +47,21 @@ const aircraftRegistrationSchema = new Schema(
     etopsCapable: { type: Boolean, default: false },
     etopsRatingMinutes: { type: Number, default: null },
 
+    // Weather limitations (per-airframe — avionics/certification dependent)
+    weatherLimitations: {
+      minCeilingFt: { type: Number, default: null },
+      minRvrM: { type: Number, default: null },
+      minVisibilityM: { type: Number, default: null },
+      maxCrosswindKt: { type: Number, default: null },
+      maxWindKt: { type: Number, default: null },
+    },
+
+    // Approach capabilities (per-airframe — avionics/certification dependent)
+    approach: {
+      ilsCategoryRequired: { type: String, default: null },
+      autolandCapable: { type: Boolean, default: false },
+    },
+
     // Noise & emissions
     noiseCategory: { type: String, default: null },
     emissionsCategory: { type: String, default: null },

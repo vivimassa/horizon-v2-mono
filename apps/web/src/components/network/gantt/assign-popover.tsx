@@ -101,7 +101,7 @@ export function AssignPopover() {
   const count = pop.flightIds.length
 
   return createPortal(
-    <div ref={ref}>
+    <div ref={ref} data-gantt-overlay>
       <div
         className="fixed z-[9999] rounded-xl overflow-hidden"
         style={{

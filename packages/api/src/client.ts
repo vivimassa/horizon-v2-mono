@@ -1076,7 +1076,7 @@ export const api = {
     }),
 
   // ─── Scheduled Flights ──────────────────────────────────
-  getScheduledFlights: (params: { operatorId?: string; seasonCode?: string; scenarioId?: string; status?: string; sortBy?: string; sortDir?: string } = {}) => {
+  getScheduledFlights: (params: { operatorId?: string; seasonCode?: string; scenarioId?: string; status?: string; sortBy?: string; sortDir?: string; dateFrom?: string; dateTo?: string } = {}) => {
     const p = new URLSearchParams()
     if (params.operatorId) p.set('operatorId', params.operatorId)
     if (params.seasonCode) p.set('seasonCode', params.seasonCode)
@@ -1084,6 +1084,8 @@ export const api = {
     if (params.status) p.set('status', params.status)
     if (params.sortBy) p.set('sortBy', params.sortBy)
     if (params.sortDir) p.set('sortDir', params.sortDir)
+    if (params.dateFrom) p.set('dateFrom', params.dateFrom)
+    if (params.dateTo) p.set('dateTo', params.dateTo)
     return request<ScheduledFlightRef[]>(`/scheduled-flights?${p.toString()}`)
   },
 
@@ -1122,11 +1124,22 @@ export const api = {
   cloneScenario: (id: string, name: string, createdBy: string) =>
     request<{ id: string; flightCount: number }>(`/scenarios/${id}/clone`, { method: 'POST', body: JSON.stringify({ name, createdBy }) }),
 
+  copyProductionIntoScenario: (id: string, statuses?: string[]) =>
+    request<{ copied: number }>(`/scenarios/${id}/copy-production`, { method: 'POST', body: JSON.stringify({ statuses }) }),
+
   updateScenario: (id: string, data: Partial<ScenarioRef>) =>
     request<ScenarioRef>(`/scenarios/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 
   publishScenario: (id: string, publishedBy?: string) =>
     request<{ scenario: ScenarioRef; activatedFlights: number }>(`/scenarios/${id}/publish`, { method: 'POST', body: JSON.stringify({ publishedBy }) }),
+
+  /** Diff preview — dry run, no writes */
+  getScenarioDiffPreview: (id: string) =>
+    request<{ added: number; modified: number; deleted: number; unchanged: number; total: number }>(`/scenarios/${id}/diff-preview`),
+
+  /** Publish & merge — applies diff to production */
+  publishMergeScenario: (id: string, publishedBy?: string) =>
+    request<{ added: number; modified: number; deleted: number; unchanged: number }>(`/scenarios/${id}/publish-merge`, { method: 'POST', body: JSON.stringify({ publishedBy }) }),
 
   deleteScenario: (id: string) =>
     request<{ success: boolean }>(`/scenarios/${id}`, { method: 'DELETE' }),

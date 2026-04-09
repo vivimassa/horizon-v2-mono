@@ -601,31 +601,52 @@ export function AircraftRegistrationDetail({
             </div>
           )}
 
-          {activeTab === "weather" && (
+          {activeTab === "weather" && (() => {
+            // Registration-level overrides take priority over type-level defaults
+            const regW = (registration as any).weatherLimitations;
+            const typeW = acType?.weather;
+            const regA = (registration as any).approach;
+            const typeA = acType?.approach;
+            const w = {
+              minCeilingFt: regW?.minCeilingFt ?? typeW?.minCeilingFt ?? null,
+              minRvrM: regW?.minRvrM ?? typeW?.minRvrM ?? null,
+              minVisibilityM: regW?.minVisibilityM ?? typeW?.minVisibilityM ?? null,
+              maxCrosswindKt: regW?.maxCrosswindKt ?? typeW?.maxCrosswindKt ?? null,
+              maxWindKt: regW?.maxWindKt ?? typeW?.maxWindKt ?? null,
+            };
+            const a = {
+              ilsCategoryRequired: regA?.ilsCategoryRequired ?? typeA?.ilsCategoryRequired ?? null,
+              autolandCapable: regA?.autolandCapable ?? typeA?.autolandCapable ?? false,
+            };
+            const hasOverride = regW?.minCeilingFt != null || regA?.ilsCategoryRequired != null;
+            return (
             <div className="space-y-6">
               <TypeSection title="Weather Limitations">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8">
-                  <FieldRow label="Min Ceiling (ft)" value={acType?.weather?.minCeilingFt ?? null} />
-                  <FieldRow label="Min RVR (m)" value={acType?.weather?.minRvrM ?? null} />
-                  <FieldRow label="Min Visibility (m)" value={acType?.weather?.minVisibilityM ?? null} />
-                  <FieldRow label="Max Crosswind (kt)" value={acType?.weather?.maxCrosswindKt ?? null} />
-                  <FieldRow label="Max Wind (kt)" value={acType?.weather?.maxWindKt ?? null} />
+                  <FieldRow label="Min Ceiling (ft)" value={w.minCeilingFt} />
+                  <FieldRow label="Min RVR (m)" value={w.minRvrM} />
+                  <FieldRow label="Min Visibility (m)" value={w.minVisibilityM} />
+                  <FieldRow label="Max Crosswind (kt)" value={w.maxCrosswindKt} />
+                  <FieldRow label="Max Wind (kt)" value={w.maxWindKt} />
                 </div>
               </TypeSection>
               <TypeSection title="Approach">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
-                  <FieldRow label="ILS Category Required" value={acType?.approach?.ilsCategoryRequired ?? null} />
-                  <FieldRow label="Autoland Capable" value={acType?.approach?.autolandCapable ? <span className="font-semibold" style={{ color: "#06C270" }}>Yes</span> : <span className="text-hz-text-secondary">No</span>} />
+                  <FieldRow label="ILS Category Required" value={a.ilsCategoryRequired} />
+                  <FieldRow label="Autoland Capable" value={a.autolandCapable ? <span className="font-semibold" style={{ color: "#06C270" }}>Yes</span> : <span className="text-hz-text-secondary">No</span>} />
                 </div>
               </TypeSection>
               <div className="px-4 py-3 rounded-xl bg-hz-border/10 border border-hz-border/30">
                 <p className="text-[12px] text-hz-text-secondary">
                   <CloudRain className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
-                  Weather data is inherited from the aircraft type ({acType?.icaoType}). Edit it in the Aircraft Types Database.
+                  {hasOverride
+                    ? <>Weather data is set per-airframe for this registration. Type defaults from {acType?.icaoType} are used for any missing values.</>
+                    : <>Weather data is inherited from the aircraft type ({acType?.icaoType}). Edit it in the Aircraft Types Database.</>}
                 </p>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {activeTab === "location" && (
             <div className="space-y-4">

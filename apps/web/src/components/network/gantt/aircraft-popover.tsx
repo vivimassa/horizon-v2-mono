@@ -28,6 +28,7 @@ export function AircraftPopover() {
   const pop = useGanttStore(s => s.aircraftPopover)
   const close = useGanttStore(s => s.closeAircraftPopover)
   const flights = useGanttStore(s => s.flights)
+  const utilizationTargets = useGanttStore(s => s.utilizationTargets)
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const ref = useRef<HTMLDivElement>(null)
@@ -118,6 +119,7 @@ export function AircraftPopover() {
 
   const content = (
     <div
+      data-gantt-overlay
       ref={ref}
       className="fixed z-[9998] rounded-xl overflow-hidden"
       style={{
@@ -203,23 +205,33 @@ export function AircraftPopover() {
           <StatRow label="Days Active" value={String(stats?.daysActive ?? 0)} text={text} muted={textSec} />
           <StatRow label="Avg/Day" value={`${(stats?.avgUtilPerDay ?? 0).toFixed(1)}h`} text={text} muted={textSec} />
         </div>
-        {/* Utilization bar */}
-        {stats && stats.daysActive > 0 && (
-          <div className="mt-2">
-            <div className="flex justify-between mb-1">
-              <span className="text-[13px]" style={{ color: textSec }}>Utilization</span>
-              <span className="text-[13px] font-mono font-bold" style={{ color: text }}>
-                {((stats.avgUtilPerDay / 24) * 100).toFixed(0)}%
-              </span>
+        {/* Utilization bar — against target, not 24h */}
+        {stats && stats.daysActive > 0 && (() => {
+          const targetHrs = utilizationTargets.get(pop.aircraftTypeIcao) ?? 10
+          const utilPct = (stats.avgUtilPerDay / targetHrs) * 100
+          const utilColor = utilPct >= 85 ? '#06C270' : utilPct >= 60 ? '#F59E0B' : '#E63535'
+          return (
+            <div className="mt-2">
+              <div className="flex justify-between mb-1">
+                <span className="text-[13px]" style={{ color: textSec }}>Utilization</span>
+                <span className="text-[13px] font-mono font-bold" style={{ color: utilColor }}>
+                  {utilPct.toFixed(0)}%
+                </span>
+              </div>
+              <div className="relative h-[6px] rounded-full" style={{ background: cardBorder }}>
+                <div className="absolute inset-y-0 left-0 rounded-full" style={{
+                  width: `${Math.min(100, utilPct)}%`,
+                  background: utilColor,
+                }} />
+                <div className="absolute" style={{
+                  left: `${Math.min(100, (targetHrs / 20) * 100)}%`,
+                  top: -3, bottom: -3, width: 2,
+                  background: '#06C270', borderRadius: 1,
+                }} />
+              </div>
             </div>
-            <div className="h-[6px] rounded-full overflow-hidden" style={{ background: `${cardBorder}` }}>
-              <div className="h-full rounded-full" style={{
-                width: `${Math.min(100, (stats.avgUtilPerDay / 24) * 100)}%`,
-                background: stats.avgUtilPerDay >= 10 ? '#06C270' : stats.avgUtilPerDay >= 6 ? '#F59E0B' : accent,
-              }} />
-            </div>
-          </div>
-        )}
+          )
+        })()}
       </div>
 
       {/* Overnight Stations */}

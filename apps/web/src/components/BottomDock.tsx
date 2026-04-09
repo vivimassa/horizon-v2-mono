@@ -51,9 +51,15 @@ export function BottomDock() {
   const activeIndex = getActiveIndex(pathname);
 
   useEffect(() => {
+    // Auto-collapse on fullscreen-style pages (Gantt, Scheduling XL)
+    const fullscreenPaths = ['/network/schedule/gantt', '/network/schedule/grid'];
+    if (fullscreenPaths.some(p => pathname.startsWith(p))) {
+      setCollapsed(true);
+      return;
+    }
     const saved = localStorage.getItem("skyhub-dock-collapsed");
     if (saved === "true") setCollapsed(true);
-  }, []);
+  }, [pathname]);
 
   const toggleCollapsed = () => {
     const next = !collapsed;

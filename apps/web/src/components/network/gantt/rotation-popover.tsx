@@ -50,6 +50,9 @@ export function RotationPopover() {
   const close = useGanttStore(s => s.closeRotationPopover)
   const flights = useGanttStore(s => s.flights)
   const aircraftTypes = useGanttStore(s => s.aircraftTypes)
+  const utilizationTargets = useGanttStore(s => s.utilizationTargets)
+  const operatorCountry = useGanttStore(s => s.operatorCountry)
+  const stationCountryMap = useGanttStore(s => s.stationCountryMap)
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const ref = useRef<HTMLDivElement>(null)
@@ -76,14 +79,30 @@ export function RotationPopover() {
 
     const totalBlockMin = dayFlights.reduce((s, f) => s + f.blockMinutes, 0)
     const totalBlockHrs = totalBlockMin / 60
-    const utilPct = (totalBlockHrs / 24) * 100
+    const targetHrs = utilizationTargets.get(pop.aircraftTypeIcao) ?? 10
+    const utilPct = (totalBlockHrs / targetHrs) * 100
 
-    // TAT default from aircraft type
-    const acType = aircraftTypes.find(t => t.icaoType === pop.aircraftTypeIcao)
-    const defaultTatMin = acType?.tatDefaultMinutes ?? 30
+    // Route-type-aware TAT lookup using operator's base country
+    const isDom = (station: string) =>
+      operatorCountry ? stationCountryMap[station] === operatorCountry : true
+
+    function flightIsDom(f: typeof dayFlights[0]): boolean {
+      return isDom(f.depStation) && isDom(f.arrStation)
+    }
+
+    function getRouteTat(curr: typeof dayFlights[0], next: typeof dayFlights[0]): number {
+      const t = aircraftTypes.find(a => a.icaoType === (curr.aircraftTypeIcao ?? pop!.aircraftTypeIcao))
+      if (!t) return 30
+      const cDom = flightIsDom(curr)
+      const nDom = flightIsDom(next)
+      if (cDom && nDom) return t.tatDomDom ?? t.tatDefaultMinutes ?? 30
+      if (cDom && !nDom) return t.tatDomInt ?? t.tatDefaultMinutes ?? 30
+      if (!cDom && nDom) return t.tatIntDom ?? t.tatDefaultMinutes ?? 30
+      return t.tatIntInt ?? t.tatDefaultMinutes ?? 30
+    }
 
     // Compute TAT gaps + conflicts
-    const gaps: { gapMs: number; gapMin: number; stationMatch: boolean; tatOk: boolean; overlap: boolean }[] = []
+    const gaps: { gapMs: number; gapMin: number; stationMatch: boolean; tatOk: boolean; overlap: boolean; minTatMin: number; routeType: string }[] = []
     for (let i = 0; i < dayFlights.length - 1; i++) {
       const curr = dayFlights[i]
       const next = dayFlights[i + 1]
@@ -91,14 +110,18 @@ export function RotationPopover() {
       const gapMin = Math.round(gapMs / 60_000)
       const stationMatch = curr.arrStation === next.depStation
       const overlap = gapMs < 0
-      const tatOk = !overlap && gapMin >= defaultTatMin
-      gaps.push({ gapMs, gapMin, stationMatch, tatOk, overlap })
+      const minTatMin = getRouteTat(curr, next)
+      const cDom = flightIsDom(curr)
+      const nDom = flightIsDom(next)
+      const routeType = `${cDom ? 'D' : 'I'}/${nDom ? 'D' : 'I'}`
+      const tatOk = !overlap && gapMin >= minTatMin
+      gaps.push({ gapMs, gapMin, stationMatch, tatOk, overlap, minTatMin, routeType })
     }
 
     const conflicts = gaps.filter(g => g.overlap || !g.stationMatch || !g.tatOk).length
 
-    return { dayFlights, totalBlockHrs, utilPct, gaps, conflicts, defaultTatMin }
-  }, [pop, flights, aircraftTypes])
+    return { dayFlights, totalBlockHrs, utilPct, gaps, conflicts }
+  }, [pop, flights, aircraftTypes, utilizationTargets, operatorCountry, stationCountryMap])
 
   if (!mounted || !pop) return null
 
@@ -121,15 +144,15 @@ export function RotationPopover() {
 
   return createPortal(
     <div
+      data-gantt-overlay
       ref={ref}
-      className="fixed z-[9998] rounded-xl overflow-hidden"
+      className="fixed z-[9998] rounded-xl flex flex-col"
       style={{
-        left, top, width: w,
+        left, top: Math.min(top, window.innerHeight - 562), width: w, maxHeight: 550,
         background: bg, border: `1px solid ${border}`,
         backdropFilter: 'blur(20px) saturate(180%)',
         WebkitBackdropFilter: 'blur(20px) saturate(180%)',
         boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)',
-        maxHeight: 'calc(100vh - 24px)', overflowY: 'auto',
       }}
     >
       {/* Header */}
@@ -162,13 +185,26 @@ export function RotationPopover() {
             <div className="text-[13px]" style={{ color: textMuted }}>Util</div>
           </div>
         </div>
-        <div className="h-[6px] rounded-full overflow-hidden" style={{ background: cardBorder }}>
-          <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, data?.utilPct ?? 0)}%`, background: utilColor }} />
+        <div className="relative h-[6px] rounded-full" style={{ background: cardBorder }}>
+          <div className="absolute inset-y-0 left-0 rounded-full transition-all" style={{ width: `${Math.min(100, data?.utilPct ?? 0)}%`, background: utilColor }} />
+          {(() => {
+            const targetHrs = utilizationTargets.get(pop.aircraftTypeIcao)
+            if (!targetHrs) return null
+            const targetPct = (targetHrs / 24) * 100
+            return (
+              <div className="absolute" style={{
+                left: `${Math.min(100, targetPct)}%`,
+                top: -3, bottom: -3, width: 2,
+                background: '#06C270',
+                borderRadius: 1,
+              }} />
+            )
+          })()}
         </div>
       </div>
 
-      {/* Flight sequence */}
-      <div className="mx-4 mb-4 rounded-lg p-3" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+      {/* Flight sequence — scrollable */}
+      <div className="mx-4 mb-4 rounded-lg p-3 flex-1 min-h-0 overflow-y-auto" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
         <div className="flex items-center justify-between mb-2">
           <span className="text-[13px] font-bold uppercase tracking-wider" style={{ color: textMuted }}>Flight Sequence</span>
           {data && data.conflicts > 0 && (
@@ -224,13 +260,13 @@ export function RotationPopover() {
                         <>
                           <AlertTriangle size={14} style={{ color: '#E63535' }} />
                           <span className="text-[13px] font-mono" style={{ color: '#E63535' }}>
-                            TAT: {fmtGap(gap.gapMs)} (min: {data.defaultTatMin}m)
+                            TAT: {fmtGap(gap.gapMs)} (min: {gap.minTatMin}m {gap.routeType})
                           </span>
                         </>
                       ) : (
                         <>
                           <CheckCircle size={14} style={{ color: '#06C270' }} />
-                          <span className="text-[13px] font-mono" style={{ color: textSec }}>TAT: {fmtGap(gap.gapMs)}</span>
+                          <span className="text-[13px] font-mono" style={{ color: textSec }}>TAT: {fmtGap(gap.gapMs)} ({gap.routeType})</span>
                         </>
                       )}
                     </div>

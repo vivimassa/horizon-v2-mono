@@ -18,10 +18,12 @@ export function ClipboardSection({ hasSelection }: Props) {
 
   return (
     <RibbonSection label="Clipboard">
-      <RibbonButton icon={Scissors} label="Cut" shortcut="Ctrl+X" disabled={!hasSelection} onClick={cutCell} small />
-      <RibbonButton icon={Copy} label="Copy" shortcut="Ctrl+C" disabled={!hasSelection} onClick={copyCell} small />
-      <RibbonButton icon={ClipboardPaste} label="Paste" shortcut="Ctrl+V" onClick={() => pasteCell()} small />
-      <RibbonButton icon={Paintbrush} label="Format Painter" disabled={!hasSelection} onClick={activateFormatPainter} active={formatPainterSource !== null} small />
+      <div className="grid grid-cols-2 gap-1.5" style={{ minWidth: 100 }}>
+        <RibbonButton icon={Scissors} label="Cut" shortcut="Ctrl+X" disabled={!hasSelection} onClick={cutCell} small />
+        <RibbonButton icon={Copy} label="Copy" shortcut="Ctrl+C" disabled={!hasSelection} onClick={copyCell} small />
+        <RibbonButton icon={ClipboardPaste} label="Paste" shortcut="Ctrl+V" onClick={() => pasteCell()} small />
+        <RibbonButton icon={Paintbrush} label="Format Painter" disabled={!hasSelection} onClick={activateFormatPainter} active={formatPainterSource !== null} small />
+      </div>
     </RibbonSection>
   );
 }

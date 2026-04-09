@@ -24,7 +24,7 @@ import { loadOurAirportsData, startAutoRefresh } from './data/ourairports-cache.
 const port = Number(process.env.PORT) || 3001
 
 async function main(): Promise<void> {
-  const app = Fastify({ logger: true })
+  const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 /* 10MB */ })
 
   // Ensure uploads directory exists
   const __dirname = path.dirname(fileURLToPath(import.meta.url))

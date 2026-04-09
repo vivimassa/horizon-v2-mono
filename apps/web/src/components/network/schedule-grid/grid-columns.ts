@@ -32,6 +32,22 @@ export const GRID_COLUMNS: GridColumn[] = [
 
 export const EDITABLE_COLUMNS = GRID_COLUMNS.filter(c => c.editable)
 
+/** Mini grid columns for Gantt Add Flight dialog — excludes AC, BLOCK, TAT, tighter widths */
+export const MINI_GRID_COLUMNS: GridColumn[] = [
+  { key: 'aircraftTypeIcao', label: 'AC TYPE',   width: '7%',  editable: true,  type: 'text',      align: 'center', mono: true, maxLength: 4 },
+  { key: 'effectiveFrom',    label: 'FROM',       width: '8%',  editable: true,  type: 'date',      align: 'center', mono: true },
+  { key: 'effectiveUntil',   label: 'TO',         width: '8%',  editable: true,  type: 'date',      align: 'center', mono: true },
+  { key: 'depStation',       label: 'DEP',        width: '6%',  editable: true,  type: 'text',      align: 'center', mono: true, maxLength: 4 },
+  { key: 'arrStation',       label: 'ARR',        width: '6%',  editable: true,  type: 'text',      align: 'center', mono: true, maxLength: 4 },
+  { key: 'flightNumber',     label: 'FLIGHT',     width: '8%',  editable: true,  type: 'text',      align: 'center', mono: true, maxLength: 8 },
+  { key: 'stdUtc',           label: 'STD',        width: '7%',  editable: true,  type: 'time',      align: 'center', mono: true, maxLength: 5 },
+  { key: 'staUtc',           label: 'STA',        width: '7%',  editable: true,  type: 'time',      align: 'center', mono: true, maxLength: 5 },
+  { key: 'departureDayOffset', label: 'OFFSET',   width: '5%',  editable: true,  type: 'text',      align: 'center', mono: true, maxLength: 1 },
+  { key: 'serviceType',      label: 'SVC',        width: '5%',  editable: true,  type: 'select',    align: 'center' },
+  { key: 'daysOfWeek',       label: 'FREQUENCY',  width: '9%',  editable: true,  type: 'frequency', align: 'center', mono: true, maxLength: 7 },
+  { key: 'status',           label: 'STATUS',     width: '7%',  editable: false, type: 'readonly',  align: 'center' },
+]
+
 export const ROW_HEIGHT = 32
 export const HEADER_HEIGHT = 32
 

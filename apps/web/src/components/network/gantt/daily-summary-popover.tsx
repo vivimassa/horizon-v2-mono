@@ -19,6 +19,7 @@ export function DailySummaryPopover() {
   const flights = useGanttStore(s => s.flights)
   const aircraft = useGanttStore(s => s.aircraft)
   const aircraftTypes = useGanttStore(s => s.aircraftTypes)
+  const utilizationTargets = useGanttStore(s => s.utilizationTargets)
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const ref = useRef<HTMLDivElement>(null)
@@ -61,14 +62,24 @@ export function DailySummaryPopover() {
       const entry = byType.get(type)
       if (entry) entry.fleetCount++
     }
-    const activityByType = [...byType.entries()].map(([type, d]) => ({
-      type,
-      flights: d.flights,
-      blockHrs: d.blockMin / 60,
-      activeAc: d.activeRegs.size,
-      fleetAc: d.fleetCount || aircraft.filter(a => (a.aircraftTypeIcao ?? 'Unknown') === type).length,
-      avgUtil: d.activeRegs.size > 0 ? (d.blockMin / 60) / d.activeRegs.size : 0,
-    })).sort((a, b) => b.flights - a.flights)
+    const activityByType = [...byType.entries()].map(([type, d]) => {
+      const fleetAc = d.fleetCount || aircraft.filter(a => (a.aircraftTypeIcao ?? 'Unknown') === type).length
+      const activeAc = d.activeRegs.size
+      const blockHrs = d.blockMin / 60
+      const acTypeInfo = aircraftTypes.find(t => t.icaoType === type)
+      const color = acTypeInfo?.color ?? '#6B7280'
+      return {
+        type,
+        flights: d.flights,
+        blockHrs,
+        activeAc,
+        fleetAc,
+        avgActive: activeAc > 0 ? blockHrs / activeAc : 0,
+        avgFleet: fleetAc > 0 ? blockHrs / fleetAc : 0,
+        target: utilizationTargets.get(type) ?? 10,
+        color,
+      }
+    }).sort((a, b) => a.type.localeCompare(b.type))
 
     // Overnight stations
     const overnightMap = new Map<string, number>()
@@ -84,7 +95,7 @@ export function DailySummaryPopover() {
       .map(([station, count]) => ({ station, count, pct: acInService > 0 ? Math.round((count / acInService) * 100) : 0 }))
 
     return { totalFlights, totalBlockHrs, acInService, fleetSize, activityByType, overnightStations }
-  }, [pop, flights, aircraft])
+  }, [pop, flights, aircraft, aircraftTypes, utilizationTargets])
 
   if (!mounted || !pop) return null
 
@@ -106,15 +117,15 @@ export function DailySummaryPopover() {
 
   return createPortal(
     <div
+      data-gantt-overlay
       ref={ref}
-      className="fixed z-[9998] rounded-xl overflow-hidden"
+      className="fixed z-[9998] rounded-xl overflow-x-hidden overflow-y-auto"
       style={{
-        left, top, width: w,
+        left, top: Math.min(top, window.innerHeight - 562), width: w, maxHeight: 550,
         background: bg, border: `1px solid ${border}`,
         backdropFilter: 'blur(20px) saturate(180%)',
         WebkitBackdropFilter: 'blur(20px) saturate(180%)',
         boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)',
-        maxHeight: 'calc(100vh - 24px)', overflowY: 'auto',
       }}
     >
       {/* Header */}
@@ -128,13 +139,25 @@ export function DailySummaryPopover() {
         </button>
       </div>
 
-      {/* Summary metrics */}
-      <div className="mx-4 mb-3 rounded-lg p-3 grid grid-cols-2 gap-y-1.5 gap-x-4" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
-        <div className="text-[13px] font-bold uppercase tracking-wider col-span-2 mb-1" style={{ color: textMuted }}>Summary</div>
-        <Stat label="Flights" value={String(stats?.totalFlights ?? 0)} text={text} muted={textSec} />
-        <Stat label="Block Hours" value={`${(stats?.totalBlockHrs ?? 0).toFixed(1)}h`} text={text} muted={textSec} />
-        <Stat label="AC in Service" value={String(stats?.acInService ?? 0)} text={text} muted={textSec} />
-        <Stat label="Fleet Size" value={String(stats?.fleetSize ?? 0)} text={text} muted={textSec} />
+      {/* Summary metrics — big numbers like V1 */}
+      <div className="mx-4 mb-3 rounded-lg p-3" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+        <div className="text-[13px] font-bold uppercase tracking-wider mb-2" style={{ color: textMuted }}>Summary</div>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="text-center">
+            <div className="text-[22px] font-bold" style={{ color: accent }}>{stats?.totalFlights ?? 0}</div>
+            <div className="text-[10px] font-medium uppercase tracking-wider" style={{ color: textMuted }}>Flights</div>
+          </div>
+          <div className="text-center">
+            <div className="text-[22px] font-bold" style={{ color: text }}>{(stats?.totalBlockHrs ?? 0).toFixed(1)}</div>
+            <div className="text-[10px] font-medium uppercase tracking-wider" style={{ color: textMuted }}>Block Hrs</div>
+          </div>
+          <div className="text-center">
+            <div className="text-[22px] font-bold" style={{ color: text }}>
+              {stats?.acInService ?? 0}<span className="text-[14px] font-normal" style={{ color: textMuted }}>/{stats?.fleetSize ?? 0}</span>
+            </div>
+            <div className="text-[10px] font-medium uppercase tracking-wider" style={{ color: textMuted }}>AC Used</div>
+          </div>
+        </div>
       </div>
 
       {/* Activity by type */}
@@ -159,22 +182,35 @@ export function DailySummaryPopover() {
         </div>
       )}
 
-      {/* Utilization per type */}
+      {/* Utilization per type — V1-style with active/fleet averages + target line */}
       {stats && stats.activityByType.length > 0 && (
         <div className="mx-4 mb-3 rounded-lg p-3" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
-          <div className="text-[13px] font-bold uppercase tracking-wider mb-2" style={{ color: textMuted }}>Utilization per Type</div>
+          <div className="text-[13px] font-bold uppercase tracking-wider" style={{ color: textMuted }}>Utilization</div>
+          <div className="text-[11px] mb-3" style={{ color: textMuted }}>Average block hours per aircraft per day</div>
           {stats.activityByType.map(row => {
-            const pct = Math.min(100, (row.avgUtil / 24) * 100)
-            const barColor = row.avgUtil >= 10 ? '#06C270' : row.avgUtil >= 6 ? '#F59E0B' : accent
+            const maxHrs = 20
+            const activePct = Math.min(100, (row.avgActive / maxHrs) * 100)
+            const fleetPct = Math.min(100, (row.avgFleet / maxHrs) * 100)
+            const targetPct = Math.min(100, (row.target / maxHrs) * 100)
             return (
-              <div key={row.type} className="mb-2">
-                <div className="flex justify-between mb-1">
-                  <span className="text-[13px] font-mono font-bold" style={{ color: text }}>{row.type}</span>
-                  <span className="text-[13px] font-mono" style={{ color: textSec }}>{row.avgUtil.toFixed(1)}h/ac</span>
+              <div key={row.type} className="mb-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: row.color }} />
+                  <span className="text-[12px] font-bold w-[36px]" style={{ color: text }}>{row.type}</span>
+                  <span className="text-[12px] font-semibold" style={{ color: '#06C270' }}>{row.avgActive.toFixed(1)}h</span>
+                  <span className="text-[10px]" style={{ color: textMuted }}>active</span>
+                  <span className="text-[12px] font-semibold ml-auto" style={{ color: textSec }}>{row.avgFleet.toFixed(1)}h</span>
+                  <span className="text-[10px]" style={{ color: textMuted }}>fleet</span>
                 </div>
-                <div className="h-[6px] rounded-full overflow-hidden" style={{ background: cardBorder }}>
-                  <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: barColor }} />
+                <div className="relative h-[6px] rounded-full" style={{ background: cardBorder }}>
+                  {/* Fleet average (background, full width) */}
+                  <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${fleetPct}%`, background: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)' }} />
+                  {/* Active average (foreground) */}
+                  <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${activePct}%`, background: row.color }} />
+                  {/* Target line */}
+                  <div className="absolute" style={{ left: `${targetPct}%`, top: -3, bottom: -3, width: 2, background: '#06C270', borderRadius: 1 }} />
                 </div>
+                <div className="text-[10px] mt-0.5" style={{ color: textMuted, marginLeft: `calc(${targetPct}% - 16px)` }}>{row.target}h target</div>
               </div>
             )
           })}

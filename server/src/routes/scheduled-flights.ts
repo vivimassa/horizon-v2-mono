@@ -45,7 +45,8 @@ export async function scheduledFlightRoutes(app: FastifyInstance): Promise<void>
     const filter: Record<string, unknown> = {}
     if (q.operatorId) filter.operatorId = q.operatorId
     if (q.seasonCode) filter.seasonCode = q.seasonCode
-    if (q.scenarioId) filter.scenarioId = q.scenarioId
+    if (q.scenarioId === '__production__') filter.scenarioId = null
+    else if (q.scenarioId) filter.scenarioId = q.scenarioId
     if (q.status) filter.status = q.status
     if (q.depStation) filter.depStation = q.depStation.toUpperCase()
     if (q.arrStation) filter.arrStation = q.arrStation.toUpperCase()

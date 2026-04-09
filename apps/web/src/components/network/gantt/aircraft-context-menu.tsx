@@ -51,6 +51,7 @@ export function AircraftContextMenu() {
   return createPortal(
     <div
       ref={ref}
+      data-gantt-overlay
       className="fixed z-[9999] rounded-xl py-1.5 overflow-hidden"
       style={{
         left, top, minWidth: 220,

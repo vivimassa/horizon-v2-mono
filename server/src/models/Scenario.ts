@@ -4,7 +4,7 @@ const scenarioSchema = new Schema(
   {
     _id: { type: String, required: true },
     operatorId: { type: String, required: true, index: true },
-    seasonCode: { type: String, required: true },
+    seasonCode: { type: String, default: '' },
     name: { type: String, required: true },
     description: { type: String, default: null },
     status: {

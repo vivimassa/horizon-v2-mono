@@ -7,7 +7,7 @@ import { getOperatorId } from "@/stores/use-operator-store";
 import { useTheme } from "@/components/theme-provider";
 
 interface ScenarioPanelProps {
-  seasonCode: string;
+  seasonCode?: string;
   activeScenarioId: string | null;
   onSelectScenario: (id: string | null) => void;
   onClose: () => void;
@@ -15,7 +15,7 @@ interface ScenarioPanelProps {
   autoCreate?: boolean;
 }
 
-export function ScenarioPanel({ seasonCode, activeScenarioId, onSelectScenario, onClose, autoCreate }: ScenarioPanelProps) {
+export function ScenarioPanel({ seasonCode = '', activeScenarioId, onSelectScenario, onClose, autoCreate }: ScenarioPanelProps) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const [scenarios, setScenarios] = useState<ScenarioRef[]>([]);
@@ -28,6 +28,10 @@ export function ScenarioPanel({ seasonCode, activeScenarioId, onSelectScenario, 
   const [copyStatuses, setCopyStatuses] = useState<Set<string>>(new Set(["draft", "active"]));
   const [publishing, setPublishing] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const [publishConfirm, setPublishConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [diffPreview, setDiffPreview] = useState<{ added: number; modified: number; deleted: number; unchanged: number } | null>(null);
+  const [loadingDiff, setLoadingDiff] = useState(false);
+  const [publishResult, setPublishResult] = useState<string | null>(null);
 
   const bg = isDark ? "#1C1C28" : "#FAFAFC";
   const border = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)";
@@ -52,19 +56,17 @@ export function ScenarioPanel({ seasonCode, activeScenarioId, onSelectScenario, 
       if (copyFlights && activeScenarioId) {
         // Clone from current scenario
         await api.cloneScenario(activeScenarioId, createName.trim(), "admin");
-      } else if (copyFlights) {
-        // Create scenario then copy default flights into it
+      } else {
+        // Create scenario
         const scenario = await api.createScenario({
           operatorId: getOperatorId(), seasonCode, name: createName.trim(),
           description: createDesc.trim() || null, createdBy: "admin",
         });
-        // Clone from production (null scenario) by copying flights
-        await api.cloneScenario(scenario._id, createName.trim(), "admin").catch(() => {});
-      } else {
-        await api.createScenario({
-          operatorId: getOperatorId(), seasonCode, name: createName.trim(),
-          description: createDesc.trim() || null, createdBy: "admin",
-        });
+        // Copy production flights if requested
+        if (copyFlights) {
+          const statuses = [...copyStatuses];
+          await api.copyProductionIntoScenario(scenario._id, statuses);
+        }
       }
       setCreateName("");
       setCreateDesc("");
@@ -73,13 +75,29 @@ export function ScenarioPanel({ seasonCode, activeScenarioId, onSelectScenario, 
     } finally { setCreating(false); }
   }, [createName, createDesc, copyFlights, activeScenarioId, seasonCode, fetchScenarios]);
 
-  const handlePublish = useCallback(async (id: string) => {
-    setPublishing(id);
+  const handlePublishClick = useCallback(async (id: string, name: string) => {
+    setPublishConfirm({ id, name });
+    setLoadingDiff(true);
+    setDiffPreview(null);
+    setPublishResult(null);
     try {
-      await api.publishScenario(id, "admin");
-      fetchScenarios();
+      const diff = await api.getScenarioDiffPreview(id);
+      setDiffPreview(diff);
+    } catch { setDiffPreview({ added: 0, modified: 0, deleted: 0, unchanged: 0 }); }
+    finally { setLoadingDiff(false); }
+  }, []);
+
+  const handlePublishConfirm = useCallback(async () => {
+    if (!publishConfirm) return;
+    setPublishing(publishConfirm.id);
+    try {
+      const result = await api.publishMergeScenario(publishConfirm.id, "admin");
+      setPublishResult(`Merged: ${result.added} added, ${result.modified} modified, ${result.deleted} deleted`);
+      setTimeout(() => { setPublishConfirm(null); setPublishResult(null); fetchScenarios(); }, 1500);
+    } catch (e) {
+      setPublishResult(`Failed: ${(e as Error).message}`);
     } finally { setPublishing(null); }
-  }, [fetchScenarios]);
+  }, [publishConfirm, fetchScenarios]);
 
   const handleDelete = useCallback(async (id: string) => {
     await api.deleteScenario(id);
@@ -104,7 +122,7 @@ export function ScenarioPanel({ seasonCode, activeScenarioId, onSelectScenario, 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}>
       <div
-        className="rounded-2xl max-w-lg w-full mx-4 max-h-[80vh] flex flex-col overflow-hidden"
+        className="rounded-2xl max-w-lg w-full mx-4 max-h-[90vh] min-h-[500px] flex flex-col overflow-hidden"
         style={{ backgroundColor: bg, border: `1px solid ${border}`, boxShadow: shadow, fontFamily: "Inter, system-ui, sans-serif" }}
       >
         {/* Header */}
@@ -143,13 +161,13 @@ export function ScenarioPanel({ seasonCode, activeScenarioId, onSelectScenario, 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {activeScenarioId === null && <Check size={14} className="text-module-accent" />}
-                <span className="text-[14px] font-semibold text-hz-text">Default Schedule</span>
+                <span className="text-[14px] font-semibold text-hz-text">Production</span>
               </div>
-              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: "rgba(6,194,112,0.10)", color: "#06C270" }}>
-                Production
+              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: activeScenarioId === null ? "rgba(62,123,250,0.10)" : "rgba(6,194,112,0.10)", color: activeScenarioId === null ? "#3E7BFA" : "#06C270" }}>
+                {activeScenarioId === null ? 'Selected' : 'Live'}
               </span>
             </div>
-            <p className="text-[12px] text-hz-text-tertiary mt-0.5 ml-6">Active published schedule</p>
+            <p className="text-[12px] text-hz-text-tertiary mt-0.5">Active published schedule</p>
           </button>
         </div>
 
@@ -174,6 +192,7 @@ export function ScenarioPanel({ seasonCode, activeScenarioId, onSelectScenario, 
                   border: `1.5px solid ${isActive ? "var(--color-module-accent)" : border}`,
                   backgroundColor: isActive ? (isDark ? "rgba(62,123,250,0.08)" : "rgba(30,64,175,0.04)") : "transparent",
                 }}
+                onContextMenu={(e) => { e.preventDefault(); setMenuOpen(menuOpen === s._id ? null : s._id); }}
               >
                 <div className="flex items-center justify-between">
                   <button
@@ -184,19 +203,16 @@ export function ScenarioPanel({ seasonCode, activeScenarioId, onSelectScenario, 
                       {isActive && <Check size={14} className="text-module-accent shrink-0" />}
                       <span className="text-[14px] font-medium text-hz-text truncate">{s.name}</span>
                     </div>
+                    <p className="text-[12px] text-hz-text-tertiary mt-0.5">
+                      {s.createdAt ? `Created ${new Date(s.createdAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Schedule variant'}
+                    </p>
                   </button>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: st.bg, color: st.color }}>
-                      {st.label}
-                    </span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === s._id ? null : s._id); }}
-                      className="p-1 rounded-md transition-colors"
-                      onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                    >
-                      <MoreHorizontal size={14} className="text-hz-text-tertiary" />
-                    </button>
+                    {isActive && (
+                      <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(62,123,250,0.10)', color: '#3E7BFA' }}>
+                        Selected
+                      </span>
+                    )}
                   </div>
                 </div>
                 {s.description && <p className="text-[12px] text-hz-text-tertiary mt-1 ml-6 line-clamp-2">{s.description}</p>}
@@ -217,7 +233,7 @@ export function ScenarioPanel({ seasonCode, activeScenarioId, onSelectScenario, 
                     </button>
                     {s.status === "draft" && (
                       <button
-                        onClick={() => { handlePublish(s._id); setMenuOpen(null); }}
+                        onClick={() => { handlePublishClick(s._id, s.name); setMenuOpen(null); }}
                         disabled={publishing === s._id}
                         className="w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 transition-colors"
                         style={{ color: "#06C270" }}
@@ -328,6 +344,68 @@ export function ScenarioPanel({ seasonCode, activeScenarioId, onSelectScenario, 
           )}
         </div>
       </div>
+
+      {/* Publish confirmation overlay */}
+      {publishConfirm && (
+        <div className="absolute inset-0 flex items-center justify-center rounded-2xl" style={{ background: isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)' }}>
+          <div className="w-full max-w-sm mx-6 rounded-xl p-5 space-y-4" style={{ background: bg, border: `1px solid ${border}`, boxShadow: shadow }}>
+            <div>
+              <h3 className="text-[15px] font-bold text-hz-text">Publish &quot;{publishConfirm.name}&quot;?</h3>
+              <p className="text-[12px] text-hz-text-tertiary mt-1">This will merge changes into the production schedule.</p>
+            </div>
+
+            {loadingDiff ? (
+              <p className="text-[13px] text-hz-text-tertiary animate-pulse">Computing diff...</p>
+            ) : diffPreview && (
+              <div className="rounded-lg p-3 space-y-1" style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', border: `1px solid ${border}` }}>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-hz-text-tertiary mb-2">Changes vs Production</div>
+                <div className="flex items-center justify-between text-[13px]">
+                  <span className="text-hz-text-secondary">New flights</span>
+                  <span className="font-bold" style={{ color: '#06C270' }}>{diffPreview.added}</span>
+                </div>
+                <div className="flex items-center justify-between text-[13px]">
+                  <span className="text-hz-text-secondary">Modified</span>
+                  <span className="font-bold" style={{ color: '#3E7BFA' }}>{diffPreview.modified}</span>
+                </div>
+                <div className="flex items-center justify-between text-[13px]">
+                  <span className="text-hz-text-secondary">Deleted</span>
+                  <span className="font-bold" style={{ color: '#E63535' }}>{diffPreview.deleted}</span>
+                </div>
+                <div className="flex items-center justify-between text-[13px]">
+                  <span className="text-hz-text-secondary">Unchanged</span>
+                  <span className="font-bold text-hz-text">{diffPreview.unchanged}</span>
+                </div>
+              </div>
+            )}
+
+            {publishResult && (
+              <p className="text-[12px] font-medium text-center" style={{ color: publishResult.startsWith('Failed') ? '#E63535' : '#06C270' }}>
+                {publishResult}
+              </p>
+            )}
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handlePublishConfirm}
+                disabled={!!publishing || loadingDiff}
+                className="flex-1 h-10 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-40"
+                style={{ background: '#06C270' }}
+              >
+                {publishing ? 'Merging...' : 'Publish & Merge'}
+              </button>
+              <button
+                onClick={() => { setPublishConfirm(null); setDiffPreview(null); setPublishResult(null); }}
+                className="h-10 px-4 rounded-lg text-[13px] font-medium text-hz-text-secondary transition-colors"
+                style={{ border: `1px solid ${border}` }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

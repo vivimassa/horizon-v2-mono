@@ -6,6 +6,7 @@ import { api } from '@skyhub/api'
 import { ChevronLeft, Plane } from 'lucide-react-native'
 import { accentTint } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { useOperatorId } from '../../../hooks/useOperatorId'
 
 const MANUFACTURERS = ['Airbus', 'Boeing', 'Embraer', 'ATR', 'Bombardier', 'Comac']
 const CATEGORIES = [
@@ -18,6 +19,7 @@ const CATEGORIES = [
 export default function AircraftTypeAddScreen() {
   const router = useRouter()
   const { palette, isDark, accent } = useAppTheme()
+  const operatorId = useOperatorId()
 
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
@@ -30,7 +32,7 @@ export default function AircraftTypeAddScreen() {
     setCreating(true); setError('')
     try {
       await api.createAircraftType({
-        operatorId: 'horizon',
+        operatorId,
         icaoType: form.icaoType.toUpperCase(),
         name: form.name,
         manufacturer: form.manufacturer || null,

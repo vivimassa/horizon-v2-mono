@@ -6,6 +6,7 @@ import { api } from '@skyhub/api'
 import { ChevronLeft, Armchair } from 'lucide-react-native'
 import { accentTint, modeColor } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { useOperatorId } from '../../../hooks/useOperatorId'
 import { SeatRowPreview } from '../../../components/lopa/SeatRowPreview'
 import { ColorSwatchPicker } from '../../../components/lopa/ColorSwatchPicker'
 
@@ -30,6 +31,7 @@ const SEAT_TYPES = ['standard', 'premium', 'lie-flat', 'suite'] as const
 export default function CabinClassAddScreen() {
   const router = useRouter()
   const { palette, isDark, accent } = useAppTheme()
+  const operatorId = useOperatorId()
 
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
@@ -53,7 +55,7 @@ export default function CabinClassAddScreen() {
     setCreating(true); setError('')
     try {
       await api.createCabinClass({
-        operatorId: 'horizon',
+        operatorId,
         code: form.code.toUpperCase(),
         name: form.name,
         color: form.color || null,

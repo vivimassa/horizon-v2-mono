@@ -1209,8 +1209,20 @@ export const api = {
   getExpiryCodeCategories: (operatorId = '') =>
     request<ExpiryCodeCategoryRef[]>(`/expiry-code-categories?operatorId=${operatorId}`),
 
-  getExpiryCodes: (operatorId = '') =>
-    request<ExpiryCodeRef[]>(`/expiry-codes?operatorId=${operatorId}`),
+  getExpiryCodes: (operatorId = '', includeInactive = false) => {
+    let path = `/expiry-codes?operatorId=${operatorId}`
+    if (includeInactive) path += '&includeInactive=true'
+    return request<ExpiryCodeRef[]>(path)
+  },
+
+  createExpiryCode: (data: Partial<ExpiryCodeRef>) =>
+    request<ExpiryCodeRef>('/expiry-codes', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateExpiryCode: (id: string, data: Partial<ExpiryCodeRef>) =>
+    request<ExpiryCodeRef>(`/expiry-codes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  deleteExpiryCode: (id: string) =>
+    request<{ success: boolean }>(`/expiry-codes/${id}`, { method: 'DELETE' }),
 
   getFlightServiceTypes: (operatorId = '') =>
     request<FlightServiceTypeRef[]>(`/flight-service-types?operatorId=${operatorId}`),
@@ -1338,6 +1350,100 @@ export const api = {
     request<{ success: boolean }>(`/users/me/sessions/${index}?userId=${userId}`, {
       method: 'DELETE',
     }),
+
+  // ─── Slots ─────────────────────────────────────────────
+
+  getSlotAirports: () =>
+    request<SlotCoordinatedAirport[]>('/slots/airports'),
+
+  getSlotFleetStats: (operatorId: string, seasonCode: string) =>
+    request<SlotFleetAirportStats[]>(`/slots/fleet-stats?operatorId=${operatorId}&seasonCode=${seasonCode}`),
+
+  getSlotSeries: (operatorId: string, airportIata: string, seasonCode: string) =>
+    request<SlotSeriesRef[]>(`/slots/series?operatorId=${operatorId}&airportIata=${airportIata}&seasonCode=${seasonCode}`),
+
+  getSlotSeriesById: (id: string) =>
+    request<SlotSeriesRef>(`/slots/series/${id}`),
+
+  getSlotDates: (seriesId: string) =>
+    request<SlotDateRef[]>(`/slots/dates?seriesId=${seriesId}`),
+
+  getSlotMessages: (operatorId: string, filters?: { airportIata?: string; seasonCode?: string; direction?: string; messageType?: string }) => {
+    let path = `/slots/messages?operatorId=${operatorId}`
+    if (filters?.airportIata) path += `&airportIata=${filters.airportIata}`
+    if (filters?.seasonCode) path += `&seasonCode=${filters.seasonCode}`
+    if (filters?.direction) path += `&direction=${filters.direction}`
+    if (filters?.messageType) path += `&messageType=${filters.messageType}`
+    return request<SlotMessageRef[]>(path)
+  },
+
+  getSlotActionLog: (seriesId: string) =>
+    request<SlotActionLogRef[]>(`/slots/action-log?seriesId=${seriesId}`),
+
+  getSlotStats: (operatorId: string, airportIata: string, seasonCode: string) =>
+    request<SlotPortfolioStats>(`/slots/stats?operatorId=${operatorId}&airportIata=${airportIata}&seasonCode=${seasonCode}`),
+
+  getSlotUtilization: (operatorId: string, airportIata: string, seasonCode: string) =>
+    request<SlotUtilizationSummary[]>(`/slots/utilization?operatorId=${operatorId}&airportIata=${airportIata}&seasonCode=${seasonCode}`),
+
+  getSlotCalendar: (operatorId: string, airportIata: string, seasonCode: string) =>
+    request<Record<string, SlotCalendarWeekRef[]>>(`/slots/calendar?operatorId=${operatorId}&airportIata=${airportIata}&seasonCode=${seasonCode}`),
+
+  getScheduledFlightsForSlots: (operatorId: string, airportIata: string) =>
+    request<ScheduledFlightForSlot[]>(`/slots/scheduled-flights?operatorId=${operatorId}&airportIata=${airportIata}`),
+
+  createSlotSeries: (data: Record<string, unknown>) =>
+    request<{ id: string; datesCreated: number }>('/slots/series', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateSlotSeries: (id: string, data: Record<string, unknown>) =>
+    request<{ ok: boolean }>(`/slots/series/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteSlotSeries: (id: string) =>
+    request<{ ok: boolean }>(`/slots/series/${id}`, {
+      method: 'DELETE',
+    }),
+
+  updateSlotDateStatus: (id: string, data: { operationStatus: string; jnusReason?: string | null }) =>
+    request<{ ok: boolean }>(`/slots/dates/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  bulkUpdateSlotDates: (data: { seriesId: string; dateRangeStart: string; dateRangeEnd: string; operationStatus: string; jnusReason?: string | null }) =>
+    request<{ updated: number }>('/slots/dates/bulk', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  createSlotMessage: (data: Record<string, unknown>) =>
+    request<{ id: string }>('/slots/messages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  logSlotAction: (data: { seriesId: string; actionCode: string; actionSource: string; messageId?: string | null; details?: Record<string, unknown> | null }) =>
+    request<{ id: string }>('/slots/action-log', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  importSlotsFromSchedule: (operatorId: string, airportIata: string, seasonCode: string) =>
+    request<{ created: number; skipped: number }>('/slots/import-from-schedule', {
+      method: 'POST',
+      body: JSON.stringify({ operatorId, airportIata, seasonCode }),
+    }),
+
+  syncSlotDates: (operatorId: string, airportIata: string, seasonCode: string) =>
+    request<{ synced: number; errors: number }>('/slots/sync-from-instances', {
+      method: 'POST',
+      body: JSON.stringify({ operatorId, airportIata, seasonCode }),
+    }),
 }
 
 // ─── User types ──────────────────────────────────────────
@@ -1417,4 +1523,156 @@ export interface UserData {
   lastLoginUtc: string
   createdAt: string
   updatedAt: string
+}
+
+// ─── Slot types ──────────────────────────────────────────
+
+export interface SlotCoordinatedAirport {
+  iataCode: string
+  name: string
+  coordinationLevel: 1 | 2 | 3
+  slotsPerHourDay: number | null
+  slotsPerHourNight: number | null
+  coordinatorName: string | null
+  coordinatorEmail: string | null
+}
+
+export interface SlotSeriesRef {
+  _id: string
+  operatorId: string
+  airportIata: string
+  seasonCode: string
+  arrivalFlightNumber: string | null
+  departureFlightNumber: string | null
+  arrivalOriginIata: string | null
+  departureDestIata: string | null
+  requestedArrivalTime: number | null
+  requestedDepartureTime: number | null
+  allocatedArrivalTime: number | null
+  allocatedDepartureTime: number | null
+  overnightIndicator: number
+  periodStart: string
+  periodEnd: string
+  daysOfOperation: string
+  frequencyRate: number
+  seats: number | null
+  aircraftTypeIcao: string | null
+  arrivalServiceType: string | null
+  departureServiceType: string | null
+  status: string
+  priorityCategory: string
+  historicEligible: boolean
+  lastActionCode: string | null
+  lastCoordinatorCode: string | null
+  flexibilityArrival: string | null
+  flexibilityDeparture: string | null
+  minTurnaroundMinutes: number | null
+  coordinatorRef: string | null
+  coordinatorReasonArrival: string | null
+  coordinatorReasonDeparture: string | null
+  waitlistPosition: number | null
+  linkedScheduledFlightId: string | null
+  notes: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface SlotDateRef {
+  _id: string
+  seriesId: string
+  slotDate: string
+  operationStatus: string
+  jnusReason: string | null
+  jnusEvidence: string | null
+  actualArrivalTime: number | null
+  actualDepartureTime: number | null
+  createdAt: string | null
+}
+
+export interface SlotMessageRef {
+  _id: string
+  operatorId: string
+  direction: string
+  messageType: string
+  airportIata: string
+  seasonCode: string
+  rawText: string
+  parseStatus: string
+  parseErrors: Array<{ line: number; message: string }> | null
+  parsedSeriesCount: number
+  source: string | null
+  reference: string | null
+  createdAt: string | null
+}
+
+export interface SlotActionLogRef {
+  _id: string
+  seriesId: string
+  actionCode: string
+  actionSource: string
+  messageId: string | null
+  details: Record<string, unknown> | null
+  createdAt: string | null
+}
+
+export interface SlotPortfolioStats {
+  totalSeries: number
+  confirmed: number
+  offered: number
+  waitlisted: number
+  refused: number
+  atRisk80: number
+}
+
+export interface SlotUtilizationSummary {
+  seriesId: string
+  totalDates: number
+  operated: number
+  cancelled: number
+  jnus: number
+  noShow: number
+  scheduled: number
+  utilizationPct: number
+  isAtRisk: boolean
+  isClose: boolean
+}
+
+export interface SlotCalendarWeekRef {
+  weekNumber: number
+  operated: number
+  cancelled: number
+  jnus: number
+  total: number
+}
+
+export interface ScheduledFlightForSlot {
+  id: string
+  airlineCode: string
+  flightNumber: string
+  depStation: string
+  arrStation: string
+  stdUtc: string
+  staUtc: string
+  daysOfOperation: string
+  periodStart: string
+  periodEnd: string
+  aircraftTypeIcao: string | null
+  status: string
+  direction: 'arrival' | 'departure'
+}
+
+export interface SlotFleetAirportStats {
+  airportIata: string
+  totalSeries: number
+  confirmed: number
+  offered: number
+  waitlisted: number
+  refused: number
+  draft: number
+  submitted: number
+  totalDates: number
+  operated: number
+  jnus: number
+  cancelled: number
+  utilizationPct: number
 }

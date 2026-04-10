@@ -7,6 +7,7 @@ import { ChevronLeft, Timer } from 'lucide-react-native'
 import { accentTint } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { ColorSwatchPicker } from '../../../components/lopa/ColorSwatchPicker'
+import { useOperatorId } from '../../../hooks/useOperatorId'
 
 const CATEGORIES = [
   'Airline Internal', 'Passenger & Baggage', 'Cargo & Mail', 'Aircraft Handling',
@@ -22,6 +23,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 export default function DelayCodeAddScreen() {
   const router = useRouter()
   const { palette, isDark, accent } = useAppTheme()
+  const operatorId = useOperatorId()
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({
@@ -34,7 +36,7 @@ export default function DelayCodeAddScreen() {
     setCreating(true); setError('')
     try {
       await api.createDelayCode({
-        operatorId: 'horizon',
+        operatorId,
         code: form.code,
         alphaCode: form.alphaCode?.toUpperCase() || null,
         name: form.name,

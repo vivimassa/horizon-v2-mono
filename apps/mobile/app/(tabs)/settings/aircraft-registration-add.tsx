@@ -6,6 +6,7 @@ import { api, type AircraftTypeRef } from '@skyhub/api'
 import { ChevronLeft, PlaneTakeoff, ChevronDown, Search, Check } from 'lucide-react-native'
 import { accentTint } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { useOperatorId } from '../../../hooks/useOperatorId'
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
@@ -17,6 +18,7 @@ const STATUS_OPTIONS = [
 export default function AircraftRegistrationAddScreen() {
   const router = useRouter()
   const { palette, isDark, accent } = useAppTheme()
+  const operatorId = useOperatorId()
   const [acTypes, setAcTypes] = useState<AircraftTypeRef[]>([])
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
@@ -43,7 +45,7 @@ export default function AircraftRegistrationAddScreen() {
     setCreating(true); setError('')
     try {
       await api.createAircraftRegistration({
-        operatorId: 'horizon',
+        operatorId,
         registration: form.registration.toUpperCase(),
         aircraftTypeId: form.aircraftTypeId,
         serialNumber: form.serialNumber || null,

@@ -9,6 +9,8 @@ import {
 } from 'lucide-react-native'
 import { accentTint, modeColor, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { useDevice } from '../../../hooks/useDevice'
+import { useOperatorId } from '../../../hooks/useOperatorId'
 import { ColorSwatchPicker } from '../../../components/lopa/ColorSwatchPicker'
 
 type TabKey = 'basic' | 'perf' | 'tat' | 'seating' | 'cargo' | 'crew' | 'weather'
@@ -51,6 +53,8 @@ export default function AircraftTypeDetailScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { palette, isDark, accent } = useAppTheme()
+  const { isTablet } = useDevice()
+  const operatorId = useOperatorId()
 
   const [acType, setAcType] = useState<AircraftTypeRef | null>(null)
   const [lopaConfigs, setLopaConfigs] = useState<LopaConfigRef[]>([])
@@ -67,7 +71,7 @@ export default function AircraftTypeDetailScreen() {
       .then(t => {
         setAcType(t)
         // Fetch LOPA configs for seating tab
-        Promise.all([api.getLopaConfigs('horizon', t.icaoType), api.getCabinClasses()])
+        Promise.all([api.getLopaConfigs(operatorId, t.icaoType), api.getCabinClasses()])
           .then(([configs, classes]) => { setLopaConfigs(configs); setCabinClasses(classes) })
           .catch(console.error)
       })
@@ -154,7 +158,7 @@ export default function AircraftTypeDetailScreen() {
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
       {/* Header */}
-      <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View className="px-4 pt-4 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center flex-1 mr-2">
             <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
@@ -171,8 +175,8 @@ export default function AircraftTypeDetailScreen() {
                 <Pressable onPress={() => { setEditing(false); setDraft({}) }} className="active:opacity-60">
                   <X size={20} color={palette.textSecondary} strokeWidth={1.8} />
                 </Pressable>
-                <Pressable onPress={handleSave} disabled={saving} className="px-3 py-1.5 rounded-lg active:opacity-60" style={{ backgroundColor: accent }}>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving...' : 'Save'}</Text>
+                <Pressable onPress={handleSave} disabled={saving} className="px-4 py-2.5 rounded-lg active:opacity-60" style={{ backgroundColor: accent }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving...' : 'Save'}</Text>
                 </Pressable>
               </>
             ) : (
@@ -184,7 +188,7 @@ export default function AircraftTypeDetailScreen() {
                   className="flex-row items-center px-3 py-1.5 rounded-lg active:opacity-60"
                   style={{ backgroundColor: accentTint(accent, isDark ? 0.15 : 0.08) }}>
                   <Pencil size={15} color={accent} strokeWidth={1.8} />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: accent, marginLeft: 6 }}>Edit</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: accent, marginLeft: 6 }}>Edit</Text>
                 </Pressable>
               </>
             )}
@@ -236,66 +240,56 @@ export default function AircraftTypeDetailScreen() {
       <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
         {activeTab === 'basic' && (
           <>
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}>
-                <Field label="ICAO Type" value={acType.icaoType} editing={editing} fieldKey="icaoType" editValue={get('icaoType')} onChange={handleFieldChange} palette={palette} mono maxLength={4} />
-              </View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}>
-                <Field label="IATA Type" value={acType.iataType} editing={editing} fieldKey="iataType" editValue={get('iataType')} onChange={handleFieldChange} palette={palette} />
-              </View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}>
-                <Field label="Name" value={acType.name} editing={editing} fieldKey="name" editValue={get('name')} onChange={handleFieldChange} palette={palette} />
-              </View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}>
-                <Field label="Family" value={acType.family} editing={editing} fieldKey="family" editValue={get('family')} onChange={handleFieldChange} palette={palette} />
-              </View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}>
-                <Field label="Cockpit Crew" value={acType.cockpitCrewRequired} editing={editing} fieldKey="cockpitCrewRequired" editValue={get('cockpitCrewRequired')} onChange={handleFieldChange} palette={palette} numeric />
-              </View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}>
-                <Field label="Cabin Crew" value={acType.cabinCrewRequired} editing={editing} fieldKey="cabinCrewRequired" editValue={get('cabinCrewRequired')} onChange={handleFieldChange} palette={palette} numeric />
-              </View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <Field label="ICAO Type" value={acType.icaoType} editing={editing} fieldKey="icaoType" editValue={get('icaoType')} onChange={handleFieldChange} palette={palette} mono maxLength={4} half={isTablet} />
+              <Field label="IATA Type" value={acType.iataType} editing={editing} fieldKey="iataType" editValue={get('iataType')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+              <Field label="Name" value={acType.name} editing={editing} fieldKey="name" editValue={get('name')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+              <Field label="Family" value={acType.family} editing={editing} fieldKey="family" editValue={get('family')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+              <Field label="Cockpit Crew" value={acType.cockpitCrewRequired} editing={editing} fieldKey="cockpitCrewRequired" editValue={get('cockpitCrewRequired')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+              <Field label="Cabin Crew" value={acType.cabinCrewRequired} editing={editing} fieldKey="cabinCrewRequired" editValue={get('cabinCrewRequired')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+              <PickerField label="Manufacturer" value={acType.manufacturer} options={MANUFACTURERS} editing={editing} fieldKey="manufacturer" editValue={get('manufacturer')} onChange={handleFieldChange} palette={palette} isDark={isDark} accent={accent} half={isTablet} />
+              <PickerField label="Category" value={catLabel} options={CATEGORIES.map(c => c.label)} editing={editing} fieldKey="category" editValue={CATEGORIES.find(c => c.value === get('category'))?.label || get('category')} onChange={(k, v) => { const cat = CATEGORIES.find(c => c.label === v); handleFieldChange(k, cat?.value || v) }} palette={palette} isDark={isDark} accent={accent} half={isTablet} />
             </View>
-            <PickerField label="Manufacturer" value={acType.manufacturer} options={MANUFACTURERS} editing={editing} fieldKey="manufacturer" editValue={get('manufacturer')} onChange={handleFieldChange} palette={palette} isDark={isDark} accent={accent} />
-            <PickerField label="Category" value={catLabel} options={CATEGORIES.map(c => c.label)} editing={editing} fieldKey="category" editValue={CATEGORIES.find(c => c.value === get('category'))?.label || get('category')} onChange={(k, v) => { const cat = CATEGORIES.find(c => c.label === v); handleFieldChange(k, cat?.value || v) }} palette={palette} isDark={isDark} accent={accent} />
             <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
               <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 6 }}>Schedule Color</Text>
               <ColorSwatchPicker value={get('color') || '#9ca3af'} onChange={(v) => handleFieldChange('color', v)} palette={palette} isDark={isDark} editing={editing} />
             </View>
             <Field label="Notes" value={acType.notes} editing={editing} fieldKey="notes" editValue={get('notes')} onChange={handleFieldChange} palette={palette} multiline />
-            <ToggleField label="Active" value={acType.isActive} editing={editing} fieldKey="isActive" editValue={get('isActive')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <ToggleField label="Active" value={acType.isActive} editing={editing} fieldKey="isActive" editValue={get('isActive')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+            </View>
           </>
         )}
 
         {activeTab === 'perf' && (
           <>
             <Section title="Weights" accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="MTOW (kg)" value={acType.performance?.mtowKg} editing={editing} fieldKey="performance.mtowKg" editValue={get('performance.mtowKg')} onChange={handleFieldChange} palette={palette} numeric /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="MLW (kg)" value={acType.performance?.mlwKg} editing={editing} fieldKey="performance.mlwKg" editValue={get('performance.mlwKg')} onChange={handleFieldChange} palette={palette} numeric /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="MZFW (kg)" value={acType.performance?.mzfwKg} editing={editing} fieldKey="performance.mzfwKg" editValue={get('performance.mzfwKg')} onChange={handleFieldChange} palette={palette} numeric /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="OEW (kg)" value={acType.performance?.oewKg} editing={editing} fieldKey="performance.oewKg" editValue={get('performance.oewKg')} onChange={handleFieldChange} palette={palette} numeric /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <Field label="MTOW (kg)" value={acType.performance?.mtowKg} editing={editing} fieldKey="performance.mtowKg" editValue={get('performance.mtowKg')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+              <Field label="MLW (kg)" value={acType.performance?.mlwKg} editing={editing} fieldKey="performance.mlwKg" editValue={get('performance.mlwKg')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+              <Field label="MZFW (kg)" value={acType.performance?.mzfwKg} editing={editing} fieldKey="performance.mzfwKg" editValue={get('performance.mzfwKg')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+              <Field label="OEW (kg)" value={acType.performance?.oewKg} editing={editing} fieldKey="performance.oewKg" editValue={get('performance.oewKg')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
             </View>
             <Section title="Fuel" accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Max Fuel (kg)" value={acType.performance?.maxFuelCapacityKg} editing={editing} fieldKey="performance.maxFuelCapacityKg" editValue={get('performance.maxFuelCapacityKg')} onChange={handleFieldChange} palette={palette} numeric /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Fuel Burn (kg/hr)" value={acType.fuelBurnRateKgPerHour} editing={editing} fieldKey="fuelBurnRateKgPerHour" editValue={get('fuelBurnRateKgPerHour')} onChange={handleFieldChange} palette={palette} numeric /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <Field label="Max Fuel (kg)" value={acType.performance?.maxFuelCapacityKg} editing={editing} fieldKey="performance.maxFuelCapacityKg" editValue={get('performance.maxFuelCapacityKg')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+              <Field label="Fuel Burn (kg/hr)" value={acType.fuelBurnRateKgPerHour} editing={editing} fieldKey="fuelBurnRateKgPerHour" editValue={get('fuelBurnRateKgPerHour')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
             </View>
             <Section title="Speed & Range" accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Cruising Speed (kts)" value={acType.performance?.cruisingSpeedKts} editing={editing} fieldKey="performance.cruisingSpeedKts" editValue={get('performance.cruisingSpeedKts')} onChange={handleFieldChange} palette={palette} numeric /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Max Range (NM)" value={acType.performance?.maxRangeNm} editing={editing} fieldKey="performance.maxRangeNm" editValue={get('performance.maxRangeNm')} onChange={handleFieldChange} palette={palette} numeric /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Ceiling (FL)" value={acType.performance?.ceilingFl} editing={editing} fieldKey="performance.ceilingFl" editValue={get('performance.ceilingFl')} onChange={handleFieldChange} palette={palette} numeric /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <Field label="Cruising Speed (kts)" value={acType.performance?.cruisingSpeedKts} editing={editing} fieldKey="performance.cruisingSpeedKts" editValue={get('performance.cruisingSpeedKts')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+              <Field label="Max Range (NM)" value={acType.performance?.maxRangeNm} editing={editing} fieldKey="performance.maxRangeNm" editValue={get('performance.maxRangeNm')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+              <Field label="Ceiling (FL)" value={acType.performance?.ceilingFl} editing={editing} fieldKey="performance.ceilingFl" editValue={get('performance.ceilingFl')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
             </View>
             <Section title="ETOPS" accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ToggleField label="ETOPS Capable" value={acType.etopsCapable} editing={editing} fieldKey="etopsCapable" editValue={get('etopsCapable')} onChange={handleFieldChange} palette={palette} isDark={isDark} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="ETOPS Rating (min)" value={acType.etopsRatingMinutes} editing={editing} fieldKey="etopsRatingMinutes" editValue={get('etopsRatingMinutes')} onChange={handleFieldChange} palette={palette} numeric /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <ToggleField label="ETOPS Capable" value={acType.etopsCapable} editing={editing} fieldKey="etopsCapable" editValue={get('etopsCapable')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+              <Field label="ETOPS Rating (min)" value={acType.etopsRatingMinutes} editing={editing} fieldKey="etopsRatingMinutes" editValue={get('etopsRatingMinutes')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
             </View>
             <Section title="Classifications" accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Noise Category" value={acType.noiseCategory} editing={editing} fieldKey="noiseCategory" editValue={get('noiseCategory')} onChange={handleFieldChange} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Emissions Category" value={acType.emissionsCategory} editing={editing} fieldKey="emissionsCategory" editValue={get('emissionsCategory')} onChange={handleFieldChange} palette={palette} /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <Field label="Noise Category" value={acType.noiseCategory} editing={editing} fieldKey="noiseCategory" editValue={get('noiseCategory')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+              <Field label="Emissions Category" value={acType.emissionsCategory} editing={editing} fieldKey="emissionsCategory" editValue={get('emissionsCategory')} onChange={handleFieldChange} palette={palette} half={isTablet} />
             </View>
           </>
         )}
@@ -303,18 +297,18 @@ export default function AircraftTypeDetailScreen() {
         {activeTab === 'tat' && (
           <>
             <Section title="Scheduled Turnaround" accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><TATRow label="DOM → DOM" value={acType.tat?.domDom} editing={editing} fieldKey="tat.domDom" onChange={handleFieldChange} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><TATRow label="DOM → INT" value={acType.tat?.domInt} editing={editing} fieldKey="tat.domInt" onChange={handleFieldChange} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><TATRow label="INT → DOM" value={acType.tat?.intDom} editing={editing} fieldKey="tat.intDom" onChange={handleFieldChange} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><TATRow label="INT → INT" value={acType.tat?.intInt} editing={editing} fieldKey="tat.intInt" onChange={handleFieldChange} palette={palette} /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <TATRow label="DOM → DOM" value={acType.tat?.domDom} editing={editing} fieldKey="tat.domDom" onChange={handleFieldChange} palette={palette} half={isTablet} />
+              <TATRow label="DOM → INT" value={acType.tat?.domInt} editing={editing} fieldKey="tat.domInt" onChange={handleFieldChange} palette={palette} half={isTablet} />
+              <TATRow label="INT → DOM" value={acType.tat?.intDom} editing={editing} fieldKey="tat.intDom" onChange={handleFieldChange} palette={palette} half={isTablet} />
+              <TATRow label="INT → INT" value={acType.tat?.intInt} editing={editing} fieldKey="tat.intInt" onChange={handleFieldChange} palette={palette} half={isTablet} />
             </View>
             <Section title="Minimum Turnaround" accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><TATRow label="MIN DOM → DOM" value={acType.tat?.minDd} editing={editing} fieldKey="tat.minDd" onChange={handleFieldChange} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><TATRow label="MIN DOM → INT" value={acType.tat?.minDi} editing={editing} fieldKey="tat.minDi" onChange={handleFieldChange} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><TATRow label="MIN INT → DOM" value={acType.tat?.minId} editing={editing} fieldKey="tat.minId" onChange={handleFieldChange} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><TATRow label="MIN INT → INT" value={acType.tat?.minIi} editing={editing} fieldKey="tat.minIi" onChange={handleFieldChange} palette={palette} /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <TATRow label="MIN DOM → DOM" value={acType.tat?.minDd} editing={editing} fieldKey="tat.minDd" onChange={handleFieldChange} palette={palette} half={isTablet} />
+              <TATRow label="MIN DOM → INT" value={acType.tat?.minDi} editing={editing} fieldKey="tat.minDi" onChange={handleFieldChange} palette={palette} half={isTablet} />
+              <TATRow label="MIN INT → DOM" value={acType.tat?.minId} editing={editing} fieldKey="tat.minId" onChange={handleFieldChange} palette={palette} half={isTablet} />
+              <TATRow label="MIN INT → INT" value={acType.tat?.minIi} editing={editing} fieldKey="tat.minIi" onChange={handleFieldChange} palette={palette} half={isTablet} />
             </View>
           </>
         )}
@@ -354,10 +348,10 @@ export default function AircraftTypeDetailScreen() {
 
         {activeTab === 'cargo' && (
           <>
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Max Cargo Weight (kg)" value={acType.cargo?.maxCargoWeightKg} editing={editing} fieldKey="cargo.maxCargoWeightKg" editValue={get('cargo.maxCargoWeightKg')} onChange={handleFieldChange} palette={palette} numeric /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Cargo Positions" value={acType.cargo?.cargoPositions} editing={editing} fieldKey="cargo.cargoPositions" editValue={get('cargo.cargoPositions')} onChange={handleFieldChange} palette={palette} numeric /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Bulk Hold (kg)" value={acType.cargo?.bulkHoldCapacityKg} editing={editing} fieldKey="cargo.bulkHoldCapacityKg" editValue={get('cargo.bulkHoldCapacityKg')} onChange={handleFieldChange} palette={palette} numeric /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <Field label="Max Cargo Weight (kg)" value={acType.cargo?.maxCargoWeightKg} editing={editing} fieldKey="cargo.maxCargoWeightKg" editValue={get('cargo.maxCargoWeightKg')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+              <Field label="Cargo Positions" value={acType.cargo?.cargoPositions} editing={editing} fieldKey="cargo.cargoPositions" editValue={get('cargo.cargoPositions')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+              <Field label="Bulk Hold (kg)" value={acType.cargo?.bulkHoldCapacityKg} editing={editing} fieldKey="cargo.bulkHoldCapacityKg" editValue={get('cargo.bulkHoldCapacityKg')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
             </View>
             <Field label="ULD Types" value={acType.cargo?.uldTypesAccepted?.join(', ')} editing={editing} fieldKey="cargo.uldTypesAccepted" editValue={get('cargo.uldTypesAccepted')?.join?.(', ') ?? get('cargo.uldTypesAccepted')} onChange={(k, v) => handleFieldChange(k, typeof v === 'string' ? v.split(',').map((s: string) => s.trim()).filter(Boolean) : v)} palette={palette} />
           </>
@@ -366,14 +360,14 @@ export default function AircraftTypeDetailScreen() {
         {activeTab === 'crew' && (
           <>
             <Section title="Cockpit Rest Facility" accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><PickerField label="Class" value={acType.crewRest?.cockpitClass} options={REST_CLASSES} editing={editing} fieldKey="crewRest.cockpitClass" editValue={get('crewRest.cockpitClass')} onChange={handleFieldChange} palette={palette} isDark={isDark} accent={accent} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Positions" value={acType.crewRest?.cockpitPositions} editing={editing} fieldKey="crewRest.cockpitPositions" editValue={get('crewRest.cockpitPositions')} onChange={handleFieldChange} palette={palette} numeric /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <PickerField label="Class" value={acType.crewRest?.cockpitClass} options={REST_CLASSES} editing={editing} fieldKey="crewRest.cockpitClass" editValue={get('crewRest.cockpitClass')} onChange={handleFieldChange} palette={palette} isDark={isDark} accent={accent} half={isTablet} />
+              <Field label="Positions" value={acType.crewRest?.cockpitPositions} editing={editing} fieldKey="crewRest.cockpitPositions" editValue={get('crewRest.cockpitPositions')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
             </View>
             <Section title="Cabin Rest Facility" accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><PickerField label="Class" value={acType.crewRest?.cabinClass} options={REST_CLASSES} editing={editing} fieldKey="crewRest.cabinClass" editValue={get('crewRest.cabinClass')} onChange={handleFieldChange} palette={palette} isDark={isDark} accent={accent} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Positions" value={acType.crewRest?.cabinPositions} editing={editing} fieldKey="crewRest.cabinPositions" editValue={get('crewRest.cabinPositions')} onChange={handleFieldChange} palette={palette} numeric /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <PickerField label="Class" value={acType.crewRest?.cabinClass} options={REST_CLASSES} editing={editing} fieldKey="crewRest.cabinClass" editValue={get('crewRest.cabinClass')} onChange={handleFieldChange} palette={palette} isDark={isDark} accent={accent} half={isTablet} />
+              <Field label="Positions" value={acType.crewRest?.cabinPositions} editing={editing} fieldKey="crewRest.cabinPositions" editValue={get('crewRest.cabinPositions')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
             </View>
           </>
         )}
@@ -381,17 +375,17 @@ export default function AircraftTypeDetailScreen() {
         {activeTab === 'weather' && (
           <>
             <Section title="Weather Limitations" accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Min Ceiling (ft)" value={acType.weather?.minCeilingFt} editing={editing} fieldKey="weather.minCeilingFt" editValue={get('weather.minCeilingFt')} onChange={handleFieldChange} palette={palette} numeric /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Min RVR (m)" value={acType.weather?.minRvrM} editing={editing} fieldKey="weather.minRvrM" editValue={get('weather.minRvrM')} onChange={handleFieldChange} palette={palette} numeric /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Min Visibility (m)" value={acType.weather?.minVisibilityM} editing={editing} fieldKey="weather.minVisibilityM" editValue={get('weather.minVisibilityM')} onChange={handleFieldChange} palette={palette} numeric /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Max Crosswind (kt)" value={acType.weather?.maxCrosswindKt} editing={editing} fieldKey="weather.maxCrosswindKt" editValue={get('weather.maxCrosswindKt')} onChange={handleFieldChange} palette={palette} numeric /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Max Wind (kt)" value={acType.weather?.maxWindKt} editing={editing} fieldKey="weather.maxWindKt" editValue={get('weather.maxWindKt')} onChange={handleFieldChange} palette={palette} numeric /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <Field label="Min Ceiling (ft)" value={acType.weather?.minCeilingFt} editing={editing} fieldKey="weather.minCeilingFt" editValue={get('weather.minCeilingFt')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+              <Field label="Min RVR (m)" value={acType.weather?.minRvrM} editing={editing} fieldKey="weather.minRvrM" editValue={get('weather.minRvrM')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+              <Field label="Min Visibility (m)" value={acType.weather?.minVisibilityM} editing={editing} fieldKey="weather.minVisibilityM" editValue={get('weather.minVisibilityM')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+              <Field label="Max Crosswind (kt)" value={acType.weather?.maxCrosswindKt} editing={editing} fieldKey="weather.maxCrosswindKt" editValue={get('weather.maxCrosswindKt')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+              <Field label="Max Wind (kt)" value={acType.weather?.maxWindKt} editing={editing} fieldKey="weather.maxWindKt" editValue={get('weather.maxWindKt')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
             </View>
             <Section title="Approach" accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><PickerField label="ILS Category" value={acType.approach?.ilsCategoryRequired} options={ILS_CATS} editing={editing} fieldKey="approach.ilsCategoryRequired" editValue={get('approach.ilsCategoryRequired')} onChange={handleFieldChange} palette={palette} isDark={isDark} accent={accent} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ToggleField label="Autoland Capable" value={acType.approach?.autolandCapable ?? false} editing={editing} fieldKey="approach.autolandCapable" editValue={get('approach.autolandCapable')} onChange={handleFieldChange} palette={palette} isDark={isDark} /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <PickerField label="ILS Category" value={acType.approach?.ilsCategoryRequired} options={ILS_CATS} editing={editing} fieldKey="approach.ilsCategoryRequired" editValue={get('approach.ilsCategoryRequired')} onChange={handleFieldChange} palette={palette} isDark={isDark} accent={accent} half={isTablet} />
+              <ToggleField label="Autoland Capable" value={acType.approach?.autolandCapable ?? false} editing={editing} fieldKey="approach.autolandCapable" editValue={get('approach.autolandCapable')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
             </View>
           </>
         )}
@@ -411,13 +405,14 @@ function Section({ title, accent }: { title: string; accent: string }) {
 }
 
 // ── TAT row (shows H:MM format) ──
-function TATRow({ label, value, editing, fieldKey, onChange, palette }: {
+function TATRow({ label, value, editing, fieldKey, onChange, palette, half }: {
   label: string; value: number | null | undefined; editing: boolean; fieldKey: string;
-  onChange: (k: string, v: any) => void; palette: Palette
+  onChange: (k: string, v: any) => void; palette: Palette; half?: boolean
 }) {
+  const halfStyle = half ? { width: '50%' as const, paddingRight: 12 } : {}
   if (editing) {
     return (
-      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
         <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
         <View className="flex-row items-center" style={{ gap: 8 }}>
           <TextInput
@@ -433,7 +428,7 @@ function TATRow({ label, value, editing, fieldKey, onChange, palette }: {
     )
   }
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
       <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       <Text style={{ fontSize: 15, fontWeight: '500', fontFamily: 'monospace', color: palette.text }}>
         {value != null ? `${value} min (${minsToHmm(value)})` : '---'}
@@ -443,13 +438,14 @@ function TATRow({ label, value, editing, fieldKey, onChange, palette }: {
 }
 
 // ── Picker field (selectable options) ──
-function PickerField({ label, value, options, editing, fieldKey, editValue, onChange, palette, isDark, accent }: {
+function PickerField({ label, value, options, editing, fieldKey, editValue, onChange, palette, isDark, accent, half }: {
   label: string; value: any; options: string[]; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean; accent: string
+  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean; accent: string; half?: boolean
 }) {
+  const halfStyle = half ? { width: '50%' as const, paddingRight: 12 } : {}
   if (editing) {
     return (
-      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
         <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 6 }}>{label}</Text>
         <View className="flex-row flex-wrap" style={{ gap: 6 }}>
           {options.map(opt => {
@@ -466,7 +462,7 @@ function PickerField({ label, value, options, editing, fieldKey, editValue, onCh
     )
   }
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
       <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       <Text style={{ fontSize: 15, fontWeight: '500', color: palette.text }}>{value ?? '---'}</Text>
     </View>
@@ -474,13 +470,14 @@ function PickerField({ label, value, options, editing, fieldKey, editValue, onCh
 }
 
 // ── Field ──
-function Field({ label, value, editing, fieldKey, editValue, onChange, palette, numeric, mono, maxLength, multiline }: {
+function Field({ label, value, editing, fieldKey, editValue, onChange, palette, numeric, mono, maxLength, multiline, half }: {
   label: string; value: any; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; numeric?: boolean; mono?: boolean; maxLength?: number; multiline?: boolean
+  onChange: (k: string, v: any) => void; palette: Palette; numeric?: boolean; mono?: boolean; maxLength?: number; multiline?: boolean; half?: boolean
 }) {
+  const halfStyle = half ? { width: '50%' as const, paddingRight: 12 } : {}
   if (editing) {
     return (
-      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
         <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
         <TextInput
           value={editValue != null ? String(editValue) : ''}
@@ -495,7 +492,7 @@ function Field({ label, value, editing, fieldKey, editValue, onChange, palette, 
     )
   }
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
       <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       <Text style={{ fontSize: 15, fontWeight: '500', color: palette.text, fontFamily: mono ? 'monospace' : undefined }}>{value ?? '---'}</Text>
     </View>
@@ -503,13 +500,13 @@ function Field({ label, value, editing, fieldKey, editValue, onChange, palette, 
 }
 
 // ── Toggle field ──
-function ToggleField({ label, value, editing, fieldKey, editValue, onChange, palette, isDark }: {
+function ToggleField({ label, value, editing, fieldKey, editValue, onChange, palette, isDark, half }: {
   label: string; value: boolean; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean
+  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean; half?: boolean
 }) {
   const current = editing ? !!editValue : value
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...(half ? { width: '50%', paddingRight: 12 } : {}) }}>
       <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       {editing ? (
         <Pressable onPress={() => onChange(fieldKey, !editValue)} className="self-start px-3 py-1 rounded-lg"

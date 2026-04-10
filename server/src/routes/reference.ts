@@ -1278,10 +1278,90 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
   // ─── Expiry Codes ──────────────────────────────────────
   app.get('/expiry-codes', async (req) => {
-    const { operatorId } = req.query as { operatorId?: string }
-    const filter: Record<string, unknown> = { isActive: true }
+    const { operatorId, includeInactive } = req.query as { operatorId?: string; includeInactive?: string }
+    const filter: Record<string, unknown> = {}
     if (operatorId) filter.operatorId = operatorId
+    if (includeInactive !== 'true') filter.isActive = true
     return ExpiryCode.find(filter).sort({ sortOrder: 1, code: 1 }).lean()
+  })
+
+  const expiryCodeCreateSchema = z.object({
+    operatorId: z.string().min(1),
+    categoryId: z.string().min(1),
+    code: z.string().min(1).max(10),
+    name: z.string().min(1, 'Name is required'),
+    description: z.string().nullable().optional(),
+    crewCategory: z.enum(['both', 'cockpit', 'cabin']).optional().default('both'),
+    applicablePositions: z.array(z.string()).optional().default([]),
+    formula: z.string().min(1),
+    formulaParams: z.record(z.string(), z.unknown()).optional().default({}),
+    acTypeScope: z.enum(['none', 'family', 'variant']).optional().default('none'),
+    linkedTrainingCode: z.string().nullable().optional(),
+    warningDays: z.number().int().min(0).nullable().optional(),
+    severity: z.array(z.string()).optional().default([]),
+    notes: z.string().nullable().optional(),
+    isActive: z.boolean().optional().default(true),
+    sortOrder: z.number().int().min(0).optional().default(0),
+  }).strict()
+
+  const expiryCodeUpdateSchema = z.object({
+    categoryId: z.string().min(1),
+    code: z.string().min(1).max(10),
+    name: z.string().min(1),
+    description: z.string().nullable(),
+    crewCategory: z.enum(['both', 'cockpit', 'cabin']),
+    applicablePositions: z.array(z.string()),
+    formula: z.string().min(1),
+    formulaParams: z.record(z.string(), z.unknown()),
+    acTypeScope: z.enum(['none', 'family', 'variant']),
+    linkedTrainingCode: z.string().nullable(),
+    warningDays: z.number().int().min(0).nullable(),
+    severity: z.array(z.string()),
+    notes: z.string().nullable(),
+    isActive: z.boolean(),
+    sortOrder: z.number().int().min(0),
+  }).partial().strict()
+
+  app.post('/expiry-codes', async (req, reply) => {
+    const raw = req.body as Record<string, unknown>
+    if (raw.code) raw.code = (raw.code as string).toUpperCase().trim()
+    if (raw.linkedTrainingCode) raw.linkedTrainingCode = (raw.linkedTrainingCode as string).toUpperCase().trim()
+    const parsed = expiryCodeCreateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body = parsed.data
+    const existing = await ExpiryCode.findOne({ operatorId: body.operatorId, code: body.code }).lean()
+    if (existing) return reply.code(409).send({ error: `Expiry code "${body.code}" already exists` })
+
+    const id = crypto.randomUUID()
+    const doc = await ExpiryCode.create({ _id: id, ...body, createdAt: new Date().toISOString() })
+    return reply.code(201).send(doc.toObject())
+  })
+
+  app.patch('/expiry-codes/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const raw = req.body as Record<string, unknown>
+    if (raw.code) raw.code = (raw.code as string).toUpperCase().trim()
+    if (raw.linkedTrainingCode) raw.linkedTrainingCode = (raw.linkedTrainingCode as string).toUpperCase().trim()
+    const parsed = expiryCodeUpdateSchema.safeParse(raw)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+    const body = { ...parsed.data, updatedAt: new Date().toISOString() }
+    const doc = await ExpiryCode.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'Expiry code not found' })
+    return doc
+  })
+
+  app.delete('/expiry-codes/:id', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const doc = await ExpiryCode.findById(id).lean()
+    if (!doc) return reply.code(404).send({ error: 'Expiry code not found' })
+    await ExpiryCode.deleteOne({ _id: id })
+    return { success: true }
   })
 
   // ─── Cabin Classes ──────────────────────────────────────

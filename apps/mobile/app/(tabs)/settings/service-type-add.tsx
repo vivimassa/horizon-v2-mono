@@ -7,10 +7,12 @@ import { ChevronLeft, Tag } from 'lucide-react-native'
 import { accentTint } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { ColorSwatchPicker } from '../../../components/lopa/ColorSwatchPicker'
+import { useOperatorId } from '../../../hooks/useOperatorId'
 
 export default function ServiceTypeAddScreen() {
   const router = useRouter()
   const { palette, isDark, accent } = useAppTheme()
+  const operatorId = useOperatorId()
 
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
@@ -23,7 +25,7 @@ export default function ServiceTypeAddScreen() {
     setCreating(true); setError('')
     try {
       await api.createFlightServiceType({
-        operatorId: 'horizon',
+        operatorId,
         code: form.code.toUpperCase(),
         name: form.name,
         description: form.description || null,

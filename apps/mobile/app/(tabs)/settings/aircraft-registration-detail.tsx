@@ -9,6 +9,8 @@ import {
 } from 'lucide-react-native'
 import { accentTint, modeColor, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { useDevice } from '../../../hooks/useDevice'
+import { useOperatorId } from '../../../hooks/useOperatorId'
 
 type TabKey = 'basic' | 'perf' | 'seating' | 'cargo' | 'crew' | 'weather' | 'location' | 'maint'
 const TABS: { key: TabKey; label: string; icon: any }[] = [
@@ -46,6 +48,8 @@ export default function AircraftRegistrationDetailScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { palette, isDark, accent } = useAppTheme()
+  const { isTablet } = useDevice()
+  const operatorId = useOperatorId()
 
   const [reg, setReg] = useState<AircraftRegistrationRef | null>(null)
   const [acTypes, setAcTypes] = useState<AircraftTypeRef[]>([])
@@ -63,7 +67,7 @@ export default function AircraftRegistrationDetailScreen() {
       .then(([r, types, classes]) => {
         setReg(r); setAcTypes(types); setCabinClasses(classes)
         const acType = types.find(t => t._id === r.aircraftTypeId)
-        if (acType) api.getLopaConfigs('horizon', acType.icaoType).then(setLopaConfigs).catch(console.error)
+        if (acType) api.getLopaConfigs(operatorId, acType.icaoType).then(setLopaConfigs).catch(console.error)
       })
       .catch(console.error)
       .finally(() => setLoading(false))
@@ -118,7 +122,7 @@ export default function AircraftRegistrationDetailScreen() {
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
       {/* Header */}
-      <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View className="px-4 pt-4 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center flex-1 mr-2">
             <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
@@ -138,8 +142,8 @@ export default function AircraftRegistrationDetailScreen() {
                 <Pressable onPress={() => { setEditing(false); setDraft({}) }} className="active:opacity-60">
                   <X size={20} color={palette.textSecondary} strokeWidth={1.8} />
                 </Pressable>
-                <Pressable onPress={handleSave} disabled={saving} className="px-3 py-1.5 rounded-lg active:opacity-60" style={{ backgroundColor: accent }}>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving...' : 'Save'}</Text>
+                <Pressable onPress={handleSave} disabled={saving} className="px-4 py-2.5 rounded-lg active:opacity-60" style={{ backgroundColor: accent }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving...' : 'Save'}</Text>
                 </Pressable>
               </>
             ) : (
@@ -151,7 +155,7 @@ export default function AircraftRegistrationDetailScreen() {
                   className="flex-row items-center px-3 py-1.5 rounded-lg active:opacity-60"
                   style={{ backgroundColor: accentTint(accent, isDark ? 0.15 : 0.08) }}>
                   <Pencil size={15} color={accent} strokeWidth={1.8} />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: accent, marginLeft: 6 }}>Edit</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: accent, marginLeft: 6 }}>Edit</Text>
                 </Pressable>
               </>
             )}
@@ -208,19 +212,19 @@ export default function AircraftRegistrationDetailScreen() {
       <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
         {activeTab === 'basic' && (
           <>
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Registration" value={reg.registration} editing={editing} fieldKey="registration" editValue={get('registration')} onChange={handleFieldChange} palette={palette} mono /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Serial Number" value={reg.serialNumber} editing={editing} fieldKey="serialNumber" editValue={get('serialNumber')} onChange={handleFieldChange} palette={palette} mono /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Variant" value={reg.variant} editing={editing} fieldKey="variant" editValue={get('variant')} onChange={handleFieldChange} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Home Base" value={reg.homeBaseIcao} editing={editing} fieldKey="homeBaseIcao" editValue={get('homeBaseIcao')} onChange={handleFieldChange} palette={palette} mono /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="SELCAL" value={reg.selcal} editing={editing} fieldKey="selcal" editValue={get('selcal')} onChange={handleFieldChange} palette={palette} mono /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Date of Manufacture" value={reg.dateOfManufacture?.split('T')[0]} editing={editing} fieldKey="dateOfManufacture" editValue={get('dateOfManufacture')?.split?.('T')?.[0] ?? get('dateOfManufacture')} onChange={handleFieldChange} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Date of Delivery" value={reg.dateOfDelivery?.split('T')[0]} editing={editing} fieldKey="dateOfDelivery" editValue={get('dateOfDelivery')?.split?.('T')?.[0] ?? get('dateOfDelivery')} onChange={handleFieldChange} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Lease Expiry" value={reg.leaseExpiryDate?.split('T')[0]} editing={editing} fieldKey="leaseExpiryDate" editValue={get('leaseExpiryDate')?.split?.('T')?.[0] ?? get('leaseExpiryDate')} onChange={handleFieldChange} palette={palette} /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <Field label="Registration" value={reg.registration} editing={editing} fieldKey="registration" editValue={get('registration')} onChange={handleFieldChange} palette={palette} mono half={isTablet} />
+              <Field label="Serial Number" value={reg.serialNumber} editing={editing} fieldKey="serialNumber" editValue={get('serialNumber')} onChange={handleFieldChange} palette={palette} mono half={isTablet} />
+              <Field label="Variant" value={reg.variant} editing={editing} fieldKey="variant" editValue={get('variant')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+              <Field label="Home Base" value={reg.homeBaseIcao} editing={editing} fieldKey="homeBaseIcao" editValue={get('homeBaseIcao')} onChange={handleFieldChange} palette={palette} mono half={isTablet} />
+              <Field label="SELCAL" value={reg.selcal} editing={editing} fieldKey="selcal" editValue={get('selcal')} onChange={handleFieldChange} palette={palette} mono half={isTablet} />
+              <Field label="Date of Manufacture" value={reg.dateOfManufacture?.split('T')[0]} editing={editing} fieldKey="dateOfManufacture" editValue={get('dateOfManufacture')?.split?.('T')?.[0] ?? get('dateOfManufacture')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+              <Field label="Date of Delivery" value={reg.dateOfDelivery?.split('T')[0]} editing={editing} fieldKey="dateOfDelivery" editValue={get('dateOfDelivery')?.split?.('T')?.[0] ?? get('dateOfDelivery')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+              <Field label="Lease Expiry" value={reg.leaseExpiryDate?.split('T')[0]} editing={editing} fieldKey="leaseExpiryDate" editValue={get('leaseExpiryDate')?.split?.('T')?.[0] ?? get('leaseExpiryDate')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+              <PickerField label="Status" value={STATUS_LABELS[reg.status]} options={STATUS_OPTIONS.map(s => STATUS_LABELS[s])} editing={editing} fieldKey="status" editValue={STATUS_LABELS[get('status')] || get('status')} onChange={(k, v) => { const s = STATUS_OPTIONS.find(o => STATUS_LABELS[o] === v); handleFieldChange(k, s || v) }} palette={palette} isDark={isDark} accent={accent} half={isTablet} />
+              <ToggleField label="Active" value={reg.isActive} editing={editing} fieldKey="isActive" editValue={get('isActive')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
             </View>
-            <PickerField label="Status" value={STATUS_LABELS[reg.status]} options={STATUS_OPTIONS.map(s => STATUS_LABELS[s])} editing={editing} fieldKey="status" editValue={STATUS_LABELS[get('status')] || get('status')} onChange={(k, v) => { const s = STATUS_OPTIONS.find(o => STATUS_LABELS[o] === v); handleFieldChange(k, s || v) }} palette={palette} isDark={isDark} accent={accent} />
             <Field label="Notes" value={reg.notes} editing={editing} fieldKey="notes" editValue={get('notes')} onChange={handleFieldChange} palette={palette} multiline />
-            <ToggleField label="Active" value={reg.isActive} editing={editing} fieldKey="isActive" editValue={get('isActive')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
           </>
         )}
 
@@ -228,22 +232,22 @@ export default function AircraftRegistrationDetailScreen() {
           <>
             <InfoBox text="Data inherited from aircraft type. Edit in Aircraft Types." palette={palette} isDark={isDark} accent={accent} />
             <Section title="Weights" accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="MTOW (kg)" value={acType.performance?.mtowKg} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="MLW (kg)" value={acType.performance?.mlwKg} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="MZFW (kg)" value={acType.performance?.mzfwKg} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="OEW (kg)" value={acType.performance?.oewKg} palette={palette} /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <ReadOnly label="MTOW (kg)" value={acType.performance?.mtowKg} palette={palette} half={isTablet} />
+              <ReadOnly label="MLW (kg)" value={acType.performance?.mlwKg} palette={palette} half={isTablet} />
+              <ReadOnly label="MZFW (kg)" value={acType.performance?.mzfwKg} palette={palette} half={isTablet} />
+              <ReadOnly label="OEW (kg)" value={acType.performance?.oewKg} palette={palette} half={isTablet} />
             </View>
             <Section title="Fuel" accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Max Fuel (kg)" value={acType.performance?.maxFuelCapacityKg} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Fuel Burn (kg/hr)" value={acType.fuelBurnRateKgPerHour} palette={palette} /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <ReadOnly label="Max Fuel (kg)" value={acType.performance?.maxFuelCapacityKg} palette={palette} half={isTablet} />
+              <ReadOnly label="Fuel Burn (kg/hr)" value={acType.fuelBurnRateKgPerHour} palette={palette} half={isTablet} />
             </View>
             <Section title="Speed & Range" accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Cruising Speed (kts)" value={acType.performance?.cruisingSpeedKts} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Max Range (NM)" value={acType.performance?.maxRangeNm} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Ceiling (FL)" value={acType.performance?.ceilingFl} palette={palette} /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <ReadOnly label="Cruising Speed (kts)" value={acType.performance?.cruisingSpeedKts} palette={palette} half={isTablet} />
+              <ReadOnly label="Max Range (NM)" value={acType.performance?.maxRangeNm} palette={palette} half={isTablet} />
+              <ReadOnly label="Ceiling (FL)" value={acType.performance?.ceilingFl} palette={palette} half={isTablet} />
             </View>
           </>
         )}
@@ -289,10 +293,10 @@ export default function AircraftRegistrationDetailScreen() {
         {activeTab === 'cargo' && acType && (
           <>
             <InfoBox text="Data inherited from aircraft type." palette={palette} isDark={isDark} accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Max Cargo (kg)" value={acType.cargo?.maxCargoWeightKg} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Cargo Positions" value={acType.cargo?.cargoPositions} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Bulk Hold (kg)" value={acType.cargo?.bulkHoldCapacityKg} palette={palette} /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <ReadOnly label="Max Cargo (kg)" value={acType.cargo?.maxCargoWeightKg} palette={palette} half={isTablet} />
+              <ReadOnly label="Cargo Positions" value={acType.cargo?.cargoPositions} palette={palette} half={isTablet} />
+              <ReadOnly label="Bulk Hold (kg)" value={acType.cargo?.bulkHoldCapacityKg} palette={palette} half={isTablet} />
             </View>
             <ReadOnly label="ULD Types" value={acType.cargo?.uldTypesAccepted?.join(', ')} palette={palette} />
           </>
@@ -302,14 +306,14 @@ export default function AircraftRegistrationDetailScreen() {
           <>
             <InfoBox text="Data inherited from aircraft type." palette={palette} isDark={isDark} accent={accent} />
             <Section title="Cockpit Rest" accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Class" value={acType.crewRest?.cockpitClass} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Positions" value={acType.crewRest?.cockpitPositions} palette={palette} /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <ReadOnly label="Class" value={acType.crewRest?.cockpitClass} palette={palette} half={isTablet} />
+              <ReadOnly label="Positions" value={acType.crewRest?.cockpitPositions} palette={palette} half={isTablet} />
             </View>
             <Section title="Cabin Rest" accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Class" value={acType.crewRest?.cabinClass} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Positions" value={acType.crewRest?.cabinPositions} palette={palette} /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <ReadOnly label="Class" value={acType.crewRest?.cabinClass} palette={palette} half={isTablet} />
+              <ReadOnly label="Positions" value={acType.crewRest?.cabinPositions} palette={palette} half={isTablet} />
             </View>
           </>
         )}
@@ -318,25 +322,25 @@ export default function AircraftRegistrationDetailScreen() {
           <>
             <InfoBox text="Data inherited from aircraft type." palette={palette} isDark={isDark} accent={accent} />
             <Section title="Weather Limitations" accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Min Ceiling (ft)" value={acType.weather?.minCeilingFt} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Min RVR (m)" value={acType.weather?.minRvrM} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Min Visibility (m)" value={acType.weather?.minVisibilityM} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Max Crosswind (kt)" value={acType.weather?.maxCrosswindKt} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Max Wind (kt)" value={acType.weather?.maxWindKt} palette={palette} /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <ReadOnly label="Min Ceiling (ft)" value={acType.weather?.minCeilingFt} palette={palette} half={isTablet} />
+              <ReadOnly label="Min RVR (m)" value={acType.weather?.minRvrM} palette={palette} half={isTablet} />
+              <ReadOnly label="Min Visibility (m)" value={acType.weather?.minVisibilityM} palette={palette} half={isTablet} />
+              <ReadOnly label="Max Crosswind (kt)" value={acType.weather?.maxCrosswindKt} palette={palette} half={isTablet} />
+              <ReadOnly label="Max Wind (kt)" value={acType.weather?.maxWindKt} palette={palette} half={isTablet} />
             </View>
             <Section title="Approach" accent={accent} />
-            <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="ILS Category" value={acType.approach?.ilsCategoryRequired} palette={palette} /></View>
-              <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Autoland" value={acType.approach?.autolandCapable ? 'Yes' : 'No'} palette={palette} /></View>
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <ReadOnly label="ILS Category" value={acType.approach?.ilsCategoryRequired} palette={palette} half={isTablet} />
+              <ReadOnly label="Autoland" value={acType.approach?.autolandCapable ? 'Yes' : 'No'} palette={palette} half={isTablet} />
             </View>
           </>
         )}
 
         {activeTab === 'location' && (
-          <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-            <View style={{ width: '50%', paddingHorizontal: 6 }}><Field label="Current Location" value={reg.currentLocationIcao} editing={editing} fieldKey="currentLocationIcao" editValue={get('currentLocationIcao')} onChange={handleFieldChange} palette={palette} mono /></View>
-            <View style={{ width: '50%', paddingHorizontal: 6 }}><ReadOnly label="Last Updated" value={reg.currentLocationUpdatedAt?.split('T')[0]} palette={palette} /></View>
+          <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+            <Field label="Current Location" value={reg.currentLocationIcao} editing={editing} fieldKey="currentLocationIcao" editValue={get('currentLocationIcao')} onChange={handleFieldChange} palette={palette} mono half={isTablet} />
+            <ReadOnly label="Last Updated" value={reg.currentLocationUpdatedAt?.split('T')[0]} palette={palette} half={isTablet} />
           </View>
         )}
 
@@ -370,22 +374,23 @@ function Section({ title, accent }: { title: string; accent: string }) {
   )
 }
 
-function ReadOnly({ label, value, palette }: { label: string; value: any; palette: Palette }) {
+function ReadOnly({ label, value, palette, half }: { label: string; value: any; palette: Palette; half?: boolean }) {
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...(half ? { width: '50%', paddingRight: 12 } : {}) }}>
       <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       <Text style={{ fontSize: 15, fontWeight: '500', color: palette.text }}>{value ?? '---'}</Text>
     </View>
   )
 }
 
-function Field({ label, value, editing, fieldKey, editValue, onChange, palette, mono, multiline }: {
+function Field({ label, value, editing, fieldKey, editValue, onChange, palette, mono, multiline, half }: {
   label: string; value: any; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; mono?: boolean; multiline?: boolean
+  onChange: (k: string, v: any) => void; palette: Palette; mono?: boolean; multiline?: boolean; half?: boolean
 }) {
+  const halfStyle = half ? { width: '50%' as const, paddingRight: 12 } : {}
   if (editing) {
     return (
-      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
         <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
         <TextInput value={editValue != null ? String(editValue) : ''} onChangeText={(v) => { if (mono) v = v.toUpperCase(); onChange(fieldKey, v) }}
           autoCapitalize={mono ? 'characters' : 'sentences'} multiline={multiline}
@@ -395,20 +400,21 @@ function Field({ label, value, editing, fieldKey, editValue, onChange, palette, 
     )
   }
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
       <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       <Text style={{ fontSize: 15, fontWeight: '500', color: palette.text, fontFamily: mono ? 'monospace' : undefined }}>{value ?? '---'}</Text>
     </View>
   )
 }
 
-function PickerField({ label, value, options, editing, fieldKey, editValue, onChange, palette, isDark, accent }: {
+function PickerField({ label, value, options, editing, fieldKey, editValue, onChange, palette, isDark, accent, half }: {
   label: string; value: any; options: string[]; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean; accent: string
+  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean; accent: string; half?: boolean
 }) {
+  const halfStyle = half ? { width: '50%' as const, paddingRight: 12 } : {}
   if (editing) {
     return (
-      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
         <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 6 }}>{label}</Text>
         <View className="flex-row flex-wrap" style={{ gap: 6 }}>
           {options.map(opt => {
@@ -425,20 +431,20 @@ function PickerField({ label, value, options, editing, fieldKey, editValue, onCh
     )
   }
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
       <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       <Text style={{ fontSize: 15, fontWeight: '500', color: palette.text }}>{value ?? '---'}</Text>
     </View>
   )
 }
 
-function ToggleField({ label, value, editing, fieldKey, editValue, onChange, palette, isDark }: {
+function ToggleField({ label, value, editing, fieldKey, editValue, onChange, palette, isDark, half }: {
   label: string; value: boolean; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean
+  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean; half?: boolean
 }) {
   const current = editing ? !!editValue : value
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...(half ? { width: '50%', paddingRight: 12 } : {}) }}>
       <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       {editing ? (
         <Pressable onPress={() => onChange(fieldKey, !editValue)} className="self-start px-3 py-1 rounded-lg"

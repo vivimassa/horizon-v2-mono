@@ -585,7 +585,7 @@ function CountCell({
   }, [value]);
 
   const commit = () => {
-    const num = Math.max(0, Math.min(9, parseInt(localVal) || 0));
+    const num = Math.max(0, parseInt(localVal) || 0);
     setLocalVal(String(num));
     onChange(num);
     setEditing(false);

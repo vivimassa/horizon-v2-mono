@@ -8,12 +8,14 @@ import {
 } from 'lucide-react-native'
 import { accentTint, modeColor, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { useOperatorId } from '../../../hooks/useOperatorId'
 import { AircraftSeatMap } from '../../../components/lopa/AircraftSeatMap'
 import { CabinEntryRow } from '../../../components/lopa/CabinEntryRow'
 
 export default function LopaConfigAddScreen() {
   const router = useRouter()
   const { palette, isDark, accent } = useAppTheme()
+  const operatorId = useOperatorId()
 
   const [cabinClasses, setCabinClasses] = useState<CabinClassRef[]>([])
   const [aircraftTypes, setAircraftTypes] = useState<AircraftTypeRef[]>([])
@@ -79,7 +81,7 @@ export default function LopaConfigAddScreen() {
     setCreating(true); setError('')
     try {
       await api.createLopaConfig({
-        operatorId: 'horizon',
+        operatorId,
         aircraftType: form.aircraftType.toUpperCase(),
         configName: form.configName,
         cabins: form.cabins,

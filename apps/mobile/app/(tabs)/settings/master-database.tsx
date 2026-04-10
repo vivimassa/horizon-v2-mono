@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router'
 import {
   Globe, Plane, Truck, Users,
   PlaneTakeoff, Building2, ArrowLeftRight, Armchair, Timer, Tag,
-  UserRound, FileCheck, PackageOpen,
+  UserRound, UsersRound, FileCheck, MapPin, ShieldCheck, CalendarDays, Activity, PackageOpen,
   ChevronRight, ChevronLeft,
   Database,
 } from 'lucide-react-native'
@@ -42,6 +42,7 @@ const SECTIONS: SectionDef[] = [
       { code: '5.1.3', label: 'Citypairs', desc: 'Routes, distances, block times', icon: ArrowLeftRight, route: '/(tabs)/settings/citypairs' },
       { code: '5.1.4', label: 'LOPA', desc: 'Cabin classes and seat configurations', icon: Armchair, route: '/(tabs)/settings/lopa' },
       { code: '5.1.5', label: 'Flight Service Types', desc: 'Define flight service types for your operation', icon: Tag, route: '/(tabs)/settings/service-types' },
+      { code: '5.1.6', label: 'Carrier Codes', desc: 'Codeshare & wetlease carrier definitions', icon: Building2, route: '/(tabs)/settings/carrier-codes' },
     ],
   },
   {
@@ -65,8 +66,15 @@ const SECTIONS: SectionDef[] = [
     icon: Users,
     color: '#7c3aed',
     cards: [
-      { code: '5.4.1', label: 'Crew Positions', desc: 'Cockpit & cabin roles, rank order', icon: UserRound, route: '' },
-      { code: '5.4.2', label: 'Expiry Codes', desc: 'Qualification validity & formulas', icon: FileCheck, route: '' },
+      { code: '5.4.1', label: 'Crew Bases', desc: 'Airport crew home bases & reporting times', icon: MapPin, route: '/(tabs)/settings/crew-bases' },
+      { code: '5.4.2', label: 'Crew Positions', desc: 'Cockpit & cabin roles, rank order', icon: UserRound, route: '/(tabs)/settings/crew-positions' },
+      { code: '5.4.3', label: 'Expiry Codes', desc: 'Qualification validity & formulas', icon: FileCheck, route: '/(tabs)/settings/expiry-codes' },
+      { code: '5.4.4', label: 'Activity Codes', desc: 'Duty, standby, training & leave classification', icon: Activity, route: '/(tabs)/settings/activity-codes' },
+      { code: '5.4.5', label: 'Crew Complements', desc: 'Aircraft type crew requirements & templates', icon: Users, route: '/(tabs)/settings/crew-complements' },
+      { code: '5.4.6', label: 'Crew Groups', desc: 'Scheduling groups & crew classification', icon: UsersRound, route: '/(tabs)/settings/crew-groups' },
+      { code: '5.4.7', label: 'FDT Rules', desc: 'Flight duty time limitations & regulatory framework', icon: ShieldCheck, route: '/(tabs)/settings/fdt-rules' },
+      { code: '5.4.8', label: 'Off/Duty Patterns', desc: 'ON/OFF rotation patterns for crew rostering', icon: CalendarDays, route: '/(tabs)/settings/duty-patterns' },
+      { code: '5.4.9', label: 'MPP Lead Times', desc: 'Training & recruitment lead times for manpower planning', icon: Timer, route: '/(tabs)/settings/mpp-lead-times' },
     ],
   },
 ]

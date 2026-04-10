@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
 import { Text, View, Pressable, Alert, ScrollView, TextInput } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -12,9 +12,17 @@ import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
 import { useOperatorId } from '../../../hooks/useOperatorId'
 import { ScheduleToolbar } from '../../../components/schedule/schedule-toolbar'
 import { RibbonToolbar } from '../../../components/schedule/ribbon-toolbar'
+import { ScheduleGrid } from '../../../components/schedule/schedule-grid'
 import { ScheduleTable } from '../../../components/schedule/schedule-table'
 import { ScheduleCardList } from '../../../components/schedule/schedule-card-list'
 import { ScheduleFilterSheet, type ScheduleFilters } from '../../../components/schedule/schedule-filter-sheet'
+import { ContextMenu } from '../../../components/schedule/context-menu'
+import { FindReplaceDialog } from '../../../components/schedule/find-replace-dialog'
+import { ScenarioPanel } from '../../../components/schedule/scenario-panel'
+import { ImportDialog } from '../../../components/schedule/import-dialog'
+import { ExportDialog } from '../../../components/schedule/export-dialog'
+import { FloatingSaveBar } from '../../../components/schedule/floating-save-bar'
+import { useScheduleGridStore } from '../../../stores/useScheduleGridStore'
 
 export default function ScheduleGridScreen() {
   const { palette, isDark, accent } = useAppTheme()
@@ -35,12 +43,30 @@ export default function ScheduleGridScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
+  // Dialogs
+  const [showContextMenu, setShowContextMenu] = useState(false)
+  const [showFindReplace, setShowFindReplace] = useState(false)
+  const [showScenarioPanel, setShowScenarioPanel] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+  const [showExport, setShowExport] = useState(false)
+
   // Filters & sorting
   const [filters, setFilters] = useState<ScheduleFilters>({ dateFrom: '', dateTo: '', dep: '', arr: '', acType: '', status: '' })
   const [showFilter, setShowFilter] = useState(false)
   const [scenarioId, setScenarioId] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState('sortOrder')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  // Sync store dirty state back to local state for save operations (tablet)
+  useEffect(() => {
+    if (!isTablet) return
+    const unsub = useScheduleGridStore.subscribe((state) => {
+      setDirtyMap(state.dirtyMap)
+      setNewIds(state.newRowIds)
+      setDeletedIds(state.deletedIds)
+    })
+    return unsub
+  }, [isTablet])
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -64,6 +90,13 @@ export default function ScheduleGridScreen() {
       ])
       setFlights(f)
       setScenarios(s)
+      // Sync to Zustand store for grid
+      const gridStore = useScheduleGridStore.getState()
+      gridStore.setRows(f)
+      gridStore.clearSeparators()
+      for (const flight of f) {
+        if ((flight.formatting as any)?.separatorBelow) gridStore.addSeparator(flight._id)
+      }
     } catch (err: any) { setError(err.message || 'Failed to load schedule') }
     finally { setLoading(false) }
   }, [operatorId, scenarioId, filters, sortKey, sortDir])
@@ -187,19 +220,52 @@ export default function ScheduleGridScreen() {
 
   const handleLongPress = useCallback((id: string) => {
     setSelectedId(id)
-    Alert.alert('Flight Options', undefined, [
-      { text: 'Edit', onPress: () => router.push({ pathname: '/(tabs)/network/schedule-flight-detail' as any, params: { id } }) },
-      { text: 'Delete', style: 'destructive', onPress: () => {
-        if (newIds.has(id)) {
-          setFlights(prev => prev.filter(f => f._id !== id))
-          setNewIds(prev => { const n = new Set(prev); n.delete(id); return n })
-        } else {
-          setDeletedIds(prev => new Set(prev).add(id))
-        }
-      }},
-      { text: 'Cancel', style: 'cancel' },
-    ])
-  }, [newIds, router])
+    if (isTablet) {
+      setShowContextMenu(true)
+    } else {
+      Alert.alert('Flight Options', undefined, [
+        { text: 'Edit', onPress: () => router.push({ pathname: '/(tabs)/network/schedule-flight-detail' as any, params: { id } }) },
+        { text: 'Delete', style: 'destructive', onPress: () => {
+          if (newIds.has(id)) {
+            setFlights(prev => prev.filter(f => f._id !== id))
+            setNewIds(prev => { const n = new Set(prev); n.delete(id); return n })
+          } else {
+            setDeletedIds(prev => new Set(prev).add(id))
+          }
+        }},
+        { text: 'Cancel', style: 'cancel' },
+      ])
+    }
+  }, [newIds, router, isTablet])
+
+  const handleFindReplace = useCallback((id: string, colKey: string, value: string) => {
+    setDirtyMap(prev => {
+      const next = new Map(prev)
+      const existing = next.get(id) ?? {}
+      next.set(id, { ...existing, [colKey]: value })
+      return next
+    })
+  }, [])
+
+  const handleContextInsertRow = useCallback(() => {
+    handleAddFlight()
+  }, [handleAddFlight])
+
+  const handleContextSeparateCycle = useCallback(() => {
+    if (!selectedId) return
+    const store = useScheduleGridStore.getState()
+    store.addSeparator(selectedId)
+  }, [selectedId])
+
+  const handleContextChangeStatus = useCallback((status: string) => {
+    if (!selectedId) return
+    setDirtyMap(prev => {
+      const next = new Map(prev)
+      const existing = next.get(selectedId) ?? {}
+      next.set(selectedId, { ...existing, status: status as ScheduledFlightRef['status'] })
+      return next
+    })
+  }, [selectedId])
 
   return (
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
@@ -240,9 +306,9 @@ export default function ScheduleGridScreen() {
         <RibbonToolbar
           onAddFlight={handleAddFlight} onInsertFlight={handleAddFlight}
           onDeleteFlight={handleDeleteSelected} onSave={handleSave}
-          onImport={undefined} onExport={undefined}
-          onScenario={undefined} onMessage={undefined}
-          onFind={undefined} onReplace={undefined} onSaveAs={undefined}
+          onImport={() => setShowImport(true)} onExport={() => setShowExport(true)}
+          onScenario={() => setShowScenarioPanel(true)} onMessage={undefined}
+          onFind={() => setShowFindReplace(true)} onReplace={() => setShowFindReplace(true)} onSaveAs={undefined}
           hasDirty={hasDirty} hasSelection={!!selectedId} saving={saving}
           palette={palette} accent={accent} isDark={isDark} />
       ) : (
@@ -271,9 +337,8 @@ export default function ScheduleGridScreen() {
                 palette={palette} accent={accent} isDark={isDark} />
             </View>
           )}
-          <ScheduleTable
-            flights={flights} dirtyMap={dirtyMap} newIds={newIds} deletedIds={deletedIds}
-            selectedId={selectedId} onSelect={setSelectedId} onCellEdit={handleCellEdit}
+          <ScheduleGrid
+            flights={flights}
             onLongPress={handleLongPress}
             palette={palette} accent={accent} isDark={isDark}
             sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
@@ -287,28 +352,10 @@ export default function ScheduleGridScreen() {
 
       {/* Floating save bar */}
       {hasDirty && (
-        <View className="absolute bottom-6 left-4 right-4 flex-row items-center rounded-xl px-4 py-3"
-          style={{ backgroundColor: palette.card, borderWidth: 1, borderColor: palette.cardBorder,
-            shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
-          <View className="flex-1">
-            <Text style={{ fontSize: 13, fontWeight: '600', color: palette.text }}>
-              {dirtyCount > 0 ? `${dirtyCount} modified` : ''}
-              {dirtyCount > 0 && (newCount > 0 || deleteCount > 0) ? ' · ' : ''}
-              {newCount > 0 ? `${newCount} new` : ''}
-              {newCount > 0 && deleteCount > 0 ? ' · ' : ''}
-              {deleteCount > 0 ? `${deleteCount} deleted` : ''}
-            </Text>
-          </View>
-          <Pressable onPress={handleDiscard} className="px-3 py-2 rounded-lg mr-2 active:opacity-70"
-            style={{ backgroundColor: isDark ? 'rgba(220,38,38,0.15)' : '#fee2e2' }}>
-            <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#f87171' : '#dc2626' }}>Discard</Text>
-          </Pressable>
-          <Pressable onPress={handleSave} disabled={saving}
-            className="px-4 py-2 rounded-lg active:opacity-70"
-            style={{ backgroundColor: accent, opacity: saving ? 0.5 : 1 }}>
-            <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving...' : 'Save'}</Text>
-          </Pressable>
-        </View>
+        <FloatingSaveBar
+          dirtyCount={dirtyCount} newCount={newCount} deleteCount={deleteCount}
+          saving={saving} onSave={handleSave} onDiscard={handleDiscard}
+          palette={palette} accent={accent} isDark={isDark} />
       )}
 
       {/* Filter sheet — phone only (tablet uses sidebar) */}
@@ -317,6 +364,36 @@ export default function ScheduleGridScreen() {
           filters={filters} onApply={handleApplyFilters}
           palette={palette} accent={accent} isDark={isDark} isTablet={false} />
       )}
+
+      {/* Context menu — tablet only */}
+      <ContextMenu visible={showContextMenu} onClose={() => setShowContextMenu(false)}
+        onCopy={() => useScheduleGridStore.getState().copyCell()}
+        onCut={() => useScheduleGridStore.getState().cutCell()}
+        onPaste={() => useScheduleGridStore.getState().pasteCell()}
+        onInsertRow={handleContextInsertRow}
+        onSeparateCycle={handleContextSeparateCycle}
+        onChangeStatus={handleContextChangeStatus}
+        onDeleteRow={handleDeleteSelected}
+        palette={palette} isDark={isDark} />
+
+      {/* Find/Replace */}
+      <FindReplaceDialog visible={showFindReplace} onClose={() => setShowFindReplace(false)}
+        flights={flights} dirtyMap={dirtyMap} onReplace={handleFindReplace}
+        palette={palette} accent={accent} isDark={isDark} />
+
+      {/* Scenario panel */}
+      <ScenarioPanel visible={showScenarioPanel} onClose={() => setShowScenarioPanel(false)}
+        scenarios={scenarios} activeScenarioId={scenarioId}
+        onSelect={(id) => setScenarioId(id)} onRefresh={fetchData}
+        operatorId={operatorId} palette={palette} accent={accent} isDark={isDark} />
+
+      {/* Import/Export */}
+      <ImportDialog visible={showImport} onClose={() => setShowImport(false)}
+        onImportComplete={fetchData} operatorId={operatorId} scenarioId={scenarioId}
+        palette={palette} accent={accent} isDark={isDark} apiBaseUrl="http://localhost:3002" />
+      <ExportDialog visible={showExport} onClose={() => setShowExport(false)}
+        operatorId={operatorId} scenarioId={scenarioId}
+        palette={palette} accent={accent} isDark={isDark} />
     </SafeAreaView>
     </View>
   )

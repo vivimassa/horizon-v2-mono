@@ -11,6 +11,7 @@ import { useDevice } from '../../../hooks/useDevice'
 import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
 import { useOperatorId } from '../../../hooks/useOperatorId'
 import { ScheduleToolbar } from '../../../components/schedule/schedule-toolbar'
+import { RibbonToolbar } from '../../../components/schedule/ribbon-toolbar'
 import { ScheduleTable } from '../../../components/schedule/schedule-table'
 import { ScheduleCardList } from '../../../components/schedule/schedule-card-list'
 import { ScheduleFilterSheet, type ScheduleFilters } from '../../../components/schedule/schedule-filter-sheet'
@@ -234,12 +235,23 @@ export default function ScheduleGridScreen() {
         )}
       </View>
 
-      {/* Toolbar */}
-      <ScheduleToolbar
-        onAdd={handleAddFlight} onSave={handleSave} onFilter={() => setShowFilter(true)}
-        onDeleteSelected={handleDeleteSelected}
-        hasDirty={hasDirty} hasSelected={!!selectedId} saving={saving}
-        isTablet={isTablet} accent={accent} palette={palette} isDark={isDark} />
+      {/* Toolbar — full ribbon on tablet, compact strip on phone */}
+      {isTablet ? (
+        <RibbonToolbar
+          onAddFlight={handleAddFlight} onInsertFlight={handleAddFlight}
+          onDeleteFlight={handleDeleteSelected} onSave={handleSave}
+          onImport={undefined} onExport={undefined}
+          onScenario={undefined} onMessage={undefined}
+          onFind={undefined} onReplace={undefined} onSaveAs={undefined}
+          hasDirty={hasDirty} hasSelection={!!selectedId} saving={saving}
+          palette={palette} accent={accent} isDark={isDark} />
+      ) : (
+        <ScheduleToolbar
+          onAdd={handleAddFlight} onSave={handleSave} onFilter={() => setShowFilter(true)}
+          onDeleteSelected={handleDeleteSelected}
+          hasDirty={hasDirty} hasSelected={!!selectedId} saving={saving}
+          isTablet={false} accent={accent} palette={palette} isDark={isDark} />
+      )}
 
       {/* Content */}
       {loading ? (

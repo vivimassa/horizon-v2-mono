@@ -272,31 +272,28 @@ const CabinClassRow = memo(function CabinClassRow({
   return (
     <Pressable
       onPress={onPress}
-      className="flex-row items-center active:opacity-70"
+      className="active:opacity-70"
       style={{
         paddingHorizontal: 16, paddingVertical: 12,
         borderBottomWidth: 1, borderBottomColor: palette.border,
       }}
     >
-      <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: color, marginRight: 10 }} />
-      <Text style={{ fontSize: 15, fontWeight: '700', fontFamily: 'monospace', color: accent, width: 32 }}>
-        {cc.code}
-      </Text>
-      <View className="flex-1 ml-2">
-        <Text style={{ fontSize: 15, fontWeight: '500', color: palette.text }} numberOfLines={1}>
-          {cc.name}
+      <View className="flex-row items-center">
+        <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: color, marginRight: 10 }} />
+        <Text style={{ fontSize: 15, fontWeight: '700', fontFamily: 'monospace', color: accent, width: 32 }}>
+          {cc.code}
         </Text>
-        {cc.seatLayout && (
-          <Text style={{ fontSize: 13, color: palette.textSecondary, marginTop: 1 }}>
-            {cc.seatLayout} layout{cc.seatType ? ` · ${cc.seatType}` : ''}
+        <View className="flex-1 ml-2">
+          <Text style={{ fontSize: 15, fontWeight: '500', color: palette.text }} numberOfLines={1}>
+            {cc.name}
           </Text>
-        )}
-      </View>
-      <View className="flex-row items-center" style={{ gap: 6 }}>
-        <Text style={{ fontSize: 11, fontFamily: 'monospace', color: palette.textTertiary }}>
-          #{cc.sortOrder}
-        </Text>
-        <ChevronRight size={14} color={palette.textTertiary} strokeWidth={1.8} />
+        </View>
+        <View className="flex-row items-center" style={{ gap: 6 }}>
+          <Text style={{ fontSize: 13, fontFamily: 'monospace', color: palette.textTertiary }}>
+            #{cc.sortOrder}
+          </Text>
+          <ChevronRight size={14} color={palette.textTertiary} strokeWidth={1.8} />
+        </View>
       </View>
     </Pressable>
   )

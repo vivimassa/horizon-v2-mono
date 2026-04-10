@@ -59,7 +59,7 @@ export const RibbonToolbar = memo(function RibbonToolbar({
 
   if (collapsed) {
     return (
-      <View style={{ backgroundColor: glassBg, borderBottomWidth: 1, borderBottomColor: glassBorder }}>
+      <View style={{ backgroundColor: glassBg, borderWidth: 1, borderColor: glassBorder, borderRadius: 16, margin: 8, marginBottom: 4, overflow: 'hidden' }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 4, height: 52, gap: 2 }}>
           <SmBtn icon={Plus} onPress={onAddFlight} palette={palette} isDark={isDark} />
@@ -89,9 +89,9 @@ export const RibbonToolbar = memo(function RibbonToolbar({
   }
 
   return (
-    <View style={{ backgroundColor: glassBg, borderBottomWidth: 1, borderBottomColor: glassBorder }}>
+    <View style={{ backgroundColor: glassBg, borderWidth: 1, borderColor: glassBorder, borderRadius: 16, margin: 8, marginBottom: 4, height: 110, overflow: 'hidden' }}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ minHeight: 110, alignItems: 'stretch' }}>
+        contentContainerStyle={{ height: 110, alignItems: 'stretch' }}>
 
         {/* Flight */}
         <RibbonSection label="Flight">
@@ -102,7 +102,7 @@ export const RibbonToolbar = memo(function RibbonToolbar({
 
         {/* Clipboard */}
         <RibbonSection label="Clipboard">
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, minWidth: 88 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, maxWidth: 88 }}>
             <SmBtn icon={Scissors} onPress={() => store.cutCell()} disabled={!hasSelection} palette={palette} isDark={isDark} />
             <SmBtn icon={Copy} onPress={() => store.copyCell()} disabled={!hasSelection} palette={palette} isDark={isDark} />
             <SmBtn icon={ClipboardPaste} onPress={() => store.pasteCell()} palette={palette} isDark={isDark} />
@@ -113,21 +113,18 @@ export const RibbonToolbar = memo(function RibbonToolbar({
         <Divider isDark={isDark} vertical />
 
         {/* Font & Alignment */}
-        <RibbonSection label="Font & Alignment" wide>
-          <View style={{ gap: 6 }}>
-            {/* Row 1: B I U | Color pickers | Alignment */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <SmBtn icon={Bold} onPress={() => store.toggleBold()} disabled={!hasSelection} palette={palette} isDark={isDark} />
-              <SmBtn icon={Italic} onPress={() => store.toggleItalic()} disabled={!hasSelection} palette={palette} isDark={isDark} />
-              <SmBtn icon={Underline} onPress={() => store.toggleUnderline()} disabled={!hasSelection} palette={palette} isDark={isDark} />
-              <MiniDivider isDark={isDark} />
-              <SmBtn icon={Type} onPress={() => setColorPicker({ type: 'text' })} disabled={!hasSelection} palette={palette} isDark={isDark} />
-              <SmBtn icon={Palette} onPress={() => setColorPicker({ type: 'bg' })} disabled={!hasSelection} palette={palette} isDark={isDark} />
-              <MiniDivider isDark={isDark} />
-              <SmBtn icon={AlignLeft} onPress={() => applyAlign('left')} disabled={!hasSelection} palette={palette} isDark={isDark} />
-              <SmBtn icon={AlignCenter} onPress={() => applyAlign('center')} disabled={!hasSelection} palette={palette} isDark={isDark} />
-              <SmBtn icon={AlignRight} onPress={() => applyAlign('right')} disabled={!hasSelection} palette={palette} isDark={isDark} />
-            </View>
+        <RibbonSection label="Font & Alignment">
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, maxWidth: 180 }}>
+            {/* Row 1: B I U | Text color | Fill color */}
+            <SmBtn icon={Bold} onPress={() => store.toggleBold()} disabled={!hasSelection} palette={palette} isDark={isDark} />
+            <SmBtn icon={Italic} onPress={() => store.toggleItalic()} disabled={!hasSelection} palette={palette} isDark={isDark} />
+            <SmBtn icon={Underline} onPress={() => store.toggleUnderline()} disabled={!hasSelection} palette={palette} isDark={isDark} />
+            <SmBtn icon={Type} onPress={() => setColorPicker({ type: 'text' })} disabled={!hasSelection} palette={palette} isDark={isDark} />
+            {/* Row 2: Fill color | Align L C R */}
+            <SmBtn icon={Palette} onPress={() => setColorPicker({ type: 'bg' })} disabled={!hasSelection} palette={palette} isDark={isDark} />
+            <SmBtn icon={AlignLeft} onPress={() => applyAlign('left')} disabled={!hasSelection} palette={palette} isDark={isDark} />
+            <SmBtn icon={AlignCenter} onPress={() => applyAlign('center')} disabled={!hasSelection} palette={palette} isDark={isDark} />
+            <SmBtn icon={AlignRight} onPress={() => applyAlign('right')} disabled={!hasSelection} palette={palette} isDark={isDark} />
           </View>
         </RibbonSection>
         <Divider isDark={isDark} vertical />
@@ -203,11 +200,11 @@ function applyAlign(align: 'left' | 'center' | 'right') {
 
 function RibbonSection({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
   return (
-    <View style={{ alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, paddingBottom: 6, paddingHorizontal: wide ? 16 : 12 }}>
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 6 }}>
+    <View style={{ alignItems: 'center', justifyContent: 'flex-end', paddingTop: 8, paddingBottom: 4, paddingHorizontal: wide ? 16 : 12, height: 110 }}>
+      <View style={{ justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 6, flex: 1 }}>
         {children}
       </View>
-      <View style={{ width: '100%', alignItems: 'center', borderTopWidth: 1, borderTopColor: 'rgba(128,128,128,0.1)', paddingTop: 4, marginTop: 4 }}>
+      <View style={{ width: '100%', alignItems: 'center', borderTopWidth: 1, borderTopColor: 'rgba(128,128,128,0.1)', paddingTop: 3, marginTop: 3 }}>
         <Text style={{ fontSize: 11, fontWeight: '500', color: 'rgba(128,128,128,0.5)' }}>{label}</Text>
       </View>
     </View>

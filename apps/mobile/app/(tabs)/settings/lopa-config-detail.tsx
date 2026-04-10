@@ -8,6 +8,7 @@ import {
 } from 'lucide-react-native'
 import { accentTint, modeColor, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { useDevice } from '../../../hooks/useDevice'
 import { AircraftSeatMap } from '../../../components/lopa/AircraftSeatMap'
 import { CabinEntryRow } from '../../../components/lopa/CabinEntryRow'
 
@@ -15,6 +16,7 @@ export default function LopaConfigDetailScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { palette, isDark, accent } = useAppTheme()
+  const { isTablet } = useDevice()
 
   const [config, setConfig] = useState<LopaConfigRef | null>(null)
   const [cabinClasses, setCabinClasses] = useState<CabinClassRef[]>([])
@@ -128,7 +130,7 @@ export default function LopaConfigDetailScreen() {
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
       {/* Header */}
-      <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View className="px-4 pt-4 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center flex-1 mr-2">
             <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
@@ -157,9 +159,9 @@ export default function LopaConfigDetailScreen() {
                   <X size={20} color={palette.textSecondary} strokeWidth={1.8} />
                 </Pressable>
                 <Pressable onPress={handleSave} disabled={saving}
-                  className="px-3 py-1.5 rounded-lg active:opacity-60"
+                  className="px-4 py-2.5 rounded-lg active:opacity-60"
                   style={{ backgroundColor: accent }}>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving...' : 'Save'}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving...' : 'Save'}</Text>
                 </Pressable>
               </>
             ) : (
@@ -168,10 +170,10 @@ export default function LopaConfigDetailScreen() {
                   <Trash2 size={18} color={palette.textTertiary} strokeWidth={1.8} />
                 </Pressable>
                 <Pressable onPress={handleEdit}
-                  className="flex-row items-center px-3 py-1.5 rounded-lg active:opacity-60"
+                  className="flex-row items-center px-4 py-2.5 rounded-lg active:opacity-60"
                   style={{ backgroundColor: accentTint(accent, isDark ? 0.15 : 0.08) }}>
                   <Pencil size={15} color={accent} strokeWidth={1.8} />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: accent, marginLeft: 6 }}>Edit</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: accent, marginLeft: 6 }}>Edit</Text>
                 </Pressable>
               </>
             )}
@@ -273,16 +275,18 @@ export default function LopaConfigDetailScreen() {
             <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text }}>Details</Text>
           </View>
 
-          <Field label="Aircraft Type" value={config.aircraftType} editing={editing} fieldKey="aircraftType"
-            editValue={get('aircraftType')} onChange={handleFieldChange} palette={palette} mono />
-          <Field label="Config Name" value={config.configName} editing={editing} fieldKey="configName"
-            editValue={get('configName')} onChange={handleFieldChange} palette={palette} />
-          <ToggleField label="Default" value={config.isDefault} editing={editing} fieldKey="isDefault"
-            editValue={get('isDefault')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
-          <Field label="Notes" value={config.notes} editing={editing} fieldKey="notes"
-            editValue={get('notes')} onChange={handleFieldChange} palette={palette} multiline />
-          <ToggleField label="Active" value={config.isActive} editing={editing} fieldKey="isActive"
-            editValue={get('isActive')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
+          <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+            <Field label="Aircraft Type" value={config.aircraftType} editing={editing} fieldKey="aircraftType"
+              editValue={get('aircraftType')} onChange={handleFieldChange} palette={palette} mono half={isTablet} />
+            <Field label="Config Name" value={config.configName} editing={editing} fieldKey="configName"
+              editValue={get('configName')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <ToggleField label="Default" value={config.isDefault} editing={editing} fieldKey="isDefault"
+              editValue={get('isDefault')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+            <ToggleField label="Active" value={config.isActive} editing={editing} fieldKey="isActive"
+              editValue={get('isActive')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+            <Field label="Notes" value={config.notes} editing={editing} fieldKey="notes"
+              editValue={get('notes')} onChange={handleFieldChange} palette={palette} multiline />
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -290,13 +294,14 @@ export default function LopaConfigDetailScreen() {
 }
 
 // ── Field ──
-function Field({ label, value, editing, fieldKey, editValue, onChange, palette, mono, multiline }: {
+function Field({ label, value, editing, fieldKey, editValue, onChange, palette, mono, multiline, half }: {
   label: string; value: any; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; mono?: boolean; multiline?: boolean
+  onChange: (k: string, v: any) => void; palette: Palette; mono?: boolean; multiline?: boolean; half?: boolean
 }) {
+  const halfStyle = half ? { width: '50%' as const, paddingRight: 12 } : {}
   if (editing) {
     return (
-      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
         <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
         <TextInput
           value={editValue != null ? String(editValue) : ''}
@@ -315,7 +320,7 @@ function Field({ label, value, editing, fieldKey, editValue, onChange, palette, 
     )
   }
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
       <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       <Text style={{ fontSize: 15, fontWeight: '500', color: palette.text, fontFamily: mono ? 'monospace' : undefined }}>
         {value ?? '---'}
@@ -325,13 +330,13 @@ function Field({ label, value, editing, fieldKey, editValue, onChange, palette, 
 }
 
 // ── Toggle field ──
-function ToggleField({ label, value, editing, fieldKey, editValue, onChange, palette, isDark }: {
+function ToggleField({ label, value, editing, fieldKey, editValue, onChange, palette, isDark, half }: {
   label: string; value: boolean; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean
+  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean; half?: boolean
 }) {
   const current = editing ? !!editValue : value
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...(half ? { width: '50%', paddingRight: 12 } : {}) }}>
       <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       {editing ? (
         <Pressable onPress={() => onChange(fieldKey, !editValue)}

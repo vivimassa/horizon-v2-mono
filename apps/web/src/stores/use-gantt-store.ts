@@ -40,6 +40,7 @@ interface GanttState {
   barLabelMode: BarLabelMode
   fleetSortOrder: FleetSortOrder
   showTat: boolean
+  showSlots: boolean
   containerWidth: number
 
   // Utilization targets (acTypeIcao → target block hours per day)
@@ -108,6 +109,7 @@ interface GanttState {
   setBarLabelMode: (mode: BarLabelMode) => void
   setFleetSortOrder: (order: FleetSortOrder) => void
   toggleTat: () => void
+  toggleSlots: () => void
   setUtilizationTargets: (targets: Map<string, number>) => void
   selectFlight: (id: string, multi?: boolean) => void
   clearSelection: () => void
@@ -264,6 +266,7 @@ export const useGanttStore = create<GanttState>((set, get) => {
     barLabelMode: 'flightNo',
     fleetSortOrder: 'type' as FleetSortOrder,
     showTat: true,
+    showSlots: true,
     utilizationTargets: new Map(),
     _forcedPlacements: null,
     containerWidth: 1200,
@@ -353,6 +356,7 @@ export const useGanttStore = create<GanttState>((set, get) => {
     },
 
     toggleTat: () => set({ showTat: !get().showTat }),
+    toggleSlots: () => set({ showSlots: !get().showSlots }),
 
     selectFlight: (id, multi = false) => {
       const sel = multi ? new Set(get().selectedFlightIds) : new Set<string>()

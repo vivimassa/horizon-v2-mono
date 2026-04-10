@@ -101,7 +101,7 @@ export default function CountryDetailScreen() {
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
       {/* Header */}
-      <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View className="px-4 pt-4 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center flex-1 mr-2">
             <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
@@ -129,9 +129,9 @@ export default function CountryDetailScreen() {
                   <X size={20} color={palette.textSecondary} strokeWidth={1.8} />
                 </Pressable>
                 <Pressable onPress={handleSave} disabled={saving}
-                  className="px-3 py-1.5 rounded-lg active:opacity-60"
+                  className="px-4 py-2.5 rounded-lg active:opacity-60"
                   style={{ backgroundColor: accent }}>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving…' : 'Save'}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving…' : 'Save'}</Text>
                 </Pressable>
               </>
             ) : (
@@ -140,10 +140,10 @@ export default function CountryDetailScreen() {
                   <Trash2 size={18} color={palette.textTertiary} strokeWidth={1.8} />
                 </Pressable>
                 <Pressable onPress={() => { setDraft({}); setEditing(true) }}
-                  className="flex-row items-center px-3 py-1.5 rounded-lg active:opacity-60"
+                  className="flex-row items-center px-4 py-2.5 rounded-lg active:opacity-60"
                   style={{ backgroundColor: accentTint(accent, isDark ? 0.15 : 0.08) }}>
                   <Pencil size={14} color={accent} strokeWidth={1.8} />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: accent, marginLeft: 6 }}>Edit</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: accent, marginLeft: 6 }}>Edit</Text>
                 </Pressable>
               </>
             )}
@@ -165,7 +165,7 @@ export default function CountryDetailScreen() {
 
       {/* Map */}
       {country.latitude != null && country.longitude != null && (
-        <View style={{ height: isTablet ? 350 : 250, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+        <View style={{ height: isTablet ? 300 : 250, borderBottomWidth: 1, borderBottomColor: palette.border }}>
           <MapView
             style={{ flex: 1 }}
             initialRegion={{
@@ -218,27 +218,27 @@ export default function CountryDetailScreen() {
       {/* Tab content */}
       <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
         {activeTab === 'basic' && (
-          <>
-            <Field label="Country Name" value={country.name} editing={editing} fieldKey="name" editValue={get('name')} onChange={handleFieldChange} palette={palette} />
-            <Field label="Official Name" value={country.officialName} editing={editing} fieldKey="officialName" editValue={get('officialName')} onChange={handleFieldChange} palette={palette} />
-            <Field label="ISO 2 Code" value={country.isoCode2} editing={editing} fieldKey="isoCode2" editValue={get('isoCode2')} onChange={handleFieldChange} palette={palette} />
-            <Field label="ISO 3 Code" value={country.isoCode3} editing={editing} fieldKey="isoCode3" editValue={get('isoCode3')} onChange={handleFieldChange} palette={palette} />
-            <Field label="Region" value={country.region} editing={editing} fieldKey="region" editValue={get('region')} onChange={handleFieldChange} palette={palette} />
-            <Field label="Sub-region" value={country.subRegion} editing={editing} fieldKey="subRegion" editValue={get('subRegion')} onChange={handleFieldChange} palette={palette} />
-            <Field label="ICAO Prefix" value={country.icaoPrefix} editing={editing} fieldKey="icaoPrefix" editValue={get('icaoPrefix')} onChange={handleFieldChange} palette={palette} />
-            <Field label="Flag Emoji" value={country.flagEmoji} editing={editing} fieldKey="flagEmoji" editValue={get('flagEmoji')} onChange={handleFieldChange} palette={palette} />
-            <ToggleField label="Active" value={country.isActive} editing={editing} fieldKey="isActive" editValue={get('isActive')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
-          </>
+          <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+            <Field label="Country Name" value={country.name} editing={editing} fieldKey="name" editValue={get('name')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <Field label="Official Name" value={country.officialName} editing={editing} fieldKey="officialName" editValue={get('officialName')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <Field label="ISO 2 Code" value={country.isoCode2} editing={editing} fieldKey="isoCode2" editValue={get('isoCode2')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <Field label="ISO 3 Code" value={country.isoCode3} editing={editing} fieldKey="isoCode3" editValue={get('isoCode3')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <Field label="Region" value={country.region} editing={editing} fieldKey="region" editValue={get('region')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <Field label="Sub-region" value={country.subRegion} editing={editing} fieldKey="subRegion" editValue={get('subRegion')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <Field label="ICAO Prefix" value={country.icaoPrefix} editing={editing} fieldKey="icaoPrefix" editValue={get('icaoPrefix')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <Field label="Flag Emoji" value={country.flagEmoji} editing={editing} fieldKey="flagEmoji" editValue={get('flagEmoji')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <ToggleField label="Active" value={country.isActive} editing={editing} fieldKey="isActive" editValue={get('isActive')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+          </View>
         )}
         {activeTab === 'extra' && (
-          <>
-            <Field label="Currency Code" value={country.currencyCode} editing={editing} fieldKey="currencyCode" editValue={get('currencyCode')} onChange={handleFieldChange} palette={palette} />
-            <Field label="Currency Name" value={country.currencyName} editing={editing} fieldKey="currencyName" editValue={get('currencyName')} onChange={handleFieldChange} palette={palette} />
-            <Field label="Currency Symbol" value={country.currencySymbol} editing={editing} fieldKey="currencySymbol" editValue={get('currencySymbol')} onChange={handleFieldChange} palette={palette} />
-            <Field label="Phone Code" value={country.phoneCode} editing={editing} fieldKey="phoneCode" editValue={get('phoneCode')} onChange={handleFieldChange} palette={palette} />
-            <Field label="Latitude" value={country.latitude?.toFixed(6)} editing={editing} fieldKey="latitude" editValue={get('latitude')} onChange={handleFieldChange} palette={palette} numeric />
-            <Field label="Longitude" value={country.longitude?.toFixed(6)} editing={editing} fieldKey="longitude" editValue={get('longitude')} onChange={handleFieldChange} palette={palette} numeric />
-          </>
+          <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+            <Field label="Currency Code" value={country.currencyCode} editing={editing} fieldKey="currencyCode" editValue={get('currencyCode')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <Field label="Currency Name" value={country.currencyName} editing={editing} fieldKey="currencyName" editValue={get('currencyName')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <Field label="Currency Symbol" value={country.currencySymbol} editing={editing} fieldKey="currencySymbol" editValue={get('currencySymbol')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <Field label="Phone Code" value={country.phoneCode} editing={editing} fieldKey="phoneCode" editValue={get('phoneCode')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <Field label="Latitude" value={country.latitude?.toFixed(6)} editing={editing} fieldKey="latitude" editValue={get('latitude')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+            <Field label="Longitude" value={country.longitude?.toFixed(6)} editing={editing} fieldKey="longitude" editValue={get('longitude')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -247,13 +247,14 @@ export default function CountryDetailScreen() {
 
 // ── Field components ──
 
-function Field({ label, value, editing, fieldKey, editValue, onChange, palette, numeric }: {
+function Field({ label, value, editing, fieldKey, editValue, onChange, palette, numeric, half }: {
   label: string; value: any; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; numeric?: boolean
+  onChange: (k: string, v: any) => void; palette: Palette; numeric?: boolean; half?: boolean
 }) {
+  const halfStyle = half ? { width: '50%' as const, paddingRight: 12 } : {}
   if (editing) {
     return (
-      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
         <Text style={{ fontSize: 11, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
         <TextInput
           value={editValue != null ? String(editValue) : ''}
@@ -266,20 +267,20 @@ function Field({ label, value, editing, fieldKey, editValue, onChange, palette, 
     )
   }
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
       <Text style={{ fontSize: 11, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       <Text style={{ fontSize: 14, fontWeight: '500', color: palette.text }}>{value ?? '—'}</Text>
     </View>
   )
 }
 
-function ToggleField({ label, value, editing, fieldKey, editValue, onChange, palette, isDark }: {
+function ToggleField({ label, value, editing, fieldKey, editValue, onChange, palette, isDark, half }: {
   label: string; value: boolean; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean
+  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean; half?: boolean
 }) {
   const current = editing ? !!editValue : value
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...(half ? { width: '50%', paddingRight: 12 } : {}) }}>
       <Text style={{ fontSize: 11, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       {editing ? (
         <Pressable onPress={() => onChange(fieldKey, !editValue)}

@@ -41,12 +41,17 @@ export function Dropdown({
 
   useEffect(() => { setMounted(true) }, [])
 
-  // Position panel when opening
+  // Position panel when opening — flip above if overflowing viewport
   useEffect(() => {
     if (!open || !triggerRef.current) return
     const rect = triggerRef.current.getBoundingClientRect()
-    setPanelPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
-  }, [open])
+    const panelHeight = Math.min(options.length * 36 + 8, 280)
+    const spaceBelow = window.innerHeight - rect.bottom
+    const top = spaceBelow < panelHeight + 8
+      ? rect.top - panelHeight - 4
+      : rect.bottom + 4
+    setPanelPos({ top, left: rect.left, width: rect.width })
+  }, [open, options.length])
 
   // Close on outside click
   useEffect(() => {

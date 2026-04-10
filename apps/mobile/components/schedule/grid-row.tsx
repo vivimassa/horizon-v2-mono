@@ -17,6 +17,7 @@ interface GridRowProps {
   selectionRange: { startRow: number; startCol: number; endRow: number; endCol: number } | null
   clipboard: ClipboardData | null
   cellFormats: Map<string, CellFormat>
+  tatMinutes: number | null
   isNew: boolean
   isDirty: boolean
   isDeleted: boolean
@@ -34,7 +35,7 @@ interface GridRowProps {
 
 export const GridRow = memo(function GridRow({
   flight, rowIdx, dirtyMap, selectedCell, editingCell, editValue,
-  selectionRange, clipboard, cellFormats,
+  selectionRange, clipboard, cellFormats, tatMinutes,
   isNew, isDirty, isDeleted, hasSeparator,
   onCellTap, onCellDoubleTap, onEditChange, onCommitEdit, onCancelEdit, onLongPress,
   palette, accent, isDark,
@@ -55,8 +56,29 @@ export const GridRow = memo(function GridRow({
     : undefined
 
   const getVal = useCallback((colKey: string): string => {
+    // TAT is computed externally
+    if (colKey === 'tat') return tatMinutes != null ? String(tatMinutes) : ''
+
     const dirty = dirtyMap.get(flight._id)
     const val = dirty && colKey in dirty ? (dirty as any)[colKey] : (flight as any)[colKey]
+
+    // Compute BLOCK from STD/STA if not stored
+    if (colKey === 'blockMinutes' && (val == null || val === 0)) {
+      const std = dirty?.stdUtc ?? flight.stdUtc
+      const sta = dirty?.staUtc ?? flight.staUtc
+      if (std && sta) {
+        const stdClean = String(std).replace(':', '')
+        const staClean = String(sta).replace(':', '')
+        if (stdClean.length >= 4 && staClean.length >= 4) {
+          const stdMin = parseInt(stdClean.slice(0, 2)) * 60 + parseInt(stdClean.slice(2, 4))
+          const staMin = parseInt(staClean.slice(0, 2)) * 60 + parseInt(staClean.slice(2, 4))
+          let diff = staMin - stdMin
+          if (diff < 0) diff += 1440
+          return String(diff)
+        }
+      }
+    }
+
     return val != null ? String(val) : ''
   }, [flight, dirtyMap])
 
@@ -82,6 +104,7 @@ export const GridRow = memo(function GridRow({
         borderLeftWidth: isDirty || isNew ? 3 : 0,
         borderLeftColor: isNew ? '#16a34a' : accent,
         opacity: isDeleted ? 0.4 : isSuspended ? 0.6 : 1,
+        flex: 1,
       }}>
         {GRID_COLUMNS.map((col, colIdx) => {
           const isSel = selectedCell?.rowIdx === rowIdx && selectedCell?.colKey === col.key
@@ -119,10 +142,12 @@ export const GridRow = memo(function GridRow({
       </View>
       {hasSeparator && (
         <View style={{
-          height: 8,
-          backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+          height: 12,
+          backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+          borderTopWidth: 1,
+          borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
           borderBottomWidth: 1,
-          borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+          borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
         }} />
       )}
     </View>

@@ -6,6 +6,7 @@ import { api, type DelayCodeRef } from '@skyhub/api'
 import { ChevronLeft, Pencil, Save, X, Trash2, Timer } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { useDevice } from '../../../hooks/useDevice'
 import { ColorSwatchPicker } from '../../../components/lopa/ColorSwatchPicker'
 
 const CATEGORIES = [
@@ -23,6 +24,7 @@ export default function DelayCodeDetailScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { palette, isDark, accent } = useAppTheme()
+  const { isTablet } = useDevice()
 
   const [code, setCode] = useState<DelayCodeRef | null>(null)
   const [loading, setLoading] = useState(true)
@@ -74,7 +76,7 @@ export default function DelayCodeDetailScreen() {
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
       {/* Header */}
-      <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View className="px-4 pt-4 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center flex-1 mr-2">
             <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
@@ -94,8 +96,8 @@ export default function DelayCodeDetailScreen() {
                 <Pressable onPress={() => { setEditing(false); setDraft({}) }} className="active:opacity-60">
                   <X size={20} color={palette.textSecondary} strokeWidth={1.8} />
                 </Pressable>
-                <Pressable onPress={handleSave} disabled={saving} className="px-3 py-1.5 rounded-lg active:opacity-60" style={{ backgroundColor: accent }}>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving...' : 'Save'}</Text>
+                <Pressable onPress={handleSave} disabled={saving} className="px-4 py-2.5 rounded-lg active:opacity-60" style={{ backgroundColor: accent }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving...' : 'Save'}</Text>
                 </Pressable>
               </>
             ) : (
@@ -104,7 +106,7 @@ export default function DelayCodeDetailScreen() {
                 <Pressable onPress={() => { setDraft({}); setEditing(true) }} className="flex-row items-center px-3 py-1.5 rounded-lg active:opacity-60"
                   style={{ backgroundColor: accentTint(accent, isDark ? 0.15 : 0.08) }}>
                   <Pencil size={15} color={accent} strokeWidth={1.8} />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: accent, marginLeft: 6 }}>Edit</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: accent, marginLeft: 6 }}>Edit</Text>
                 </Pressable>
               </>
             )}
@@ -164,19 +166,11 @@ export default function DelayCodeDetailScreen() {
           <Text style={{ fontSize: 14, fontWeight: '700', color: accent }}>Legacy Code</Text>
         </View>
 
-        <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-          <View style={{ width: '50%', paddingHorizontal: 6 }}>
-            <Field label="Numeric Code" value={code.code} editing={editing} fieldKey="code" editValue={get('code')} onChange={handleFieldChange} palette={palette} mono maxLength={3} />
-          </View>
-          <View style={{ width: '50%', paddingHorizontal: 6 }}>
-            <Field label="Alpha Sub-Code" value={code.alphaCode} editing={editing} fieldKey="alphaCode" editValue={get('alphaCode')} onChange={handleFieldChange} palette={palette} mono maxLength={2} />
-          </View>
-          <View style={{ width: '50%', paddingHorizontal: 6 }}>
-            <Field label="Name" value={code.name} editing={editing} fieldKey="name" editValue={get('name')} onChange={handleFieldChange} palette={palette} />
-          </View>
-          <View style={{ width: '50%', paddingHorizontal: 6 }}>
-            <ToggleField label="IATA Standard" value={code.isIataStandard} editing={editing} fieldKey="isIataStandard" editValue={get('isIataStandard')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
-          </View>
+        <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+          <Field label="Numeric Code" value={code.code} editing={editing} fieldKey="code" editValue={get('code')} onChange={handleFieldChange} palette={palette} mono maxLength={3} half={isTablet} />
+          <Field label="Alpha Sub-Code" value={code.alphaCode} editing={editing} fieldKey="alphaCode" editValue={get('alphaCode')} onChange={handleFieldChange} palette={palette} mono maxLength={2} half={isTablet} />
+          <Field label="Name" value={code.name} editing={editing} fieldKey="name" editValue={get('name')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+          <ToggleField label="IATA Standard" value={code.isIataStandard} editing={editing} fieldKey="isIataStandard" editValue={get('isIataStandard')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
         </View>
 
         <PickerField label="Category" value={code.category} options={CATEGORIES} editing={editing} fieldKey="category" editValue={get('category')} onChange={handleFieldChange} palette={palette} isDark={isDark} accent={accent} />
@@ -187,7 +181,9 @@ export default function DelayCodeDetailScreen() {
         </View>
 
         <Field label="Description" value={code.description} editing={editing} fieldKey="description" editValue={get('description')} onChange={handleFieldChange} palette={palette} multiline />
-        <ToggleField label="Active" value={code.isActive} editing={editing} fieldKey="isActive" editValue={get('isActive')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
+        <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+          <ToggleField label="Active" value={code.isActive} editing={editing} fieldKey="isActive" editValue={get('isActive')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+        </View>
       </ScrollView>
     </SafeAreaView>
   )
@@ -235,13 +231,14 @@ function TripleBoxDisplay({ label, value, palette, accent, isDark }: {
 }
 
 // ── Shared field components ──
-function Field({ label, value, editing, fieldKey, editValue, onChange, palette, mono, maxLength, multiline }: {
+function Field({ label, value, editing, fieldKey, editValue, onChange, palette, mono, maxLength, multiline, half }: {
   label: string; value: any; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; mono?: boolean; maxLength?: number; multiline?: boolean
+  onChange: (k: string, v: any) => void; palette: Palette; mono?: boolean; maxLength?: number; multiline?: boolean; half?: boolean
 }) {
+  const halfStyle = half ? { width: '50%' as const, paddingRight: 12 } : {}
   if (editing) {
     return (
-      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
         <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
         <TextInput value={editValue != null ? String(editValue) : ''} onChangeText={(v) => { if (mono) v = v.toUpperCase(); onChange(fieldKey, v) }}
           autoCapitalize={mono ? 'characters' : 'sentences'} maxLength={maxLength} multiline={multiline}
@@ -251,20 +248,21 @@ function Field({ label, value, editing, fieldKey, editValue, onChange, palette, 
     )
   }
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
       <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       <Text style={{ fontSize: 15, fontWeight: '500', color: palette.text, fontFamily: mono ? 'monospace' : undefined }}>{value ?? '---'}</Text>
     </View>
   )
 }
 
-function PickerField({ label, value, options, editing, fieldKey, editValue, onChange, palette, isDark, accent }: {
+function PickerField({ label, value, options, editing, fieldKey, editValue, onChange, palette, isDark, accent, half }: {
   label: string; value: any; options: string[]; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean; accent: string
+  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean; accent: string; half?: boolean
 }) {
+  const halfStyle = half ? { width: '50%' as const, paddingRight: 12 } : {}
   if (editing) {
     return (
-      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
         <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 6 }}>{label}</Text>
         <View className="flex-row flex-wrap" style={{ gap: 6 }}>
           {options.map(opt => {
@@ -283,20 +281,20 @@ function PickerField({ label, value, options, editing, fieldKey, editValue, onCh
     )
   }
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
       <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       <Text style={{ fontSize: 15, fontWeight: '500', color: palette.text }}>{value ?? '---'}</Text>
     </View>
   )
 }
 
-function ToggleField({ label, value, editing, fieldKey, editValue, onChange, palette, isDark }: {
+function ToggleField({ label, value, editing, fieldKey, editValue, onChange, palette, isDark, half }: {
   label: string; value: boolean; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean
+  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean; half?: boolean
 }) {
   const current = editing ? !!editValue : value
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...(half ? { width: '50%', paddingRight: 12 } : {}) }}>
       <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       {editing ? (
         <Pressable onPress={() => onChange(fieldKey, !editValue)} className="self-start px-3 py-1 rounded-lg"

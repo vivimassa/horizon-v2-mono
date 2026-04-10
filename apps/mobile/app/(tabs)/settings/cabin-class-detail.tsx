@@ -10,6 +10,7 @@ import {
 } from 'lucide-react-native'
 import { accentTint, modeColor, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { useDevice } from '../../../hooks/useDevice'
 import { SeatRowPreview } from '../../../components/lopa/SeatRowPreview'
 import { ColorSwatchPicker } from '../../../components/lopa/ColorSwatchPicker'
 
@@ -28,6 +29,7 @@ export default function CabinClassDetailScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { palette, isDark, accent } = useAppTheme()
+  const { isTablet } = useDevice()
 
   const [cabinClass, setCabinClass] = useState<CabinClassRef | null>(null)
   const [lopaConfigs, setLopaConfigs] = useState<LopaConfigRef[]>([])
@@ -121,7 +123,7 @@ export default function CabinClassDetailScreen() {
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
       {/* Header */}
-      <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View className="px-4 pt-4 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center flex-1 mr-2">
             <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
@@ -153,9 +155,9 @@ export default function CabinClassDetailScreen() {
                   <X size={20} color={palette.textSecondary} strokeWidth={1.8} />
                 </Pressable>
                 <Pressable onPress={handleSave} disabled={saving}
-                  className="px-3 py-1.5 rounded-lg active:opacity-60"
+                  className="px-4 py-2.5 rounded-lg active:opacity-60"
                   style={{ backgroundColor: accent }}>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving...' : 'Save'}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving...' : 'Save'}</Text>
                 </Pressable>
               </>
             ) : (
@@ -167,7 +169,7 @@ export default function CabinClassDetailScreen() {
                   className="flex-row items-center px-3 py-1.5 rounded-lg active:opacity-60"
                   style={{ backgroundColor: accentTint(accent, isDark ? 0.15 : 0.08) }}>
                   <Pencil size={15} color={accent} strokeWidth={1.8} />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: accent, marginLeft: 6 }}>Edit</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: accent, marginLeft: 6 }}>Edit</Text>
                 </Pressable>
               </>
             )}
@@ -190,7 +192,7 @@ export default function CabinClassDetailScreen() {
 
       {/* Metric cards */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12, gap: 10 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12, gap: 10, flexGrow: 1, justifyContent: 'center' }}
         style={{ flexGrow: 0, borderBottomWidth: 1, borderBottomColor: palette.border }}
       >
         {cabinClass.seatPitchIn != null && (
@@ -228,24 +230,28 @@ export default function CabinClassDetailScreen() {
       >
         {activeTab === 'specs' && (
           <>
-            <Field label="Code" value={cabinClass.code} editing={editing} fieldKey="code"
-              editValue={get('code')} onChange={handleFieldChange} palette={palette} mono maxLength={2} />
-            <Field label="Name" value={cabinClass.name} editing={editing} fieldKey="name"
-              editValue={get('name')} onChange={handleFieldChange} palette={palette} />
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <Field label="Code" value={cabinClass.code} editing={editing} fieldKey="code"
+                editValue={get('code')} onChange={handleFieldChange} palette={palette} mono maxLength={2} half={isTablet} />
+              <Field label="Name" value={cabinClass.name} editing={editing} fieldKey="name"
+                editValue={get('name')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            </View>
 
             <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
               <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 6 }}>Color</Text>
               <ColorSwatchPicker value={get('color') || '#9ca3af'} onChange={(v) => handleFieldChange('color', v)} palette={palette} isDark={isDark} editing={editing} />
             </View>
 
-            <Field label="Sort Order" value={String(cabinClass.sortOrder)} editing={editing} fieldKey="sortOrder"
-              editValue={get('sortOrder')} onChange={handleFieldChange} palette={palette} numeric />
-            <Field label="Seat Layout" value={cabinClass.seatLayout} editing={editing} fieldKey="seatLayout"
-              editValue={get('seatLayout')} onChange={handleFieldChange} palette={palette} mono />
-            <Field label="Seat Pitch (in)" value={cabinClass.seatPitchIn != null ? `${cabinClass.seatPitchIn}"` : null}
-              editing={editing} fieldKey="seatPitchIn" editValue={get('seatPitchIn')} onChange={handleFieldChange} palette={palette} numeric />
-            <Field label="Seat Width (in)" value={cabinClass.seatWidthIn != null ? `${cabinClass.seatWidthIn}"` : null}
-              editing={editing} fieldKey="seatWidthIn" editValue={get('seatWidthIn')} onChange={handleFieldChange} palette={palette} numeric />
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <Field label="Sort Order" value={String(cabinClass.sortOrder)} editing={editing} fieldKey="sortOrder"
+                editValue={get('sortOrder')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+              <Field label="Seat Layout" value={cabinClass.seatLayout} editing={editing} fieldKey="seatLayout"
+                editValue={get('seatLayout')} onChange={handleFieldChange} palette={palette} mono half={isTablet} />
+              <Field label="Seat Pitch (in)" value={cabinClass.seatPitchIn != null ? `${cabinClass.seatPitchIn}"` : null}
+                editing={editing} fieldKey="seatPitchIn" editValue={get('seatPitchIn')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+              <Field label="Seat Width (in)" value={cabinClass.seatWidthIn != null ? `${cabinClass.seatWidthIn}"` : null}
+                editing={editing} fieldKey="seatWidthIn" editValue={get('seatWidthIn')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+            </View>
 
             {/* Seat Type */}
             <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
@@ -275,12 +281,14 @@ export default function CabinClassDetailScreen() {
               )}
             </View>
 
-            <ToggleField label="IFE Screen" value={cabinClass.hasIfe} editing={editing} fieldKey="hasIfe"
-              editValue={get('hasIfe')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
-            <ToggleField label="Power Outlet" value={cabinClass.hasPower} editing={editing} fieldKey="hasPower"
-              editValue={get('hasPower')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
-            <ToggleField label="Active" value={cabinClass.isActive} editing={editing} fieldKey="isActive"
-              editValue={get('isActive')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <ToggleField label="IFE Screen" value={cabinClass.hasIfe} editing={editing} fieldKey="hasIfe"
+                editValue={get('hasIfe')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+              <ToggleField label="Power Outlet" value={cabinClass.hasPower} editing={editing} fieldKey="hasPower"
+                editValue={get('hasPower')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+              <ToggleField label="Active" value={cabinClass.isActive} editing={editing} fieldKey="isActive"
+                editValue={get('isActive')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+            </View>
           </>
         )}
 
@@ -349,13 +357,14 @@ function MetricCard({ icon: Icon, label, value, color, palette }: {
 }
 
 // ── Field ──
-function Field({ label, value, editing, fieldKey, editValue, onChange, palette, numeric, mono, maxLength }: {
+function Field({ label, value, editing, fieldKey, editValue, onChange, palette, numeric, mono, maxLength, half }: {
   label: string; value: any; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; numeric?: boolean; mono?: boolean; maxLength?: number
+  onChange: (k: string, v: any) => void; palette: Palette; numeric?: boolean; mono?: boolean; maxLength?: number; half?: boolean
 }) {
+  const halfStyle = half ? { width: '50%' as const, paddingRight: 12 } : {}
   if (editing) {
     return (
-      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
         <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
         <TextInput
           value={editValue != null ? String(editValue) : ''}
@@ -377,7 +386,7 @@ function Field({ label, value, editing, fieldKey, editValue, onChange, palette, 
     )
   }
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
       <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       <Text style={{ fontSize: 15, fontWeight: '500', color: palette.text, fontFamily: mono ? 'monospace' : undefined }}>
         {value ?? '---'}
@@ -387,13 +396,13 @@ function Field({ label, value, editing, fieldKey, editValue, onChange, palette, 
 }
 
 // ── Toggle field ──
-function ToggleField({ label, value, editing, fieldKey, editValue, onChange, palette, isDark }: {
+function ToggleField({ label, value, editing, fieldKey, editValue, onChange, palette, isDark, half }: {
   label: string; value: boolean; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean
+  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean; half?: boolean
 }) {
   const current = editing ? !!editValue : value
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...(half ? { width: '50%', paddingRight: 12 } : {}) }}>
       <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       {editing ? (
         <Pressable onPress={() => onChange(fieldKey, !editValue)}

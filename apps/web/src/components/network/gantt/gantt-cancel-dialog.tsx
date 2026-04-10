@@ -2,9 +2,12 @@
 
 import { useMemo, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Trash2, X, Loader2 } from 'lucide-react'
+import { Trash2, X, Loader2, AlertTriangle } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { useGanttStore } from '@/stores/use-gantt-store'
+import { useOperatorStore } from '@/stores/use-operator-store'
+import { fetchCancelImpact } from '@/lib/gantt/api'
+import type { SlotCancelImpact } from '@/lib/gantt/api'
 
 export function GanttCancelDialog() {
   const cancelDialog = useGanttStore(s => s.cancelDialog)
@@ -18,6 +21,10 @@ export function GanttCancelDialog() {
   const [mounted, setMounted] = useState(false)
   const [executing, setExecuting] = useState(false)
 
+  // Slot impact state
+  const [impacts, setImpacts] = useState<SlotCancelImpact[]>([])
+  const [impactLoading, setImpactLoading] = useState(false)
+
   useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
@@ -28,6 +35,29 @@ export function GanttCancelDialog() {
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [cancelDialog, closeCancelDialog])
+
+  // Fetch slot cancel impact when dialog opens
+  useEffect(() => {
+    if (!cancelDialog) { setImpacts([]); return }
+    const operatorId = useOperatorStore.getState().operator?._id
+    if (!operatorId) return
+
+    setImpactLoading(true)
+    const timeout = setTimeout(() => setImpactLoading(false), 3000) // 3s max wait
+
+    fetchCancelImpact(operatorId, cancelDialog.flightIds)
+      .then(data => {
+        clearTimeout(timeout)
+        setImpacts(data.impacts || [])
+      })
+      .catch(err => {
+        console.warn('Slot impact check failed (non-blocking):', err)
+        setImpacts([])
+      })
+      .finally(() => setImpactLoading(false))
+
+    return () => clearTimeout(timeout)
+  }, [cancelDialog])
 
   const affected = useMemo(() => {
     if (!cancelDialog) return null
@@ -50,7 +80,11 @@ export function GanttCancelDialog() {
 
   const dateRange = affected.dates.length === 1
     ? formatDate(affected.dates[0])
-    : `${formatDate(affected.dates[0])} — ${formatDate(affected.dates[affected.dates.length - 1])}`
+    : `${formatDate(affected.dates[0])} \u2014 ${formatDate(affected.dates[affected.dates.length - 1])}`
+
+  // Check if any impact will breach or is already at risk
+  const riskyImpacts = impacts.filter(i => i.willBreachThreshold || i.isAlreadyAtRisk)
+  const hasSlotRisk = riskyImpacts.length > 0
 
   async function handleConfirm() {
     setExecuting(true)
@@ -69,7 +103,7 @@ export function GanttCancelDialog() {
         ref={ref}
         className="rounded-2xl overflow-hidden"
         style={{
-          width: 480, maxHeight: '80vh',
+          width: 520, maxHeight: '85vh',
           background: bg, border: `1px solid ${border}`,
           backdropFilter: 'blur(24px) saturate(180%)',
           WebkitBackdropFilter: 'blur(24px) saturate(180%)',
@@ -87,7 +121,7 @@ export function GanttCancelDialog() {
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-4">
+        <div className="px-5 py-4 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(85vh - 130px)' }}>
           {/* Description */}
           <div className="text-[13px]" style={{ color: textColor }}>
             {affected.flts.length === 1
@@ -99,10 +133,10 @@ export function GanttCancelDialog() {
           {/* Affected flights card */}
           <div className="rounded-xl p-3 space-y-2.5" style={{ background: cardBg, border: `1px solid ${border}` }}>
             <div className="flex items-center justify-between">
-              <div className="text-[12px] font-medium" style={{ color: textMuted }}>{dateRange}</div>
-              <div className="flex items-center gap-2.5 text-[11px]" style={{ color: textMuted }}>
+              <div className="text-[13px] font-medium" style={{ color: textMuted }}>{dateRange}</div>
+              <div className="flex items-center gap-2.5 text-[13px]" style={{ color: textMuted }}>
                 <span><span className="font-semibold" style={{ color: textColor }}>{affected.flts.length}</span> flt{affected.flts.length !== 1 ? 's' : ''}</span>
-                <span style={{ opacity: 0.3 }}>·</span>
+                <span style={{ opacity: 0.3 }}>&middot;</span>
                 <span><span className="font-semibold" style={{ color: textColor }}>{blockH}:{blockM}</span></span>
               </div>
             </div>
@@ -113,7 +147,7 @@ export function GanttCancelDialog() {
                   ? `${f.depStation}-${f.arrStation}`
                   : f.flightNumber
                 return (
-                  <span key={f.id} className="px-2 py-1 rounded-md text-[11px] font-medium text-white"
+                  <span key={f.id} className="px-2 py-1 rounded-md text-[13px] font-medium text-white"
                     style={{ background: '#E63535' }}>
                     {label}
                   </span>
@@ -121,6 +155,85 @@ export function GanttCancelDialog() {
               })}
             </div>
           </div>
+
+          {/* Slot utilization warning */}
+          {impactLoading && (
+            <div className="flex items-center gap-2 text-[13px]" style={{ color: textMuted }}>
+              <Loader2 size={14} className="animate-spin" />
+              Checking slot impact...
+            </div>
+          )}
+
+          {!impactLoading && riskyImpacts.map(impact => (
+            <div key={impact.seriesId} className="rounded-xl overflow-hidden"
+              style={{ border: `1px solid ${impact.willBreachThreshold ? 'rgba(255,59,59,0.3)' : 'rgba(255,136,0,0.3)'}` }}>
+
+              {/* Warning header */}
+              <div className="flex items-center gap-2.5 px-4 py-2.5"
+                style={{
+                  background: impact.willBreachThreshold
+                    ? (isDark ? 'rgba(255,59,59,0.08)' : 'rgba(255,59,59,0.05)')
+                    : (isDark ? 'rgba(255,136,0,0.08)' : 'rgba(255,136,0,0.05)'),
+                }}>
+                <AlertTriangle size={16} style={{ color: impact.willBreachThreshold ? '#FF3B3B' : '#FF8800' }} />
+                <span className="text-[14px] font-semibold" style={{ color: textColor }}>
+                  Slot Utilization Warning
+                </span>
+              </div>
+
+              {/* Warning content */}
+              <div className="px-4 py-3 space-y-2.5">
+                {/* Airport info */}
+                <div className="text-[13px]" style={{ color: textColor }}>
+                  <span className="font-bold">{impact.airportIata}</span>
+                  {' \u2014 '}
+                  {impact.airportName}
+                  {' '}
+                  <span className="font-medium px-1.5 py-0.5 rounded text-[13px]"
+                    style={{ background: 'rgba(124,58,237,0.1)', color: '#7c3aed' }}>
+                    Level {impact.coordinationLevel}
+                  </span>
+                </div>
+
+                {/* Utilization breakdown */}
+                <div className="text-[13px]" style={{ color: textMuted }}>
+                  Current: <span className="font-semibold" style={{ color: textColor }}>{impact.currentPct}%</span>
+                  {' '}({impact.operated} operated + {impact.jnus} JNUS / {impact.total} total)
+                </div>
+
+                {/* Before → After with visual bar */}
+                <div className="flex items-center gap-3">
+                  <span className="text-[15px] font-bold" style={{ color: impact.currentPct >= 80 ? '#06C270' : '#FF3B3B' }}>
+                    {impact.currentPct}%
+                  </span>
+                  <span className="text-[13px]" style={{ color: textMuted }}>{'\u2192'}</span>
+                  <span className="text-[15px] font-bold" style={{ color: impact.afterPct < 80 ? '#FF3B3B' : '#FF8800' }}>
+                    {impact.afterPct}%
+                  </span>
+                  <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}>
+                    <div className="h-full rounded-full transition-all"
+                      style={{ width: `${impact.afterPct}%`, background: impact.afterPct < 80 ? '#FF3B3B' : '#FF8800' }} />
+                  </div>
+                </div>
+
+                {/* Threshold breach warning */}
+                {impact.willBreachThreshold && (
+                  <div className="rounded-lg px-3 py-2.5 text-[13px]"
+                    style={{ background: isDark ? 'rgba(255,59,59,0.1)' : 'rgba(255,59,59,0.06)', color: '#FF3B3B' }}>
+                    Cancelling {impact.cancelledCount > 1 ? `these ${impact.cancelledCount} dates` : 'this flight'} will
+                    drop utilization below the 80% threshold. Historic rights for <span className="font-bold">{impact.nextSeason}</span> are at risk.
+                  </div>
+                )}
+
+                {impact.isAlreadyAtRisk && !impact.willBreachThreshold && (
+                  <div className="rounded-lg px-3 py-2.5 text-[13px]"
+                    style={{ background: isDark ? 'rgba(255,136,0,0.1)' : 'rgba(255,136,0,0.06)', color: '#FF8800' }}>
+                    This slot is already below the 80% threshold. Cancelling will further reduce utilization.
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Footer */}
@@ -128,9 +241,13 @@ export function GanttCancelDialog() {
           <button
             onClick={closeCancelDialog}
             className="px-4 py-2 rounded-lg text-[13px] font-medium transition-colors"
-            style={{ color: textColor, border: `1px solid ${border}` }}
+            style={{
+              color: hasSlotRisk ? '#fff' : textColor,
+              background: hasSlotRisk ? '#2563eb' : 'transparent',
+              border: hasSlotRisk ? 'none' : `1px solid ${border}`,
+            }}
           >
-            No, Keep
+            {hasSlotRisk ? 'Keep Flight' : 'No, Keep'}
           </button>
           <button
             onClick={handleConfirm}
@@ -139,7 +256,7 @@ export function GanttCancelDialog() {
             style={{ background: '#E63535', opacity: executing ? 0.7 : 1 }}
           >
             {executing && <Loader2 size={14} className="animate-spin" />}
-            Yes, Cancel
+            {hasSlotRisk ? 'Cancel Anyway' : 'Yes, Cancel'}
           </button>
         </div>
       </div>

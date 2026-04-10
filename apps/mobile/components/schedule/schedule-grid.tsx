@@ -1,4 +1,4 @@
-import { useCallback, useRef, memo } from 'react'
+import { useCallback, useRef, useMemo, memo } from 'react'
 import { Text, View, FlatList, ScrollView, Pressable } from 'react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import type { ScheduledFlightRef } from '@skyhub/api'
@@ -64,6 +64,33 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     store.setEditValue(v)
   }, [store])
 
+  // Precompute TAT map: flightId → minutes between prev STA and this STD
+  // TAT displays on the SECOND flight (the one arriving after the turnaround)
+  // Skip first flight of each rotation cycle
+  const tatMap = useMemo(() => {
+    const map = new Map<string, number>()
+    const parseHHMM = (t: string): number => {
+      if (!t) return -1
+      const clean = t.replace(':', '')
+      if (clean.length < 4) return -1
+      return parseInt(clean.slice(0, 2)) * 60 + parseInt(clean.slice(2, 4))
+    }
+    for (let i = 1; i < flights.length; i++) {
+      const prev = flights[i - 1]
+      const cur = flights[i]
+      // Skip if different rotation (new cycle)
+      if (prev.rotationId !== cur.rotationId) continue
+      const sta = parseHHMM(prev.staUtc)
+      const std = parseHHMM(cur.stdUtc)
+      if (sta >= 0 && std >= 0) {
+        let diff = std - sta
+        if (diff < 0) diff += 1440
+        map.set(cur._id, diff)
+      }
+    }
+    return map
+  }, [flights])
+
   const handleCommitEdit = useCallback(() => {
     store.commitEdit()
   }, [store])
@@ -86,6 +113,7 @@ export const ScheduleGrid = memo(function ScheduleGrid({
       selectionRange={store.selectionRange}
       clipboard={store.clipboard}
       cellFormats={store.cellFormats}
+      tatMinutes={tatMap.get(flight._id) ?? null}
       isNew={store.newRowIds.has(flight._id)}
       isDirty={store.dirtyMap.has(flight._id)}
       isDeleted={store.deletedIds.has(flight._id)}
@@ -110,9 +138,11 @@ export const ScheduleGrid = memo(function ScheduleGrid({
     <View className="flex-1">
       {/* Header — synced horizontal scroll */}
       <ScrollView ref={headerScrollRef} horizontal showsHorizontalScrollIndicator={false}
-        onScroll={handleHeaderScroll} scrollEventThrottle={16}>
+        onScroll={handleHeaderScroll} scrollEventThrottle={16}
+        contentContainerStyle={{ flexGrow: 1 }}>
         <View className="flex-row" style={{
           height: HEADER_HEIGHT,
+          minWidth: TOTAL_WIDTH,
           backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
           borderBottomWidth: 2,
           borderBottomColor: palette.border,
@@ -142,8 +172,9 @@ export const ScheduleGrid = memo(function ScheduleGrid({
 
       {/* Body — synced horizontal scroll wrapping vertical FlatList */}
       <ScrollView ref={bodyScrollRef} horizontal showsHorizontalScrollIndicator={true}
-        onScroll={handleBodyScroll} scrollEventThrottle={16}>
-        <View style={{ width: TOTAL_WIDTH }}>
+        onScroll={handleBodyScroll} scrollEventThrottle={16}
+        contentContainerStyle={{ flexGrow: 1 }}>
+        <View style={{ minWidth: TOTAL_WIDTH }}>
           <FlatList
             data={dataWithBuffer}
             keyExtractor={f => f._id}

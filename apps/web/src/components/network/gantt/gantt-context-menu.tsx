@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Info, Link, Unlink, ArrowLeftRight, Trash2, ChevronRight } from 'lucide-react'
+import { Info, Link, Unlink, ArrowLeftRight, Trash2, ChevronRight, Clock } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { useGanttStore } from '@/stores/use-gantt-store'
 
@@ -120,6 +120,9 @@ export function GanttContextMenu() {
       >
         <MenuItem icon={Info} label="Flight Information" shortcut="F1" disabled={!isSingle}
           onClick={() => { openFlightInfo(ctx.flightId); closeContextMenu() }}
+          textColor={textColor} textMuted={textMuted} hoverBg={hoverBg} />
+        <MenuItem icon={Clock} label="Slot Details" disabled={!isSingle || !selectedFlts[0]?.slotStatus}
+          onClick={() => { window.open('/network/schedule/slot-manager', '_blank'); closeContextMenu() }}
           textColor={textColor} textMuted={textMuted} hoverBg={hoverBg} />
         <Divider color={dividerColor} />
 

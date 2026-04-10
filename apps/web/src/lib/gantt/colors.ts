@@ -69,6 +69,22 @@ function applyOpacity(hex: string, opacity: number): string {
   return `rgba(${r},${g},${b},${opacity})`
 }
 
+/** Slot status indicator colors */
+export const SLOT_STATUS_COLORS: Record<string, string> = {
+  confirmed: '#06C270',
+  offered: '#FF8800',
+  waitlisted: '#7c3aed',
+  refused: '#FF3B3B',
+  conditional: '#00CFDE',
+}
+
+/** Utilization risk level colors for corner flags */
+export const SLOT_RISK_COLORS: Record<string, string> = {
+  safe: '#06C270',
+  close: '#FF8800',
+  at_risk: '#FF3B3B',
+}
+
 /** Default palette when AircraftType.color is null. */
 export const AC_TYPE_COLOR_PALETTE = [
   '#0d9488', '#2563eb', '#d97706', '#7c3aed',

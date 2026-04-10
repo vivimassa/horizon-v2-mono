@@ -10,7 +10,7 @@ export interface GridColumn {
 }
 
 export const GRID_COLUMNS: GridColumn[] = [
-  { key: 'rotationLabel',      label: 'AC',       width: 50,  editable: false, type: 'readonly',  align: 'center', mono: true },
+  { key: 'rotationLabel',      label: 'AC',       width: 75,  editable: false, type: 'readonly',  align: 'center', mono: true },
   { key: 'aircraftTypeIcao',   label: 'AC TYPE',  width: 65,  editable: true,  type: 'text',      align: 'center', mono: true, maxLength: 4 },
   { key: 'effectiveFrom',      label: 'FROM',     width: 90,  editable: true,  type: 'date',      align: 'center', mono: true },
   { key: 'effectiveUntil',     label: 'TO',       width: 90,  editable: true,  type: 'date',      align: 'center', mono: true },

@@ -10,6 +10,8 @@ import { LopaConfig } from '../models/LopaConfig.js'
 import { CabinClass } from '../models/CabinClass.js'
 import { Operator } from '../models/Operator.js'
 import { OptimizerRun } from '../models/OptimizerRun.js'
+import { SlotSeries } from '../models/SlotSeries.js'
+import { SlotDate } from '../models/SlotDate.js'
 
 // ── Zod schemas ──
 
@@ -191,6 +193,64 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     }
 
     flights.sort((a, b) => a.stdUtc - b.stdUtc)
+
+    // ── Slot status + utilization join ──
+    const sfIds = [...new Set(flights.map(f => f.scheduledFlightId).filter(Boolean))]
+    if (sfIds.length > 0) {
+      const slotSeriesDocs = await SlotSeries.find(
+        { linkedScheduledFlightId: { $in: sfIds } },
+        { linkedScheduledFlightId: 1, status: 1, _id: 1, airportIata: 1 },
+      ).lean()
+
+      // Build sfId → series info map
+      const slotMap = new Map<string, { status: string; seriesId: string; airportIata: string }>()
+      const seriesIds: string[] = []
+      for (const ss of slotSeriesDocs) {
+        if (ss.linkedScheduledFlightId) {
+          slotMap.set(ss.linkedScheduledFlightId, {
+            status: ss.status,
+            seriesId: ss._id as string,
+            airportIata: ss.airportIata,
+          })
+          seriesIds.push(ss._id as string)
+        }
+      }
+
+      // Batch utilization aggregation for all series at once
+      const utilAgg = seriesIds.length > 0 ? await SlotDate.aggregate([
+        { $match: { seriesId: { $in: seriesIds } } },
+        { $group: {
+          _id: '$seriesId',
+          total: { $sum: 1 },
+          operated: { $sum: { $cond: [{ $eq: ['$operationStatus', 'operated'] }, 1, 0] } },
+          jnus: { $sum: { $cond: [{ $eq: ['$operationStatus', 'jnus'] }, 1, 0] } },
+        }},
+      ]) : []
+
+      const utilMap = new Map<string, { pct: number; operated: number; jnus: number; total: number }>()
+      for (const row of utilAgg) {
+        const total = row.total as number
+        const operated = row.operated as number
+        const jnusCount = row.jnus as number
+        const pct = total > 0 ? Math.round(((operated + jnusCount) / total) * 100) : 0
+        utilMap.set(row._id as string, { pct, operated, jnus: jnusCount, total })
+      }
+
+      // Attach slot data to each flight
+      for (const f of flights) {
+        const slot = slotMap.get(f.scheduledFlightId)
+        if (!slot) continue
+        if (slot.status !== 'draft' && slot.status !== 'submitted') {
+          f.slotStatus = slot.status
+        }
+        f.slotSeriesId = slot.seriesId
+        const util = utilMap.get(slot.seriesId)
+        if (util) {
+          f.slotUtilizationPct = util.pct
+          f.slotRiskLevel = util.pct >= 85 ? 'safe' : util.pct >= 80 ? 'close' : 'at_risk'
+        }
+      }
+    }
 
     // Aircraft with joined type info, sorted by type then registration
     const aircraft = registrations
@@ -451,7 +511,135 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       await FlightInstance.bulkWrite(bulkOps as any[], { ordered: false })
     }
 
+    // ── Phase 3: Cascade cancel to SlotDate records (fire-and-forget) ──
+    Promise.resolve().then(async () => {
+      try {
+        const sfIdSet = new Map<string, string[]>()
+        for (const id of flightIds) {
+          const [sfId, opDate] = id.split('|')
+          if (!sfIdSet.has(sfId)) sfIdSet.set(sfId, [])
+          sfIdSet.get(sfId)!.push(opDate)
+        }
+
+        const linkedSeries = await SlotSeries.find(
+          { linkedScheduledFlightId: { $in: [...sfIdSet.keys()] } },
+          { _id: 1, linkedScheduledFlightId: 1 },
+        ).lean()
+
+        for (const ss of linkedSeries) {
+          const dates = sfIdSet.get(ss.linkedScheduledFlightId as string)
+          if (!dates?.length) continue
+          await SlotDate.updateMany(
+            { seriesId: ss._id, slotDate: { $in: dates }, operationStatus: { $ne: 'jnus' } },
+            { $set: { operationStatus: 'cancelled' } },
+          )
+        }
+      } catch (e) {
+        console.error('SlotDate cascade error (non-blocking):', e)
+      }
+    })
+
     return { removed: bulkOps.length }
+  })
+
+  // ── POST /gantt/cancel-impact — simulate slot utilization impact of cancellation ──
+  const cancelImpactSchema = z.object({
+    operatorId: z.string().min(1),
+    flightIds: z.array(z.string().min(1)).min(1),
+  })
+
+  app.post('/gantt/cancel-impact', async (req, reply) => {
+    const parsed = cancelImpactSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Validation failed' })
+    }
+    const { flightIds } = parsed.data
+
+    // Parse flightIds into scheduledFlightId + operatingDate pairs
+    const sfDatePairs = new Map<string, string[]>()
+    for (const id of flightIds) {
+      const [sfId, opDate] = id.split('|')
+      if (!sfDatePairs.has(sfId)) sfDatePairs.set(sfId, [])
+      sfDatePairs.get(sfId)!.push(opDate)
+    }
+
+    // Find linked slot series
+    const linkedSeries = await SlotSeries.find(
+      { linkedScheduledFlightId: { $in: [...sfDatePairs.keys()] } },
+      { _id: 1, linkedScheduledFlightId: 1, airportIata: 1, arrivalFlightNumber: 1, departureFlightNumber: 1, seasonCode: 1 },
+    ).lean()
+
+    if (!linkedSeries.length) return { impacts: [] }
+
+    // Get utilization for each series
+    const seriesIds = linkedSeries.map(s => s._id as string)
+    const utilAgg = await SlotDate.aggregate([
+      { $match: { seriesId: { $in: seriesIds } } },
+      { $group: {
+        _id: '$seriesId',
+        total: { $sum: 1 },
+        operated: { $sum: { $cond: [{ $eq: ['$operationStatus', 'operated'] }, 1, 0] } },
+        jnus: { $sum: { $cond: [{ $eq: ['$operationStatus', 'jnus'] }, 1, 0] } },
+      }},
+    ])
+    const utilMap = new Map(utilAgg.map((r: Record<string, unknown>) => [r._id as string, r]))
+
+    // Count how many dates per series would be cancelled
+    const cancelCountMap = new Map<string, number>()
+    for (const ss of linkedSeries) {
+      const dates = sfDatePairs.get(ss.linkedScheduledFlightId as string) || []
+      // Count dates that are currently operated or scheduled (not already cancelled/jnus)
+      const existingDates = await SlotDate.countDocuments({
+        seriesId: ss._id,
+        slotDate: { $in: dates },
+        operationStatus: { $in: ['operated', 'scheduled'] },
+      })
+      cancelCountMap.set(ss._id as string, existingDates)
+    }
+
+    // Look up airport names
+    const airportIatas = [...new Set(linkedSeries.map(s => s.airportIata))]
+    const airports = await Airport.find(
+      { iataCode: { $in: airportIatas } },
+      { iataCode: 1, name: 1, coordinationLevel: 1 },
+    ).lean()
+    const airportMap = new Map(airports.map(a => [a.iataCode, a]))
+
+    // Build impact results
+    const impacts = linkedSeries.map(ss => {
+      const util = utilMap.get(ss._id as string) as Record<string, number> | undefined
+      const total = (util?.total ?? 0) as number
+      const operated = (util?.operated ?? 0) as number
+      const jnusCount = (util?.jnus ?? 0) as number
+      const cancelledCount = cancelCountMap.get(ss._id as string) ?? 0
+      const currentPct = total > 0 ? Math.round(((operated + jnusCount) / total) * 100) : 0
+      const afterPct = total > 0 ? Math.round(((operated + jnusCount - cancelledCount) / total) * 100) : 0
+      const airport = airportMap.get(ss.airportIata) as Record<string, unknown> | undefined
+
+      // Determine next season
+      const seasonType = (ss.seasonCode as string)?.[0]
+      const seasonNum = parseInt((ss.seasonCode as string)?.slice(1) || '26', 10)
+      const nextSeason = seasonType === 'S' ? `W${seasonNum}` : `S${seasonNum + 1}`
+
+      return {
+        seriesId: ss._id,
+        airportIata: ss.airportIata,
+        airportName: (airport?.name as string) ?? ss.airportIata,
+        coordinationLevel: (airport?.coordinationLevel as number) ?? 3,
+        flightNumber: (ss.arrivalFlightNumber || ss.departureFlightNumber || '') as string,
+        currentPct,
+        afterPct: Math.max(0, afterPct),
+        operated,
+        jnus: jnusCount,
+        total,
+        cancelledCount,
+        willBreachThreshold: currentPct >= 80 && afterPct < 80,
+        isAlreadyAtRisk: currentPct < 80,
+        nextSeason,
+      }
+    }).filter(i => i.cancelledCount > 0) // Only include series actually impacted
+
+    return { impacts }
   })
 
   // ── PATCH /gantt/swap — bidirectional per-date tail swap between two aircraft ──

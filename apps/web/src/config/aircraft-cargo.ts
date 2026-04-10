@@ -62,5 +62,5 @@ export const AIRCRAFT_CARGO_CONFIGS: Record<string, AircraftCargoConfig> = {
 };
 
 export function getAircraftImage(_type: string) {
-  return `/assets/aircraft/A321.png`;
+  return `/assets/aircraft/aircraft-a321.png`;
 }

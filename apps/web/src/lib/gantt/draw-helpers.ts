@@ -1,4 +1,5 @@
 import type { BarLayout, RowLayout, TickMark } from './types'
+import { SLOT_STATUS_COLORS, SLOT_RISK_COLORS } from './colors'
 
 // ── Helpers ──
 
@@ -459,4 +460,71 @@ export function drawDropTarget(
   // Left accent bar
   ctx.fillStyle = c.border
   ctx.fillRect(sx, row.y, 3, row.height)
+}
+
+// ── Slot Status Indicators ──
+
+/**
+ * Draw a corner flag in the top-right of flight bars that have a linked slot status.
+ * The flag is a filled triangle whose 90-degree corner follows the bar's border radius,
+ * creating a seamless "folded corner" effect.
+ *
+ *   Bar top-right corner:
+ *          ╭──────╮
+ *          │  ◣   │  ← colored triangle fills the corner
+ *          │      │
+ *
+ * The curved edge uses an arc matching the bar's 4px radius.
+ */
+export function drawSlotIndicators(
+  ctx: CanvasRenderingContext2D,
+  bars: BarLayout[],
+  sx: number,
+  sy: number,
+  vw: number,
+  vh: number,
+) {
+  const BAR_RADIUS = 4
+  const FLAG_SIZE = 12  // triangle leg length
+
+  for (const bar of bars) {
+    const status = bar.flight.slotStatus
+    if (!status) continue
+
+    // Use risk-level color if available, otherwise fall back to slot status color
+    const riskLevel = bar.flight.slotRiskLevel
+    const color = riskLevel ? SLOT_RISK_COLORS[riskLevel] : SLOT_STATUS_COLORS[status]
+    if (!color) continue
+
+    // Skip bars that are too narrow or outside viewport
+    // Note: canvas is already translated by (-sx, -sy), so use bar coords directly
+    if (bar.width < 30) continue
+    if (bar.x + bar.width < sx || bar.x > sx + vw || bar.y + bar.height < sy || bar.y > sy + vh) continue
+
+    // Slightly larger flag for at-risk flights
+    const flagSize = riskLevel === 'at_risk' ? 14 : FLAG_SIZE
+
+    // Top-right corner of the bar
+    const rx = bar.x + bar.width
+    const ty = bar.y
+
+    ctx.save()
+
+    // Pulse animation for at-risk flights
+    if (riskLevel === 'at_risk') {
+      ctx.globalAlpha = 0.65 + 0.35 * Math.sin(Date.now() / 400)
+    }
+
+    ctx.beginPath()
+    ctx.moveTo(rx - flagSize, ty)
+    ctx.lineTo(rx - BAR_RADIUS, ty)
+    ctx.arc(rx - BAR_RADIUS, ty + BAR_RADIUS, BAR_RADIUS, -Math.PI / 2, 0)
+    ctx.lineTo(rx, ty + flagSize)
+    ctx.closePath()
+
+    ctx.fillStyle = color
+    ctx.fill()
+
+    ctx.restore()
+  }
 }

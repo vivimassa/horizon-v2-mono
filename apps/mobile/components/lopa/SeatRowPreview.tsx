@@ -9,6 +9,7 @@ interface SeatRowPreviewProps {
   seatType?: 'standard' | 'premium' | 'lie-flat' | 'suite' | null
   pitchIn?: number | null
   palette: Palette
+  align?: 'center' | 'left'
 }
 
 const SEAT_LETTERS_LEFT: Record<number, string[]> = {
@@ -39,7 +40,7 @@ function getSeatLetters(groups: number[]): string[][] {
 }
 
 export const SeatRowPreview = memo(function SeatRowPreview({
-  seatLayout, color, seatType, pitchIn, palette,
+  seatLayout, color, seatType, pitchIn, palette, align = 'center',
 }: SeatRowPreviewProps) {
   const groups = useMemo(() => seatLayout.split('-').map(Number), [seatLayout])
   const letters = useMemo(() => getSeatLetters(groups), [groups])
@@ -79,11 +80,12 @@ export const SeatRowPreview = memo(function SeatRowPreview({
   }
 
   return (
-    <View style={{ alignItems: 'center', gap: 8 }}>
+    <View style={{ alignItems: align === 'left' ? 'flex-start' : 'center', gap: 8 }}>
       <Svg
         viewBox={`0 0 ${totalW} ${totalH}`}
-        width="100%"
-        style={{ maxWidth: Math.min(totalW * 1.2, 400) }}
+        width={Math.min(totalW * 1.2, 400)}
+        height={totalH * Math.min(totalW * 1.2, 400) / totalW}
+        style={{ maxWidth: '100%' }}
       >
         {aisles.map((aisle, i) => {
           const center = aisle.x + groupGap / 2

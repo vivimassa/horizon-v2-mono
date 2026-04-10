@@ -2,7 +2,7 @@ import { memo } from 'react'
 import { Text, View, Pressable } from 'react-native'
 import type { Palette } from '@skyhub/ui/theme'
 
-const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const
+const DAYS = ['1', '2', '3', '4', '5', '6', '7'] as const
 const DAY_NUMS = ['1', '2', '3', '4', '5', '6', '7'] as const
 
 export const FrequencyPicker = memo(function FrequencyPicker({
@@ -40,25 +40,17 @@ export const FrequencyPicker = memo(function FrequencyPicker({
   )
 })
 
-/** Display-only frequency dots */
+/** Display-only frequency text — shows active day numbers like "1.3.5.7" or "1234567" */
 export const FrequencyDots = memo(function FrequencyDots({
-  value, accent, palette, size = 18,
+  value, accent, palette, size = 11,
 }: {
   value: string; accent: string; palette: Palette; size?: number
 }) {
+  // Show each digit, inactive ones as dots
+  const display = DAY_NUMS.map(d => value.includes(d) ? d : '.').join('')
   return (
-    <View className="flex-row" style={{ gap: 2 }}>
-      {DAYS.map((label, i) => {
-        const active = value.includes(DAY_NUMS[i])
-        return (
-          <View key={i} className="items-center justify-center"
-            style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: active ? accent : 'transparent' }}>
-            <Text style={{ fontSize: size * 0.55, fontWeight: '600', color: active ? '#fff' : palette.textTertiary }}>
-              {label}
-            </Text>
-          </View>
-        )
-      })}
-    </View>
+    <Text style={{ fontSize: 13, fontWeight: '500', fontFamily: 'monospace', color: palette.text }} numberOfLines={1}>
+      {display}
+    </Text>
   )
 })

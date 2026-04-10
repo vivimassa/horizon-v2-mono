@@ -95,7 +95,7 @@ export function GanttFilterPanel({ forceCollapsed = false, onGo }: { forceCollap
           <ChevronRight size={16} className="text-hz-text-secondary" />
         </div>
         <div className="flex-1 flex items-center justify-center" style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)' }}>
-          <span className="text-[12px] font-semibold uppercase tracking-wider text-hz-text-tertiary whitespace-nowrap">
+          <span className="text-[13px] font-semibold uppercase tracking-wider text-hz-text-tertiary whitespace-nowrap">
             Filters
           </span>
         </div>
@@ -119,7 +119,7 @@ export function GanttFilterPanel({ forceCollapsed = false, onGo }: { forceCollap
             <Filter size={14} className="text-module-accent" />
             <span className="text-[15px] font-bold">Filters</span>
             {activeCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-module-accent text-white text-[11px] font-bold">{activeCount}</span>
+              <span className="px-2 py-0.5 rounded-full bg-module-accent text-white text-[13px] font-bold">{activeCount}</span>
             )}
           </div>
           <button onClick={() => setCollapsed(true)} className="p-1 rounded-md hover:bg-hz-border/30 transition-colors">
@@ -169,7 +169,7 @@ export function GanttFilterPanel({ forceCollapsed = false, onGo }: { forceCollap
             <div className="flex rounded-xl overflow-hidden" style={{ border: `1px solid ${inputBorder}` }}>
               {(['type', 'registration', 'utilization'] as const).map(mode => (
                 <button key={mode} onClick={() => setFleetSortOrder(mode)}
-                  className={`flex-1 py-2 text-[12px] font-semibold transition-colors duration-150`}
+                  className={`flex-1 py-2 text-[13px] font-semibold transition-colors duration-150`}
                   style={fleetSortOrder === mode
                     ? { background: isDark ? 'rgba(62,123,250,0.15)' : 'rgba(30,64,175,0.10)', color: isDark ? '#5B8DEF' : '#1e40af' }
                     : { color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)' }}
@@ -336,7 +336,7 @@ function AcTypeDropdown({
         className="w-full h-9 flex items-center justify-between px-3 rounded-xl text-[13px] font-medium transition-colors"
         style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
       >
-        <span className="truncate text-hz-text font-mono">{label}</span>
+        <span className="truncate text-hz-text">{label}</span>
         <ChevronDown size={14} className={`text-hz-text-tertiary shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
@@ -370,7 +370,7 @@ function AcTypeDropdown({
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   )}
                 </span>
-                <span className="text-[13px] font-mono font-medium text-hz-text">{icao}</span>
+                <span className="text-[13px] font-medium text-hz-text">{icao}</span>
               </button>
             )
           })}

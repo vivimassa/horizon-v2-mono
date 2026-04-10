@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from 'react'
-import { View, Text, Image, LayoutChangeEvent } from 'react-native'
+import { View, Text, Image, LayoutChangeEvent, useWindowDimensions } from 'react-native'
 import Svg, { Rect, G, Text as SvgText, Line, Path } from 'react-native-svg'
 import { modeColor, type Palette } from '@skyhub/ui/theme'
 import type { CabinClassRef, CabinEntry } from '@skyhub/api'
@@ -106,6 +106,9 @@ function ImageSeatMap({ sections, fuselageImg, onImgError, palette, isDark }: {
   isDark: boolean
 }) {
   const [containerW, setContainerW] = useState(0)
+  const { width: screenW } = useWindowDimensions()
+  const isTablet = screenW >= 768
+  const imgH = isTablet ? 300 : 120
 
   const onLayout = (e: LayoutChangeEvent) => setContainerW(e.nativeEvent.layout.width)
 
@@ -139,11 +142,11 @@ function ImageSeatMap({ sections, fuselageImg, onImgError, palette, isDark }: {
 
   return (
     <View style={{ width: '100%' }} onLayout={onLayout}>
-      {/* Fuselage image — full width, 60% of natural height */}
-      <View style={{ width: '100%', height: 300, borderRadius: 12, overflow: 'hidden' }}>
+      {/* Fuselage image */}
+      <View style={{ width: '100%', height: imgH, borderRadius: 12, overflow: 'hidden' }}>
         <Image
           source={fuselageImg}
-          style={{ width: '100%', height: 300, opacity: isDark ? 0.85 : 1 }}
+          style={{ width: '100%', height: imgH, opacity: isDark ? 0.85 : 1 }}
           resizeMode="stretch"
           onError={onImgError}
         />

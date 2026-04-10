@@ -19,6 +19,14 @@ export interface GanttFlight {
   rotationId: string | null
   rotationSequence: number | null
   rotationLabel: string | null
+  /** Slot status from SlotSeries linked via scheduledFlightId */
+  slotStatus?: 'confirmed' | 'offered' | 'waitlisted' | 'refused' | 'conditional' | null
+  /** Slot utilization % for the linked series (0-100) */
+  slotUtilizationPct?: number | null
+  /** Risk level derived from utilization: safe (>=85%), close (80-85%), at_risk (<80%) */
+  slotRiskLevel?: 'safe' | 'close' | 'at_risk' | null
+  /** SlotSeries ID for cancel-impact lookup */
+  slotSeriesId?: string | null
 }
 
 export interface GanttAircraft {

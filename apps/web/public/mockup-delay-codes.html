@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Delay Codes Mockup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f5f5f7; color: #1a1a1a; }
+
+  .container { display: flex; height: 100vh; gap: 1px; background: #e5e5e5; }
+
+  /* Left Panel */
+  .left { width: 320px; background: #fff; display: flex; flex-direction: column; }
+  .left-header { padding: 16px; border-bottom: 1px solid #e5e5e5; }
+  .left-header h2 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+  .search { width: 100%; padding: 8px 12px 8px 32px; border: 1px solid #e0e0e0; border-radius: 12px; font-size: 13px; outline: none; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") 10px center no-repeat; }
+
+  /* Toggle */
+  .toggle-row { display: flex; gap: 4px; padding: 12px 16px 0; }
+  .toggle-btn { flex: 1; padding: 6px; border: 1px solid #e0e0e0; background: #fff; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; text-align: center; }
+  .toggle-btn.active { background: #1e40af; color: #fff; border-color: #1e40af; }
+
+  .left-list { flex: 1; overflow-y: auto; padding: 8px; }
+
+  .cat-header { display: flex; align-items: center; gap: 6px; padding: 8px 8px 4px; margin-top: 4px; }
+  .cat-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .cat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #888; }
+  .cat-line { flex: 1; height: 1px; background: #eee; }
+
+  .code-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; cursor: pointer; border-left: 3px solid transparent; }
+  .code-item:hover { background: #f5f5f5; }
+  .code-item.selected { background: rgba(30,64,175,0.06); border-left-color: #1e40af; }
+  .code-num { font-size: 14px; font-weight: 700; font-family: 'SF Mono', monospace; width: 24px; }
+  .code-alpha { font-size: 11px; font-weight: 600; color: #1e40af; font-family: 'SF Mono', monospace; background: rgba(30,64,175,0.08); padding: 2px 5px; border-radius: 4px; }
+  .code-name { font-size: 13px; font-weight: 500; flex: 1; }
+  .code-732 { font-size: 10px; color: #888; font-family: 'SF Mono', monospace; }
+
+  /* Right Panel */
+  .right { flex: 1; background: #fff; display: flex; flex-direction: column; }
+
+  .right-header { padding: 20px 24px; border-bottom: 1px solid #e5e5e5; }
+  .right-header-row { display: flex; align-items: center; justify-content: space-between; }
+  .right-title { display: flex; align-items: center; gap: 12px; }
+  .badge-num { font-size: 24px; font-weight: 800; font-family: 'SF Mono', monospace; background: #f0f0f0; padding: 4px 12px; border-radius: 8px; }
+  .badge-alpha { font-size: 14px; font-weight: 700; color: #1e40af; font-family: 'SF Mono', monospace; background: rgba(30,64,175,0.08); padding: 4px 10px; border-radius: 6px; }
+  .right-name { font-size: 18px; font-weight: 600; }
+  .cat-badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; background: #fef3c7; color: #92400e; }
+  .active-badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; background: #dcfce7; color: #166534; }
+  .btn-row { display: flex; gap: 8px; }
+  .btn { padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; border: none; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  .btn-edit { background: none; color: #666; }
+  .btn-del { background: none; color: #ccc; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; padding: 8px 16px; border-bottom: 1px solid #e5e5e5; }
+  .tab { padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; color: #888; cursor: pointer; border: none; background: none; }
+  .tab.active { background: rgba(30,64,175,0.1); color: #1e40af; }
+
+  .right-content { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+  /* AHM 732 Card */
+  .ahm732-card { background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%); border: 1px solid #e0e7ff; border-radius: 14px; padding: 20px; margin-bottom: 24px; }
+  .ahm732-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #6366f1; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .ahm732-title .dot { width: 6px; height: 6px; border-radius: 50%; background: #6366f1; }
+  .triple-a { display: flex; gap: 12px; align-items: stretch; }
+  .triple-box { flex: 1; background: #fff; border-radius: 10px; padding: 14px; border: 1px solid #e0e7ff; text-align: center; }
+  .triple-letter { font-size: 28px; font-weight: 800; font-family: 'SF Mono', monospace; color: #1e40af; }
+  .triple-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #6366f1; margin-top: 2px; margin-bottom: 6px; }
+  .triple-desc { font-size: 12px; color: #555; line-height: 1.3; }
+  .triple-sep { display: flex; align-items: center; font-size: 18px; color: #c7d2fe; font-weight: 300; }
+  .ahm732-combined { text-align: center; margin-top: 14px; padding-top: 14px; border-top: 1px solid #e0e7ff; }
+  .combined-code { font-size: 20px; font-weight: 800; font-family: 'SF Mono', monospace; color: #4f46e5; letter-spacing: 2px; }
+  .combined-label { font-size: 11px; color: #888; margin-top: 2px; }
+
+  /* Legacy section */
+  .section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 10px; }
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 32px; }
+  .field { padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+  .field-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 4px; }
+  .field-value { font-size: 13px; font-weight: 500; }
+  .field-value.mono { font-family: 'SF Mono', monospace; font-weight: 700; }
+  .field-value .color-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; vertical-align: middle; margin-right: 6px; border: 1px solid rgba(0,0,0,0.1); }
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- LEFT PANEL -->
+  <div class="left">
+    <div class="left-header">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <h2>Delay Codes</h2>
+        <button class="btn" style="background:#1e40af;color:#fff;font-size:12px;font-weight:600;padding:4px 10px;border-radius:8px">+ Add</button>
+      </div>
+      <div class="toggle-row" style="padding:0;margin-bottom:10px">
+        <button class="toggle-btn active">AHM 730/731</button>
+        <button class="toggle-btn">AHM 732</button>
+      </div>
+      <input class="search" placeholder="Search code, name..." />
+    </div>
+    <div class="left-list">
+      <!-- Category: Technical -->
+      <div class="cat-header">
+        <div class="cat-dot" style="background:#ef4444"></div>
+        <span class="cat-label">Technical (41-48)</span>
+        <div class="cat-line"></div>
+      </div>
+      <div class="code-item selected">
+        <span class="code-num">41</span>
+        <span class="code-alpha">TD</span>
+        <span class="code-name">Aircraft Defects</span>
+      </div>
+      <div class="code-item">
+        <span class="code-num">42</span>
+        <span class="code-alpha">TM</span>
+        <span class="code-name">Scheduled Maintenance</span>
+      </div>
+      <div class="code-item">
+        <span class="code-num">43</span>
+        <span class="code-alpha">TN</span>
+        <span class="code-name">Non-Scheduled Maintenance</span>
+      </div>
+      <div class="code-item">
+        <span class="code-num">44</span>
+        <span class="code-alpha">TS</span>
+        <span class="code-name">Spares & Maintenance Equip</span>
+      </div>
+      <div class="code-item">
+        <span class="code-num">45</span>
+        <span class="code-alpha">TA</span>
+        <span class="code-name">AOG Spares</span>
+      </div>
+      <div class="code-item">
+        <span class="code-num">46</span>
+        <span class="code-alpha">TC</span>
+        <span class="code-name">Aircraft Change (Tech)</span>
+      </div>
+
+      <!-- Category: Operations -->
+      <div class="cat-header">
+        <div class="cat-dot" style="background:#3b82f6"></div>
+        <span class="cat-label">Operations (61-69)</span>
+        <div class="cat-line"></div>
+      </div>
+      <div class="code-item">
+        <span class="code-num">61</span>
+        <span class="code-alpha">FP</span>
+        <span class="code-name">Flight Plan</span>
+      </div>
+      <div class="code-item">
+        <span class="code-num">63</span>
+        <span class="code-alpha">FT</span>
+        <span class="code-name">Late Crew Boarding</span>
+      </div>
+      <div class="code-item">
+        <span class="code-num">64</span>
+        <span class="code-alpha">FS</span>
+        <span class="code-name">Flight Crew Shortage</span>
+      </div>
+
+      <!-- Category: Weather -->
+      <div class="cat-header">
+        <div class="cat-dot" style="background:#f59e0b"></div>
+        <span class="cat-label">Weather (71-77)</span>
+        <div class="cat-line"></div>
+      </div>
+      <div class="code-item">
+        <span class="code-num">71</span>
+        <span class="code-alpha">WO</span>
+        <span class="code-name">Departure Weather</span>
+      </div>
+      <div class="code-item">
+        <span class="code-num">72</span>
+        <span class="code-alpha">WT</span>
+        <span class="code-name">Destination Weather</span>
+      </div>
+      <div class="code-item">
+        <span class="code-num">75</span>
+        <span class="code-alpha">WI</span>
+        <span class="code-name">De-icing</span>
+      </div>
+
+      <!-- Category: Reactionary -->
+      <div class="cat-header">
+        <div class="cat-dot" style="background:#8b5cf6"></div>
+        <span class="cat-label">Reactionary (91-99)</span>
+        <div class="cat-line"></div>
+      </div>
+      <div class="code-item">
+        <span class="code-num">93</span>
+        <span class="code-alpha">RA</span>
+        <span class="code-name">Aircraft Rotation</span>
+      </div>
+      <div class="code-item">
+        <span class="code-num">96</span>
+        <span class="code-alpha">RO</span>
+        <span class="code-name">Ops Control / Rerouting</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right">
+    <!-- Header -->
+    <div class="right-header">
+      <div class="right-header-row">
+        <div class="right-title">
+          <span class="badge-num">41</span>
+          <span class="badge-alpha">TD</span>
+          <span class="right-name">Aircraft Defects</span>
+          <span class="cat-badge">Technical</span>
+          <span class="active-badge">Active</span>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-del">🗑</button>
+          <button class="btn btn-edit">✏️ Edit</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active">ℹ️ Details</button>
+      <button class="tab">🔗 AHM 732 Mapping</button>
+    </div>
+
+    <div class="right-content">
+      <!-- AHM 732 Mapping Card -->
+      <div class="ahm732-card">
+        <div class="ahm732-title"><span class="dot"></span>AHM 732 EQUIVALENT</div>
+        <div class="triple-a">
+          <div class="triple-box">
+            <div class="triple-label">Process</div>
+            <div class="triple-letter">M</div>
+            <div class="triple-desc">Maintenance</div>
+          </div>
+          <div class="triple-sep">–</div>
+          <div class="triple-box">
+            <div class="triple-label">Reason</div>
+            <div class="triple-letter">D</div>
+            <div class="triple-desc">Defect found</div>
+          </div>
+          <div class="triple-sep">–</div>
+          <div class="triple-box">
+            <div class="triple-label">Stakeholder</div>
+            <div class="triple-letter">A</div>
+            <div class="triple-desc">Airline</div>
+          </div>
+        </div>
+        <div class="ahm732-combined">
+          <div class="combined-code">M – D – A</div>
+          <div class="combined-label">AHM 732 Triple-A Code</div>
+        </div>
+      </div>
+
+      <!-- Legacy Details -->
+      <div style="margin-bottom:20px">
+        <div class="section-title">Legacy Code (AHM 730/731)</div>
+        <div class="field-grid">
+          <div class="field">
+            <div class="field-label">Numeric Code</div>
+            <div class="field-value mono">41</div>
+          </div>
+          <div class="field">
+            <div class="field-label">Alpha Sub-Code</div>
+            <div class="field-value mono">TD</div>
+          </div>
+          <div class="field">
+            <div class="field-label">Name</div>
+            <div class="field-value">Aircraft Defects</div>
+          </div>
+          <div class="field">
+            <div class="field-label">Category</div>
+            <div class="field-value">Technical</div>
+          </div>
+          <div class="field">
+            <div class="field-label">Code Range</div>
+            <div class="field-value mono">41–48</div>
+          </div>
+          <div class="field">
+            <div class="field-label">Color</div>
+            <div class="field-value"><span class="color-dot" style="background:#ef4444"></span><span class="mono">#ef4444</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-title">Description</div>
+        <div class="field">
+          <div class="field-value" style="line-height:1.6;color:#555">Aircraft defects including items discovered at the departure station requiring immediate rectification, unscheduled component changes, or deferred defects that must be addressed before departure. Includes MEL/CDL items requiring attention.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

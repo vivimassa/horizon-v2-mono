@@ -10,6 +10,11 @@ import { TabletBreadcrumb } from './tablet-breadcrumb'
  * Mobile file-based routing doesn't always match the nav tree hierarchy.
  */
 const MOBILE_ROUTE_MAP: Record<string, string> = {
+  // Network
+  '/network': '/network',
+  '/network/schedule-grid': '/network/control/schedule-grid',
+  '/network/schedule-flight-detail': '/network/control/schedule-grid',
+  // Ground Ops
   '/ground-ops': '/ground-ops',
   '/ground-ops/cargo-loading': '/ground-ops/cargo/cargo-manifest',
   // Settings

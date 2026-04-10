@@ -8,12 +8,14 @@ import {
 } from 'lucide-react-native'
 import { accentTint, modeColor, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { useDevice } from '../../../hooks/useDevice'
 import { ColorSwatchPicker } from '../../../components/lopa/ColorSwatchPicker'
 
 export default function ServiceTypeDetailScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { palette, isDark, accent } = useAppTheme()
+  const { isTablet } = useDevice()
 
   const [serviceType, setServiceType] = useState<FlightServiceTypeRef | null>(null)
   const [loading, setLoading] = useState(true)
@@ -92,7 +94,7 @@ export default function ServiceTypeDetailScreen() {
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
       {/* Header */}
-      <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View className="px-4 pt-4 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center flex-1 mr-2">
             <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
@@ -124,9 +126,9 @@ export default function ServiceTypeDetailScreen() {
                   <X size={20} color={palette.textSecondary} strokeWidth={1.8} />
                 </Pressable>
                 <Pressable onPress={handleSave} disabled={saving}
-                  className="px-3 py-1.5 rounded-lg active:opacity-60"
+                  className="px-4 py-2.5 rounded-lg active:opacity-60"
                   style={{ backgroundColor: accent }}>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving...' : 'Save'}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving...' : 'Save'}</Text>
                 </Pressable>
               </>
             ) : (
@@ -138,7 +140,7 @@ export default function ServiceTypeDetailScreen() {
                   className="flex-row items-center px-3 py-1.5 rounded-lg active:opacity-60"
                   style={{ backgroundColor: accentTint(accent, isDark ? 0.15 : 0.08) }}>
                   <Pencil size={15} color={accent} strokeWidth={1.8} />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: accent, marginLeft: 6 }}>Edit</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: accent, marginLeft: 6 }}>Edit</Text>
                 </Pressable>
               </>
             )}
@@ -150,10 +152,12 @@ export default function ServiceTypeDetailScreen() {
       <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
         keyboardShouldPersistTaps="handled"
       >
-        <Field label="Code" value={serviceType.code} editing={editing} fieldKey="code"
-          editValue={get('code')} onChange={handleFieldChange} palette={palette} mono maxLength={2} />
-        <Field label="Name" value={serviceType.name} editing={editing} fieldKey="name"
-          editValue={get('name')} onChange={handleFieldChange} palette={palette} />
+        <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+          <Field label="Code" value={serviceType.code} editing={editing} fieldKey="code"
+            editValue={get('code')} onChange={handleFieldChange} palette={palette} mono maxLength={2} half={isTablet} />
+          <Field label="Name" value={serviceType.name} editing={editing} fieldKey="name"
+            editValue={get('name')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+        </View>
         <Field label="Description" value={serviceType.description} editing={editing} fieldKey="description"
           editValue={get('description')} onChange={handleFieldChange} palette={palette} multiline />
 
@@ -162,20 +166,23 @@ export default function ServiceTypeDetailScreen() {
           <ColorSwatchPicker value={get('color') || '#9ca3af'} onChange={(v) => handleFieldChange('color', v)} palette={palette} isDark={isDark} editing={editing} />
         </View>
 
-        <ToggleField label="Active" value={serviceType.isActive} editing={editing} fieldKey="isActive"
-          editValue={get('isActive')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
+        <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+          <ToggleField label="Active" value={serviceType.isActive} editing={editing} fieldKey="isActive"
+            editValue={get('isActive')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+        </View>
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-function Field({ label, value, editing, fieldKey, editValue, onChange, palette, mono, maxLength, multiline }: {
+function Field({ label, value, editing, fieldKey, editValue, onChange, palette, mono, maxLength, multiline, half }: {
   label: string; value: any; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; mono?: boolean; maxLength?: number; multiline?: boolean
+  onChange: (k: string, v: any) => void; palette: Palette; mono?: boolean; maxLength?: number; multiline?: boolean; half?: boolean
 }) {
+  const halfStyle = half ? { width: '50%' as const, paddingRight: 12 } : {}
   if (editing) {
     return (
-      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
         <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
         <TextInput
           value={editValue != null ? String(editValue) : ''}
@@ -198,7 +205,7 @@ function Field({ label, value, editing, fieldKey, editValue, onChange, palette, 
     )
   }
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
       <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       <Text style={{ fontSize: 15, fontWeight: '500', color: palette.text, fontFamily: mono ? 'monospace' : undefined }}>
         {value ?? '---'}
@@ -207,13 +214,13 @@ function Field({ label, value, editing, fieldKey, editValue, onChange, palette, 
   )
 }
 
-function ToggleField({ label, value, editing, fieldKey, editValue, onChange, palette, isDark }: {
+function ToggleField({ label, value, editing, fieldKey, editValue, onChange, palette, isDark, half }: {
   label: string; value: boolean; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean
+  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean; half?: boolean
 }) {
   const current = editing ? !!editValue : value
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...(half ? { width: '50%', paddingRight: 12 } : {}) }}>
       <Text style={{ fontSize: 12, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       {editing ? (
         <Pressable onPress={() => onChange(fieldKey, !editValue)}

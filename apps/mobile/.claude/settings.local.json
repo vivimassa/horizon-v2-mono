@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx expo:*)",
+      "Bash(ls /c/Users/vivim/horizon-v2-mono/apps/mobile/node_modules/react-native-svg/src/lib/SvgTouchableMixin*)",
+      "Bash(ls:*)",
+      "Bash(curl -s http://localhost:3002/delay-codes?operatorId=horizon)",
+      "Bash(node server/seed-delay-codes.mjs)",
+      "Bash(node server/seed-ahm732.mjs)",
+      "Bash(npx tsc:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
+}

@@ -62,6 +62,11 @@ const airportSchema = new Schema(
 
     // Slot control
     isSlotControlled: { type: Boolean, default: false },
+    coordinationLevel: { type: Number, default: null },       // 1 | 2 | 3
+    slotsPerHourDay: { type: Number, default: null },
+    slotsPerHourNight: { type: Number, default: null },
+    coordinatorName: { type: String, default: null },
+    coordinatorEmail: { type: String, default: null },
 
     // Weather monitoring
     weatherMonitored: { type: Boolean, default: false },

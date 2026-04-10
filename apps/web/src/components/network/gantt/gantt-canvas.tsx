@@ -8,7 +8,7 @@ import { useGanttStore } from '@/stores/use-gantt-store'
 import { ROW_HEIGHT_LEVELS } from '@/lib/gantt/types'
 import { computePixelsPerHour, computeNowLineX, dateToMs, xToUtc } from '@/lib/gantt/time-axis'
 import { hitTestBars, hitTestRow } from '@/lib/gantt/hit-testing'
-import { drawGrid, drawGroupHeaders, drawBars, drawTatLabels, drawNightstopLabels, drawNowLine, drawDragGhosts, drawDraggedBars, drawDropTarget, buildBarsByRow } from '@/lib/gantt/draw-helpers'
+import { drawGrid, drawGroupHeaders, drawBars, drawTatLabels, drawNightstopLabels, drawNowLine, drawDragGhosts, drawDraggedBars, drawDropTarget, buildBarsByRow, drawSlotIndicators } from '@/lib/gantt/draw-helpers'
 import { FlightTooltip } from './gantt-flight-tooltip'
 import { GanttContextMenu } from './gantt-context-menu'
 import { AircraftContextMenu } from './aircraft-context-menu'
@@ -53,6 +53,7 @@ export function GanttCanvas() {
   const hoveredFlightId = useGanttStore(s => s.hoveredFlightId)
   const swapMode = useGanttStore(s => s.swapMode)
   const showTat = useGanttStore(s => s.showTat)
+  const showSlots = useGanttStore(s => s.showSlots)
   const scenarioId = useGanttStore(s => s.scenarioId)
   const periodFrom = useGanttStore(s => s.periodFrom)
   const periodTo = useGanttStore(s => s.periodTo)
@@ -106,6 +107,7 @@ export function GanttCanvas() {
     drawGroupHeaders(ctx, layout.rows, sx, sy, vw, vh, isDark)
     const swapSourceIds = swapMode ? new Set(swapMode.sourceFlightIds) : undefined
     drawBars(ctx, layout.bars, selectedFlightIds, hoveredFlightId, sx, sy, vw, vh, swapSourceIds)
+    if (showSlots) drawSlotIndicators(ctx, layout.bars, sx, sy, vw, vh)
     if (showTat) drawTatLabels(ctx, barsByRowRef.current, sx, sy, vw, vh, isDark)
     drawNightstopLabels(ctx, barsByRowRef.current, sx, sy, vw, vh, isDark)
 
@@ -133,7 +135,7 @@ export function GanttCanvas() {
 
     ctx.restore()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, selectedFlightIds, hoveredFlightId, isDark, periodFrom, periodTo, containerWidth, zoomLevel, swapMode, dragActive, showTat, scenarioId])
+  }, [layout, selectedFlightIds, hoveredFlightId, isDark, periodFrom, periodTo, containerWidth, zoomLevel, swapMode, dragActive, showTat, showSlots, scenarioId])
 
   const drawRef = useRef(draw)
   drawRef.current = draw
@@ -455,7 +457,7 @@ export function GanttCanvas() {
   useEffect(() => {
     cancelAnimationFrame(rafId.current)
     rafId.current = requestAnimationFrame(() => drawRef.current())
-  }, [layout, selectedFlightIds, isDark])
+  }, [layout, selectedFlightIds, isDark, showTat, showSlots])
 
   // Now-line timer
   useEffect(() => {

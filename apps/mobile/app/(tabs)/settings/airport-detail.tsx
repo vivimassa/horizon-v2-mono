@@ -105,7 +105,7 @@ export default function AirportDetailScreen() {
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
       {/* Header */}
-      <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View className="px-4 pt-4 pb-4" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center flex-1 mr-2">
             <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
@@ -133,9 +133,9 @@ export default function AirportDetailScreen() {
                   <X size={20} color={palette.textSecondary} strokeWidth={1.8} />
                 </Pressable>
                 <Pressable onPress={handleSave} disabled={saving}
-                  className="px-3 py-1.5 rounded-lg active:opacity-60"
+                  className="px-4 py-2.5 rounded-lg active:opacity-60"
                   style={{ backgroundColor: accent }}>
-                  <Text style={{ fontSize: 15, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving…' : 'Save'}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving…' : 'Save'}</Text>
                 </Pressable>
               </>
             ) : (
@@ -144,10 +144,10 @@ export default function AirportDetailScreen() {
                   <Trash2 size={18} color={palette.textTertiary} strokeWidth={1.8} />
                 </Pressable>
                 <Pressable onPress={() => { setDraft({}); setEditing(true) }}
-                  className="flex-row items-center px-3 py-1.5 rounded-lg active:opacity-60"
+                  className="flex-row items-center px-4 py-2.5 rounded-lg active:opacity-60"
                   style={{ backgroundColor: accentTint(accent, isDark ? 0.15 : 0.08) }}>
                   <Pencil size={15} color={accent} strokeWidth={1.8} />
-                  <Text style={{ fontSize: 15, fontWeight: '600', color: accent, marginLeft: 6 }}>Edit</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: accent, marginLeft: 6 }}>Edit</Text>
                 </Pressable>
               </>
             )}
@@ -158,7 +158,7 @@ export default function AirportDetailScreen() {
 
       {/* Map */}
       {airport.latitude != null && airport.longitude != null && (
-        <View style={{ height: isTablet ? 350 : 250, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+        <View style={{ height: isTablet ? 300 : 250, borderBottomWidth: 1, borderBottomColor: palette.border }}>
           <MapView
             style={{ flex: 1 }}
             initialRegion={{
@@ -209,18 +209,18 @@ export default function AirportDetailScreen() {
       {/* Tab content */}
       <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
         {activeTab === 'basic' && (
-          <>
-            <Field label="IATA Code" value={airport.iataCode} editing={editing} fieldKey="iataCode" editValue={get('iataCode')} onChange={handleFieldChange} palette={palette} />
-            <Field label="ICAO Code" value={airport.icaoCode} editing={editing} fieldKey="icaoCode" editValue={get('icaoCode')} onChange={handleFieldChange} palette={palette} />
-            <Field label="Airport Name" value={airport.name} editing={editing} fieldKey="name" editValue={get('name')} onChange={handleFieldChange} palette={palette} />
-            <Field label="City" value={airport.city} editing={editing} fieldKey="city" editValue={get('city')} onChange={handleFieldChange} palette={palette} />
-            <Field label="Country" value={airport.countryName ?? airport.country} editing={editing} fieldKey="countryName" editValue={get('countryName')} onChange={handleFieldChange} palette={palette} />
-            <Field label="Timezone" value={airport.timezone} editing={editing} fieldKey="timezone" editValue={get('timezone')} onChange={handleFieldChange} palette={palette} />
-            <Field label="Latitude" value={airport.latitude?.toFixed(6)} editing={editing} fieldKey="latitude" editValue={get('latitude')} onChange={handleFieldChange} palette={palette} numeric />
-            <Field label="Longitude" value={airport.longitude?.toFixed(6)} editing={editing} fieldKey="longitude" editValue={get('longitude')} onChange={handleFieldChange} palette={palette} numeric />
-            <Field label="Elevation (ft)" value={airport.elevationFt} editing={editing} fieldKey="elevationFt" editValue={get('elevationFt')} onChange={handleFieldChange} palette={palette} numeric />
-            <ToggleField label="Active" value={airport.isActive} editing={editing} fieldKey="isActive" editValue={get('isActive')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
-          </>
+          <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+            <Field label="IATA Code" value={airport.iataCode} editing={editing} fieldKey="iataCode" editValue={get('iataCode')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <Field label="ICAO Code" value={airport.icaoCode} editing={editing} fieldKey="icaoCode" editValue={get('icaoCode')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <Field label="Airport Name" value={airport.name} editing={editing} fieldKey="name" editValue={get('name')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <Field label="City" value={airport.city} editing={editing} fieldKey="city" editValue={get('city')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <Field label="Country" value={airport.countryName ?? airport.country} editing={editing} fieldKey="countryName" editValue={get('countryName')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <Field label="Timezone" value={airport.timezone} editing={editing} fieldKey="timezone" editValue={get('timezone')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <Field label="Latitude" value={airport.latitude?.toFixed(6)} editing={editing} fieldKey="latitude" editValue={get('latitude')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+            <Field label="Longitude" value={airport.longitude?.toFixed(6)} editing={editing} fieldKey="longitude" editValue={get('longitude')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+            <Field label="Elevation (ft)" value={airport.elevationFt} editing={editing} fieldKey="elevationFt" editValue={get('elevationFt')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+            <ToggleField label="Active" value={airport.isActive} editing={editing} fieldKey="isActive" editValue={get('isActive')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+          </View>
         )}
         {activeTab === 'runway' && (
           <>
@@ -234,31 +234,33 @@ export default function AirportDetailScreen() {
               <View style={{ width: 3, height: 16, borderRadius: 2, backgroundColor: accent }} />
               <Text style={{ fontSize: 14, fontWeight: '700', color: palette.text }}>Facilities</Text>
             </View>
-            <Field label="Number of Gates" value={airport.numberOfGates} editing={editing} fieldKey="numberOfGates" editValue={get('numberOfGates')} onChange={handleFieldChange} palette={palette} numeric />
-            <Field label="Fire Category" value={airport.fireCategory} editing={editing} fieldKey="fireCategory" editValue={get('fireCategory')} onChange={handleFieldChange} palette={palette} numeric />
-            <ToggleField label="Fuel Available" value={airport.hasFuelAvailable} editing={editing} fieldKey="hasFuelAvailable" editValue={get('hasFuelAvailable')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
-            <ToggleField label="Crew Facilities" value={airport.hasCrewFacilities} editing={editing} fieldKey="hasCrewFacilities" editValue={get('hasCrewFacilities')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
+            <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+              <Field label="Number of Gates" value={airport.numberOfGates} editing={editing} fieldKey="numberOfGates" editValue={get('numberOfGates')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+              <Field label="Fire Category" value={airport.fireCategory} editing={editing} fieldKey="fireCategory" editValue={get('fireCategory')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+              <ToggleField label="Fuel Available" value={airport.hasFuelAvailable} editing={editing} fieldKey="hasFuelAvailable" editValue={get('hasFuelAvailable')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+              <ToggleField label="Crew Facilities" value={airport.hasCrewFacilities} editing={editing} fieldKey="hasCrewFacilities" editValue={get('hasCrewFacilities')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+            </View>
           </>
         )}
         {activeTab === 'operations' && (
-          <>
-            <ToggleField label="Slot Controlled" value={airport.isSlotControlled} editing={editing} fieldKey="isSlotControlled" editValue={get('isSlotControlled')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
-            <ToggleField label="Has Curfew" value={airport.hasCurfew} editing={editing} fieldKey="hasCurfew" editValue={get('hasCurfew')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
-            <Field label="Curfew Start" value={airport.curfewStart} editing={editing} fieldKey="curfewStart" editValue={get('curfewStart')} onChange={handleFieldChange} palette={palette} />
-            <Field label="Curfew End" value={airport.curfewEnd} editing={editing} fieldKey="curfewEnd" editValue={get('curfewEnd')} onChange={handleFieldChange} palette={palette} />
-            <ToggleField label="Weather Monitored" value={airport.weatherMonitored} editing={editing} fieldKey="weatherMonitored" editValue={get('weatherMonitored')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
-            <Field label="Weather Station" value={airport.weatherStation} editing={editing} fieldKey="weatherStation" editValue={get('weatherStation')} onChange={handleFieldChange} palette={palette} />
-            <ToggleField label="Home Base" value={airport.isHomeBase} editing={editing} fieldKey="isHomeBase" editValue={get('isHomeBase')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
-            <Field label="UTC Offset" value={airport.utcOffsetHours != null ? `UTC${airport.utcOffsetHours >= 0 ? '+' : ''}${airport.utcOffsetHours}` : null} editing={editing} fieldKey="utcOffsetHours" editValue={get('utcOffsetHours')} onChange={handleFieldChange} palette={palette} numeric />
-          </>
+          <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+            <ToggleField label="Slot Controlled" value={airport.isSlotControlled} editing={editing} fieldKey="isSlotControlled" editValue={get('isSlotControlled')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+            <ToggleField label="Has Curfew" value={airport.hasCurfew} editing={editing} fieldKey="hasCurfew" editValue={get('hasCurfew')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+            <Field label="Curfew Start" value={airport.curfewStart} editing={editing} fieldKey="curfewStart" editValue={get('curfewStart')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <Field label="Curfew End" value={airport.curfewEnd} editing={editing} fieldKey="curfewEnd" editValue={get('curfewEnd')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <ToggleField label="Weather Monitored" value={airport.weatherMonitored} editing={editing} fieldKey="weatherMonitored" editValue={get('weatherMonitored')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+            <Field label="Weather Station" value={airport.weatherStation} editing={editing} fieldKey="weatherStation" editValue={get('weatherStation')} onChange={handleFieldChange} palette={palette} half={isTablet} />
+            <ToggleField label="Home Base" value={airport.isHomeBase} editing={editing} fieldKey="isHomeBase" editValue={get('isHomeBase')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+            <Field label="UTC Offset" value={airport.utcOffsetHours != null ? `UTC${airport.utcOffsetHours >= 0 ? '+' : ''}${airport.utcOffsetHours}` : null} editing={editing} fieldKey="utcOffsetHours" editValue={get('utcOffsetHours')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+          </View>
         )}
         {activeTab === 'crew' && (
-          <>
-            <ToggleField label="Crew Base" value={airport.isCrewBase} editing={editing} fieldKey="isCrewBase" editValue={get('isCrewBase')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
-            <Field label="Crew Reporting Time (min)" value={airport.crewReportingTimeMinutes != null ? `${airport.crewReportingTimeMinutes} min` : null} editing={editing} fieldKey="crewReportingTimeMinutes" editValue={get('crewReportingTimeMinutes')} onChange={handleFieldChange} palette={palette} numeric />
-            <Field label="Crew Debrief Time (min)" value={airport.crewDebriefTimeMinutes != null ? `${airport.crewDebriefTimeMinutes} min` : null} editing={editing} fieldKey="crewDebriefTimeMinutes" editValue={get('crewDebriefTimeMinutes')} onChange={handleFieldChange} palette={palette} numeric />
-            <ToggleField label="Crew Facilities" value={airport.hasCrewFacilities} editing={editing} fieldKey="hasCrewFacilities" editValue={get('hasCrewFacilities')} onChange={handleFieldChange} palette={palette} isDark={isDark} />
-          </>
+          <View className={isTablet ? 'flex-row flex-wrap' : ''}>
+            <ToggleField label="Crew Base" value={airport.isCrewBase} editing={editing} fieldKey="isCrewBase" editValue={get('isCrewBase')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+            <Field label="Crew Reporting Time (min)" value={airport.crewReportingTimeMinutes != null ? `${airport.crewReportingTimeMinutes} min` : null} editing={editing} fieldKey="crewReportingTimeMinutes" editValue={get('crewReportingTimeMinutes')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+            <Field label="Crew Debrief Time (min)" value={airport.crewDebriefTimeMinutes != null ? `${airport.crewDebriefTimeMinutes} min` : null} editing={editing} fieldKey="crewDebriefTimeMinutes" editValue={get('crewDebriefTimeMinutes')} onChange={handleFieldChange} palette={palette} numeric half={isTablet} />
+            <ToggleField label="Crew Facilities" value={airport.hasCrewFacilities} editing={editing} fieldKey="hasCrewFacilities" editValue={get('hasCrewFacilities')} onChange={handleFieldChange} palette={palette} isDark={isDark} half={isTablet} />
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -267,13 +269,14 @@ export default function AirportDetailScreen() {
 
 // ── Field components ──
 
-function Field({ label, value, editing, fieldKey, editValue, onChange, palette, numeric }: {
+function Field({ label, value, editing, fieldKey, editValue, onChange, palette, numeric, half }: {
   label: string; value: any; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; numeric?: boolean
+  onChange: (k: string, v: any) => void; palette: Palette; numeric?: boolean; half?: boolean
 }) {
+  const halfStyle = half ? { width: '50%' as const, paddingRight: 12 } : {}
   if (editing) {
     return (
-      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
         <Text style={{ fontSize: 15, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
         <TextInput
           value={editValue != null ? String(editValue) : ''}
@@ -286,20 +289,20 @@ function Field({ label, value, editing, fieldKey, editValue, onChange, palette, 
     )
   }
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
       <Text style={{ fontSize: 15, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       <Text style={{ fontSize: 15, fontWeight: '500', color: palette.text }}>{value ?? '—'}</Text>
     </View>
   )
 }
 
-function ToggleField({ label, value, editing, fieldKey, editValue, onChange, palette, isDark }: {
+function ToggleField({ label, value, editing, fieldKey, editValue, onChange, palette, isDark, half }: {
   label: string; value: boolean; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean
+  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean; half?: boolean
 }) {
   const current = editing ? !!editValue : value
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...(half ? { width: '50%', paddingRight: 12 } : {}) }}>
       <Text style={{ fontSize: 15, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       {editing ? (
         <Pressable onPress={() => onChange(fieldKey, !editValue)}

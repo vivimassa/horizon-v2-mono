@@ -34,7 +34,10 @@ export const ScheduleCardList = memo(function ScheduleCardList({
         const isDeleted = deletedIds.has(flight._id)
         const statusColor = STATUS_COLORS[flight.status] ?? palette.textTertiary
 
+        const hasSeparator = (flight.formatting as any)?.separatorBelow
+
         return (
+          <View>
           <Pressable onPress={() => onPress(flight._id)} className="active:opacity-70"
             style={{
               paddingHorizontal: 16, paddingVertical: 12,
@@ -90,6 +93,15 @@ export const ScheduleCardList = memo(function ScheduleCardList({
               <FrequencyDots value={flight.daysOfWeek} accent={accent} palette={palette} size={16} />
             </View>
           </Pressable>
+          {hasSeparator && (
+            <View style={{
+              height: 12,
+              backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+              borderTopWidth: 1, borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+              borderBottomWidth: 1, borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+            }} />
+          )}
+          </View>
         )
       }}
       ListEmptyComponent={

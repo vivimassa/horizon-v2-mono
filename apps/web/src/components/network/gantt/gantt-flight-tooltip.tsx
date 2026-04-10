@@ -8,6 +8,7 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { GanttFlight } from '@/lib/gantt/types'
+import { SLOT_STATUS_COLORS, SLOT_RISK_COLORS } from '@/lib/gantt/colors'
 import { useGanttStore } from '@/stores/use-gantt-store'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -230,6 +231,34 @@ export const FlightTooltip = memo(function FlightTooltip({
             <div className="flex justify-between">
               <span style={{ color: muted }}>Service</span>
               <span style={{ color: body }}>{flight.serviceType}</span>
+            </div>
+          )}
+          {flight.slotStatus && (
+            <div className="flex justify-between">
+              <span style={{ color: muted }}>Slot</span>
+              <span className="font-medium" style={{ color: SLOT_STATUS_COLORS[flight.slotStatus] || body }}>
+                {flight.slotStatus.charAt(0).toUpperCase() + flight.slotStatus.slice(1)}
+              </span>
+            </div>
+          )}
+          {flight.slotUtilizationPct != null && (
+            <div className="flex justify-between">
+              <span style={{ color: muted }}>Utilization</span>
+              <span className="font-medium" style={{ color: SLOT_RISK_COLORS[flight.slotRiskLevel || 'safe'] || body }}>
+                {flight.slotUtilizationPct}%
+              </span>
+            </div>
+          )}
+          {flight.slotRiskLevel && flight.slotRiskLevel !== 'safe' && (
+            <div className="flex justify-between">
+              <span style={{ color: muted }}>Risk</span>
+              <span className="font-medium" style={{
+                padding: '1px 6px', borderRadius: 4,
+                background: flight.slotRiskLevel === 'at_risk' ? 'rgba(255,59,59,0.15)' : 'rgba(255,136,0,0.15)',
+                color: SLOT_RISK_COLORS[flight.slotRiskLevel],
+              }}>
+                {flight.slotRiskLevel === 'at_risk' ? 'AT RISK' : 'CLOSE'}
+              </span>
             </div>
           )}
         </div>

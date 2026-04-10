@@ -1,0 +1,1 @@
+- [No slide modals](feedback_no_slide_modal.md) — Always use animationType="fade" on RN Modal, never "slide"

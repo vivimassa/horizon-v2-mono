@@ -82,7 +82,17 @@ export const GridRow = React.memo(function GridRow({ columns: columnsProp, row, 
       if (colKey === "stdUtc" || colKey === "staUtc") return fmtTime(v);
       return v;
     }
-    if (colKey === "tat") return "";
+    if (colKey === "tat") {
+      if (!prevRow) return "";
+      // No TAT for first flight in a new cycle/rotation
+      if (prevRow.rotationId !== row.rotationId) return "";
+      // TAT = current STD - previous STA (ground time between consecutive flights)
+      const prevSta = (getDirtyValue(prevRow._id, "staUtc") as string) ?? prevRow.staUtc;
+      const curStd = (getDirtyValue(row._id, "stdUtc") as string) ?? row.stdUtc;
+      if (!prevSta || !curStd) return "";
+      const tat = calcBlockMinutes(prevSta, curStd);
+      return tat != null ? fmtMinutes(tat) : "";
+    }
     if (colKey === "effectiveFrom" || colKey === "effectiveUntil") {
       const val = (row as any)[colKey];
       return val ? formatDate(String(val), operatorDateFormat) : "";

@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import {
   Wand2, BarChart3, Search, Maximize2, Minimize2, LayoutGrid,
   CalendarCheck, RefreshCw, Link, Activity, ChevronUp, ChevronDown, Crosshair, MessageSquare, Timer,
-  Binary, Route, GitBranch, Plus,
+  Binary, Route, GitBranch, Plus, Clock,
 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { colors } from '@skyhub/ui/theme'
@@ -32,6 +32,8 @@ export function GanttToolbar({ onSearch, onFullscreen, isFullscreen, onAddFlight
   const barLabelMode = useGanttStore(s => s.barLabelMode)
   const showTat = useGanttStore(s => s.showTat)
   const toggleTat = useGanttStore(s => s.toggleTat)
+  const showSlots = useGanttStore(s => s.showSlots)
+  const toggleSlots = useGanttStore(s => s.toggleSlots)
   const setZoom = useGanttStore(s => s.setZoom)
   const zoomRowIn = useGanttStore(s => s.zoomRowIn)
   const zoomRowOut = useGanttStore(s => s.zoomRowOut)
@@ -172,6 +174,7 @@ export function GanttToolbar({ onSearch, onFullscreen, isFullscreen, onAddFlight
     { icon: LayoutGrid, label: 'Format', tooltip: 'Row height & zoom range', onClick: () => setFormatOpen(o => !o), ref: formatBtnRef, active: formatOpen },
     { icon: barLabelMode === 'flightNo' ? Binary : Route, label: barLabelMode === 'flightNo' ? 'Flight' : 'Sector', tooltip: barLabelMode === 'flightNo' ? 'Showing flight numbers — click for sectors' : 'Showing sectors — click for flight numbers', onClick: () => setBarLabelMode(barLabelMode === 'flightNo' ? 'sector' : 'flightNo') },
     { icon: Timer, label: 'TAT', tooltip: showTat ? 'Hide turnaround times' : 'Show turnaround times', onClick: toggleTat, active: showTat },
+    { icon: Clock, label: 'Slot', tooltip: showSlots ? 'Hide slot status flags' : 'Show slot status flags', onClick: toggleSlots, active: showSlots },
     { icon: Crosshair, label: 'Center', tooltip: centerTimebar ? 'Center timebar Enabled' : 'Center timebar Disabled', onClick: handleCenterTimebar, active: centerTimebar },
     { icon: isFullscreen ? Minimize2 : Maximize2, label: isFullscreen ? 'Exit' : 'Fullscreen', tooltip: isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen', onClick: onFullscreen, active: isFullscreen },
     // Settings
@@ -292,6 +295,10 @@ export function GanttToolbar({ onSearch, onFullscreen, isFullscreen, onAddFlight
               onClick={toggleTat} active={showTat}
               isDark={isDark} hoverBg={hoverBg} activeBg={activeBg}
               tooltip={showTat ? 'Hide turnaround times' : 'Show turnaround times'} />
+            <RibbonBtn icon={Clock} label="Slot"
+              onClick={toggleSlots} active={showSlots}
+              isDark={isDark} hoverBg={hoverBg} activeBg={activeBg}
+              tooltip={showSlots ? 'Hide slot status flags' : 'Show slot status flags'} />
             <RibbonBtn icon={Crosshair} label="Center"
               onClick={handleCenterTimebar} active={centerTimebar}
               isDark={isDark} hoverBg={hoverBg} activeBg={activeBg}

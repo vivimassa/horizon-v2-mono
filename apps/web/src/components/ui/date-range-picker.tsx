@@ -231,7 +231,7 @@ export function DateRangePicker({
       {/* Day-of-week headers */}
       <div className="grid grid-cols-7 px-3">
         {DAYS.map((d) => (
-          <div key={d} className="text-center text-[11px] font-semibold py-1" style={{ color: dimText }}>
+          <div key={d} className="text-center text-[13px] font-semibold py-1" style={{ color: dimText }}>
             {d}
           </div>
         ))}
@@ -243,7 +243,7 @@ export function DateRangePicker({
         {Array.from({ length: calOffset }).map((_, i) => {
           const day = prevMonthDays - calOffset + 1 + i;
           return (
-            <div key={`p${i}`} className="text-center py-[5px] text-[12px]" style={{ color: dimText, opacity: 0.5 }}>
+            <div key={`p${i}`} className="text-center py-[5px] text-[13px]" style={{ color: dimText, opacity: 0.5 }}>
               {day}
             </div>
           );
@@ -265,7 +265,7 @@ export function DateRangePicker({
               onClick={() => selectDate(day)}
               onMouseEnter={() => setHovered(iso)}
               onMouseLeave={() => setHovered("")}
-              className="relative flex items-center justify-center py-[5px] text-[12px] font-medium rounded-md transition-all"
+              className="relative flex items-center justify-center py-[5px] text-[13px] font-medium rounded-md transition-all"
               style={{
                 color: isSelected ? "#fff" : isToday ? accent : textColor,
                 background: isSelected ? accent : isInRange ? rangeBg : "transparent",
@@ -293,7 +293,7 @@ export function DateRangePicker({
           const remaining = (calOffset + totalDays) % 7;
           const trailing = remaining === 0 ? 0 : 7 - remaining;
           return Array.from({ length: trailing }).map((_, i) => (
-            <div key={`n${i}`} className="text-center py-[5px] text-[12px]" style={{ color: dimText, opacity: 0.5 }}>
+            <div key={`n${i}`} className="text-center py-[5px] text-[13px]" style={{ color: dimText, opacity: 0.5 }}>
               {i + 1}
             </div>
           ));
@@ -308,7 +308,7 @@ export function DateRangePicker({
       <button
         type="button"
         onClick={() => setPicking("from")}
-        className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[12px] font-mono font-medium transition-all"
+        className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[13px] font-medium transition-all"
         style={{
           background: picking === "from" ? accent : getActiveBg(from),
           border: picking === "from" ? "none" : `1px solid ${getFromBorder(from)}`,
@@ -322,7 +322,7 @@ export function DateRangePicker({
       <button
         type="button"
         onClick={() => setPicking("to")}
-        className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[12px] font-mono font-medium transition-all"
+        className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[13px] font-medium transition-all"
         style={{
           background: picking === "to" ? accent : getActiveBg(to),
           border: picking === "to" ? "none" : `1px solid ${getToBorder(to)}`,
@@ -364,7 +364,7 @@ export function DateRangePicker({
       {/* ── Trigger: two pills side-by-side ── */}
       <div ref={triggerRef} className="grid grid-cols-2 gap-1.5 cursor-pointer" onClick={handleOpen}>
         <div
-          className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[12px] font-mono font-medium transition-all"
+          className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[13px] font-medium transition-all"
           style={{
             background: getActiveBg(from),
             border: `1px solid ${getFromBorder(from)}`,
@@ -378,7 +378,7 @@ export function DateRangePicker({
           <span>{from ? formatDisplay(from) : "FROM"}</span>
         </div>
         <div
-          className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[12px] font-mono font-medium transition-all"
+          className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg text-[13px] font-medium transition-all"
           style={{
             background: getActiveBg(to),
             border: `1px solid ${getToBorder(to)}`,
@@ -412,7 +412,7 @@ export function DateRangePicker({
         >
           {/* Picking indicator */}
           <div className="px-4 pt-3 pb-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: accent }}>
+            <span className="text-[13px] font-semibold uppercase tracking-wider" style={{ color: accent }}>
               {picking === "from" ? "Select start date" : "Select end date"}
             </span>
           </div>
@@ -427,7 +427,7 @@ export function DateRangePicker({
             <button
               type="button"
               onClick={handleClear}
-              className="text-[12px] font-medium transition-colors"
+              className="text-[13px] font-medium transition-colors"
               style={{ color: mutedText }}
               onMouseEnter={(e) => (e.currentTarget.style.color = textColor)}
               onMouseLeave={(e) => (e.currentTarget.style.color = mutedText)}
@@ -446,7 +446,7 @@ export function DateRangePicker({
                   setOpen(false);
                 }
               }}
-              className="text-[12px] font-medium transition-colors"
+              className="text-[13px] font-medium transition-colors"
               style={{ color: accent }}
             >
               Today

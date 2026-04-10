@@ -89,7 +89,9 @@ export const GridCell = memo(function GridCell({
   }
 
   // ── Display mode ──
-  const displayVal = col.key === 'blockMinutes' ? fmtMinutes(Number(value) || null) : (value || '\u2014')
+  const displayVal = (col.key === 'blockMinutes' || col.key === 'tat')
+    ? fmtMinutes(Number(value) || null)
+    : (value || '\u2014')
 
   return (
     <Pressable onPress={onTap} onLongPress={onDoubleTap}

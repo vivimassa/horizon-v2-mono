@@ -16,6 +16,11 @@ export { PageShell } from './components/PageShell'
 export { SpotlightDock } from './components/SpotlightDock'
 export { NavTile } from './components/NavTile'
 export { Tooltip } from './components/Tooltip'
+export { FilterPanel } from './components/FilterPanel'
+export { FilterSection } from './components/FilterSection'
+export { DateRangePicker } from './components/DateRangePicker'
+export { DropdownSelect } from './components/DropdownSelect'
+export { MultiSelect } from './components/MultiSelect'
 
 // ── Gluestack Primitives ──
 export * from './gluestack'

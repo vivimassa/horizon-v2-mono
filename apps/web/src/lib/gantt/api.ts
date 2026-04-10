@@ -89,6 +89,38 @@ export async function cancelFlights(
   return res.json()
 }
 
+// ── Slot cancel impact ──
+
+export interface SlotCancelImpact {
+  seriesId: string
+  airportIata: string
+  airportName: string
+  coordinationLevel: number
+  flightNumber: string
+  currentPct: number
+  afterPct: number
+  operated: number
+  jnus: number
+  total: number
+  cancelledCount: number
+  willBreachThreshold: boolean
+  isAlreadyAtRisk: boolean
+  nextSeason: string
+}
+
+export async function fetchCancelImpact(
+  operatorId: string,
+  flightIds: string[],
+): Promise<{ impacts: SlotCancelImpact[] }> {
+  const res = await fetch(`${API_BASE}/gantt/cancel-impact`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ operatorId, flightIds }),
+  })
+  if (!res.ok) throw new Error(`Cancel impact API ${res.status}`)
+  return res.json()
+}
+
 export async function swapFlights(
   operatorId: string,
   aFlightIds: string[],

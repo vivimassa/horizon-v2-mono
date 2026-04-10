@@ -54,15 +54,9 @@ export const NAV_TREE: NavModuleData[] = [
         pages: [
           { key: 'schedule-grid', label: 'Scheduling XL', num: '1.1.1', route: '/network/control/schedule-grid', iconName: 'LayoutGrid', desc: 'Excel-style flight schedule editor' },
           { key: 'gantt', label: 'Gantt Chart', num: '1.1.2', route: '/network/schedule/gantt', iconName: 'GanttChart', desc: 'Visual timeline' },
-          { key: 'flight-patterns', label: 'Flight Patterns', num: '1.1.3', route: '/network/schedule/flight-patterns', iconName: 'Repeat', desc: 'Build & edit patterns' },
-          { key: 'season-manager', label: 'Season Manager', num: '1.1.4', route: '/network/schedule/season-manager', iconName: 'CalendarRange', desc: 'Seasonal schedule management' },
-        ],
-      },
-      {
-        key: 'slots', label: 'Slot Management', num: '1.2', iconName: 'Clock',
-        pages: [
-          { key: 'slot-manager', label: 'Slot Manager', num: '1.2.1', route: '/network/slots/slot-manager', iconName: 'Clock', desc: 'Airport slot allocation' },
-          { key: 'slot-requests', label: 'Slot Requests', num: '1.2.2', route: '/network/slots/slot-requests', iconName: 'Send', desc: 'Request & track slots' },
+          { key: 'slot-manager', label: 'Slot Manager', num: '1.1.3', route: '/network/schedule/slot-manager', iconName: 'Clock', desc: 'Airport slot allocations & IATA 80/20' },
+          { key: 'flight-patterns', label: 'Flight Patterns', num: '1.1.4', route: '/network/schedule/flight-patterns', iconName: 'Repeat', desc: 'Build & edit patterns' },
+          { key: 'season-manager', label: 'Season Manager', num: '1.1.5', route: '/network/schedule/season-manager', iconName: 'CalendarRange', desc: 'Seasonal schedule management' },
         ],
       },
       {

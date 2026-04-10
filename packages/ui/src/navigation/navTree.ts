@@ -82,7 +82,7 @@ export const NAV_TREE: NavModule[] = [
           { key: 'text-schedule', label: 'Text Schedule', num: '2.1.1', route: '/network/schedule/text-schedule', icon: FileText },
           { key: 'gantt', label: 'Gantt View', num: '2.1.2', route: '/network/schedule/gantt', icon: GanttChart },
           { key: 'flight-patterns', label: 'Flight Patterns', num: '2.1.3', route: '/network/schedule/flight-patterns', icon: Repeat },
-          { key: 'season-manager', label: 'Season Manager', num: '2.1.4', route: '/network/schedule/season-manager', icon: CalendarRange },
+          { key: 'schedule-messaging', label: 'Schedule Messaging', num: '2.1.4', route: '/network/control/schedule-messaging', icon: MessageSquare },
         ],
       },
       {
@@ -96,7 +96,7 @@ export const NAV_TREE: NavModule[] = [
         key: 'commercial', label: 'Commercial', num: '2.3', icon: Handshake,
         pages: [
           { key: 'codeshare', label: 'Codeshare', num: '2.3.1', route: '/network/commercial/codeshare', icon: Handshake },
-          { key: 'charter', label: 'Charter', num: '2.3.2', route: '/network/commercial/charter', icon: PlaneTakeoff },
+          { key: 'charter-manager', label: 'Charter Manager', num: '2.3.2', route: '/network/control/charter-manager', icon: PlaneTakeoff },
           { key: 'aircraft-routes', label: 'Aircraft Routes', num: '2.3.3', route: '/network/commercial/aircraft-routes', icon: Globe },
         ],
       },

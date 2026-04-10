@@ -54,16 +54,15 @@ export const NAV_TREE: NavModuleData[] = [
         pages: [
           { key: 'schedule-grid', label: 'Scheduling XL', num: '1.1.1', route: '/network/control/schedule-grid', iconName: 'LayoutGrid', desc: 'Excel-style flight schedule editor' },
           { key: 'gantt', label: 'Gantt Chart', num: '1.1.2', route: '/network/schedule/gantt', iconName: 'GanttChart', desc: 'Visual timeline' },
-          { key: 'slot-manager', label: 'Slot Manager', num: '1.1.3', route: '/network/schedule/slot-manager', iconName: 'Clock', desc: 'Airport slot allocations & IATA 80/20' },
-          { key: 'flight-patterns', label: 'Flight Patterns', num: '1.1.4', route: '/network/schedule/flight-patterns', iconName: 'Repeat', desc: 'Build & edit patterns' },
-          { key: 'season-manager', label: 'Season Manager', num: '1.1.5', route: '/network/schedule/season-manager', iconName: 'CalendarRange', desc: 'Seasonal schedule management' },
+          { key: 'slot-manager', label: 'Slot Planning', num: '1.1.3', route: '/network/schedule/slot-manager', iconName: 'Clock', desc: 'Airport slot allocations & IATA 80/20' },
+          { key: 'codeshare-manager', label: 'Codeshare Manager', num: '1.1.4', route: '/network/control/codeshare-manager', iconName: 'Link2', desc: 'Codeshare agreements & partner flight designators' },
+          { key: 'charter-manager', label: 'Charter Manager', num: '1.1.5', route: '/network/control/charter-manager', iconName: 'PlaneTakeoff', desc: 'Charter & ad-hoc flight operations' },
+          { key: 'schedule-messaging', label: 'Schedule Messaging', num: '1.1.6', route: '/network/control/schedule-messaging', iconName: 'MessageSquare', desc: 'ASM/SSM inbound & outbound message management' },
         ],
       },
       {
         key: 'commercial', label: 'Commercial', num: '2.3', iconName: 'Handshake',
         pages: [
-          { key: 'codeshare', label: 'Codeshare', num: '2.3.1', route: '/network/commercial/codeshare', iconName: 'Handshake', desc: 'Codeshare agreements' },
-          { key: 'charter', label: 'Charter', num: '2.3.2', route: '/network/commercial/charter', iconName: 'PlaneTakeoff', desc: 'Charter flights' },
           { key: 'aircraft-routes', label: 'Aircraft Routes', num: '2.3.3', route: '/network/commercial/aircraft-routes', iconName: 'Globe', desc: 'Route-tail assignment' },
         ],
       },

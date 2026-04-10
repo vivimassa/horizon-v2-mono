@@ -1152,8 +1152,64 @@ export const api = {
   },
 
   // ─── Schedule Messages ────────────────────────────────
-  generateScheduleMessages: (params: { operatorId: string; seasonCode: string; baseScenarioId?: string; targetScenarioId?: string }) =>
+  generateScheduleMessages: (params: { operatorId: string; dateFrom?: string; dateTo?: string; targetScenarioId?: string }) =>
     request<{ messages: any[]; baseCount: number; targetCount: number }>('/schedule-messages/generate', { method: 'POST', body: JSON.stringify(params) }),
+
+  getScheduleMessages: (params: ScheduleMessageQuery) => {
+    const p = new URLSearchParams({ operatorId: params.operatorId })
+    if (params.direction) p.set('direction', params.direction)
+    if (params.actionCodes) p.set('actionCodes', params.actionCodes.join(','))
+    if (params.messageTypes) p.set('messageTypes', params.messageTypes.join(','))
+    if (params.status) p.set('status', params.status)
+    if (params.flightNumber) p.set('flightNumber', params.flightNumber)
+    if (params.flightDateFrom) p.set('flightDateFrom', params.flightDateFrom)
+    if (params.flightDateTo) p.set('flightDateTo', params.flightDateTo)
+    if (params.search) p.set('search', params.search)
+    if (params.limit != null) p.set('limit', String(params.limit))
+    if (params.offset != null) p.set('offset', String(params.offset))
+    return request<{ messages: ScheduleMessageRef[]; total: number }>(`/schedule-messages?${p.toString()}`)
+  },
+
+  getScheduleMessageStats: (operatorId: string) =>
+    request<ScheduleMessageStats>(`/schedule-messages/stats?operatorId=${operatorId}`),
+
+  getHeldScheduleMessages: (operatorId: string) =>
+    request<{ messages: ScheduleMessageRef[] }>(`/schedule-messages/held?operatorId=${operatorId}`),
+
+  createScheduleMessage: (data: {
+    operatorId: string; messageType: 'ASM' | 'SSM'; actionCode: string;
+    direction: 'inbound' | 'outbound'; status?: string;
+    flightNumber?: string | null; flightDate?: string | null;
+    depStation?: string | null; arrStation?: string | null;
+    seasonCode?: string | null; summary?: string | null;
+    rawMessage?: string | null; changes?: Record<string, unknown> | null;
+  }) =>
+    request<{ id: string }>('/schedule-messages', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateScheduleMessageStatus: (id: string, status: string, rejectReason?: string) =>
+    request<{ ok: boolean }>(`/schedule-messages/${id}/status`, {
+      method: 'PATCH', body: JSON.stringify({ status, rejectReason }),
+    }),
+
+  holdScheduleMessages: (data: {
+    operatorId: string;
+    before: ScheduleMessageSnapshot[];
+    after: ScheduleMessageSnapshot[];
+    operatorIataCode: string;
+  }) =>
+    request<{ held: number; neutralized: number }>('/schedule-messages/hold-batch', { method: 'POST', body: JSON.stringify(data) }),
+
+  releaseScheduleMessages: (messageIds: string[]) =>
+    request<{ released: number }>('/schedule-messages/release', { method: 'POST', body: JSON.stringify({ messageIds }) }),
+
+  discardScheduleMessages: (messageIds: string[]) =>
+    request<{ discarded: number }>('/schedule-messages/discard', { method: 'POST', body: JSON.stringify({ messageIds }) }),
+
+  applyInboundMessage: (data: {
+    messageId: string; actionCode: string; flightNumber: string; flightDate: string;
+    changes: Record<string, { from?: string; to: string }>;
+  }) =>
+    request<{ ok: boolean; instancesUpdated: number }>('/schedule-messages/apply-inbound', { method: 'POST', body: JSON.stringify(data) }),
 
   // ─── FDTL ───────────────────────────────────────────────
   getFdtlFrameworks: () =>
@@ -1444,6 +1500,205 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ operatorId, airportIata, seasonCode }),
     }),
+
+  // ─── Codeshare ──────────────────────────────────────────
+
+  getCodeshareAgreements: (operatorId: string) =>
+    request<CodeshareAgreementRef[]>(`/codeshare/agreements?operatorId=${operatorId}`),
+
+  getCodeshareAgreement: (id: string) =>
+    request<CodeshareAgreementRef>(`/codeshare/agreements/${id}`),
+
+  createCodeshareAgreement: (data: Record<string, unknown>) =>
+    request<{ id: string }>('/codeshare/agreements', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateCodeshareAgreement: (id: string, data: Record<string, unknown>) =>
+    request<{ ok: boolean }>(`/codeshare/agreements/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  suspendCodeshareAgreement: (id: string) =>
+    request<{ ok: boolean }>(`/codeshare/agreements/${id}/suspend`, {
+      method: 'PATCH',
+    }),
+
+  getCodeshareMappings: (agreementId: string) =>
+    request<CodeshareMappingRef[]>(`/codeshare/mappings?agreementId=${agreementId}`),
+
+  getCodeshareStats: (agreementId: string) =>
+    request<CodeshareAgreementStats>(`/codeshare/stats?agreementId=${agreementId}`),
+
+  createCodeshareMapping: (data: Record<string, unknown>) =>
+    request<{ id: string }>('/codeshare/mappings', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  bulkCreateCodeshareMappings: (data: Record<string, unknown>) =>
+    request<{ created: number }>('/codeshare/mappings/bulk', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateCodeshareMapping: (id: string, data: Record<string, unknown>) =>
+    request<{ ok: boolean }>(`/codeshare/mappings/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteCodeshareMapping: (id: string) =>
+    request<{ ok: boolean }>(`/codeshare/mappings/${id}`, {
+      method: 'DELETE',
+    }),
+
+  getCodeshareSeatAllocations: (params: { mappingId?: string; agreementId?: string }) => {
+    const qs = params.mappingId
+      ? `mappingId=${params.mappingId}`
+      : `agreementId=${params.agreementId}`
+    return request<CodeshareSeatAllocationRef[]>(`/codeshare/seat-allocations?${qs}`)
+  },
+
+  upsertCodeshareSeatAllocations: (mappingId: string, allocations: { cabinCode: string; allocatedSeats: number; releaseHours: number }[]) =>
+    request<{ ok: boolean }>('/codeshare/seat-allocations', {
+      method: 'PUT',
+      body: JSON.stringify({ mappingId, allocations }),
+    }),
+
+  getCodeshareCabinConfigs: (operatorId: string) =>
+    request<Record<string, Record<string, number>>>(`/codeshare/cabin-configs?operatorId=${operatorId}`),
+
+  getCodeshareOperatingFlights: (operatorId: string) =>
+    request<CodeshareOperatingFlightRef[]>(`/codeshare/operating-flights?operatorId=${operatorId}`),
+
+  getCodeshareUnmappedFlights: (agreementId: string, operatorId: string) =>
+    request<CodeshareOperatingFlightRef[]>(`/codeshare/unmapped-flights?agreementId=${agreementId}&operatorId=${operatorId}`),
+
+  getCodeshareMappingHealth: (agreementId: string, operatorId?: string) => {
+    let path = `/codeshare/health?agreementId=${agreementId}`
+    if (operatorId) path += `&operatorId=${operatorId}`
+    return request<Record<string, string>>(path)
+  },
+
+  getCodeshareFlightCapacity: (operatorId: string) =>
+    request<Record<string, number>>(`/codeshare/flight-capacity?operatorId=${operatorId}`),
+
+  // ─── Charter ──────────────────────────────────────────
+
+  getCharterContracts: (operatorId: string) =>
+    request<CharterContractRef[]>(`/charter/contracts?operatorId=${operatorId}`),
+
+  createCharterContract: (data: Record<string, unknown>) =>
+    request<{ id: string }>('/charter/contracts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateCharterContract: (id: string, data: Record<string, unknown>) =>
+    request<CharterContractRef>(`/charter/contracts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  updateCharterContractStatus: (id: string, status: string) =>
+    request<{ ok: boolean }>(`/charter/contracts/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
+
+  deleteCharterContract: (id: string) =>
+    request<{ ok: boolean }>(`/charter/contracts/${id}`, {
+      method: 'DELETE',
+    }),
+
+  getCharterFlights: (contractId: string) =>
+    request<CharterFlightRef[]>(`/charter/flights?contractId=${contractId}`),
+
+  createCharterFlight: (data: Record<string, unknown>) =>
+    request<{ id: string }>('/charter/flights', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  deleteCharterFlight: (id: string) =>
+    request<{ ok: boolean }>(`/charter/flights/${id}`, {
+      method: 'DELETE',
+    }),
+
+  getCharterStats: (contractId: string) =>
+    request<CharterContractStats>(`/charter/stats?contractId=${contractId}`),
+
+  getNextCharterFlightNumber: () =>
+    request<{ flightNumber: string }>('/charter/next-flight-number'),
+
+  generateCharterPositioning: (contractId: string, operatorCode: string, homeBase: string) =>
+    request<{ legs: CharterPositioningLeg[] }>('/charter/generate-positioning', {
+      method: 'POST',
+      body: JSON.stringify({ contractId, operatorCode, homeBase }),
+    }),
+}
+
+// ─── Codeshare types ────────────────────────────────────
+
+export interface CodeshareAgreementRef {
+  _id: string
+  operatorId: string
+  partnerAirlineCode: string
+  partnerAirlineName: string
+  partnerNumericCode: string | null
+  agreementType: 'free_sale' | 'block_space' | 'hard_block'
+  effectiveFrom: string
+  effectiveUntil: string | null
+  status: 'active' | 'pending' | 'suspended' | 'terminated'
+  brandColor: string | null
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CodeshareMappingRef {
+  _id: string
+  agreementId: string
+  operatingFlightNumber: string
+  marketingFlightNumber: string
+  departureIata: string
+  arrivalIata: string
+  daysOfOperation: string
+  effectiveFrom: string
+  effectiveUntil: string | null
+  seatAllocation: number | null
+  agreedAircraftType: string | null
+  status: 'active' | 'pending' | 'cancelled'
+  createdAt: string
+}
+
+export interface CodeshareSeatAllocationRef {
+  _id: string
+  mappingId: string
+  cabinCode: string
+  allocatedSeats: number
+  releaseHours: number
+  createdAt: string
+}
+
+export interface CodeshareAgreementStats {
+  mappedFlights: number
+  routeCount: number
+  weeklySeats: number
+}
+
+export interface CodeshareOperatingFlightRef {
+  _id: string
+  flightNumber: string
+  depStation: string
+  arrStation: string
+  daysOfWeek: string
+  aircraftTypeIcao: string | null
+  effectiveFrom: string
+  effectiveUntil: string
 }
 
 // ─── User types ──────────────────────────────────────────
@@ -1675,4 +1930,136 @@ export interface SlotFleetAirportStats {
   jnus: number
   cancelled: number
   utilizationPct: number
+}
+
+// ─── Charter types ──────────────────────────────────────
+
+export interface CharterContractRef {
+  _id: string
+  operatorId: string
+  contractNumber: string
+  contractType: 'passenger' | 'cargo' | 'government' | 'acmi' | 'humanitarian' | 'hajj' | 'sports' | 'other'
+  clientName: string
+  clientContactName: string | null
+  clientContactEmail: string | null
+  clientContactPhone: string | null
+  aircraftTypeIcao: string | null
+  aircraftRegistration: string | null
+  paxCapacity: number | null
+  ratePerSector: number | null
+  ratePerBlockHour: number | null
+  currency: string
+  fuelSurchargeIncluded: boolean
+  catering: 'operator' | 'client' | 'none'
+  cancelPenalty14d: number
+  cancelPenalty7d: number
+  cancelPenalty48h: number
+  contractStart: string
+  contractEnd: string | null
+  status: 'draft' | 'proposed' | 'confirmed' | 'operating' | 'completed' | 'cancelled'
+  seasonId: string | null
+  notes: string | null
+  internalNotes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CharterFlightRef {
+  _id: string
+  operatorId: string
+  contractId: string
+  flightNumber: string
+  flightDate: string
+  departureIata: string
+  arrivalIata: string
+  stdUtc: string
+  staUtc: string
+  blockMinutes: number
+  arrivalDayOffset: number
+  aircraftTypeIcao: string | null
+  aircraftRegistration: string | null
+  legType: 'revenue' | 'positioning' | 'technical'
+  paxBooked: number
+  cargoKg: number
+  status: 'planned' | 'confirmed' | 'assigned' | 'operated' | 'cancelled'
+  scheduledFlightId: string | null
+  crewNotes: string | null
+  slotRequested: boolean
+  slotStatus: string | null
+  createdAt: string
+}
+
+export interface CharterContractStats {
+  totalFlights: number
+  revenueFlights: number
+  positioningFlights: number
+  totalBlockMinutes: number
+  estimatedRevenue: number
+  paxTotal: number
+}
+
+export interface CharterPositioningLeg {
+  from: string
+  to: string
+  date: string
+  before?: string
+}
+
+// ─── Schedule Message Types ──────────────────────────────
+
+export interface ScheduleMessageRef {
+  _id: string
+  operatorId: string
+  messageType: 'ASM' | 'SSM'
+  actionCode: string
+  direction: 'inbound' | 'outbound'
+  status: 'held' | 'pending' | 'sent' | 'applied' | 'rejected' | 'discarded' | 'neutralized'
+  flightNumber: string | null
+  flightDate: string | null
+  depStation: string | null
+  arrStation: string | null
+  seasonCode: string | null
+  summary: string | null
+  rawMessage: string | null
+  changes: Record<string, { from?: string; to: string }> | null
+  rejectReason: string | null
+  processedAtUtc: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export interface ScheduleMessageQuery {
+  operatorId: string
+  direction?: 'inbound' | 'outbound'
+  actionCodes?: string[]
+  messageTypes?: string[]
+  status?: string
+  flightNumber?: string
+  flightDateFrom?: string
+  flightDateTo?: string
+  search?: string
+  limit?: number
+  offset?: number
+}
+
+export interface ScheduleMessageStats {
+  total: number
+  held: number
+  pending: number
+  sent: number
+  applied: number
+  rejected: number
+  thisWeek: number
+}
+
+export interface ScheduleMessageSnapshot {
+  id: string
+  flightNumber: string
+  instanceDate: string
+  depStation: string
+  arrStation: string
+  stdUtc: string
+  staUtc: string
+  aircraftTypeIcao: string
+  status: string
 }

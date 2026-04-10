@@ -27,6 +27,8 @@ export * from './pairing/mpp-engine'
 // Messaging
 export * from './messaging/slot-message-generator'
 export * from './messaging/slot-message-parser'
+export * from './messaging/asm-parser'
+export * from './messaging/asm-diff-engine'
 
 // Utils — tail-assignment & ops-tail-assignment both export autoAssignFlights
 export * from './utils/color-helpers'

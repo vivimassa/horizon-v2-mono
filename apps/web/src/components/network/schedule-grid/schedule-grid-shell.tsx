@@ -391,7 +391,7 @@ export function ScheduleGridShell() {
 
           {/* Message dialog */}
           {showMessages && (
-            <MessageDialog seasonCode="" targetScenarioId={activeScenarioId ?? undefined} onClose={() => setShowMessages(false)} />
+            <MessageDialog dateFrom={filterDateFrom || undefined} dateTo={filterDateTo || undefined} targetScenarioId={activeScenarioId ?? undefined} onClose={() => setShowMessages(false)} />
           )}
 
           {/* Ribbon toolbar */}

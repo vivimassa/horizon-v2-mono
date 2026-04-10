@@ -20,6 +20,8 @@ import { scheduleMessageRoutes } from './routes/schedule-messages.js'
 import { rotationRoutes } from './routes/rotations.js'
 import { ganttRoutes } from './routes/gantt.js'
 import { slotRoutes } from './routes/slots.js'
+import { codeshareRoutes } from './routes/codeshare.js'
+import { charterRoutes } from './routes/charter.js'
 import { loadOurAirportsData, startAutoRefresh } from './data/ourairports-cache.js'
 
 const port = Number(process.env.PORT) || 3001
@@ -68,6 +70,8 @@ async function main(): Promise<void> {
   await app.register(rotationRoutes)
   await app.register(ganttRoutes)
   await app.register(slotRoutes)
+  await app.register(codeshareRoutes)
+  await app.register(charterRoutes)
 
   // Start
   await app.listen({ port, host: '0.0.0.0' })

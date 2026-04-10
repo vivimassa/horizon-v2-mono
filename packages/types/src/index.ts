@@ -3,6 +3,7 @@
 // that conflict (AircraftType, CrewMember, CrewPosition), so we namespace them.
 
 export * from './database'
+export * from './schedule-messaging'
 
 // Re-export GCS types under a namespace to avoid collisions
 export * as GCS from './gcs'

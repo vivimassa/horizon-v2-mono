@@ -44,7 +44,7 @@ const SECTIONS: SectionDef[] = [
     cards: [
       { code: "1.1.1", label: "Scheduling XL", desc: "Excel-style flight schedule editor", icon: LayoutGrid, href: "/network/control/schedule-grid" },
       { code: "1.1.2", label: "Gantt Chart", desc: "Fleet utilization, tail assignment, conflicts", icon: GanttChart, href: "/network/schedule/gantt" },
-      { code: "1.1.3", label: "Slot Manager", desc: "Airport slot allocations & IATA 80/20", icon: Clock, href: "/network/schedule/slot-manager" },
+      { code: "1.1.3", label: "Slot Planning", desc: "Airport slot allocations & IATA 80/20", icon: Clock, href: "/network/schedule/slot-manager" },
     ],
   },
   {
@@ -53,9 +53,8 @@ const SECTIONS: SectionDef[] = [
     icon: PlayCircle,
     color: "#7c3aed",
     cards: [
-      { code: "1.1.4", label: "Schedule Publish", desc: "Review, approve, publish planning scenarios", icon: PlayCircle, href: "/network/admin/schedule-publish" },
-      { code: "1.1.5", label: "Codeshare Manager", desc: "Partner designators & marketing carriers", icon: Link2, href: "/network/admin/codeshare" },
-      { code: "1.1.6", label: "Charter Manager", desc: "Ad-hoc and charter flight operations", icon: Plane, href: "/network/admin/charter" },
+      { code: "1.1.4", label: "Codeshare Manager", desc: "Partner designators & marketing carriers", icon: Link2, href: "/network/control/codeshare-manager" },
+      { code: "1.1.5", label: "Charter Manager", desc: "Ad-hoc and charter flight operations", icon: Plane, href: "/network/control/charter-manager" },
     ],
   },
   {

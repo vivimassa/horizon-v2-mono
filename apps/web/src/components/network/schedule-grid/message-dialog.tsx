@@ -6,8 +6,8 @@ import { getOperatorId } from "@/stores/use-operator-store";
 import { api } from "@skyhub/api";
 
 interface MessageDialogProps {
-  seasonCode: string;
-  baseScenarioId?: string;
+  dateFrom?: string;
+  dateTo?: string;
   targetScenarioId?: string;
   onClose: () => void;
 }
@@ -29,7 +29,7 @@ const ACTION_COLORS: Record<string, { bg: string; text: string }> = {
   RRT: { bg: "rgba(255,136,0,0.12)", text: "#E67A00" },
 };
 
-export function MessageDialog({ seasonCode, baseScenarioId, targetScenarioId, onClose }: MessageDialogProps) {
+export function MessageDialog({ dateFrom, dateTo, targetScenarioId, onClose }: MessageDialogProps) {
   const [messages, setMessages] = useState<ScheduleMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [generated, setGenerated] = useState(false);
@@ -40,15 +40,15 @@ export function MessageDialog({ seasonCode, baseScenarioId, targetScenarioId, on
     try {
       const result = await api.generateScheduleMessages({
         operatorId: getOperatorId(),
-        seasonCode,
-        baseScenarioId,
+        dateFrom,
+        dateTo,
         targetScenarioId,
       });
       setMessages(result.messages);
       setGenerated(true);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
-  }, [seasonCode, baseScenarioId, targetScenarioId]);
+  }, [dateFrom, dateTo, targetScenarioId]);
 
   const handleCopy = useCallback(() => {
     const text = messages.map(m => m.summary).join("\n");

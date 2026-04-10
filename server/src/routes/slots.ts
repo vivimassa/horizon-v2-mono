@@ -192,10 +192,11 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
       }},
     ])
 
-    // Get utilization for all series at once
+    // Get utilization for all series at once (past dates only)
+    const today = new Date().toISOString().split('T')[0]
     const allSeriesIds = seriesAgg.flatMap((a: Record<string, unknown>) => (a.seriesIds as string[]) || [])
     const dateAgg = allSeriesIds.length > 0 ? await SlotDate.aggregate([
-      { $match: { seriesId: { $in: allSeriesIds } } },
+      { $match: { seriesId: { $in: allSeriesIds }, slotDate: { $lte: today } } },
       { $lookup: { from: 'slotSeries', localField: 'seriesId', foreignField: '_id', as: 'series' } },
       { $unwind: '$series' },
       { $group: {
@@ -291,11 +292,12 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
       else if (s.status === 'refused') stats.refused++
     }
 
-    // Compute at-risk from utilization
+    // Compute at-risk from utilization (past dates only)
     if (seriesList.length > 0) {
+      const today = new Date().toISOString().split('T')[0]
       const seriesIds = seriesList.map(s => s._id)
       const pipeline = [
-        { $match: { seriesId: { $in: seriesIds } } },
+        { $match: { seriesId: { $in: seriesIds }, slotDate: { $lte: today } } },
         { $group: {
           _id: '$seriesId',
           total: { $sum: 1 },
@@ -316,6 +318,7 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
   })
 
   // ─── GET /slots/utilization ───
+  // Only past dates count toward utilization — future dates haven't happened yet
   app.get('/slots/utilization', async (req) => {
     const { operatorId, airportIata, seasonCode } = seriesQuery.parse(req.query)
     const seriesList = await SlotSeries.find({ operatorId, airportIata, seasonCode })
@@ -323,9 +326,10 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
 
     if (!seriesList.length) return []
 
+    const today = new Date().toISOString().split('T')[0]
     const seriesIds = seriesList.map(s => s._id)
     const pipeline = [
-      { $match: { seriesId: { $in: seriesIds } } },
+      { $match: { seriesId: { $in: seriesIds }, slotDate: { $lte: today } } },
       { $group: {
         _id: '$seriesId',
         total: { $sum: 1 },

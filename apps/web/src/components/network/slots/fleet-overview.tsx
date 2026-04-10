@@ -16,13 +16,14 @@ interface FleetOverviewProps {
   onSelectAirport: (iata: string) => void
   isDark: boolean
   viewMode?: 'grid' | 'list'
+  searchQuery?: string
 }
 
 // Grid column template — shared by header and rows for perfect alignment
 const GRID_COLS = '28px 56px 40px 1fr 70px 70px 70px 70px 70px 160px'
 
 export function FleetOverview({
-  airports, fleetStats, seasonCode, onSelectAirport, isDark, viewMode = 'list',
+  airports, fleetStats, seasonCode, onSelectAirport, isDark, viewMode = 'list', searchQuery = '',
 }: FleetOverviewProps) {
   const palette = isDark ? colors.dark : colors.light
   const accent = MODULE_THEMES.network.accent
@@ -34,9 +35,17 @@ export function FleetOverview({
     return m
   }, [airports])
 
-  const sorted = useMemo(() =>
-    [...fleetStats].sort((a, b) => a.utilizationPct - b.utilizationPct),
-  [fleetStats])
+  const sorted = useMemo(() => {
+    const q = searchQuery.toLowerCase()
+    const filtered = q
+      ? fleetStats.filter(s => {
+          const airport = nameMap.get(s.airportIata)
+          return s.airportIata.toLowerCase().includes(q)
+            || (airport?.name.toLowerCase().includes(q))
+        })
+      : fleetStats
+    return [...filtered].sort((a, b) => a.utilizationPct - b.utilizationPct)
+  }, [fleetStats, searchQuery, nameMap])
 
   // Fleet-wide KPIs
   const totals = useMemo(() => {

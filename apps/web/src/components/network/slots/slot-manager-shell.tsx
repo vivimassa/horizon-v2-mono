@@ -4,10 +4,12 @@ import { useEffect, useState, useCallback } from 'react'
 import { useTheme } from '@/components/theme-provider'
 import { useOperatorStore, getOperatorId } from '@/stores/use-operator-store'
 import { RunwayLoadingPanel } from '@/components/ui/runway-loading-panel'
+import { EmptyPanel } from '@/components/ui/empty-panel'
 import { useRunwayLoading } from '@/hooks/use-runway-loading'
 import { api } from '@skyhub/api'
 import type { SlotCoordinatedAirport, SlotFleetAirportStats, SlotSeriesRef, SlotPortfolioStats } from '@skyhub/api'
 import * as XLSX from 'xlsx'
+import { SlotSearch } from './slot-search'
 import { SlotFilterPanel } from './slot-filter-panel'
 import type { SlotFilterState } from './slot-filter-panel'
 import { SlotToolbar } from './slot-toolbar'
@@ -34,6 +36,8 @@ export function SlotManagerShell() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
   const [showSlotFlags, setShowSlotFlags] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Dialog state
   const [requestOpen, setRequestOpen] = useState(false)
@@ -190,7 +194,7 @@ export function SlotManagerShell() {
                 XLSX.utils.book_append_sheet(wb, ws2, 'Fleet Summary')
                 XLSX.writeFile(wb, `slots-${filters.seasonCode}-${selectedIata || 'all'}.xlsx`)
               }}
-              onSearch={() => {}}
+              onSearch={() => setSearchOpen(v => !v)}
               showSlotFlags={showSlotFlags}
               onToggleSlotFlags={() => setShowSlotFlags(v => !v)}
               viewMode={viewMode}
@@ -200,11 +204,16 @@ export function SlotManagerShell() {
         )}
 
         {/* Content panel */}
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl" style={glassStyle}>
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl relative" style={glassStyle}>
+          <SlotSearch
+            open={searchOpen}
+            onClose={() => { setSearchOpen(false); setSearchQuery('') }}
+            onQueryChange={setSearchQuery}
+          />
           {runway.active ? (
             <RunwayLoadingPanel percent={runway.percent} label={runway.label} />
           ) : !dataLoaded ? (
-            <EmptyPanel />
+            <EmptyPanel message="Select a season and click Go to load slot data" />
           ) : (
             <FleetOverview
               airports={airports}
@@ -213,6 +222,7 @@ export function SlotManagerShell() {
               onSelectAirport={setSelectedIata}
               isDark={isDark}
               viewMode={viewMode}
+              searchQuery={searchQuery}
             />
           )}
         </div>
@@ -234,21 +244,6 @@ export function SlotManagerShell() {
           series={seriesForSCR} airportIata={selectedIata} seasonCode={filters.seasonCode}
           onGenerated={handleDataChanged} isDark={isDark} />
       )}
-    </div>
-  )
-}
-
-function EmptyPanel() {
-  return (
-    <div className="flex-1 flex items-center justify-center">
-      <div className="text-center">
-        <div className="text-[15px] font-medium text-hz-text-secondary mb-1">
-          Set your filters and click Go
-        </div>
-        <div className="text-[13px] text-hz-text-tertiary">
-          Select a season, airports, and other criteria to load slot data
-        </div>
-      </div>
     </div>
   )
 }

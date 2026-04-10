@@ -216,9 +216,10 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
-      // Batch utilization aggregation for all series at once
+      // Batch utilization aggregation for all series (past dates only)
+      const todayISO = new Date().toISOString().split('T')[0]
       const utilAgg = seriesIds.length > 0 ? await SlotDate.aggregate([
-        { $match: { seriesId: { $in: seriesIds } } },
+        { $match: { seriesId: { $in: seriesIds }, slotDate: { $lte: todayISO } } },
         { $group: {
           _id: '$seriesId',
           total: { $sum: 1 },

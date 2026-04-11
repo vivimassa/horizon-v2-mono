@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "lint": "eslint src/ --ext .ts,.tsx --max-warnings 9999"
   },
   "dependencies": {
     "@skyhub/api": "*",
@@ -35,6 +36,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@skyhub/eslint-config": "*",
     "typescript": "^5"
   }
 }

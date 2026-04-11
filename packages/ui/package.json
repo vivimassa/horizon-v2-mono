@@ -13,7 +13,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'no linter configured yet'"
+    "lint": "eslint src/ --ext .ts,.tsx --max-warnings 9999"
   },
   "dependencies": {
     "@gluestack-ui/nativewind-utils": "^1.0.28",
@@ -25,6 +25,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@skyhub/eslint-config": "*",
     "@types/react": "^19.2.14",
     "nativewind": "^4.2.3",
     "typescript": "~5.7.0"

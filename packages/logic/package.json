@@ -13,7 +13,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'no linter configured yet'"
+    "lint": "eslint src/ --ext .ts --max-warnings 9999"
   },
   "dependencies": {
     "@skyhub/types": "*",
@@ -21,6 +21,7 @@
     "date-fns-tz": "^3.2.0"
   },
   "devDependencies": {
+    "@skyhub/eslint-config": "*",
     "typescript": "~5.7.0"
   }
 }

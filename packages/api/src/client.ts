@@ -15,14 +15,43 @@ export function getApiBaseUrl(): string {
   return _baseUrl
 }
 
+// ─── Auth interceptor ─────────────────────────────────────
+// Consumers (mobile / web apps) register callbacks once at startup so the
+// client package itself stays free of platform concerns like MMKV or
+// localStorage.
+
+interface AuthCallbacks {
+  getAccessToken: () => string | null
+  onAuthFailure: () => void
+}
+
+let _authCallbacks: AuthCallbacks | null = null
+
+/** Called once at app startup to wire token storage + 401 handling. */
+export function setAuthCallbacks(callbacks: AuthCallbacks) {
+  _authCallbacks = callbacks
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers: Record<string, string> = { ...init?.headers as Record<string, string> }
+  const headers: Record<string, string> = { ...(init?.headers as Record<string, string>) }
   if (init?.body) headers['Content-Type'] = 'application/json'
+
+  // Attach Authorization header if a token is available
+  const token = _authCallbacks?.getAccessToken() ?? null
+  if (token && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
 
   const res = await fetch(`${_baseUrl}${path}`, {
     ...init,
     headers,
   })
+
+  if (res.status === 401) {
+    _authCallbacks?.onAuthFailure()
+    const body = await res.text().catch(() => '')
+    throw new Error(`API 401: ${body || 'Unauthorized'}`)
+  }
 
   if (!res.ok) {
     const body = await res.text()
@@ -714,7 +743,50 @@ export interface ReferenceStats {
 
 // ─── API methods ──────────────────────────────────────────
 
+export interface LoginResponse {
+  accessToken: string
+  refreshToken: string
+  user: {
+    _id: string
+    operatorId: string
+    role: string
+    profile: {
+      firstName: string
+      lastName: string
+      email: string
+      avatarUrl: string
+    }
+    [key: string]: unknown
+  }
+}
+
+export interface RefreshResponse {
+  accessToken: string
+  refreshToken: string
+}
+
 export const api = {
+  // Auth
+  login: (email: string, password: string) =>
+    request<LoginResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+
+  refreshToken: (refreshToken: string) =>
+    request<RefreshResponse>('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken }),
+    }),
+
+  setPassword: (userId: string, password: string) =>
+    request<{ success: boolean }>('/auth/set-password', {
+      method: 'POST',
+      body: JSON.stringify({ userId, password }),
+    }),
+
+  getMe: () => request<UserData>('/users/me'),
+
   // Flights
   getFlights: (operatorId = '', from?: string, to?: string) => {
     let path = `/flights?operatorId=${operatorId}`
@@ -753,8 +825,7 @@ export const api = {
       method: 'DELETE',
     }),
 
-  lookupAirport: (icao: string) =>
-    request<AirportLookupResult>(`/airports/lookup?icao=${encodeURIComponent(icao)}`),
+  lookupAirport: (icao: string) => request<AirportLookupResult>(`/airports/lookup?icao=${encodeURIComponent(icao)}`),
 
   addRunway: (airportId: string, data: Omit<RunwayData, '_id'>) =>
     request<AirportRef>(`/airports/${airportId}/runways`, {
@@ -773,8 +844,7 @@ export const api = {
       method: 'DELETE',
     }),
 
-  getAircraftTypes: (operatorId = '') =>
-    request<AircraftTypeRef[]>(`/aircraft-types?operatorId=${operatorId}`),
+  getAircraftTypes: (operatorId = '') => request<AircraftTypeRef[]>(`/aircraft-types?operatorId=${operatorId}`),
 
   getAircraftType: (id: string) => request<AircraftTypeRef>(`/aircraft-types/${id}`),
 
@@ -819,14 +889,14 @@ export const api = {
     }),
 
   uploadAircraftImage: async (id: string, file: File): Promise<{ success: boolean; imageUrl: string }> => {
-    const form = new FormData();
-    form.append('file', file);
+    const form = new FormData()
+    form.append('file', file)
     const res = await fetch(`${_baseUrl}/aircraft-registrations/${id}/image`, {
       method: 'POST',
       body: form,
-    });
-    if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
-    return res.json();
+    })
+    if (!res.ok) throw new Error(`Upload failed: ${res.status}`)
+    return res.json()
   },
 
   getCountries: (params?: { region?: string; search?: string }) => {
@@ -865,7 +935,12 @@ export const api = {
 
   getCityPair: (id: string) => request<CityPairRef>(`/city-pairs/${id}`),
 
-  createCityPair: (data: { station1Icao: string; station2Icao: string; standardBlockMinutes?: number; notes?: string }) =>
+  createCityPair: (data: {
+    station1Icao: string
+    station2Icao: string
+    standardBlockMinutes?: number
+    notes?: string
+  }) =>
     request<CityPairRef>('/city-pairs', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -913,8 +988,7 @@ export const api = {
     request<{ success: boolean }>(`/activity-code-groups/${id}`, { method: 'DELETE' }),
 
   // ─── Activity Codes ────────────────────────────────────
-  getActivityCodes: (operatorId = '') =>
-    request<ActivityCodeRef[]>(`/activity-codes?operatorId=${operatorId}`),
+  getActivityCodes: (operatorId = '') => request<ActivityCodeRef[]>(`/activity-codes?operatorId=${operatorId}`),
 
   createActivityCode: (data: Partial<ActivityCodeRef>) =>
     request<ActivityCodeRef>('/activity-codes', { method: 'POST', body: JSON.stringify(data) }),
@@ -926,10 +1000,12 @@ export const api = {
     request<ActivityCodeRef>(`/activity-codes/${id}/flags`, { method: 'PATCH', body: JSON.stringify({ flags }) }),
 
   updateActivityCodePositions: (id: string, positions: string[]) =>
-    request<ActivityCodeRef>(`/activity-codes/${id}/positions`, { method: 'PATCH', body: JSON.stringify({ applicablePositions: positions }) }),
+    request<ActivityCodeRef>(`/activity-codes/${id}/positions`, {
+      method: 'PATCH',
+      body: JSON.stringify({ applicablePositions: positions }),
+    }),
 
-  deleteActivityCode: (id: string) =>
-    request<{ success: boolean }>(`/activity-codes/${id}`, { method: 'DELETE' }),
+  deleteActivityCode: (id: string) => request<{ success: boolean }>(`/activity-codes/${id}`, { method: 'DELETE' }),
 
   seedActivityCodeDefaults: (operatorId = '') =>
     request<{ success: boolean; groupCount: number; codeCount: number }>('/activity-codes/seed-defaults', {
@@ -937,8 +1013,7 @@ export const api = {
       body: JSON.stringify({ operatorId }),
     }),
 
-  getDelayCodes: (operatorId = '') =>
-    request<DelayCodeRef[]>(`/delay-codes?operatorId=${operatorId}`),
+  getDelayCodes: (operatorId = '') => request<DelayCodeRef[]>(`/delay-codes?operatorId=${operatorId}`),
 
   createDelayCode: (data: Partial<DelayCodeRef>) =>
     request<DelayCodeRef>('/delay-codes', { method: 'POST', body: JSON.stringify(data) }),
@@ -946,8 +1021,7 @@ export const api = {
   updateDelayCode: (id: string, data: Partial<DelayCodeRef>) =>
     request<DelayCodeRef>(`/delay-codes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 
-  deleteDelayCode: (id: string) =>
-    request<{ success: boolean }>(`/delay-codes/${id}`, { method: 'DELETE' }),
+  deleteDelayCode: (id: string) => request<{ success: boolean }>(`/delay-codes/${id}`, { method: 'DELETE' }),
 
   getCrewPositions: (operatorId = '', includeInactive = false) => {
     let path = `/crew-positions?operatorId=${operatorId}`
@@ -961,11 +1035,9 @@ export const api = {
   updateCrewPosition: (id: string, data: Partial<CrewPositionRef>) =>
     request<CrewPositionRef>(`/crew-positions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 
-  deleteCrewPosition: (id: string) =>
-    request<{ success: boolean }>(`/crew-positions/${id}`, { method: 'DELETE' }),
+  deleteCrewPosition: (id: string) => request<{ success: boolean }>(`/crew-positions/${id}`, { method: 'DELETE' }),
 
-  getCrewPositionReferences: (id: string) =>
-    request<CrewPositionReferences>(`/crew-positions/${id}/references`),
+  getCrewPositionReferences: (id: string) => request<CrewPositionReferences>(`/crew-positions/${id}/references`),
 
   seedCrewPositions: (operatorId = '') =>
     request<{ success: boolean }>('/crew-positions/seed-defaults', {
@@ -986,8 +1058,7 @@ export const api = {
   updateCrewComplement: (id: string, data: Partial<CrewComplementRef>) =>
     request<CrewComplementRef>(`/crew-complements/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 
-  deleteCrewComplement: (id: string) =>
-    request<{ success: boolean }>(`/crew-complements/${id}`, { method: 'DELETE' }),
+  deleteCrewComplement: (id: string) => request<{ success: boolean }>(`/crew-complements/${id}`, { method: 'DELETE' }),
 
   seedCrewComplementDefaults: (operatorId = '', aircraftTypeIcao?: string) =>
     request<{ success: boolean; count: number }>('/crew-complements/seed-defaults', {
@@ -996,9 +1067,12 @@ export const api = {
     }),
 
   deleteCrewComplementsByType: (operatorId: string, icaoType: string) =>
-    request<{ success: boolean }>(`/crew-complements/by-type/${encodeURIComponent(icaoType)}?operatorId=${operatorId}`, {
-      method: 'DELETE',
-    }),
+    request<{ success: boolean }>(
+      `/crew-complements/by-type/${encodeURIComponent(icaoType)}?operatorId=${operatorId}`,
+      {
+        method: 'DELETE',
+      },
+    ),
 
   // ─── Crew Groups ─────────────────────────────────────────
   getCrewGroups: (operatorId = '', includeInactive = false) => {
@@ -1013,8 +1087,7 @@ export const api = {
   updateCrewGroup: (id: string, data: Partial<CrewGroupRef>) =>
     request<CrewGroupRef>(`/crew-groups/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 
-  deleteCrewGroup: (id: string) =>
-    request<{ success: boolean }>(`/crew-groups/${id}`, { method: 'DELETE' }),
+  deleteCrewGroup: (id: string) => request<{ success: boolean }>(`/crew-groups/${id}`, { method: 'DELETE' }),
 
   seedCrewGroups: (operatorId = '') =>
     request<{ success: boolean; count: number }>('/crew-groups/seed-defaults', {
@@ -1023,8 +1096,7 @@ export const api = {
     }),
 
   // ─── Duty Patterns ──────────────────────────────────────
-  getDutyPatterns: (operatorId = '') =>
-    request<DutyPatternRef[]>(`/duty-patterns?operatorId=${operatorId}`),
+  getDutyPatterns: (operatorId = '') => request<DutyPatternRef[]>(`/duty-patterns?operatorId=${operatorId}`),
 
   createDutyPattern: (data: Partial<DutyPatternRef>) =>
     request<DutyPatternRef>('/duty-patterns', { method: 'POST', body: JSON.stringify(data) }),
@@ -1032,8 +1104,7 @@ export const api = {
   updateDutyPattern: (id: string, data: Partial<DutyPatternRef>) =>
     request<DutyPatternRef>(`/duty-patterns/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 
-  deleteDutyPattern: (id: string) =>
-    request<{ success: boolean }>(`/duty-patterns/${id}`, { method: 'DELETE' }),
+  deleteDutyPattern: (id: string) => request<{ success: boolean }>(`/duty-patterns/${id}`, { method: 'DELETE' }),
 
   seedDutyPatterns: (operatorId = '') =>
     request<{ success: boolean; count: number }>('/duty-patterns/seed-defaults', {
@@ -1076,7 +1147,18 @@ export const api = {
     }),
 
   // ─── Scheduled Flights ──────────────────────────────────
-  getScheduledFlights: (params: { operatorId?: string; seasonCode?: string; scenarioId?: string; status?: string; sortBy?: string; sortDir?: string; dateFrom?: string; dateTo?: string } = {}) => {
+  getScheduledFlights: (
+    params: {
+      operatorId?: string
+      seasonCode?: string
+      scenarioId?: string
+      status?: string
+      sortBy?: string
+      sortDir?: string
+      dateFrom?: string
+      dateTo?: string
+    } = {},
+  ) => {
     const p = new URLSearchParams()
     if (params.operatorId) p.set('operatorId', params.operatorId)
     if (params.seasonCode) p.set('seasonCode', params.seasonCode)
@@ -1089,8 +1171,7 @@ export const api = {
     return request<ScheduledFlightRef[]>(`/scheduled-flights?${p.toString()}`)
   },
 
-  getScheduledFlight: (id: string) =>
-    request<ScheduledFlightRef>(`/scheduled-flights/${id}`),
+  getScheduledFlight: (id: string) => request<ScheduledFlightRef>(`/scheduled-flights/${id}`),
 
   createScheduledFlight: (data: Partial<ScheduledFlightRef>) =>
     request<ScheduledFlightRef>('/scheduled-flights', { method: 'POST', body: JSON.stringify(data) }),
@@ -1122,27 +1203,40 @@ export const api = {
     request<ScenarioRef>('/scenarios', { method: 'POST', body: JSON.stringify(data) }),
 
   cloneScenario: (id: string, name: string, createdBy: string) =>
-    request<{ id: string; flightCount: number }>(`/scenarios/${id}/clone`, { method: 'POST', body: JSON.stringify({ name, createdBy }) }),
+    request<{ id: string; flightCount: number }>(`/scenarios/${id}/clone`, {
+      method: 'POST',
+      body: JSON.stringify({ name, createdBy }),
+    }),
 
   copyProductionIntoScenario: (id: string, statuses?: string[]) =>
-    request<{ copied: number }>(`/scenarios/${id}/copy-production`, { method: 'POST', body: JSON.stringify({ statuses }) }),
+    request<{ copied: number }>(`/scenarios/${id}/copy-production`, {
+      method: 'POST',
+      body: JSON.stringify({ statuses }),
+    }),
 
   updateScenario: (id: string, data: Partial<ScenarioRef>) =>
     request<ScenarioRef>(`/scenarios/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 
   publishScenario: (id: string, publishedBy?: string) =>
-    request<{ scenario: ScenarioRef; activatedFlights: number }>(`/scenarios/${id}/publish`, { method: 'POST', body: JSON.stringify({ publishedBy }) }),
+    request<{ scenario: ScenarioRef; activatedFlights: number }>(`/scenarios/${id}/publish`, {
+      method: 'POST',
+      body: JSON.stringify({ publishedBy }),
+    }),
 
   /** Diff preview — dry run, no writes */
   getScenarioDiffPreview: (id: string) =>
-    request<{ added: number; modified: number; deleted: number; unchanged: number; total: number }>(`/scenarios/${id}/diff-preview`),
+    request<{ added: number; modified: number; deleted: number; unchanged: number; total: number }>(
+      `/scenarios/${id}/diff-preview`,
+    ),
 
   /** Publish & merge — applies diff to production */
   publishMergeScenario: (id: string, publishedBy?: string) =>
-    request<{ added: number; modified: number; deleted: number; unchanged: number }>(`/scenarios/${id}/publish-merge`, { method: 'POST', body: JSON.stringify({ publishedBy }) }),
+    request<{ added: number; modified: number; deleted: number; unchanged: number }>(`/scenarios/${id}/publish-merge`, {
+      method: 'POST',
+      body: JSON.stringify({ publishedBy }),
+    }),
 
-  deleteScenario: (id: string) =>
-    request<{ success: boolean }>(`/scenarios/${id}`, { method: 'DELETE' }),
+  deleteScenario: (id: string) => request<{ success: boolean }>(`/scenarios/${id}`, { method: 'DELETE' }),
 
   // ─── SSIM Import/Export ────────────────────────────────
   exportSsim: (params: {
@@ -1158,12 +1252,20 @@ export const api = {
     if (params.scenarioId) p.set('scenarioId', params.scenarioId)
     if (params.format) p.set('format', params.format)
     if (params.timeMode) p.set('timeMode', params.timeMode)
-    return fetch(`${getApiBaseUrl()}/ssim/export?${p.toString()}`).then(r => r.blob())
+    return fetch(`${getApiBaseUrl()}/ssim/export?${p.toString()}`).then((r) => r.blob())
   },
 
   // ─── Schedule Messages ────────────────────────────────
-  generateScheduleMessages: (params: { operatorId: string; dateFrom?: string; dateTo?: string; targetScenarioId?: string }) =>
-    request<{ messages: any[]; baseCount: number; targetCount: number }>('/schedule-messages/generate', { method: 'POST', body: JSON.stringify(params) }),
+  generateScheduleMessages: (params: {
+    operatorId: string
+    dateFrom?: string
+    dateTo?: string
+    targetScenarioId?: string
+  }) =>
+    request<{ messages: any[]; baseCount: number; targetCount: number }>('/schedule-messages/generate', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    }),
 
   getScheduleMessages: (params: ScheduleMessageQuery) => {
     const p = new URLSearchParams({ operatorId: params.operatorId })
@@ -1187,49 +1289,68 @@ export const api = {
     request<{ messages: ScheduleMessageRef[] }>(`/schedule-messages/held?operatorId=${operatorId}`),
 
   createScheduleMessage: (data: {
-    operatorId: string; messageType: 'ASM' | 'SSM'; actionCode: string;
-    direction: 'inbound' | 'outbound'; status?: string;
-    flightNumber?: string | null; flightDate?: string | null;
-    depStation?: string | null; arrStation?: string | null;
-    seasonCode?: string | null; summary?: string | null;
-    rawMessage?: string | null; changes?: Record<string, unknown> | null;
-  }) =>
-    request<{ id: string }>('/schedule-messages', { method: 'POST', body: JSON.stringify(data) }),
+    operatorId: string
+    messageType: 'ASM' | 'SSM'
+    actionCode: string
+    direction: 'inbound' | 'outbound'
+    status?: string
+    flightNumber?: string | null
+    flightDate?: string | null
+    depStation?: string | null
+    arrStation?: string | null
+    seasonCode?: string | null
+    summary?: string | null
+    rawMessage?: string | null
+    changes?: Record<string, unknown> | null
+  }) => request<{ id: string }>('/schedule-messages', { method: 'POST', body: JSON.stringify(data) }),
 
   updateScheduleMessageStatus: (id: string, status: string, rejectReason?: string) =>
     request<{ ok: boolean }>(`/schedule-messages/${id}/status`, {
-      method: 'PATCH', body: JSON.stringify({ status, rejectReason }),
+      method: 'PATCH',
+      body: JSON.stringify({ status, rejectReason }),
     }),
 
   holdScheduleMessages: (data: {
-    operatorId: string;
-    before: ScheduleMessageSnapshot[];
-    after: ScheduleMessageSnapshot[];
-    operatorIataCode: string;
+    operatorId: string
+    before: ScheduleMessageSnapshot[]
+    after: ScheduleMessageSnapshot[]
+    operatorIataCode: string
   }) =>
-    request<{ held: number; neutralized: number }>('/schedule-messages/hold-batch', { method: 'POST', body: JSON.stringify(data) }),
+    request<{ held: number; neutralized: number }>('/schedule-messages/hold-batch', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   releaseScheduleMessages: (messageIds: string[]) =>
-    request<{ released: number }>('/schedule-messages/release', { method: 'POST', body: JSON.stringify({ messageIds }) }),
+    request<{ released: number }>('/schedule-messages/release', {
+      method: 'POST',
+      body: JSON.stringify({ messageIds }),
+    }),
 
   discardScheduleMessages: (messageIds: string[]) =>
-    request<{ discarded: number }>('/schedule-messages/discard', { method: 'POST', body: JSON.stringify({ messageIds }) }),
+    request<{ discarded: number }>('/schedule-messages/discard', {
+      method: 'POST',
+      body: JSON.stringify({ messageIds }),
+    }),
 
   applyInboundMessage: (data: {
-    messageId: string; actionCode: string; flightNumber: string; flightDate: string;
-    changes: Record<string, { from?: string; to: string }>;
+    messageId: string
+    actionCode: string
+    flightNumber: string
+    flightDate: string
+    changes: Record<string, { from?: string; to: string }>
   }) =>
-    request<{ ok: boolean; instancesUpdated: number }>('/schedule-messages/apply-inbound', { method: 'POST', body: JSON.stringify(data) }),
+    request<{ ok: boolean; instancesUpdated: number }>('/schedule-messages/apply-inbound', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   // ─── FDTL ───────────────────────────────────────────────
-  getFdtlFrameworks: () =>
-    request<FdtlFrameworkRef[]>('/fdtl/frameworks'),
+  getFdtlFrameworks: () => request<FdtlFrameworkRef[]>('/fdtl/frameworks'),
 
-  getFdtlTabGroups: () =>
-    request<FdtlTabGroup[]>('/fdtl/tab-groups'),
+  getFdtlTabGroups: () => request<FdtlTabGroup[]>('/fdtl/tab-groups'),
 
-  getFdtlScheme: (operatorId = '') =>
-    request<FdtlSchemeRef>(`/fdtl/schemes/${operatorId}`),
+  getFdtlScheme: (operatorId = '') => request<FdtlSchemeRef>(`/fdtl/schemes/${operatorId}`),
 
   createFdtlScheme: (data: Partial<FdtlSchemeRef>) =>
     request<FdtlSchemeRef>('/fdtl/schemes', { method: 'POST', body: JSON.stringify(data) }),
@@ -1247,8 +1368,7 @@ export const api = {
   updateFdtlRule: (id: string, data: Partial<FdtlRuleRef>) =>
     request<FdtlRuleRef>(`/fdtl/rules/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 
-  resetFdtlRule: (id: string) =>
-    request<FdtlRuleRef>(`/fdtl/rules/${id}/reset`, { method: 'POST' }),
+  resetFdtlRule: (id: string) => request<FdtlRuleRef>(`/fdtl/rules/${id}/reset`, { method: 'POST' }),
 
   getFdtlTables: (operatorId = '', frameworkCode?: string, tabKey?: string) => {
     let path = `/fdtl/tables?operatorId=${operatorId}`
@@ -1263,8 +1383,7 @@ export const api = {
       body: JSON.stringify({ rowKey, colKey, valueMinutes }),
     }),
 
-  resetFdtlTable: (tableId: string) =>
-    request<FdtlTableRef>(`/fdtl/tables/${tableId}/reset`, { method: 'POST' }),
+  resetFdtlTable: (tableId: string) => request<FdtlTableRef>(`/fdtl/tables/${tableId}/reset`, { method: 'POST' }),
 
   seedFdtl: (operatorId = '', frameworkCode: string) =>
     request<{ success: boolean; frameworkCode: string; rulesSeeded: number; tablesSeeded: number }>('/fdtl/seed', {
@@ -1287,8 +1406,7 @@ export const api = {
   updateExpiryCode: (id: string, data: Partial<ExpiryCodeRef>) =>
     request<ExpiryCodeRef>(`/expiry-codes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 
-  deleteExpiryCode: (id: string) =>
-    request<{ success: boolean }>(`/expiry-codes/${id}`, { method: 'DELETE' }),
+  deleteExpiryCode: (id: string) => request<{ success: boolean }>(`/expiry-codes/${id}`, { method: 'DELETE' }),
 
   getFlightServiceTypes: (operatorId = '') =>
     request<FlightServiceTypeRef[]>(`/flight-service-types?operatorId=${operatorId}`),
@@ -1302,8 +1420,7 @@ export const api = {
   deleteFlightServiceType: (id: string) =>
     request<{ success: boolean }>(`/flight-service-types/${id}`, { method: 'DELETE' }),
 
-  getCarrierCodes: (operatorId = '') =>
-    request<CarrierCodeRef[]>(`/carrier-codes?operatorId=${operatorId}`),
+  getCarrierCodes: (operatorId = '') => request<CarrierCodeRef[]>(`/carrier-codes?operatorId=${operatorId}`),
 
   createCarrierCode: (data: Partial<CarrierCodeRef>) =>
     request<CarrierCodeRef>('/carrier-codes', { method: 'POST', body: JSON.stringify(data) }),
@@ -1311,8 +1428,7 @@ export const api = {
   updateCarrierCode: (id: string, data: Partial<CarrierCodeRef>) =>
     request<CarrierCodeRef>(`/carrier-codes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 
-  deleteCarrierCode: (id: string) =>
-    request<{ success: boolean }>(`/carrier-codes/${id}`, { method: 'DELETE' }),
+  deleteCarrierCode: (id: string) => request<{ success: boolean }>(`/carrier-codes/${id}`, { method: 'DELETE' }),
 
   getOperators: () => request<OperatorRef[]>('/operators'),
 
@@ -1327,8 +1443,7 @@ export const api = {
   getReferenceStats: () => request<ReferenceStats>('/reference/stats'),
 
   // ─── Cabin Classes ──────────────────────────────────────
-  getCabinClasses: (operatorId = '') =>
-    request<CabinClassRef[]>(`/cabin-classes?operatorId=${operatorId}`),
+  getCabinClasses: (operatorId = '') => request<CabinClassRef[]>(`/cabin-classes?operatorId=${operatorId}`),
 
   getCabinClass: (id: string) => request<CabinClassRef>(`/cabin-classes/${id}`),
 
@@ -1379,62 +1494,63 @@ export const api = {
   health: () => request<{ status: string }>('/health'),
 
   // ─── User / Settings ─────────────────────────────────────
-  getMe: (userId = 'skyhub-admin-001') =>
-    request<UserData>(`/users/me?userId=${userId}`),
+  // NOTE: getMe is declared above in the Auth section (uses req.userId from JWT).
 
-  updateProfile: (data: Partial<UserProfile>, userId = 'skyhub-admin-001') =>
-    request<{ success: boolean; profile: UserProfile }>(`/users/me/profile?userId=${userId}`, {
+  updateProfile: (data: Partial<UserProfile>) =>
+    request<{ success: boolean; profile: UserProfile }>(`/users/me/profile`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
 
-  updateSecurity: (data: Record<string, any>, userId = 'skyhub-admin-001') =>
-    request<{ success: boolean; security: UserSecurity }>(`/users/me/security?userId=${userId}`, {
+  updateSecurity: (data: Record<string, any>) =>
+    request<{ success: boolean; security: UserSecurity }>(`/users/me/security`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
 
-  updatePreferences: (data: Partial<UserPreferences>, userId = 'skyhub-admin-001') =>
-    request<{ success: boolean; preferences: UserPreferences }>(`/users/me/preferences?userId=${userId}`, {
+  updatePreferences: (data: Partial<UserPreferences>) =>
+    request<{ success: boolean; preferences: UserPreferences }>(`/users/me/preferences`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
 
-  updateNotifications: (data: Record<string, any>, userId = 'skyhub-admin-001') =>
-    request<{ success: boolean; notifications: UserNotifications }>(`/users/me/notifications?userId=${userId}`, {
+  updateNotifications: (data: Record<string, any>) =>
+    request<{ success: boolean; notifications: UserNotifications }>(`/users/me/notifications`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
 
-  updateDisplay: (data: Record<string, any>, userId = 'skyhub-admin-001') =>
-    request<{ success: boolean; display: UserDisplay }>(`/users/me/display?userId=${userId}`, {
+  updateDisplay: (data: Record<string, any>) =>
+    request<{ success: boolean; display: UserDisplay }>(`/users/me/display`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
 
-  revokeSession: (index: number, userId = 'skyhub-admin-001') =>
-    request<{ success: boolean }>(`/users/me/sessions/${index}?userId=${userId}`, {
+  revokeSession: (index: number) =>
+    request<{ success: boolean }>(`/users/me/sessions/${index}`, {
       method: 'DELETE',
     }),
 
   // ─── Slots ─────────────────────────────────────────────
 
-  getSlotAirports: () =>
-    request<SlotCoordinatedAirport[]>('/slots/airports'),
+  getSlotAirports: () => request<SlotCoordinatedAirport[]>('/slots/airports'),
 
   getSlotFleetStats: (operatorId: string, seasonCode: string) =>
     request<SlotFleetAirportStats[]>(`/slots/fleet-stats?operatorId=${operatorId}&seasonCode=${seasonCode}`),
 
   getSlotSeries: (operatorId: string, airportIata: string, seasonCode: string) =>
-    request<SlotSeriesRef[]>(`/slots/series?operatorId=${operatorId}&airportIata=${airportIata}&seasonCode=${seasonCode}`),
+    request<SlotSeriesRef[]>(
+      `/slots/series?operatorId=${operatorId}&airportIata=${airportIata}&seasonCode=${seasonCode}`,
+    ),
 
-  getSlotSeriesById: (id: string) =>
-    request<SlotSeriesRef>(`/slots/series/${id}`),
+  getSlotSeriesById: (id: string) => request<SlotSeriesRef>(`/slots/series/${id}`),
 
-  getSlotDates: (seriesId: string) =>
-    request<SlotDateRef[]>(`/slots/dates?seriesId=${seriesId}`),
+  getSlotDates: (seriesId: string) => request<SlotDateRef[]>(`/slots/dates?seriesId=${seriesId}`),
 
-  getSlotMessages: (operatorId: string, filters?: { airportIata?: string; seasonCode?: string; direction?: string; messageType?: string }) => {
+  getSlotMessages: (
+    operatorId: string,
+    filters?: { airportIata?: string; seasonCode?: string; direction?: string; messageType?: string },
+  ) => {
     let path = `/slots/messages?operatorId=${operatorId}`
     if (filters?.airportIata) path += `&airportIata=${filters.airportIata}`
     if (filters?.seasonCode) path += `&seasonCode=${filters.seasonCode}`
@@ -1443,17 +1559,22 @@ export const api = {
     return request<SlotMessageRef[]>(path)
   },
 
-  getSlotActionLog: (seriesId: string) =>
-    request<SlotActionLogRef[]>(`/slots/action-log?seriesId=${seriesId}`),
+  getSlotActionLog: (seriesId: string) => request<SlotActionLogRef[]>(`/slots/action-log?seriesId=${seriesId}`),
 
   getSlotStats: (operatorId: string, airportIata: string, seasonCode: string) =>
-    request<SlotPortfolioStats>(`/slots/stats?operatorId=${operatorId}&airportIata=${airportIata}&seasonCode=${seasonCode}`),
+    request<SlotPortfolioStats>(
+      `/slots/stats?operatorId=${operatorId}&airportIata=${airportIata}&seasonCode=${seasonCode}`,
+    ),
 
   getSlotUtilization: (operatorId: string, airportIata: string, seasonCode: string) =>
-    request<SlotUtilizationSummary[]>(`/slots/utilization?operatorId=${operatorId}&airportIata=${airportIata}&seasonCode=${seasonCode}`),
+    request<SlotUtilizationSummary[]>(
+      `/slots/utilization?operatorId=${operatorId}&airportIata=${airportIata}&seasonCode=${seasonCode}`,
+    ),
 
   getSlotCalendar: (operatorId: string, airportIata: string, seasonCode: string) =>
-    request<Record<string, SlotCalendarWeekRef[]>>(`/slots/calendar?operatorId=${operatorId}&airportIata=${airportIata}&seasonCode=${seasonCode}`),
+    request<Record<string, SlotCalendarWeekRef[]>>(
+      `/slots/calendar?operatorId=${operatorId}&airportIata=${airportIata}&seasonCode=${seasonCode}`,
+    ),
 
   getScheduledFlightsForSlots: (operatorId: string, airportIata: string) =>
     request<ScheduledFlightForSlot[]>(`/slots/scheduled-flights?operatorId=${operatorId}&airportIata=${airportIata}`),
@@ -1481,7 +1602,13 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  bulkUpdateSlotDates: (data: { seriesId: string; dateRangeStart: string; dateRangeEnd: string; operationStatus: string; jnusReason?: string | null }) =>
+  bulkUpdateSlotDates: (data: {
+    seriesId: string
+    dateRangeStart: string
+    dateRangeEnd: string
+    operationStatus: string
+    jnusReason?: string | null
+  }) =>
     request<{ updated: number }>('/slots/dates/bulk', {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -1493,7 +1620,13 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  logSlotAction: (data: { seriesId: string; actionCode: string; actionSource: string; messageId?: string | null; details?: Record<string, unknown> | null }) =>
+  logSlotAction: (data: {
+    seriesId: string
+    actionCode: string
+    actionSource: string
+    messageId?: string | null
+    details?: Record<string, unknown> | null
+  }) =>
     request<{ id: string }>('/slots/action-log', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -1516,8 +1649,7 @@ export const api = {
   getCodeshareAgreements: (operatorId: string) =>
     request<CodeshareAgreementRef[]>(`/codeshare/agreements?operatorId=${operatorId}`),
 
-  getCodeshareAgreement: (id: string) =>
-    request<CodeshareAgreementRef>(`/codeshare/agreements/${id}`),
+  getCodeshareAgreement: (id: string) => request<CodeshareAgreementRef>(`/codeshare/agreements/${id}`),
 
   createCodeshareAgreement: (data: Record<string, unknown>) =>
     request<{ id: string }>('/codeshare/agreements', {
@@ -1566,13 +1698,14 @@ export const api = {
     }),
 
   getCodeshareSeatAllocations: (params: { mappingId?: string; agreementId?: string }) => {
-    const qs = params.mappingId
-      ? `mappingId=${params.mappingId}`
-      : `agreementId=${params.agreementId}`
+    const qs = params.mappingId ? `mappingId=${params.mappingId}` : `agreementId=${params.agreementId}`
     return request<CodeshareSeatAllocationRef[]>(`/codeshare/seat-allocations?${qs}`)
   },
 
-  upsertCodeshareSeatAllocations: (mappingId: string, allocations: { cabinCode: string; allocatedSeats: number; releaseHours: number }[]) =>
+  upsertCodeshareSeatAllocations: (
+    mappingId: string,
+    allocations: { cabinCode: string; allocatedSeats: number; releaseHours: number }[],
+  ) =>
     request<{ ok: boolean }>('/codeshare/seat-allocations', {
       method: 'PUT',
       body: JSON.stringify({ mappingId, allocations }),
@@ -1585,7 +1718,9 @@ export const api = {
     request<CodeshareOperatingFlightRef[]>(`/codeshare/operating-flights?operatorId=${operatorId}`),
 
   getCodeshareUnmappedFlights: (agreementId: string, operatorId: string) =>
-    request<CodeshareOperatingFlightRef[]>(`/codeshare/unmapped-flights?agreementId=${agreementId}&operatorId=${operatorId}`),
+    request<CodeshareOperatingFlightRef[]>(
+      `/codeshare/unmapped-flights?agreementId=${agreementId}&operatorId=${operatorId}`,
+    ),
 
   getCodeshareMappingHealth: (agreementId: string, operatorId?: string) => {
     let path = `/codeshare/health?agreementId=${agreementId}`
@@ -1624,8 +1759,7 @@ export const api = {
       method: 'DELETE',
     }),
 
-  getCharterFlights: (contractId: string) =>
-    request<CharterFlightRef[]>(`/charter/flights?contractId=${contractId}`),
+  getCharterFlights: (contractId: string) => request<CharterFlightRef[]>(`/charter/flights?contractId=${contractId}`),
 
   createCharterFlight: (data: Record<string, unknown>) =>
     request<{ id: string }>('/charter/flights', {
@@ -1638,11 +1772,9 @@ export const api = {
       method: 'DELETE',
     }),
 
-  getCharterStats: (contractId: string) =>
-    request<CharterContractStats>(`/charter/stats?contractId=${contractId}`),
+  getCharterStats: (contractId: string) => request<CharterContractStats>(`/charter/stats?contractId=${contractId}`),
 
-  getNextCharterFlightNumber: () =>
-    request<{ flightNumber: string }>('/charter/next-flight-number'),
+  getNextCharterFlightNumber: () => request<{ flightNumber: string }>('/charter/next-flight-number'),
 
   generateCharterPositioning: (contractId: string, operatorCode: string, homeBase: string) =>
     request<{ legs: CharterPositioningLeg[] }>('/charter/generate-positioning', {

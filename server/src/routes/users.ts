@@ -2,13 +2,14 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { pipeline } from 'node:stream/promises'
+import bcrypt from 'bcryptjs'
 import type { FastifyInstance } from 'fastify'
 import { User } from '../models/User.js'
 
 export async function userRoutes(app: FastifyInstance) {
-  // ── GET /users/me — get current user (hardcoded ID for now, replace with JWT later) ──
+  // ── GET /users/me — get current user from JWT ──
   app.get('/users/me', async (req, reply) => {
-    const userId = (req.query as any).userId || 'skyhub-admin-001'
+    const userId = req.userId
     const user = await User.findById(userId).lean()
     if (!user) return reply.code(404).send({ error: 'User not found' })
     // Strip password hash from response
@@ -19,7 +20,7 @@ export async function userRoutes(app: FastifyInstance) {
 
   // ── PATCH /users/me/profile — update profile fields ──
   app.patch('/users/me/profile', async (req, reply) => {
-    const userId = (req.query as any).userId || 'skyhub-admin-001'
+    const userId = req.userId
     const body = req.body as Record<string, any>
 
     const update: Record<string, any> = { updatedAt: new Date().toISOString() }
@@ -34,15 +35,24 @@ export async function userRoutes(app: FastifyInstance) {
 
   // ── PATCH /users/me/security — update security settings ──
   app.patch('/users/me/security', async (req, reply) => {
-    const userId = (req.query as any).userId || 'skyhub-admin-001'
+    const userId = req.userId
     const body = req.body as Record<string, any>
 
     const update: Record<string, any> = { updatedAt: new Date().toISOString() }
 
     // Handle password change
     if (body.newPassword) {
-      // In production: hash the password, verify currentPassword
-      update['security.passwordHash'] = `hashed_${body.newPassword}`
+      if (typeof body.newPassword !== 'string' || body.newPassword.length < 8) {
+        return reply.code(400).send({ error: 'New password must be at least 8 characters' })
+      }
+      if (body.currentPassword) {
+        const current = await User.findById(userId).lean()
+        const currentHash = (current as { security?: { passwordHash?: string } } | null)?.security?.passwordHash
+        if (currentHash && !(await bcrypt.compare(body.currentPassword, currentHash))) {
+          return reply.code(401).send({ error: 'Current password is incorrect' })
+        }
+      }
+      update['security.passwordHash'] = await bcrypt.hash(body.newPassword, 12)
       update['security.lastPasswordChange'] = new Date().toISOString()
     }
 
@@ -61,7 +71,7 @@ export async function userRoutes(app: FastifyInstance) {
 
   // ── PATCH /users/me/preferences — update preferences ──
   app.patch('/users/me/preferences', async (req, reply) => {
-    const userId = (req.query as any).userId || 'skyhub-admin-001'
+    const userId = req.userId
     const body = req.body as Record<string, any>
 
     const update: Record<string, any> = { updatedAt: new Date().toISOString() }
@@ -76,7 +86,7 @@ export async function userRoutes(app: FastifyInstance) {
 
   // ── PATCH /users/me/notifications — update notification settings ──
   app.patch('/users/me/notifications', async (req, reply) => {
-    const userId = (req.query as any).userId || 'skyhub-admin-001'
+    const userId = req.userId
     const body = req.body as Record<string, any>
 
     const update: Record<string, any> = { updatedAt: new Date().toISOString() }
@@ -98,7 +108,7 @@ export async function userRoutes(app: FastifyInstance) {
 
   // ── PATCH /users/me/display — update display settings ──
   app.patch('/users/me/display', async (req, reply) => {
-    const userId = (req.query as any).userId || 'skyhub-admin-001'
+    const userId = req.userId
     const body = req.body as Record<string, any>
 
     const update: Record<string, any> = { updatedAt: new Date().toISOString() }
@@ -113,7 +123,7 @@ export async function userRoutes(app: FastifyInstance) {
 
   // ── DELETE /users/me/sessions/:index — revoke a session ──
   app.delete('/users/me/sessions/:index', async (req, reply) => {
-    const userId = (req.query as any).userId || 'skyhub-admin-001'
+    const userId = req.userId
     const index = parseInt((req.params as any).index, 10)
 
     const user = await User.findById(userId)
@@ -132,7 +142,7 @@ export async function userRoutes(app: FastifyInstance) {
 
   // ── POST /users/me/avatar — upload avatar image ──
   app.post('/users/me/avatar', async (req, reply) => {
-    const userId = (req.query as any).userId || 'skyhub-admin-001'
+    const userId = req.userId
 
     const file = await req.file()
     if (!file) return reply.code(400).send({ error: 'No file uploaded' })
@@ -160,7 +170,7 @@ export async function userRoutes(app: FastifyInstance) {
 
   // ── DELETE /users/me/avatar — remove avatar ──
   app.delete('/users/me/avatar', async (req, reply) => {
-    const userId = (req.query as any).userId || 'skyhub-admin-001'
+    const userId = req.userId
     const user = await User.findById(userId).lean()
     if (!user) return reply.code(404).send({ error: 'User not found' })
 

@@ -25,37 +25,40 @@ export interface ParseResult {
 
 const COLUMN_MAP: Record<string, string> = {
   'ac type': 'aircraftTypeIcao',
-  'type': 'aircraftTypeIcao',
-  'aircraft': 'aircraftTypeIcao',
-  'dep': 'depStation',
-  'departure': 'depStation',
-  'arr': 'arrStation',
-  'arrival': 'arrStation',
-  'flight': 'flightNumber',
+  type: 'aircraftTypeIcao',
+  aircraft: 'aircraftTypeIcao',
+  dep: 'depStation',
+  departure: 'depStation',
+  arr: 'arrStation',
+  arrival: 'arrStation',
+  flight: 'flightNumber',
   'flight number': 'flightNumber',
   'flight no': 'flightNumber',
-  'std': 'stdUtc',
-  'sta': 'staUtc',
-  'svc': 'serviceType',
-  'service': 'serviceType',
-  'freq': 'daysOfWeek',
-  'frequency': 'daysOfWeek',
-  'dow': 'daysOfWeek',
-  'from': 'effectiveFrom',
+  std: 'stdUtc',
+  sta: 'staUtc',
+  svc: 'serviceType',
+  service: 'serviceType',
+  freq: 'daysOfWeek',
+  frequency: 'daysOfWeek',
+  dow: 'daysOfWeek',
+  from: 'effectiveFrom',
   'effective from': 'effectiveFrom',
   'period start': 'effectiveFrom',
-  'to': 'effectiveUntil',
+  to: 'effectiveUntil',
   'effective to': 'effectiveUntil',
   'effective until': 'effectiveUntil',
   'period end': 'effectiveUntil',
-  'block': 'blockMinutes',
+  block: 'blockMinutes',
   'block time': 'blockMinutes',
-  'offset': 'departureDayOffset',
+  offset: 'departureDayOffset',
 }
 
 export async function parseSsimExcel(buffer: Buffer): Promise<ParseResult> {
   const workbook = new ExcelJS.Workbook()
-  await workbook.xlsx.load(buffer)
+  // ExcelJS's .load() type signature expects Buffer with ArrayBuffer backing;
+  // Node 20 Buffer types are typed as Buffer<ArrayBufferLike>. Widen to any at
+  // the boundary — the runtime contract is unchanged.
+  await workbook.xlsx.load(buffer as unknown as ArrayBuffer)
   const sheet = workbook.worksheets[0]
   if (!sheet) return { flights: [], errors: [{ row: 0, message: 'No worksheet found' }] }
 
@@ -63,7 +66,9 @@ export async function parseSsimExcel(buffer: Buffer): Promise<ParseResult> {
   const headerRow = sheet.getRow(1)
   const colMapping: Record<number, string> = {}
   headerRow.eachCell((cell, colNum) => {
-    const header = String(cell.value ?? '').toLowerCase().trim()
+    const header = String(cell.value ?? '')
+      .toLowerCase()
+      .trim()
     const mapped = COLUMN_MAP[header]
     if (mapped) colMapping[colNum] = mapped
   })

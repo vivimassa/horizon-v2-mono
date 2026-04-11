@@ -1,20 +1,32 @@
 // @skyhub/ui — SkyHub Design System
 
-// ── SkyHub Custom Components ──
+// ── Screen scaffolding ──
+export { ScreenContainer } from './components/ScreenContainer'
+export { PageShell } from './components/PageShell'
+export { ListScreenHeader } from './components/ListScreenHeader'
+export { DetailScreenHeader } from './components/DetailScreenHeader'
+export { TabBar, type TabBarItem } from './components/TabBar'
+export { SpotlightDock } from './components/SpotlightDock'
+// AnimatedBackground is lazy-loaded by PageShell — not exported from barrel
+// to avoid eagerly pulling in react-native-reanimated/worklets
+
+// ── Data display ──
 export { Card } from './components/Card'
 export { SectionHeader } from './components/SectionHeader'
 export { ListItem } from './components/ListItem'
-export { SearchInput } from './components/SearchInput'
-export { StatusChip } from './components/StatusChip'
-export { Button } from './components/Button'
-export { EmptyState } from './components/EmptyState'
+export { FieldRow, type FieldRowType, type FieldRowOption } from './components/FieldRow'
 export { Badge } from './components/Badge'
-export { Icon } from './components/Icon'
-export { PageShell } from './components/PageShell'
-// AnimatedBackground is lazy-loaded by PageShell — not exported from barrel
-// to avoid eagerly pulling in react-native-reanimated/worklets
-export { SpotlightDock } from './components/SpotlightDock'
+export { StatusChip } from './components/StatusChip'
+export { EmptyState } from './components/EmptyState'
 export { NavTile } from './components/NavTile'
+
+// ── Primitives ──
+export { Text, type TextVariant } from './components/Text'
+export { Button } from './components/Button'
+export { Icon } from './components/Icon'
+export { Divider } from './components/Divider'
+export { TextInput } from './components/TextInput'
+export { SearchInput } from './components/SearchInput'
 export { Tooltip } from './components/Tooltip'
 export { FilterPanel } from './components/FilterPanel'
 export { FilterSection } from './components/FilterSection'
@@ -48,4 +60,5 @@ export * from './navigation'
 // ── Hooks ──
 export { useTheme } from './hooks/useTheme'
 export { useThemeStore, type BackgroundPreset } from './stores/useThemeStore'
+export { useAuthStore, type AuthUser } from './stores/useAuthStore'
 export { useResponsive } from './hooks/useResponsive'

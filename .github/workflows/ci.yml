@@ -33,7 +33,25 @@ jobs:
       - name: Check Prettier formatting
         run: npm run format:check
 
-  # NOTE: typecheck + build jobs are omitted tonight because the
-  # pre-existing @skyhub/types build is broken (missing .js extensions on
-  # relative imports under moduleResolution: NodeNext). Fixing that is a
-  # separate follow-up task — re-enable the jobs here once it is resolved.
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Typecheck server
+        run: cd server && npx tsc --noEmit
+      - name: Typecheck mobile
+        run: cd apps/mobile && npx tsc --noEmit
+      - name: Typecheck packages
+        run: npx turbo typecheck --filter=@skyhub/api --filter=@skyhub/ui --filter=@skyhub/env --filter=@skyhub/logic --filter=@skyhub/types --filter=@skyhub/constants
+
+  # NOTE: Web app typecheck + build are intentionally not in CI yet. The web
+  # workspace has pre-existing type errors in slot-detail-dialog, slot-toolbar,
+  # slot-manager-shell, and global-runway-progress that are unrelated to the
+  # infrastructure hardening sprints. Re-enable after those are fixed in a
+  # separate cleanup pass.

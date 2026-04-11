@@ -2,16 +2,14 @@ import type { FastifyInstance } from 'fastify'
 import { FlightInstance } from '../models/FlightInstance.js'
 
 export async function flightRoutes(app: FastifyInstance): Promise<void> {
-  // GET /flights?operatorId=&from=&to=
+  // GET /flights?from=&to= — operatorId is always req.operatorId (from JWT)
   app.get('/flights', async (req, reply) => {
-    const { operatorId, from, to } = req.query as {
-      operatorId?: string
+    const { from, to } = req.query as {
       from?: string
       to?: string
     }
 
-    const filter: Record<string, unknown> = {}
-    if (operatorId) filter.operatorId = operatorId
+    const filter: Record<string, unknown> = { operatorId: req.operatorId }
     if (from || to) {
       filter.operatingDate = {
         ...(from && { $gte: from }),
@@ -19,9 +17,7 @@ export async function flightRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    const flights = await FlightInstance.find(filter)
-      .sort({ 'schedule.stdUtc': 1 })
-      .lean()
+    const flights = await FlightInstance.find(filter).sort({ 'schedule.stdUtc': 1 }).lean()
 
     return flights
   })
@@ -58,7 +54,7 @@ export async function flightRoutes(app: FastifyInstance): Promise<void> {
         'syncMeta.updatedAt': Date.now(),
         $inc: { 'syncMeta.version': 1 },
       },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     ).lean()
 
     if (!flight) {

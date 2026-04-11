@@ -10,6 +10,8 @@ import jwt from '@fastify/jwt'
 import multipart from '@fastify/multipart'
 import fastifyStatic from '@fastify/static'
 import { connectDB } from './db/connection.js'
+import { registerAuthMiddleware } from './middleware/authenticate.js'
+import { authRoutes } from './routes/auth.js'
 import { flightRoutes } from './routes/flights.js'
 import { referenceRoutes } from './routes/reference.js'
 import { userRoutes } from './routes/users.js'
@@ -48,6 +50,9 @@ async function main(): Promise<void> {
     decorateReply: false,
   })
 
+  // Auth middleware — runs before every request, gates everything except PUBLIC_PATHS
+  registerAuthMiddleware(app)
+
   // Database
   await connectDB(env.MONGODB_URI)
 
@@ -60,6 +65,7 @@ async function main(): Promise<void> {
   app.get('/health', async () => ({ status: 'ok' }))
 
   // Routes
+  await app.register(authRoutes)
   await app.register(flightRoutes)
   await app.register(referenceRoutes)
   await app.register(userRoutes)

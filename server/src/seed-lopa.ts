@@ -1,4 +1,6 @@
 import 'dotenv/config'
+import { validateServerEnv } from '@skyhub/env'
+const env = validateServerEnv()
 import crypto from 'node:crypto'
 import { connectDB } from './db/connection.js'
 import { CabinClass } from './models/CabinClass.js'
@@ -7,10 +9,54 @@ import { LopaConfig } from './models/LopaConfig.js'
 const OPERATOR_ID = 'horizon'
 
 const CABIN_CLASSES = [
-  { code: 'F', name: 'First Class',       color: '#d97706', sortOrder: 1, seatLayout: '1-1',  seatPitchIn: 82, seatWidthIn: 36, seatType: 'suite',    hasIfe: true,  hasPower: true },
-  { code: 'C', name: 'Business Class',    color: '#3b82f6', sortOrder: 2, seatLayout: '2-2',  seatPitchIn: 42, seatWidthIn: 21, seatType: 'lie-flat',  hasIfe: true,  hasPower: true },
-  { code: 'W', name: 'Premium Economy',   color: '#8b5cf6', sortOrder: 3, seatLayout: '3-3',  seatPitchIn: 34, seatWidthIn: 19, seatType: 'premium',   hasIfe: true,  hasPower: true },
-  { code: 'Y', name: 'Economy',           color: '#22c55e', sortOrder: 4, seatLayout: '3-3',  seatPitchIn: 29, seatWidthIn: 17, seatType: 'standard',  hasIfe: false, hasPower: true },
+  {
+    code: 'F',
+    name: 'First Class',
+    color: '#d97706',
+    sortOrder: 1,
+    seatLayout: '1-1',
+    seatPitchIn: 82,
+    seatWidthIn: 36,
+    seatType: 'suite',
+    hasIfe: true,
+    hasPower: true,
+  },
+  {
+    code: 'C',
+    name: 'Business Class',
+    color: '#3b82f6',
+    sortOrder: 2,
+    seatLayout: '2-2',
+    seatPitchIn: 42,
+    seatWidthIn: 21,
+    seatType: 'lie-flat',
+    hasIfe: true,
+    hasPower: true,
+  },
+  {
+    code: 'W',
+    name: 'Premium Economy',
+    color: '#8b5cf6',
+    sortOrder: 3,
+    seatLayout: '3-3',
+    seatPitchIn: 34,
+    seatWidthIn: 19,
+    seatType: 'premium',
+    hasIfe: true,
+    hasPower: true,
+  },
+  {
+    code: 'Y',
+    name: 'Economy',
+    color: '#22c55e',
+    sortOrder: 4,
+    seatLayout: '3-3',
+    seatPitchIn: 29,
+    seatWidthIn: 17,
+    seatType: 'standard',
+    hasIfe: false,
+    hasPower: true,
+  },
 ]
 
 const LOPA_CONFIGS = [
@@ -25,7 +71,7 @@ const LOPA_CONFIGS = [
 ]
 
 async function seedLopa() {
-  await connectDB()
+  await connectDB(env.MONGODB_URI)
 
   // Seed cabin classes (idempotent — skip existing)
   for (const cc of CABIN_CLASSES) {

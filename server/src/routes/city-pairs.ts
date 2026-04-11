@@ -31,15 +31,17 @@ const cityPairCreateSchema = z.object({
   notes: z.string().nullable().optional(),
 })
 
-const cityPairUpdateSchema = z.object({
-  standardBlockMinutes: z.number().min(0).nullable().optional(),
-  routeType: z.string().optional(),
-  isEtops: z.boolean().optional(),
-  etopsDiversionTimeMinutes: z.number().min(0).nullable().optional(),
-  isOverwater: z.boolean().optional(),
-  isActive: z.boolean().optional(),
-  notes: z.string().nullable().optional(),
-}).strict()
+const cityPairUpdateSchema = z
+  .object({
+    standardBlockMinutes: z.number().min(0).nullable().optional(),
+    routeType: z.string().optional(),
+    isEtops: z.boolean().optional(),
+    etopsDiversionTimeMinutes: z.number().min(0).nullable().optional(),
+    isOverwater: z.boolean().optional(),
+    isActive: z.boolean().optional(),
+    notes: z.string().nullable().optional(),
+  })
+  .strict()
 
 // ─── Helper: resolve airport data ───────────────────────
 
@@ -60,12 +62,10 @@ async function resolveAirport(icao: string) {
 // ─── Routes ─────────────────────────────────────────────
 
 export async function cityPairRoutes(app: FastifyInstance): Promise<void> {
-
   // List all city pairs
   app.get('/city-pairs', async (req) => {
-    const { operatorId } = req.query as { operatorId?: string }
-    const filter: Record<string, unknown> = { isActive: true }
-    if (operatorId) filter.operatorId = operatorId
+    const operatorId = req.operatorId
+    const filter: Record<string, unknown> = { isActive: true, operatorId }
     return CityPair.find(filter).sort({ station1Icao: 1, station2Icao: 1 }).lean()
   })
 
@@ -81,7 +81,7 @@ export async function cityPairRoutes(app: FastifyInstance): Promise<void> {
   app.post('/city-pairs', async (req, reply) => {
     const parsed = cityPairCreateSchema.safeParse(req.body)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -158,7 +158,7 @@ export async function cityPairRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string }
     const parsed = cityPairUpdateSchema.safeParse(req.body)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -183,16 +183,12 @@ export async function cityPairRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string }
     const parsed = blockHourSchema.safeParse(req.body)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
     const bh = { _id: crypto.randomUUID(), ...parsed.data }
-    const doc = await CityPair.findByIdAndUpdate(
-      id,
-      { $push: { blockHours: bh } },
-      { new: true }
-    ).lean()
+    const doc = await CityPair.findByIdAndUpdate(id, { $push: { blockHours: bh } }, { new: true }).lean()
     if (!doc) return reply.code(404).send({ error: 'City pair not found' })
     return doc
   })
@@ -201,7 +197,7 @@ export async function cityPairRoutes(app: FastifyInstance): Promise<void> {
     const { id, bhId } = req.params as { id: string; bhId: string }
     const parsed = blockHourSchema.partial().safeParse(req.body)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -213,7 +209,7 @@ export async function cityPairRoutes(app: FastifyInstance): Promise<void> {
     const doc = await CityPair.findOneAndUpdate(
       { _id: id, 'blockHours._id': bhId },
       { $set: setFields },
-      { new: true }
+      { new: true },
     ).lean()
     if (!doc) return reply.code(404).send({ error: 'City pair or block hour not found' })
     return doc
@@ -221,11 +217,7 @@ export async function cityPairRoutes(app: FastifyInstance): Promise<void> {
 
   app.delete('/city-pairs/:id/block-hours/:bhId', async (req, reply) => {
     const { id, bhId } = req.params as { id: string; bhId: string }
-    const doc = await CityPair.findByIdAndUpdate(
-      id,
-      { $pull: { blockHours: { _id: bhId } } },
-      { new: true }
-    ).lean()
+    const doc = await CityPair.findByIdAndUpdate(id, { $pull: { blockHours: { _id: bhId } } }, { new: true }).lean()
     if (!doc) return reply.code(404).send({ error: 'City pair not found' })
     return doc
   })

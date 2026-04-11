@@ -27,12 +27,14 @@ export default function RootLayout({
       <body className="flex flex-col h-screen bg-hz-bg text-hz-text">
         <ThemeProvider>
           <DisplayProvider>
-            <UserProvider>
-              <AnimatedBodyBg />
-              <Breadcrumb />
-              <main className="flex-1 overflow-y-auto pb-22 -mt-1">{children}</main>
-              <SpotlightDock />
-            </UserProvider>
+            <AuthProvider>
+              <UserProvider>
+                <AnimatedBodyBg />
+                <Breadcrumb />
+                <main className="flex-1 overflow-y-auto pb-22 -mt-1">{children}</main>
+                <SpotlightDock />
+              </UserProvider>
+            </AuthProvider>
           </DisplayProvider>
         </ThemeProvider>
       </body>

@@ -41,41 +41,60 @@ const runwaySchema = z.object({
   notes: z.string().nullable().optional(),
 })
 
-const airportCreateSchema = z.object({
-  icaoCode: z.string().min(3).max(4).regex(/^[A-Z]{3,4}$/, 'ICAO must be 3-4 uppercase letters'),
-  iataCode: z.string().length(3).regex(/^[A-Z]{3}$/, 'IATA must be 3 uppercase letters').nullable().optional(),
-  name: z.string().min(1, 'Airport name is required'),
-  city: z.string().nullable().optional(),
-  country: z.string().nullable().optional(),
-  countryId: z.string().nullable().optional(),
-  countryName: z.string().nullable().optional(),
-  countryIso2: z.string().nullable().optional(),
-  countryFlag: z.string().nullable().optional(),
-  timezone: z.string().min(1, 'Timezone is required'),
-  utcOffsetHours: z.number().min(-12).max(14).nullable().optional(),
-  latitude: z.number().min(-90).max(90).nullable().optional(),
-  longitude: z.number().min(-180).max(180).nullable().optional(),
-  elevationFt: z.number().min(-1500).max(15000).nullable().optional(),
-  isActive: z.boolean().optional().default(true),
-  isHomeBase: z.boolean().optional().default(false),
-  isCrewBase: z.boolean().optional().default(false),
-  crewReportingTimeMinutes: z.number().min(0).nullable().optional(),
-  crewDebriefTimeMinutes: z.number().min(0).nullable().optional(),
-  runways: z.array(runwaySchema).optional().default([]),
-  numberOfRunways: z.number().int().min(0).nullable().optional(),
-  longestRunwayFt: z.number().min(0).nullable().optional(),
-  hasFuelAvailable: z.boolean().optional().default(false),
-  hasCrewFacilities: z.boolean().optional().default(false),
-  fireCategory: z.number().int().min(1).max(10).nullable().optional(),
-  hasCurfew: z.boolean().optional().default(false),
-  curfewStart: z.string().regex(/^\d{2}:\d{2}$/, 'Format: HH:MM').nullable().optional(),
-  curfewEnd: z.string().regex(/^\d{2}:\d{2}$/, 'Format: HH:MM').nullable().optional(),
-  isSlotControlled: z.boolean().optional().default(false),
-  weatherMonitored: z.boolean().optional().default(false),
-  weatherStation: z.string().nullable().optional(),
-  numberOfGates: z.number().int().min(0).nullable().optional(),
-  ianaTimezone: z.string().nullable().optional(),
-}).strict()
+const airportCreateSchema = z
+  .object({
+    icaoCode: z
+      .string()
+      .min(3)
+      .max(4)
+      .regex(/^[A-Z]{3,4}$/, 'ICAO must be 3-4 uppercase letters'),
+    iataCode: z
+      .string()
+      .length(3)
+      .regex(/^[A-Z]{3}$/, 'IATA must be 3 uppercase letters')
+      .nullable()
+      .optional(),
+    name: z.string().min(1, 'Airport name is required'),
+    city: z.string().nullable().optional(),
+    country: z.string().nullable().optional(),
+    countryId: z.string().nullable().optional(),
+    countryName: z.string().nullable().optional(),
+    countryIso2: z.string().nullable().optional(),
+    countryFlag: z.string().nullable().optional(),
+    timezone: z.string().min(1, 'Timezone is required'),
+    utcOffsetHours: z.number().min(-12).max(14).nullable().optional(),
+    latitude: z.number().min(-90).max(90).nullable().optional(),
+    longitude: z.number().min(-180).max(180).nullable().optional(),
+    elevationFt: z.number().min(-1500).max(15000).nullable().optional(),
+    isActive: z.boolean().optional().default(true),
+    isHomeBase: z.boolean().optional().default(false),
+    isCrewBase: z.boolean().optional().default(false),
+    crewReportingTimeMinutes: z.number().min(0).nullable().optional(),
+    crewDebriefTimeMinutes: z.number().min(0).nullable().optional(),
+    runways: z.array(runwaySchema).optional().default([]),
+    numberOfRunways: z.number().int().min(0).nullable().optional(),
+    longestRunwayFt: z.number().min(0).nullable().optional(),
+    hasFuelAvailable: z.boolean().optional().default(false),
+    hasCrewFacilities: z.boolean().optional().default(false),
+    fireCategory: z.number().int().min(1).max(10).nullable().optional(),
+    hasCurfew: z.boolean().optional().default(false),
+    curfewStart: z
+      .string()
+      .regex(/^\d{2}:\d{2}$/, 'Format: HH:MM')
+      .nullable()
+      .optional(),
+    curfewEnd: z
+      .string()
+      .regex(/^\d{2}:\d{2}$/, 'Format: HH:MM')
+      .nullable()
+      .optional(),
+    isSlotControlled: z.boolean().optional().default(false),
+    weatherMonitored: z.boolean().optional().default(false),
+    weatherStation: z.string().nullable().optional(),
+    numberOfGates: z.number().int().min(0).nullable().optional(),
+    ianaTimezone: z.string().nullable().optional(),
+  })
+  .strict()
 
 const airportUpdateSchema = airportCreateSchema.partial()
 
@@ -91,23 +110,31 @@ function recomputeRunwaySummary(runways: any[]): { numberOfRunways: number; long
 
 // ─── Zod schemas for country validation ──────────────────
 
-const countryCreateSchema = z.object({
-  isoCode2: z.string().length(2).regex(/^[A-Z]{2}$/, 'ISO 2 must be 2 uppercase letters'),
-  isoCode3: z.string().length(3).regex(/^[A-Z]{3}$/, 'ISO 3 must be 3 uppercase letters'),
-  name: z.string().min(1, 'Country name is required'),
-  officialName: z.string().nullable().optional(),
-  region: z.string().nullable().optional(),
-  subRegion: z.string().nullable().optional(),
-  icaoPrefix: z.string().nullable().optional(),
-  currencyCode: z.string().nullable().optional(),
-  currencyName: z.string().nullable().optional(),
-  currencySymbol: z.string().nullable().optional(),
-  phoneCode: z.string().nullable().optional(),
-  flagEmoji: z.string().nullable().optional(),
-  latitude: z.number().min(-90).max(90).nullable().optional(),
-  longitude: z.number().min(-180).max(180).nullable().optional(),
-  isActive: z.boolean().optional().default(true),
-}).strict()
+const countryCreateSchema = z
+  .object({
+    isoCode2: z
+      .string()
+      .length(2)
+      .regex(/^[A-Z]{2}$/, 'ISO 2 must be 2 uppercase letters'),
+    isoCode3: z
+      .string()
+      .length(3)
+      .regex(/^[A-Z]{3}$/, 'ISO 3 must be 3 uppercase letters'),
+    name: z.string().min(1, 'Country name is required'),
+    officialName: z.string().nullable().optional(),
+    region: z.string().nullable().optional(),
+    subRegion: z.string().nullable().optional(),
+    icaoPrefix: z.string().nullable().optional(),
+    currencyCode: z.string().nullable().optional(),
+    currencyName: z.string().nullable().optional(),
+    currencySymbol: z.string().nullable().optional(),
+    phoneCode: z.string().nullable().optional(),
+    flagEmoji: z.string().nullable().optional(),
+    latitude: z.number().min(-90).max(90).nullable().optional(),
+    longitude: z.number().min(-180).max(180).nullable().optional(),
+    isActive: z.boolean().optional().default(true),
+  })
+  .strict()
 
 const countryUpdateSchema = countryCreateSchema.partial()
 
@@ -223,7 +250,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     // Source 1: OurAirports cache (85k+ airports, instant, includes runways)
     const oa = lookupByIcao(code)
     if (oa) {
-      const active = oa.runways.filter(r => r.status !== 'closed')
+      const active = oa.runways.filter((r) => r.status !== 'closed')
       const longestFt = active.reduce((max, r) => Math.max(max, r.lengthFt ?? 0), 0)
       return {
         source: 'OurAirports',
@@ -239,7 +266,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
         elevationFt: oa.elevationFt,
         numberOfRunways: active.length || null,
         longestRunwayFt: longestFt || null,
-        runways: oa.runways.map(r => ({ ...r, ilsCategory: null, notes: null })),
+        runways: oa.runways.map((r) => ({ ...r, ilsCategory: null, notes: null })),
       }
     }
 
@@ -247,18 +274,20 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     try {
       const res = await fetch(`https://airportdb.io/api/v1/airport/${code}?apiToken=free`)
       if (res.ok) {
-        const data = await res.json() as Record<string, any>
+        const data = (await res.json()) as Record<string, any>
         if (data.icao) {
           return { source: 'airportdb.io', ...mapAirportDbResponse(data) }
         }
       }
-    } catch { /* fallback */ }
+    } catch {
+      /* fallback */
+    }
 
     // Source 3 (fallback): mwgg/Airports — no runway data
     try {
       const res = await fetch('https://raw.githubusercontent.com/mwgg/Airports/master/airports.json')
       if (res.ok) {
-        const data = await res.json() as Record<string, any>
+        const data = (await res.json()) as Record<string, any>
         const airport = data[code]
         if (airport) {
           return {
@@ -279,7 +308,9 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
           }
         }
       }
-    } catch { /* fallback */ }
+    } catch {
+      /* fallback */
+    }
 
     return reply.code(404).send({ error: `No airport data found for ICAO code: ${code}` })
   })
@@ -301,7 +332,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const parsed = airportCreateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -352,7 +383,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const parsed = airportUpdateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -401,16 +432,12 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string }
     const parsed = runwaySchema.safeParse(req.body)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
     const runway = { _id: crypto.randomUUID(), ...parsed.data }
-    const doc = await Airport.findByIdAndUpdate(
-      id,
-      { $push: { runways: runway } },
-      { new: true }
-    ).lean()
+    const doc = await Airport.findByIdAndUpdate(id, { $push: { runways: runway } }, { new: true }).lean()
     if (!doc) return reply.code(404).send({ error: 'Airport not found' })
 
     // Recompute summary
@@ -424,7 +451,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     const { id, rwId } = req.params as { id: string; rwId: string }
     const parsed = runwaySchema.partial().safeParse(req.body)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -437,7 +464,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     const doc = await Airport.findOneAndUpdate(
       { _id: id, 'runways._id': rwId },
       { $set: setFields },
-      { new: true }
+      { new: true },
     ).lean()
     if (!doc) return reply.code(404).send({ error: 'Airport or runway not found' })
 
@@ -449,11 +476,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
   // Delete runway
   app.delete('/airports/:id/runways/:rwId', async (req, reply) => {
     const { id, rwId } = req.params as { id: string; rwId: string }
-    const doc = await Airport.findByIdAndUpdate(
-      id,
-      { $pull: { runways: { _id: rwId } } },
-      { new: true }
-    ).lean()
+    const doc = await Airport.findByIdAndUpdate(id, { $pull: { runways: { _id: rwId } } }, { new: true }).lean()
     if (!doc) return reply.code(404).send({ error: 'Airport not found' })
 
     const summary = recomputeRunwaySummary(doc.runways ?? [])
@@ -463,141 +486,164 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
   // ─── Aircraft Types ─────────────────────────────────────
 
-  const aircraftTypeCreateSchema = z.object({
-    operatorId: z.string().min(1),
-    icaoType: z.string().min(1).max(4),
-    iataType: z.string().max(3).nullable().optional(),
-    iataTypeCode: z.string().max(4).nullable().optional(),
-    name: z.string().min(1, 'Name is required'),
-    family: z.string().nullable().optional(),
-    category: z.enum(['narrow_body', 'wide_body', 'regional', 'turboprop']).optional().default('narrow_body'),
-    manufacturer: z.string().nullable().optional(),
-    paxCapacity: z.number().int().min(0).nullable().optional(),
-    cockpitCrewRequired: z.number().int().min(0).optional().default(2),
-    cabinCrewRequired: z.number().int().min(0).nullable().optional(),
-    tat: z.object({
-      defaultMinutes: z.number().nullable().optional(),
-      domDom: z.number().nullable().optional(),
-      domInt: z.number().nullable().optional(),
-      intDom: z.number().nullable().optional(),
-      intInt: z.number().nullable().optional(),
-      minDd: z.number().nullable().optional(),
-      minDi: z.number().nullable().optional(),
-      minId: z.number().nullable().optional(),
-      minIi: z.number().nullable().optional(),
-    }).optional(),
-    performance: z.object({
-      mtowKg: z.number().nullable().optional(),
-      mlwKg: z.number().nullable().optional(),
-      mzfwKg: z.number().nullable().optional(),
-      oewKg: z.number().nullable().optional(),
-      maxFuelCapacityKg: z.number().nullable().optional(),
-      maxRangeNm: z.number().nullable().optional(),
-      cruisingSpeedKts: z.number().nullable().optional(),
-      ceilingFl: z.number().nullable().optional(),
-    }).optional(),
-    fuelBurnRateKgPerHour: z.number().nullable().optional(),
-    etopsCapable: z.boolean().optional().default(false),
-    etopsRatingMinutes: z.number().nullable().optional(),
-    noiseCategory: z.string().nullable().optional(),
-    emissionsCategory: z.string().nullable().optional(),
-    cargo: z.object({
-      maxCargoWeightKg: z.number().nullable().optional(),
-      cargoPositions: z.number().nullable().optional(),
-      bulkHoldCapacityKg: z.number().nullable().optional(),
-      uldTypesAccepted: z.array(z.string()).optional(),
-    }).optional(),
-    crewRest: z.object({
-      cockpitClass: z.string().nullable().optional(),
-      cockpitPositions: z.number().nullable().optional(),
-      cabinClass: z.string().nullable().optional(),
-      cabinPositions: z.number().nullable().optional(),
-    }).optional(),
-    weather: z.object({
-      minCeilingFt: z.number().nullable().optional(),
-      minRvrM: z.number().nullable().optional(),
-      minVisibilityM: z.number().nullable().optional(),
-      maxCrosswindKt: z.number().nullable().optional(),
-      maxWindKt: z.number().nullable().optional(),
-    }).optional(),
-    approach: z.object({
-      ilsCategoryRequired: z.string().nullable().optional(),
-      autolandCapable: z.boolean().optional(),
-    }).optional(),
-    notes: z.string().nullable().optional(),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be hex color').nullable().optional(),
-    isActive: z.boolean().optional().default(true),
-  }).strict()
+  const aircraftTypeCreateSchema = z
+    .object({
+      operatorId: z.string().min(1),
+      icaoType: z.string().min(1).max(4),
+      iataType: z.string().max(3).nullable().optional(),
+      iataTypeCode: z.string().max(4).nullable().optional(),
+      name: z.string().min(1, 'Name is required'),
+      family: z.string().nullable().optional(),
+      category: z.enum(['narrow_body', 'wide_body', 'regional', 'turboprop']).optional().default('narrow_body'),
+      manufacturer: z.string().nullable().optional(),
+      paxCapacity: z.number().int().min(0).nullable().optional(),
+      cockpitCrewRequired: z.number().int().min(0).optional().default(2),
+      cabinCrewRequired: z.number().int().min(0).nullable().optional(),
+      tat: z
+        .object({
+          defaultMinutes: z.number().nullable().optional(),
+          domDom: z.number().nullable().optional(),
+          domInt: z.number().nullable().optional(),
+          intDom: z.number().nullable().optional(),
+          intInt: z.number().nullable().optional(),
+          minDd: z.number().nullable().optional(),
+          minDi: z.number().nullable().optional(),
+          minId: z.number().nullable().optional(),
+          minIi: z.number().nullable().optional(),
+        })
+        .optional(),
+      performance: z
+        .object({
+          mtowKg: z.number().nullable().optional(),
+          mlwKg: z.number().nullable().optional(),
+          mzfwKg: z.number().nullable().optional(),
+          oewKg: z.number().nullable().optional(),
+          maxFuelCapacityKg: z.number().nullable().optional(),
+          maxRangeNm: z.number().nullable().optional(),
+          cruisingSpeedKts: z.number().nullable().optional(),
+          ceilingFl: z.number().nullable().optional(),
+        })
+        .optional(),
+      fuelBurnRateKgPerHour: z.number().nullable().optional(),
+      etopsCapable: z.boolean().optional().default(false),
+      etopsRatingMinutes: z.number().nullable().optional(),
+      noiseCategory: z.string().nullable().optional(),
+      emissionsCategory: z.string().nullable().optional(),
+      cargo: z
+        .object({
+          maxCargoWeightKg: z.number().nullable().optional(),
+          cargoPositions: z.number().nullable().optional(),
+          bulkHoldCapacityKg: z.number().nullable().optional(),
+          uldTypesAccepted: z.array(z.string()).optional(),
+        })
+        .optional(),
+      crewRest: z
+        .object({
+          cockpitClass: z.string().nullable().optional(),
+          cockpitPositions: z.number().nullable().optional(),
+          cabinClass: z.string().nullable().optional(),
+          cabinPositions: z.number().nullable().optional(),
+        })
+        .optional(),
+      weather: z
+        .object({
+          minCeilingFt: z.number().nullable().optional(),
+          minRvrM: z.number().nullable().optional(),
+          minVisibilityM: z.number().nullable().optional(),
+          maxCrosswindKt: z.number().nullable().optional(),
+          maxWindKt: z.number().nullable().optional(),
+        })
+        .optional(),
+      approach: z
+        .object({
+          ilsCategoryRequired: z.string().nullable().optional(),
+          autolandCapable: z.boolean().optional(),
+        })
+        .optional(),
+      notes: z.string().nullable().optional(),
+      color: z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/, 'Must be hex color')
+        .nullable()
+        .optional(),
+      isActive: z.boolean().optional().default(true),
+    })
+    .strict()
 
-  const aircraftTypeUpdateSchema = z.object({
-    icaoType: z.string().min(1).max(4),
-    iataType: z.string().max(3).nullable(),
-    iataTypeCode: z.string().max(4).nullable(),
-    name: z.string().min(1),
-    family: z.string().nullable(),
-    category: z.enum(['narrow_body', 'wide_body', 'regional', 'turboprop']),
-    manufacturer: z.string().nullable(),
-    paxCapacity: z.number().int().min(0).nullable(),
-    cockpitCrewRequired: z.number().int().min(0),
-    cabinCrewRequired: z.number().int().min(0).nullable(),
-    tat: z.object({
-      defaultMinutes: z.number().nullable().optional(),
-      domDom: z.number().nullable().optional(),
-      domInt: z.number().nullable().optional(),
-      intDom: z.number().nullable().optional(),
-      intInt: z.number().nullable().optional(),
-      minDd: z.number().nullable().optional(),
-      minDi: z.number().nullable().optional(),
-      minId: z.number().nullable().optional(),
-      minIi: z.number().nullable().optional(),
-    }),
-    performance: z.object({
-      mtowKg: z.number().nullable().optional(),
-      mlwKg: z.number().nullable().optional(),
-      mzfwKg: z.number().nullable().optional(),
-      oewKg: z.number().nullable().optional(),
-      maxFuelCapacityKg: z.number().nullable().optional(),
-      maxRangeNm: z.number().nullable().optional(),
-      cruisingSpeedKts: z.number().nullable().optional(),
-      ceilingFl: z.number().nullable().optional(),
-    }),
-    fuelBurnRateKgPerHour: z.number().nullable(),
-    etopsCapable: z.boolean(),
-    etopsRatingMinutes: z.number().nullable(),
-    noiseCategory: z.string().nullable(),
-    emissionsCategory: z.string().nullable(),
-    cargo: z.object({
-      maxCargoWeightKg: z.number().nullable().optional(),
-      cargoPositions: z.number().nullable().optional(),
-      bulkHoldCapacityKg: z.number().nullable().optional(),
-      uldTypesAccepted: z.array(z.string()).optional(),
-    }),
-    crewRest: z.object({
-      cockpitClass: z.string().nullable().optional(),
-      cockpitPositions: z.number().nullable().optional(),
-      cabinClass: z.string().nullable().optional(),
-      cabinPositions: z.number().nullable().optional(),
-    }),
-    weather: z.object({
-      minCeilingFt: z.number().nullable().optional(),
-      minRvrM: z.number().nullable().optional(),
-      minVisibilityM: z.number().nullable().optional(),
-      maxCrosswindKt: z.number().nullable().optional(),
-      maxWindKt: z.number().nullable().optional(),
-    }),
-    approach: z.object({
-      ilsCategoryRequired: z.string().nullable().optional(),
-      autolandCapable: z.boolean().optional(),
-    }),
-    notes: z.string().nullable(),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be hex color').nullable(),
-    isActive: z.boolean(),
-  }).partial().strict()
+  const aircraftTypeUpdateSchema = z
+    .object({
+      icaoType: z.string().min(1).max(4),
+      iataType: z.string().max(3).nullable(),
+      iataTypeCode: z.string().max(4).nullable(),
+      name: z.string().min(1),
+      family: z.string().nullable(),
+      category: z.enum(['narrow_body', 'wide_body', 'regional', 'turboprop']),
+      manufacturer: z.string().nullable(),
+      paxCapacity: z.number().int().min(0).nullable(),
+      cockpitCrewRequired: z.number().int().min(0),
+      cabinCrewRequired: z.number().int().min(0).nullable(),
+      tat: z.object({
+        defaultMinutes: z.number().nullable().optional(),
+        domDom: z.number().nullable().optional(),
+        domInt: z.number().nullable().optional(),
+        intDom: z.number().nullable().optional(),
+        intInt: z.number().nullable().optional(),
+        minDd: z.number().nullable().optional(),
+        minDi: z.number().nullable().optional(),
+        minId: z.number().nullable().optional(),
+        minIi: z.number().nullable().optional(),
+      }),
+      performance: z.object({
+        mtowKg: z.number().nullable().optional(),
+        mlwKg: z.number().nullable().optional(),
+        mzfwKg: z.number().nullable().optional(),
+        oewKg: z.number().nullable().optional(),
+        maxFuelCapacityKg: z.number().nullable().optional(),
+        maxRangeNm: z.number().nullable().optional(),
+        cruisingSpeedKts: z.number().nullable().optional(),
+        ceilingFl: z.number().nullable().optional(),
+      }),
+      fuelBurnRateKgPerHour: z.number().nullable(),
+      etopsCapable: z.boolean(),
+      etopsRatingMinutes: z.number().nullable(),
+      noiseCategory: z.string().nullable(),
+      emissionsCategory: z.string().nullable(),
+      cargo: z.object({
+        maxCargoWeightKg: z.number().nullable().optional(),
+        cargoPositions: z.number().nullable().optional(),
+        bulkHoldCapacityKg: z.number().nullable().optional(),
+        uldTypesAccepted: z.array(z.string()).optional(),
+      }),
+      crewRest: z.object({
+        cockpitClass: z.string().nullable().optional(),
+        cockpitPositions: z.number().nullable().optional(),
+        cabinClass: z.string().nullable().optional(),
+        cabinPositions: z.number().nullable().optional(),
+      }),
+      weather: z.object({
+        minCeilingFt: z.number().nullable().optional(),
+        minRvrM: z.number().nullable().optional(),
+        minVisibilityM: z.number().nullable().optional(),
+        maxCrosswindKt: z.number().nullable().optional(),
+        maxWindKt: z.number().nullable().optional(),
+      }),
+      approach: z.object({
+        ilsCategoryRequired: z.string().nullable().optional(),
+        autolandCapable: z.boolean().optional(),
+      }),
+      notes: z.string().nullable(),
+      color: z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/, 'Must be hex color')
+        .nullable(),
+      isActive: z.boolean(),
+    })
+    .partial()
+    .strict()
 
   app.get('/aircraft-types', async (req) => {
-    const { operatorId } = req.query as { operatorId?: string }
-    const filter: Record<string, unknown> = {}
-    if (operatorId) filter.operatorId = operatorId
+    const operatorId = req.operatorId
+    const filter: Record<string, unknown> = { operatorId }
     return AircraftType.find(filter).sort({ icaoType: 1 }).lean()
   })
 
@@ -614,7 +660,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const parsed = aircraftTypeCreateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -643,7 +689,9 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
         fs.mkdirSync(targetDir, { recursive: true })
         fs.copyFileSync(templateFuselage, targetFile)
       }
-    } catch { /* non-critical — seat map falls back to SVG */ }
+    } catch {
+      /* non-critical — seat map falls back to SVG */
+    }
 
     return reply.code(201).send(doc.toObject())
   })
@@ -655,7 +703,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const parsed = aircraftTypeUpdateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -687,100 +735,111 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
   // ─── Aircraft Registrations ─────────────────────────────
 
-  const aircraftRegCreateSchema = z.object({
-    operatorId: z.string().min(1),
-    registration: z.string().min(1).max(10),
-    aircraftTypeId: z.string().min(1),
-    lopaConfigId: z.string().nullable().optional(),
-    serialNumber: z.string().nullable().optional(),
-    variant: z.string().nullable().optional(),
-    status: z.enum(['active', 'maintenance', 'stored', 'retired']).optional().default('active'),
-    homeBaseIcao: z.string().max(4).nullable().optional(),
-    currentLocationIcao: z.string().max(4).nullable().optional(),
-    dateOfManufacture: z.string().nullable().optional(),
-    dateOfDelivery: z.string().nullable().optional(),
-    leaseExpiryDate: z.string().nullable().optional(),
-    selcal: z.string().max(8).nullable().optional(),
-    performance: z.object({
-      mtowKg: z.number().nullable().optional(),
-      mlwKg: z.number().nullable().optional(),
-      mzfwKg: z.number().nullable().optional(),
-      oewKg: z.number().nullable().optional(),
-      maxFuelCapacityKg: z.number().nullable().optional(),
-      maxRangeNm: z.number().nullable().optional(),
-      cruisingSpeedKts: z.number().nullable().optional(),
-      ceilingFl: z.number().nullable().optional(),
-    }).optional(),
-    fuelBurnRateKgPerHour: z.number().nullable().optional(),
-    etopsCapable: z.boolean().optional(),
-    etopsRatingMinutes: z.number().nullable().optional(),
-    weatherLimitations: z.object({
-      minCeilingFt: z.number().nullable().optional(),
-      minRvrM: z.number().nullable().optional(),
-      minVisibilityM: z.number().nullable().optional(),
-      maxCrosswindKt: z.number().nullable().optional(),
-      maxWindKt: z.number().nullable().optional(),
-    }).optional(),
-    approach: z.object({
-      ilsCategoryRequired: z.string().nullable().optional(),
-      autolandCapable: z.boolean().optional(),
-    }).optional(),
-    noiseCategory: z.string().nullable().optional(),
-    emissionsCategory: z.string().nullable().optional(),
-    imageUrl: z.string().nullable().optional(),
-    notes: z.string().nullable().optional(),
-    isActive: z.boolean().optional().default(true),
-  }).strict()
+  const aircraftRegCreateSchema = z
+    .object({
+      operatorId: z.string().min(1),
+      registration: z.string().min(1).max(10),
+      aircraftTypeId: z.string().min(1),
+      lopaConfigId: z.string().nullable().optional(),
+      serialNumber: z.string().nullable().optional(),
+      variant: z.string().nullable().optional(),
+      status: z.enum(['active', 'maintenance', 'stored', 'retired']).optional().default('active'),
+      homeBaseIcao: z.string().max(4).nullable().optional(),
+      currentLocationIcao: z.string().max(4).nullable().optional(),
+      dateOfManufacture: z.string().nullable().optional(),
+      dateOfDelivery: z.string().nullable().optional(),
+      leaseExpiryDate: z.string().nullable().optional(),
+      selcal: z.string().max(8).nullable().optional(),
+      performance: z
+        .object({
+          mtowKg: z.number().nullable().optional(),
+          mlwKg: z.number().nullable().optional(),
+          mzfwKg: z.number().nullable().optional(),
+          oewKg: z.number().nullable().optional(),
+          maxFuelCapacityKg: z.number().nullable().optional(),
+          maxRangeNm: z.number().nullable().optional(),
+          cruisingSpeedKts: z.number().nullable().optional(),
+          ceilingFl: z.number().nullable().optional(),
+        })
+        .optional(),
+      fuelBurnRateKgPerHour: z.number().nullable().optional(),
+      etopsCapable: z.boolean().optional(),
+      etopsRatingMinutes: z.number().nullable().optional(),
+      weatherLimitations: z
+        .object({
+          minCeilingFt: z.number().nullable().optional(),
+          minRvrM: z.number().nullable().optional(),
+          minVisibilityM: z.number().nullable().optional(),
+          maxCrosswindKt: z.number().nullable().optional(),
+          maxWindKt: z.number().nullable().optional(),
+        })
+        .optional(),
+      approach: z
+        .object({
+          ilsCategoryRequired: z.string().nullable().optional(),
+          autolandCapable: z.boolean().optional(),
+        })
+        .optional(),
+      noiseCategory: z.string().nullable().optional(),
+      emissionsCategory: z.string().nullable().optional(),
+      imageUrl: z.string().nullable().optional(),
+      notes: z.string().nullable().optional(),
+      isActive: z.boolean().optional().default(true),
+    })
+    .strict()
 
-  const aircraftRegUpdateSchema = z.object({
-    registration: z.string().min(1).max(10),
-    aircraftTypeId: z.string().min(1),
-    lopaConfigId: z.string().nullable(),
-    serialNumber: z.string().nullable(),
-    variant: z.string().nullable(),
-    status: z.enum(['active', 'maintenance', 'stored', 'retired']),
-    homeBaseIcao: z.string().max(4).nullable(),
-    currentLocationIcao: z.string().max(4).nullable(),
-    currentLocationUpdatedAt: z.string().nullable(),
-    dateOfManufacture: z.string().nullable(),
-    dateOfDelivery: z.string().nullable(),
-    leaseExpiryDate: z.string().nullable(),
-    selcal: z.string().max(8).nullable(),
-    performance: z.object({
-      mtowKg: z.number().nullable().optional(),
-      mlwKg: z.number().nullable().optional(),
-      mzfwKg: z.number().nullable().optional(),
-      oewKg: z.number().nullable().optional(),
-      maxFuelCapacityKg: z.number().nullable().optional(),
-      maxRangeNm: z.number().nullable().optional(),
-      cruisingSpeedKts: z.number().nullable().optional(),
-      ceilingFl: z.number().nullable().optional(),
-    }),
-    fuelBurnRateKgPerHour: z.number().nullable(),
-    etopsCapable: z.boolean(),
-    etopsRatingMinutes: z.number().nullable(),
-    weatherLimitations: z.object({
-      minCeilingFt: z.number().nullable().optional(),
-      minRvrM: z.number().nullable().optional(),
-      minVisibilityM: z.number().nullable().optional(),
-      maxCrosswindKt: z.number().nullable().optional(),
-      maxWindKt: z.number().nullable().optional(),
-    }),
-    approach: z.object({
-      ilsCategoryRequired: z.string().nullable().optional(),
-      autolandCapable: z.boolean().optional(),
-    }),
-    noiseCategory: z.string().nullable(),
-    emissionsCategory: z.string().nullable(),
-    imageUrl: z.string().nullable(),
-    notes: z.string().nullable(),
-    isActive: z.boolean(),
-  }).partial().strict()
+  const aircraftRegUpdateSchema = z
+    .object({
+      registration: z.string().min(1).max(10),
+      aircraftTypeId: z.string().min(1),
+      lopaConfigId: z.string().nullable(),
+      serialNumber: z.string().nullable(),
+      variant: z.string().nullable(),
+      status: z.enum(['active', 'maintenance', 'stored', 'retired']),
+      homeBaseIcao: z.string().max(4).nullable(),
+      currentLocationIcao: z.string().max(4).nullable(),
+      currentLocationUpdatedAt: z.string().nullable(),
+      dateOfManufacture: z.string().nullable(),
+      dateOfDelivery: z.string().nullable(),
+      leaseExpiryDate: z.string().nullable(),
+      selcal: z.string().max(8).nullable(),
+      performance: z.object({
+        mtowKg: z.number().nullable().optional(),
+        mlwKg: z.number().nullable().optional(),
+        mzfwKg: z.number().nullable().optional(),
+        oewKg: z.number().nullable().optional(),
+        maxFuelCapacityKg: z.number().nullable().optional(),
+        maxRangeNm: z.number().nullable().optional(),
+        cruisingSpeedKts: z.number().nullable().optional(),
+        ceilingFl: z.number().nullable().optional(),
+      }),
+      fuelBurnRateKgPerHour: z.number().nullable(),
+      etopsCapable: z.boolean(),
+      etopsRatingMinutes: z.number().nullable(),
+      weatherLimitations: z.object({
+        minCeilingFt: z.number().nullable().optional(),
+        minRvrM: z.number().nullable().optional(),
+        minVisibilityM: z.number().nullable().optional(),
+        maxCrosswindKt: z.number().nullable().optional(),
+        maxWindKt: z.number().nullable().optional(),
+      }),
+      approach: z.object({
+        ilsCategoryRequired: z.string().nullable().optional(),
+        autolandCapable: z.boolean().optional(),
+      }),
+      noiseCategory: z.string().nullable(),
+      emissionsCategory: z.string().nullable(),
+      imageUrl: z.string().nullable(),
+      notes: z.string().nullable(),
+      isActive: z.boolean(),
+    })
+    .partial()
+    .strict()
 
   app.get('/aircraft-registrations', async (req) => {
-    const { operatorId, aircraftTypeId } = req.query as { operatorId?: string; aircraftTypeId?: string }
-    const filter: Record<string, unknown> = {}
-    if (operatorId) filter.operatorId = operatorId
+    const operatorId = req.operatorId
+    const { aircraftTypeId } = req.query as { aircraftTypeId?: string }
+    const filter: Record<string, unknown> = { operatorId }
     if (aircraftTypeId) filter.aircraftTypeId = aircraftTypeId
     return AircraftRegistration.find(filter).sort({ registration: 1 }).lean()
   })
@@ -799,13 +858,16 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const parsed = aircraftRegCreateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
     const body = parsed.data
 
-    const existing = await AircraftRegistration.findOne({ operatorId: body.operatorId, registration: body.registration }).lean()
+    const existing = await AircraftRegistration.findOne({
+      operatorId: body.operatorId,
+      registration: body.registration,
+    }).lean()
     if (existing) {
       return reply.code(409).send({ error: `Registration "${body.registration}" already exists` })
     }
@@ -828,7 +890,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const parsed = aircraftRegUpdateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -914,7 +976,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const parsed = countryCreateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -946,7 +1008,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const parsed = countryUpdateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -974,39 +1036,50 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
   })
 
   // ─── Delay Codes ────────────────────────────────────────
-  const delayCodeCreateSchema = z.object({
-    operatorId: z.string().min(1),
-    code: z.string().min(1).max(3),
-    alphaCode: z.string().max(2).nullable().optional(),
-    ahm732Process: z.string().max(1).nullable().optional(),
-    ahm732Reason: z.string().max(1).nullable().optional(),
-    ahm732Stakeholder: z.string().max(1).nullable().optional(),
-    category: z.string().min(1),
-    name: z.string().min(1),
-    description: z.string().nullable().optional(),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
-    isActive: z.boolean().optional().default(true),
-    isIataStandard: z.boolean().optional().default(false),
-  }).strict()
+  const delayCodeCreateSchema = z
+    .object({
+      operatorId: z.string().min(1),
+      code: z.string().min(1).max(3),
+      alphaCode: z.string().max(2).nullable().optional(),
+      ahm732Process: z.string().max(1).nullable().optional(),
+      ahm732Reason: z.string().max(1).nullable().optional(),
+      ahm732Stakeholder: z.string().max(1).nullable().optional(),
+      category: z.string().min(1),
+      name: z.string().min(1),
+      description: z.string().nullable().optional(),
+      color: z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/)
+        .nullable()
+        .optional(),
+      isActive: z.boolean().optional().default(true),
+      isIataStandard: z.boolean().optional().default(false),
+    })
+    .strict()
 
-  const delayCodeUpdateSchema = z.object({
-    code: z.string().min(1).max(3),
-    alphaCode: z.string().max(2).nullable(),
-    ahm732Process: z.string().max(1).nullable(),
-    ahm732Reason: z.string().max(1).nullable(),
-    ahm732Stakeholder: z.string().max(1).nullable(),
-    category: z.string().min(1),
-    name: z.string().min(1),
-    description: z.string().nullable(),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(),
-    isActive: z.boolean(),
-    isIataStandard: z.boolean(),
-  }).partial().strict()
+  const delayCodeUpdateSchema = z
+    .object({
+      code: z.string().min(1).max(3),
+      alphaCode: z.string().max(2).nullable(),
+      ahm732Process: z.string().max(1).nullable(),
+      ahm732Reason: z.string().max(1).nullable(),
+      ahm732Stakeholder: z.string().max(1).nullable(),
+      category: z.string().min(1),
+      name: z.string().min(1),
+      description: z.string().nullable(),
+      color: z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/)
+        .nullable(),
+      isActive: z.boolean(),
+      isIataStandard: z.boolean(),
+    })
+    .partial()
+    .strict()
 
   app.get('/delay-codes', async (req) => {
-    const { operatorId } = req.query as { operatorId?: string }
-    const filter: Record<string, unknown> = {}
-    if (operatorId) filter.operatorId = operatorId
+    const operatorId = req.operatorId
+    const filter: Record<string, unknown> = { operatorId }
     return DelayCode.find(filter).sort({ code: 1 }).lean()
   })
 
@@ -1021,7 +1094,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     const raw = req.body as Record<string, unknown>
     const parsed = delayCodeCreateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
     const body = parsed.data
@@ -1036,7 +1109,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string }
     const parsed = delayCodeUpdateSchema.safeParse(req.body)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
     const body = { ...parsed.data, updatedAt: new Date().toISOString() }
@@ -1054,27 +1127,38 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
   })
 
   // ─── Flight Service Types ──────────────────────────────
-  const fstCreateSchema = z.object({
-    operatorId: z.string().min(1),
-    code: z.string().min(1).max(2),
-    name: z.string().min(1),
-    description: z.string().nullable().optional(),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
-    isActive: z.boolean().optional().default(true),
-  }).strict()
+  const fstCreateSchema = z
+    .object({
+      operatorId: z.string().min(1),
+      code: z.string().min(1).max(2),
+      name: z.string().min(1),
+      description: z.string().nullable().optional(),
+      color: z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/)
+        .nullable()
+        .optional(),
+      isActive: z.boolean().optional().default(true),
+    })
+    .strict()
 
-  const fstUpdateSchema = z.object({
-    code: z.string().min(1).max(2),
-    name: z.string().min(1),
-    description: z.string().nullable(),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(),
-    isActive: z.boolean(),
-  }).partial().strict()
+  const fstUpdateSchema = z
+    .object({
+      code: z.string().min(1).max(2),
+      name: z.string().min(1),
+      description: z.string().nullable(),
+      color: z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/)
+        .nullable(),
+      isActive: z.boolean(),
+    })
+    .partial()
+    .strict()
 
   app.get('/flight-service-types', async (req) => {
-    const { operatorId } = req.query as { operatorId?: string }
-    const filter: Record<string, unknown> = {}
-    if (operatorId) filter.operatorId = operatorId
+    const operatorId = req.operatorId
+    const filter: Record<string, unknown> = { operatorId }
     return FlightServiceType.find(filter).sort({ code: 1 }).lean()
   })
 
@@ -1091,7 +1175,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const parsed = fstCreateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -1111,7 +1195,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const parsed = fstUpdateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -1131,44 +1215,64 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
   // ─── Crew Positions ────────────────────────────────────
   app.get('/crew-positions', async (req) => {
-    const { operatorId, includeInactive } = req.query as { operatorId?: string; includeInactive?: string }
-    const filter: Record<string, unknown> = {}
-    if (operatorId) filter.operatorId = operatorId
+    const operatorId = req.operatorId
+    const { includeInactive } = req.query as { includeInactive?: string }
+    const filter: Record<string, unknown> = { operatorId }
     if (includeInactive !== 'true') filter.isActive = true
     return CrewPosition.find(filter).sort({ category: 1, rankOrder: 1 }).lean()
   })
 
-  const crewPositionCreateSchema = z.object({
-    operatorId: z.string().min(1),
-    code: z.string().min(1).max(3).regex(/^[A-Z]{1,3}$/, 'Code must be 1-3 uppercase letters'),
-    name: z.string().min(1, 'Name is required'),
-    category: z.enum(['cockpit', 'cabin']),
-    rankOrder: z.number().int().min(0),
-    isPic: z.boolean().optional().default(false),
-    canDownrank: z.boolean().optional().default(false),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
-    description: z.string().nullable().optional(),
-    isActive: z.boolean().optional().default(true),
-  }).strict()
+  const crewPositionCreateSchema = z
+    .object({
+      operatorId: z.string().min(1),
+      code: z
+        .string()
+        .min(1)
+        .max(3)
+        .regex(/^[A-Z]{1,3}$/, 'Code must be 1-3 uppercase letters'),
+      name: z.string().min(1, 'Name is required'),
+      category: z.enum(['cockpit', 'cabin']),
+      rankOrder: z.number().int().min(0),
+      isPic: z.boolean().optional().default(false),
+      canDownrank: z.boolean().optional().default(false),
+      color: z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/)
+        .nullable()
+        .optional(),
+      description: z.string().nullable().optional(),
+      isActive: z.boolean().optional().default(true),
+    })
+    .strict()
 
-  const crewPositionUpdateSchema = z.object({
-    code: z.string().min(1).max(3).regex(/^[A-Z]{1,3}$/),
-    name: z.string().min(1),
-    category: z.enum(['cockpit', 'cabin']),
-    rankOrder: z.number().int().min(0),
-    isPic: z.boolean(),
-    canDownrank: z.boolean(),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(),
-    description: z.string().nullable(),
-    isActive: z.boolean(),
-  }).partial().strict()
+  const crewPositionUpdateSchema = z
+    .object({
+      code: z
+        .string()
+        .min(1)
+        .max(3)
+        .regex(/^[A-Z]{1,3}$/),
+      name: z.string().min(1),
+      category: z.enum(['cockpit', 'cabin']),
+      rankOrder: z.number().int().min(0),
+      isPic: z.boolean(),
+      canDownrank: z.boolean(),
+      color: z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/)
+        .nullable(),
+      description: z.string().nullable(),
+      isActive: z.boolean(),
+    })
+    .partial()
+    .strict()
 
   app.post('/crew-positions', async (req, reply) => {
     const raw = req.body as Record<string, unknown>
     if (raw.code) raw.code = (raw.code as string).toUpperCase()
     const parsed = crewPositionCreateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
     const body = parsed.data
@@ -1186,7 +1290,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     if (raw.code) raw.code = (raw.code as string).toUpperCase()
     const parsed = crewPositionUpdateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
     const body = { ...parsed.data, updatedAt: new Date().toISOString() }
@@ -1253,7 +1357,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
       { code: 'TF', name: 'Trainee FA', category: 'cabin', rankOrder: 5, isPic: false, color: '#ea580c' },
     ]
 
-    const rows = defaults.map(d => ({
+    const rows = defaults.map((d) => ({
       _id: crypto.randomUUID(),
       operatorId,
       ...d,
@@ -1270,57 +1374,61 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
   // ─── Expiry Code Categories ────────────────────────────
   app.get('/expiry-code-categories', async (req) => {
-    const { operatorId } = req.query as { operatorId?: string }
-    const filter: Record<string, unknown> = {}
-    if (operatorId) filter.operatorId = operatorId
+    const operatorId = req.operatorId
+    const filter: Record<string, unknown> = { operatorId }
     return ExpiryCodeCategory.find(filter).sort({ sortOrder: 1 }).lean()
   })
 
   // ─── Expiry Codes ──────────────────────────────────────
   app.get('/expiry-codes', async (req) => {
-    const { operatorId, includeInactive } = req.query as { operatorId?: string; includeInactive?: string }
-    const filter: Record<string, unknown> = {}
-    if (operatorId) filter.operatorId = operatorId
+    const operatorId = req.operatorId
+    const { includeInactive } = req.query as { includeInactive?: string }
+    const filter: Record<string, unknown> = { operatorId }
     if (includeInactive !== 'true') filter.isActive = true
     return ExpiryCode.find(filter).sort({ sortOrder: 1, code: 1 }).lean()
   })
 
-  const expiryCodeCreateSchema = z.object({
-    operatorId: z.string().min(1),
-    categoryId: z.string().min(1),
-    code: z.string().min(1).max(10),
-    name: z.string().min(1, 'Name is required'),
-    description: z.string().nullable().optional(),
-    crewCategory: z.enum(['both', 'cockpit', 'cabin']).optional().default('both'),
-    applicablePositions: z.array(z.string()).optional().default([]),
-    formula: z.string().min(1),
-    formulaParams: z.record(z.string(), z.unknown()).optional().default({}),
-    acTypeScope: z.enum(['none', 'family', 'variant']).optional().default('none'),
-    linkedTrainingCode: z.string().nullable().optional(),
-    warningDays: z.number().int().min(0).nullable().optional(),
-    severity: z.array(z.string()).optional().default([]),
-    notes: z.string().nullable().optional(),
-    isActive: z.boolean().optional().default(true),
-    sortOrder: z.number().int().min(0).optional().default(0),
-  }).strict()
+  const expiryCodeCreateSchema = z
+    .object({
+      operatorId: z.string().min(1),
+      categoryId: z.string().min(1),
+      code: z.string().min(1).max(10),
+      name: z.string().min(1, 'Name is required'),
+      description: z.string().nullable().optional(),
+      crewCategory: z.enum(['both', 'cockpit', 'cabin']).optional().default('both'),
+      applicablePositions: z.array(z.string()).optional().default([]),
+      formula: z.string().min(1),
+      formulaParams: z.record(z.string(), z.unknown()).optional().default({}),
+      acTypeScope: z.enum(['none', 'family', 'variant']).optional().default('none'),
+      linkedTrainingCode: z.string().nullable().optional(),
+      warningDays: z.number().int().min(0).nullable().optional(),
+      severity: z.array(z.string()).optional().default([]),
+      notes: z.string().nullable().optional(),
+      isActive: z.boolean().optional().default(true),
+      sortOrder: z.number().int().min(0).optional().default(0),
+    })
+    .strict()
 
-  const expiryCodeUpdateSchema = z.object({
-    categoryId: z.string().min(1),
-    code: z.string().min(1).max(10),
-    name: z.string().min(1),
-    description: z.string().nullable(),
-    crewCategory: z.enum(['both', 'cockpit', 'cabin']),
-    applicablePositions: z.array(z.string()),
-    formula: z.string().min(1),
-    formulaParams: z.record(z.string(), z.unknown()),
-    acTypeScope: z.enum(['none', 'family', 'variant']),
-    linkedTrainingCode: z.string().nullable(),
-    warningDays: z.number().int().min(0).nullable(),
-    severity: z.array(z.string()),
-    notes: z.string().nullable(),
-    isActive: z.boolean(),
-    sortOrder: z.number().int().min(0),
-  }).partial().strict()
+  const expiryCodeUpdateSchema = z
+    .object({
+      categoryId: z.string().min(1),
+      code: z.string().min(1).max(10),
+      name: z.string().min(1),
+      description: z.string().nullable(),
+      crewCategory: z.enum(['both', 'cockpit', 'cabin']),
+      applicablePositions: z.array(z.string()),
+      formula: z.string().min(1),
+      formulaParams: z.record(z.string(), z.unknown()),
+      acTypeScope: z.enum(['none', 'family', 'variant']),
+      linkedTrainingCode: z.string().nullable(),
+      warningDays: z.number().int().min(0).nullable(),
+      severity: z.array(z.string()),
+      notes: z.string().nullable(),
+      isActive: z.boolean(),
+      sortOrder: z.number().int().min(0),
+    })
+    .partial()
+    .strict()
 
   app.post('/expiry-codes', async (req, reply) => {
     const raw = req.body as Record<string, unknown>
@@ -1328,7 +1436,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     if (raw.linkedTrainingCode) raw.linkedTrainingCode = (raw.linkedTrainingCode as string).toUpperCase().trim()
     const parsed = expiryCodeCreateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
     const body = parsed.data
@@ -1347,7 +1455,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     if (raw.linkedTrainingCode) raw.linkedTrainingCode = (raw.linkedTrainingCode as string).toUpperCase().trim()
     const parsed = expiryCodeUpdateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
     const body = { ...parsed.data, updatedAt: new Date().toISOString() }
@@ -1366,39 +1474,65 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
   // ─── Cabin Classes ──────────────────────────────────────
 
-  const cabinClassCreateSchema = z.object({
-    operatorId: z.string().min(1),
-    code: z.string().min(1).max(2).regex(/^[A-Z]{1,2}$/, 'Code must be 1-2 uppercase letters'),
-    name: z.string().min(1, 'Name is required'),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be hex color').nullable().optional(),
-    sortOrder: z.number().int().min(0).optional().default(0),
-    seatLayout: z.string().regex(/^[0-9](-[0-9]){1,3}$/, 'Format: 3-3 or 2-2 or 1-2-1').nullable().optional(),
-    seatPitchIn: z.number().min(20).max(90).nullable().optional(),
-    seatWidthIn: z.number().min(14).max(40).nullable().optional(),
-    seatType: z.enum(['standard', 'premium', 'lie-flat', 'suite']).nullable().optional(),
-    hasIfe: z.boolean().optional().default(false),
-    hasPower: z.boolean().optional().default(false),
-    isActive: z.boolean().optional().default(true),
-  }).strict()
+  const cabinClassCreateSchema = z
+    .object({
+      operatorId: z.string().min(1),
+      code: z
+        .string()
+        .min(1)
+        .max(2)
+        .regex(/^[A-Z]{1,2}$/, 'Code must be 1-2 uppercase letters'),
+      name: z.string().min(1, 'Name is required'),
+      color: z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/, 'Must be hex color')
+        .nullable()
+        .optional(),
+      sortOrder: z.number().int().min(0).optional().default(0),
+      seatLayout: z
+        .string()
+        .regex(/^[0-9](-[0-9]){1,3}$/, 'Format: 3-3 or 2-2 or 1-2-1')
+        .nullable()
+        .optional(),
+      seatPitchIn: z.number().min(20).max(90).nullable().optional(),
+      seatWidthIn: z.number().min(14).max(40).nullable().optional(),
+      seatType: z.enum(['standard', 'premium', 'lie-flat', 'suite']).nullable().optional(),
+      hasIfe: z.boolean().optional().default(false),
+      hasPower: z.boolean().optional().default(false),
+      isActive: z.boolean().optional().default(true),
+    })
+    .strict()
 
-  const cabinClassUpdateSchema = z.object({
-    code: z.string().min(1).max(2).regex(/^[A-Z]{1,2}$/, 'Code must be 1-2 uppercase letters'),
-    name: z.string().min(1, 'Name is required'),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be hex color').nullable(),
-    sortOrder: z.number().int().min(0),
-    seatLayout: z.string().regex(/^[0-9](-[0-9]){1,3}$/, 'Format: 3-3 or 2-2 or 1-2-1').nullable(),
-    seatPitchIn: z.number().min(20).max(90).nullable(),
-    seatWidthIn: z.number().min(14).max(40).nullable(),
-    seatType: z.enum(['standard', 'premium', 'lie-flat', 'suite']).nullable(),
-    hasIfe: z.boolean(),
-    hasPower: z.boolean(),
-    isActive: z.boolean(),
-  }).partial().strict()
+  const cabinClassUpdateSchema = z
+    .object({
+      code: z
+        .string()
+        .min(1)
+        .max(2)
+        .regex(/^[A-Z]{1,2}$/, 'Code must be 1-2 uppercase letters'),
+      name: z.string().min(1, 'Name is required'),
+      color: z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/, 'Must be hex color')
+        .nullable(),
+      sortOrder: z.number().int().min(0),
+      seatLayout: z
+        .string()
+        .regex(/^[0-9](-[0-9]){1,3}$/, 'Format: 3-3 or 2-2 or 1-2-1')
+        .nullable(),
+      seatPitchIn: z.number().min(20).max(90).nullable(),
+      seatWidthIn: z.number().min(14).max(40).nullable(),
+      seatType: z.enum(['standard', 'premium', 'lie-flat', 'suite']).nullable(),
+      hasIfe: z.boolean(),
+      hasPower: z.boolean(),
+      isActive: z.boolean(),
+    })
+    .partial()
+    .strict()
 
   app.get('/cabin-classes', async (req) => {
-    const { operatorId } = req.query as { operatorId?: string }
-    const filter: Record<string, unknown> = {}
-    if (operatorId) filter.operatorId = operatorId
+    const operatorId = req.operatorId
+    const filter: Record<string, unknown> = { operatorId }
     return CabinClass.find(filter).sort({ sortOrder: 1, code: 1 }).lean()
   })
 
@@ -1415,7 +1549,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const parsed = cabinClassCreateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -1443,7 +1577,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const parsed = cabinClassUpdateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -1474,35 +1608,56 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
   // ─── LOPA Configurations ──────────────────────────────
 
-  const lopaConfigCreateSchema = z.object({
-    operatorId: z.string().min(1),
-    aircraftType: z.string().min(3).max(4).regex(/^[A-Z0-9]{3,4}$/, 'Must be 3-4 uppercase alphanumeric'),
-    configName: z.string().min(1, 'Config name is required'),
-    cabins: z.array(z.object({
-      classCode: z.string().min(1),
-      seats: z.number().int().min(0),
-    })).min(1, 'At least one cabin entry is required'),
-    isDefault: z.boolean().optional().default(false),
-    notes: z.string().nullable().optional(),
-    isActive: z.boolean().optional().default(true),
-  }).strict()
+  const lopaConfigCreateSchema = z
+    .object({
+      operatorId: z.string().min(1),
+      aircraftType: z
+        .string()
+        .min(3)
+        .max(4)
+        .regex(/^[A-Z0-9]{3,4}$/, 'Must be 3-4 uppercase alphanumeric'),
+      configName: z.string().min(1, 'Config name is required'),
+      cabins: z
+        .array(
+          z.object({
+            classCode: z.string().min(1),
+            seats: z.number().int().min(0),
+          }),
+        )
+        .min(1, 'At least one cabin entry is required'),
+      isDefault: z.boolean().optional().default(false),
+      notes: z.string().nullable().optional(),
+      isActive: z.boolean().optional().default(true),
+    })
+    .strict()
 
-  const lopaConfigUpdateSchema = z.object({
-    aircraftType: z.string().min(3).max(4).regex(/^[A-Z0-9]{3,4}$/, 'Must be 3-4 uppercase alphanumeric'),
-    configName: z.string().min(1, 'Config name is required'),
-    cabins: z.array(z.object({
-      classCode: z.string().min(1),
-      seats: z.number().int().min(0),
-    })).min(1, 'At least one cabin entry is required'),
-    isDefault: z.boolean(),
-    notes: z.string().nullable(),
-    isActive: z.boolean(),
-  }).partial().strict()
+  const lopaConfigUpdateSchema = z
+    .object({
+      aircraftType: z
+        .string()
+        .min(3)
+        .max(4)
+        .regex(/^[A-Z0-9]{3,4}$/, 'Must be 3-4 uppercase alphanumeric'),
+      configName: z.string().min(1, 'Config name is required'),
+      cabins: z
+        .array(
+          z.object({
+            classCode: z.string().min(1),
+            seats: z.number().int().min(0),
+          }),
+        )
+        .min(1, 'At least one cabin entry is required'),
+      isDefault: z.boolean(),
+      notes: z.string().nullable(),
+      isActive: z.boolean(),
+    })
+    .partial()
+    .strict()
 
   app.get('/lopa-configs', async (req) => {
-    const { operatorId, aircraftType } = req.query as { operatorId?: string; aircraftType?: string }
-    const filter: Record<string, unknown> = {}
-    if (operatorId) filter.operatorId = operatorId
+    const operatorId = req.operatorId
+    const { aircraftType } = req.query as { aircraftType?: string }
+    const filter: Record<string, unknown> = { operatorId }
     if (aircraftType) filter.aircraftType = aircraftType.toUpperCase()
     return LopaConfig.find(filter).sort({ aircraftType: 1, configName: 1 }).lean()
   })
@@ -1520,7 +1675,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const parsed = lopaConfigCreateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -1540,7 +1695,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     if (body.isDefault) {
       await LopaConfig.updateMany(
         { operatorId: body.operatorId, aircraftType: body.aircraftType },
-        { $set: { isDefault: false } }
+        { $set: { isDefault: false } },
       )
     }
 
@@ -1562,7 +1717,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const parsed = lopaConfigUpdateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -1578,8 +1733,12 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
       const current = await LopaConfig.findById(id).lean()
       if (current) {
         await LopaConfig.updateMany(
-          { operatorId: current.operatorId, aircraftType: parsed.data.aircraftType ?? current.aircraftType, _id: { $ne: id } },
-          { $set: { isDefault: false } }
+          {
+            operatorId: current.operatorId,
+            aircraftType: parsed.data.aircraftType ?? current.aircraftType,
+            _id: { $ne: id },
+          },
+          { $set: { isDefault: false } },
         )
       }
     }
@@ -1673,25 +1832,29 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
   })
 
   // ─── Activity Code Groups ──────────────────────────────
-  const acGroupCreateSchema = z.object({
-    operatorId: z.string().min(1),
-    code: z.string().min(1).max(8),
-    name: z.string().min(1).max(60),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-    sortOrder: z.number().int().min(0).optional(),
-  }).strict()
+  const acGroupCreateSchema = z
+    .object({
+      operatorId: z.string().min(1),
+      code: z.string().min(1).max(8),
+      name: z.string().min(1).max(60),
+      color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+      sortOrder: z.number().int().min(0).optional(),
+    })
+    .strict()
 
-  const acGroupUpdateSchema = z.object({
-    code: z.string().min(1).max(8),
-    name: z.string().min(1).max(60),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-    sortOrder: z.number().int().min(0),
-  }).partial().strict()
+  const acGroupUpdateSchema = z
+    .object({
+      code: z.string().min(1).max(8),
+      name: z.string().min(1).max(60),
+      color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+      sortOrder: z.number().int().min(0),
+    })
+    .partial()
+    .strict()
 
   app.get('/activity-code-groups', async (req) => {
-    const { operatorId } = req.query as { operatorId?: string }
-    const filter: Record<string, unknown> = {}
-    if (operatorId) filter.operatorId = operatorId
+    const operatorId = req.operatorId
+    const filter: Record<string, unknown> = { operatorId }
     return ActivityCodeGroup.find(filter).sort({ sortOrder: 1, code: 1 }).lean()
   })
 
@@ -1700,7 +1863,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     if (raw.code) raw.code = (raw.code as string).toUpperCase()
     const parsed = acGroupCreateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
     const body = parsed.data
@@ -1724,7 +1887,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     if (raw.code) raw.code = (raw.code as string).toUpperCase()
     const parsed = acGroupUpdateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
     const body = { ...parsed.data, updatedAt: new Date().toISOString() }
@@ -1748,58 +1911,69 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
   })
 
   // ─── Activity Codes ────────────────────────────────────
-  const acCodeCreateSchema = z.object({
-    operatorId: z.string().min(1),
-    groupId: z.string().min(1),
-    code: z.string().min(1).max(8),
-    name: z.string().min(1).max(60),
-    description: z.string().nullable().optional(),
-    shortLabel: z.string().nullable().optional(),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
-    isSystem: z.boolean().optional().default(false),
-    isActive: z.boolean().optional().default(true),
-    isArchived: z.boolean().optional().default(false),
-    flags: z.array(z.string()).optional().default([]),
-    creditRatio: z.number().nullable().optional(),
-    creditFixedMin: z.number().int().nullable().optional(),
-    payRatio: z.number().nullable().optional(),
-    minRestBeforeMin: z.number().int().nullable().optional(),
-    minRestAfterMin: z.number().int().nullable().optional(),
-    defaultDurationMin: z.number().int().nullable().optional(),
-    requiresTime: z.boolean().optional().default(false),
-    defaultStartTime: z.string().nullable().optional(),
-    defaultEndTime: z.string().nullable().optional(),
-    simPlatform: z.string().nullable().optional(),
-    simDurationMin: z.number().int().nullable().optional(),
-    applicablePositions: z.array(z.string()).optional().default([]),
-  }).strict()
+  const acCodeCreateSchema = z
+    .object({
+      operatorId: z.string().min(1),
+      groupId: z.string().min(1),
+      code: z.string().min(1).max(8),
+      name: z.string().min(1).max(60),
+      description: z.string().nullable().optional(),
+      shortLabel: z.string().nullable().optional(),
+      color: z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/)
+        .nullable()
+        .optional(),
+      isSystem: z.boolean().optional().default(false),
+      isActive: z.boolean().optional().default(true),
+      isArchived: z.boolean().optional().default(false),
+      flags: z.array(z.string()).optional().default([]),
+      creditRatio: z.number().nullable().optional(),
+      creditFixedMin: z.number().int().nullable().optional(),
+      payRatio: z.number().nullable().optional(),
+      minRestBeforeMin: z.number().int().nullable().optional(),
+      minRestAfterMin: z.number().int().nullable().optional(),
+      defaultDurationMin: z.number().int().nullable().optional(),
+      requiresTime: z.boolean().optional().default(false),
+      defaultStartTime: z.string().nullable().optional(),
+      defaultEndTime: z.string().nullable().optional(),
+      simPlatform: z.string().nullable().optional(),
+      simDurationMin: z.number().int().nullable().optional(),
+      applicablePositions: z.array(z.string()).optional().default([]),
+    })
+    .strict()
 
-  const acCodeUpdateSchema = z.object({
-    groupId: z.string().min(1),
-    code: z.string().min(1).max(8),
-    name: z.string().min(1).max(60),
-    description: z.string().nullable(),
-    shortLabel: z.string().nullable(),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(),
-    isActive: z.boolean(),
-    isArchived: z.boolean(),
-    creditRatio: z.number().nullable(),
-    creditFixedMin: z.number().int().nullable(),
-    payRatio: z.number().nullable(),
-    minRestBeforeMin: z.number().int().nullable(),
-    minRestAfterMin: z.number().int().nullable(),
-    defaultDurationMin: z.number().int().nullable(),
-    requiresTime: z.boolean(),
-    defaultStartTime: z.string().nullable(),
-    defaultEndTime: z.string().nullable(),
-    simPlatform: z.string().nullable(),
-    simDurationMin: z.number().int().nullable(),
-  }).partial().strict()
+  const acCodeUpdateSchema = z
+    .object({
+      groupId: z.string().min(1),
+      code: z.string().min(1).max(8),
+      name: z.string().min(1).max(60),
+      description: z.string().nullable(),
+      shortLabel: z.string().nullable(),
+      color: z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/)
+        .nullable(),
+      isActive: z.boolean(),
+      isArchived: z.boolean(),
+      creditRatio: z.number().nullable(),
+      creditFixedMin: z.number().int().nullable(),
+      payRatio: z.number().nullable(),
+      minRestBeforeMin: z.number().int().nullable(),
+      minRestAfterMin: z.number().int().nullable(),
+      defaultDurationMin: z.number().int().nullable(),
+      requiresTime: z.boolean(),
+      defaultStartTime: z.string().nullable(),
+      defaultEndTime: z.string().nullable(),
+      simPlatform: z.string().nullable(),
+      simDurationMin: z.number().int().nullable(),
+    })
+    .partial()
+    .strict()
 
   app.get('/activity-codes', async (req) => {
-    const { operatorId } = req.query as { operatorId?: string }
-    const filter: Record<string, unknown> = {}
-    if (operatorId) filter.operatorId = operatorId
+    const operatorId = req.operatorId
+    const filter: Record<string, unknown> = { operatorId }
     return ActivityCode.find(filter).sort({ code: 1 }).lean()
   })
 
@@ -1815,7 +1989,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     if (raw.code) raw.code = (raw.code as string).toUpperCase()
     const parsed = acCodeCreateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
     const body = parsed.data
@@ -1832,7 +2006,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     if (raw.code) raw.code = (raw.code as string).toUpperCase()
     const parsed = acCodeUpdateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
     const existing = await ActivityCode.findById(id).lean()
@@ -1840,7 +2014,9 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     if (existing.isSystem) {
       // System codes: only allow color updates
       const allowed = { color: parsed.data.color, updatedAt: new Date().toISOString() } as Record<string, unknown>
-      Object.keys(allowed).forEach(k => { if (allowed[k] === undefined) delete allowed[k] })
+      Object.keys(allowed).forEach((k) => {
+        if (allowed[k] === undefined) delete allowed[k]
+      })
       const doc = await ActivityCode.findByIdAndUpdate(id, { $set: allowed }, { new: true }).lean()
       return doc
     }
@@ -1856,18 +2032,27 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     const existing = await ActivityCode.findById(id).lean()
     if (!existing) return reply.code(404).send({ error: 'Activity code not found' })
     if (existing.isSystem) return reply.code(403).send({ error: 'Cannot modify flags on system codes' })
-    const doc = await ActivityCode.findByIdAndUpdate(id, { $set: { flags, updatedAt: new Date().toISOString() } }, { new: true }).lean()
+    const doc = await ActivityCode.findByIdAndUpdate(
+      id,
+      { $set: { flags, updatedAt: new Date().toISOString() } },
+      { new: true },
+    ).lean()
     return doc
   })
 
   app.patch('/activity-codes/:id/positions', async (req, reply) => {
     const { id } = req.params as { id: string }
     const { applicablePositions } = req.body as { applicablePositions: string[] }
-    if (!Array.isArray(applicablePositions)) return reply.code(400).send({ error: 'applicablePositions must be an array' })
+    if (!Array.isArray(applicablePositions))
+      return reply.code(400).send({ error: 'applicablePositions must be an array' })
     const existing = await ActivityCode.findById(id).lean()
     if (!existing) return reply.code(404).send({ error: 'Activity code not found' })
     if (existing.isSystem) return reply.code(403).send({ error: 'Cannot modify positions on system codes' })
-    const doc = await ActivityCode.findByIdAndUpdate(id, { $set: { applicablePositions, updatedAt: new Date().toISOString() } }, { new: true }).lean()
+    const doc = await ActivityCode.findByIdAndUpdate(
+      id,
+      { $set: { applicablePositions, updatedAt: new Date().toISOString() } },
+      { new: true },
+    ).lean()
     return doc
   })
 
@@ -1887,18 +2072,20 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const existingGroups = await ActivityCodeGroup.countDocuments({ operatorId })
     if (existingGroups > 0) {
-      return reply.code(409).send({ error: 'Activity code groups already exist for this operator. Seed is only for initial setup.' })
+      return reply
+        .code(409)
+        .send({ error: 'Activity code groups already exist for this operator. Seed is only for initial setup.' })
     }
 
     const now = new Date().toISOString()
 
     const groups = [
-      { code: 'DUTY',  name: 'Flight Duty', color: '#dc2626', sortOrder: 10 },
-      { code: 'STBY',  name: 'Standby',     color: '#f59e0b', sortOrder: 20 },
-      { code: 'TRAIN', name: 'Training',     color: '#3b82f6', sortOrder: 30 },
-      { code: 'LEAVE', name: 'Leave & Off',  color: '#10b981', sortOrder: 40 },
-      { code: 'MED',   name: 'Medical',      color: '#8b5cf6', sortOrder: 50 },
-      { code: 'SYS',   name: 'System',       color: '#6b7280', sortOrder: 90 },
+      { code: 'DUTY', name: 'Flight Duty', color: '#dc2626', sortOrder: 10 },
+      { code: 'STBY', name: 'Standby', color: '#f59e0b', sortOrder: 20 },
+      { code: 'TRAIN', name: 'Training', color: '#3b82f6', sortOrder: 30 },
+      { code: 'LEAVE', name: 'Leave & Off', color: '#10b981', sortOrder: 40 },
+      { code: 'MED', name: 'Medical', color: '#8b5cf6', sortOrder: 50 },
+      { code: 'SYS', name: 'System', color: '#6b7280', sortOrder: 90 },
     ]
 
     const groupMap: Record<string, string> = {}
@@ -1910,29 +2097,147 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const codes = [
       // DUTY
-      { groupCode: 'DUTY', code: 'FLT', name: 'Flight Duty', description: 'Operating crew on a scheduled or charter flight', flags: ['is_flight_duty', 'counts_fdp', 'counts_block_hours', 'counts_duty_time'], creditRatio: 1.0 },
-      { groupCode: 'DUTY', code: 'DH', name: 'Deadhead', description: 'Positioning as a non-operating crew member on a flight', flags: ['is_deadhead', 'counts_duty_time'], creditRatio: 0.5 },
-      { groupCode: 'DUTY', code: 'GRD', name: 'Ground Duty', description: 'Ground-based duty including briefings, admin, and surface positioning', flags: ['is_ground_duty', 'counts_duty_time'] },
+      {
+        groupCode: 'DUTY',
+        code: 'FLT',
+        name: 'Flight Duty',
+        description: 'Operating crew on a scheduled or charter flight',
+        flags: ['is_flight_duty', 'counts_fdp', 'counts_block_hours', 'counts_duty_time'],
+        creditRatio: 1.0,
+      },
+      {
+        groupCode: 'DUTY',
+        code: 'DH',
+        name: 'Deadhead',
+        description: 'Positioning as a non-operating crew member on a flight',
+        flags: ['is_deadhead', 'counts_duty_time'],
+        creditRatio: 0.5,
+      },
+      {
+        groupCode: 'DUTY',
+        code: 'GRD',
+        name: 'Ground Duty',
+        description: 'Ground-based duty including briefings, admin, and surface positioning',
+        flags: ['is_ground_duty', 'counts_duty_time'],
+      },
       // STBY
-      { groupCode: 'STBY', code: 'AVLB', name: 'Available', description: 'Crew available and contactable for assignment', flags: ['is_airport_standby', 'counts_fdp'] },
-      { groupCode: 'STBY', code: 'ASBY', name: 'Airport Standby', description: 'Crew physically present at the airport on standby', flags: ['is_airport_standby', 'counts_fdp', 'counts_duty_time'] },
-      { groupCode: 'STBY', code: 'HSBY', name: 'Home Standby', description: 'Crew on standby at home, contactable within defined callout time', flags: ['is_home_standby'] },
-      { groupCode: 'STBY', code: 'RSV', name: 'Reserve', description: 'Reserve crew period — available within short-call parameters', flags: ['is_reserve'] },
+      {
+        groupCode: 'STBY',
+        code: 'AVLB',
+        name: 'Available',
+        description: 'Crew available and contactable for assignment',
+        flags: ['is_airport_standby', 'counts_fdp'],
+      },
+      {
+        groupCode: 'STBY',
+        code: 'ASBY',
+        name: 'Airport Standby',
+        description: 'Crew physically present at the airport on standby',
+        flags: ['is_airport_standby', 'counts_fdp', 'counts_duty_time'],
+      },
+      {
+        groupCode: 'STBY',
+        code: 'HSBY',
+        name: 'Home Standby',
+        description: 'Crew on standby at home, contactable within defined callout time',
+        flags: ['is_home_standby'],
+      },
+      {
+        groupCode: 'STBY',
+        code: 'RSV',
+        name: 'Reserve',
+        description: 'Reserve crew period — available within short-call parameters',
+        flags: ['is_reserve'],
+      },
       // TRAIN
-      { groupCode: 'TRAIN', code: 'SIM', name: 'Simulator Check', description: 'Simulator session on an approved FSTD or full-flight simulator', flags: ['is_simulator', 'counts_fdp', 'counts_duty_time'], creditRatio: 1.0, defaultDurationMin: 480 },
-      { groupCode: 'TRAIN', code: 'TRG', name: 'Training', description: 'Ground school, classroom, or computer-based training', flags: ['is_training', 'counts_duty_time'], defaultDurationMin: 480 },
-      { groupCode: 'TRAIN', code: 'OJT', name: 'On-Job Training', description: 'Supervised line training flight as operating crew', flags: ['is_training', 'is_flight_duty', 'counts_fdp', 'counts_block_hours', 'counts_duty_time'], creditRatio: 1.0, defaultDurationMin: 480 },
+      {
+        groupCode: 'TRAIN',
+        code: 'SIM',
+        name: 'Simulator Check',
+        description: 'Simulator session on an approved FSTD or full-flight simulator',
+        flags: ['is_simulator', 'counts_fdp', 'counts_duty_time'],
+        creditRatio: 1.0,
+        defaultDurationMin: 480,
+      },
+      {
+        groupCode: 'TRAIN',
+        code: 'TRG',
+        name: 'Training',
+        description: 'Ground school, classroom, or computer-based training',
+        flags: ['is_training', 'counts_duty_time'],
+        defaultDurationMin: 480,
+      },
+      {
+        groupCode: 'TRAIN',
+        code: 'OJT',
+        name: 'On-Job Training',
+        description: 'Supervised line training flight as operating crew',
+        flags: ['is_training', 'is_flight_duty', 'counts_fdp', 'counts_block_hours', 'counts_duty_time'],
+        creditRatio: 1.0,
+        defaultDurationMin: 480,
+      },
       // LEAVE
-      { groupCode: 'LEAVE', code: 'AL', name: 'Annual Leave', description: 'Annual leave entitlement day', flags: ['is_annual_leave', 'is_day_off'] },
-      { groupCode: 'LEAVE', code: 'SL', name: 'Sick Leave', description: 'Sick leave or medical incapacity absence', flags: ['is_sick_leave', 'is_day_off'] },
-      { groupCode: 'LEAVE', code: 'RD', name: 'Rest Day', description: 'Scheduled rest day — no duty obligations apply', flags: ['is_day_off', 'is_rest_period'] },
-      { groupCode: 'LEAVE', code: 'COMP', name: 'Compensatory Off', description: 'Compensatory rest day granted in lieu of worked rest period', flags: ['is_day_off'] },
+      {
+        groupCode: 'LEAVE',
+        code: 'AL',
+        name: 'Annual Leave',
+        description: 'Annual leave entitlement day',
+        flags: ['is_annual_leave', 'is_day_off'],
+      },
+      {
+        groupCode: 'LEAVE',
+        code: 'SL',
+        name: 'Sick Leave',
+        description: 'Sick leave or medical incapacity absence',
+        flags: ['is_sick_leave', 'is_day_off'],
+      },
+      {
+        groupCode: 'LEAVE',
+        code: 'RD',
+        name: 'Rest Day',
+        description: 'Scheduled rest day — no duty obligations apply',
+        flags: ['is_day_off', 'is_rest_period'],
+      },
+      {
+        groupCode: 'LEAVE',
+        code: 'COMP',
+        name: 'Compensatory Off',
+        description: 'Compensatory rest day granted in lieu of worked rest period',
+        flags: ['is_day_off'],
+      },
       // MED
-      { groupCode: 'MED', code: 'MED', name: 'Medical Check', description: 'Periodic medical examination or aeromedical assessment', flags: ['is_medical', 'counts_duty_time'] },
-      { groupCode: 'MED', code: 'FIT', name: 'Fitness Check', description: 'Fitness-for-duty assessment or recurrency check', flags: ['is_medical'] },
+      {
+        groupCode: 'MED',
+        code: 'MED',
+        name: 'Medical Check',
+        description: 'Periodic medical examination or aeromedical assessment',
+        flags: ['is_medical', 'counts_duty_time'],
+      },
+      {
+        groupCode: 'MED',
+        code: 'FIT',
+        name: 'Fitness Check',
+        description: 'Fitness-for-duty assessment or recurrency check',
+        flags: ['is_medical'],
+      },
       // SYS
-      { groupCode: 'SYS', code: 'REST', name: 'Rest Day', description: 'Post-duty recovery day — system-assigned when preceding duty releases past midnight local. Does not count as a regulatory day off.', flags: ['is_rest_period'], isSystem: true },
-      { groupCode: 'SYS', code: 'OFF', name: 'Day Off', description: 'Generic off day — used by automated rostering for unspecified off periods', flags: ['is_day_off'], isSystem: true },
+      {
+        groupCode: 'SYS',
+        code: 'REST',
+        name: 'Rest Day',
+        description:
+          'Post-duty recovery day — system-assigned when preceding duty releases past midnight local. Does not count as a regulatory day off.',
+        flags: ['is_rest_period'],
+        isSystem: true,
+      },
+      {
+        groupCode: 'SYS',
+        code: 'OFF',
+        name: 'Day Off',
+        description: 'Generic off day — used by automated rostering for unspecified off periods',
+        flags: ['is_day_off'],
+        isSystem: true,
+      },
     ]
 
     for (const c of codes) {
@@ -1958,9 +2263,9 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
   // ─── Crew Complements ───────────────────────────────────
 
   app.get('/crew-complements', async (req) => {
-    const { operatorId, aircraftTypeIcao } = req.query as { operatorId?: string; aircraftTypeIcao?: string }
-    const filter: Record<string, unknown> = {}
-    if (operatorId) filter.operatorId = operatorId
+    const operatorId = req.operatorId
+    const { aircraftTypeIcao } = req.query as { aircraftTypeIcao?: string }
+    const filter: Record<string, unknown> = { operatorId }
     if (aircraftTypeIcao) filter.aircraftTypeIcao = aircraftTypeIcao
     return CrewComplement.find(filter).sort({ aircraftTypeIcao: 1, createdAt: 1 }).lean()
   })
@@ -1972,18 +2277,20 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     return doc
   })
 
-  const complementCreateSchema = z.object({
-    operatorId: z.string().min(1),
-    aircraftTypeIcao: z.string().min(2).max(4),
-    templateKey: z.string().min(1),
-    counts: z.record(z.string(), z.number().int().min(0)).optional().default({}),
-    notes: z.string().nullable().optional(),
-  }).strict()
+  const complementCreateSchema = z
+    .object({
+      operatorId: z.string().min(1),
+      aircraftTypeIcao: z.string().min(2).max(4),
+      templateKey: z.string().min(1),
+      counts: z.record(z.string(), z.number().int().min(0)).optional().default({}),
+      notes: z.string().nullable().optional(),
+    })
+    .strict()
 
   app.post('/crew-complements', async (req, reply) => {
     const parsed = complementCreateSchema.safeParse(req.body)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
     const body = parsed.data
@@ -1994,7 +2301,9 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
       templateKey: body.templateKey,
     }).lean()
     if (existing) {
-      return reply.code(409).send({ error: `Complement "${body.templateKey}" already exists for ${body.aircraftTypeIcao}` })
+      return reply
+        .code(409)
+        .send({ error: `Complement "${body.templateKey}" already exists for ${body.aircraftTypeIcao}` })
     }
 
     const id = crypto.randomUUID()
@@ -2007,18 +2316,21 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(201).send(doc.toObject())
   })
 
-  const complementUpdateSchema = z.object({
-    templateKey: z.string().min(1),
-    counts: z.record(z.string(), z.number().int().min(0)),
-    notes: z.string().nullable(),
-    isActive: z.boolean(),
-  }).partial().strict()
+  const complementUpdateSchema = z
+    .object({
+      templateKey: z.string().min(1),
+      counts: z.record(z.string(), z.number().int().min(0)),
+      notes: z.string().nullable(),
+      isActive: z.boolean(),
+    })
+    .partial()
+    .strict()
 
   app.patch('/crew-complements/:id', async (req, reply) => {
     const { id } = req.params as { id: string }
     const parsed = complementUpdateSchema.safeParse(req.body)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
     const body = { ...parsed.data, updatedAt: new Date().toISOString() }
@@ -2034,7 +2346,11 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     // Protect standard templates — only custom rows can be deleted
     if (['standard', 'aug1', 'aug2'].includes(doc.templateKey)) {
-      return reply.code(400).send({ error: 'Standard, Aug 1, and Aug 2 templates cannot be deleted. Use the table to set counts to 0 instead.' })
+      return reply
+        .code(400)
+        .send({
+          error: 'Standard, Aug 1, and Aug 2 templates cannot be deleted. Use the table to set counts to 0 instead.',
+        })
     }
 
     await CrewComplement.findByIdAndDelete(id)
@@ -2052,8 +2368,8 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: 'No active crew positions found. Configure positions in 5.4.2 first.' })
     }
 
-    const cockpit = positions.filter(p => p.category === 'cockpit')
-    const cabin = positions.filter(p => p.category === 'cabin')
+    const cockpit = positions.filter((p) => p.category === 'cockpit')
+    const cabin = positions.filter((p) => p.category === 'cabin')
 
     // Build default counts per template
     const buildCounts = (template: 'standard' | 'aug1' | 'aug2'): Record<string, number> => {
@@ -2088,7 +2404,11 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     for (const { icaoType } of types) {
       for (const tmpl of templates) {
         // Skip if already exists
-        const exists = await CrewComplement.findOne({ operatorId, aircraftTypeIcao: icaoType, templateKey: tmpl }).lean()
+        const exists = await CrewComplement.findOne({
+          operatorId,
+          aircraftTypeIcao: icaoType,
+          templateKey: tmpl,
+        }).lean()
         if (exists) continue
 
         rows.push({
@@ -2114,8 +2434,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
   // Delete all complements for an aircraft type
   app.delete('/crew-complements/by-type/:icaoType', async (req, reply) => {
     const { icaoType } = req.params as { icaoType: string }
-    const { operatorId } = req.query as { operatorId: string }
-    if (!operatorId) return reply.code(400).send({ error: 'operatorId query param is required' })
+    const operatorId = req.operatorId
     await CrewComplement.deleteMany({ operatorId, aircraftTypeIcao: icaoType })
     return { success: true }
   })
@@ -2123,31 +2442,36 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
   // ─── Crew Groups ────────────────────────────────────────
 
   app.get('/crew-groups', async (req) => {
-    const { operatorId, includeInactive } = req.query as { operatorId?: string; includeInactive?: string }
-    const filter: Record<string, unknown> = {}
-    if (operatorId) filter.operatorId = operatorId
+    const operatorId = req.operatorId
+    const { includeInactive } = req.query as { includeInactive?: string }
+    const filter: Record<string, unknown> = { operatorId }
     if (includeInactive !== 'true') filter.isActive = true
     return CrewGroup.find(filter).sort({ sortOrder: 1, name: 1 }).lean()
   })
 
-  const crewGroupCreateSchema = z.object({
-    operatorId: z.string().min(1),
-    name: z.string().min(1).max(100),
-    description: z.string().nullable().optional(),
-    sortOrder: z.number().int().min(0).optional(),
-  }).strict()
+  const crewGroupCreateSchema = z
+    .object({
+      operatorId: z.string().min(1),
+      name: z.string().min(1).max(100),
+      description: z.string().nullable().optional(),
+      sortOrder: z.number().int().min(0).optional(),
+    })
+    .strict()
 
-  const crewGroupUpdateSchema = z.object({
-    name: z.string().min(1).max(100),
-    description: z.string().nullable(),
-    sortOrder: z.number().int().min(0),
-    isActive: z.boolean(),
-  }).partial().strict()
+  const crewGroupUpdateSchema = z
+    .object({
+      name: z.string().min(1).max(100),
+      description: z.string().nullable(),
+      sortOrder: z.number().int().min(0),
+      isActive: z.boolean(),
+    })
+    .partial()
+    .strict()
 
   app.post('/crew-groups', async (req, reply) => {
     const parsed = crewGroupCreateSchema.safeParse(req.body)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
     const body = parsed.data
@@ -2175,7 +2499,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string }
     const parsed = crewGroupUpdateSchema.safeParse(req.body)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
     const body = { ...parsed.data, updatedAt: new Date().toISOString() }
@@ -2230,29 +2554,39 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
   // ─── Duty Patterns ──────────────────────────────────────────
 
-  const dpCreateSchema = z.object({
-    operatorId: z.string().min(1),
-    code: z.string().min(1).max(20),
-    description: z.string().nullable().optional(),
-    sequence: z.array(z.number().int().min(1)).min(2).refine(arr => arr.length % 2 === 0, { message: 'Sequence must have an even number of segments' }),
-    offCode: z.string().min(1).max(10).optional().default('DO'),
-    isActive: z.boolean().optional().default(true),
-    sortOrder: z.number().int().min(0).optional(),
-  }).strict()
+  const dpCreateSchema = z
+    .object({
+      operatorId: z.string().min(1),
+      code: z.string().min(1).max(20),
+      description: z.string().nullable().optional(),
+      sequence: z
+        .array(z.number().int().min(1))
+        .min(2)
+        .refine((arr) => arr.length % 2 === 0, { message: 'Sequence must have an even number of segments' }),
+      offCode: z.string().min(1).max(10).optional().default('DO'),
+      isActive: z.boolean().optional().default(true),
+      sortOrder: z.number().int().min(0).optional(),
+    })
+    .strict()
 
-  const dpUpdateSchema = z.object({
-    code: z.string().min(1).max(20),
-    description: z.string().nullable(),
-    sequence: z.array(z.number().int().min(1)).min(2).refine(arr => arr.length % 2 === 0, { message: 'Sequence must have an even number of segments' }),
-    offCode: z.string().min(1).max(10),
-    isActive: z.boolean(),
-    sortOrder: z.number().int().min(0),
-  }).partial().strict()
+  const dpUpdateSchema = z
+    .object({
+      code: z.string().min(1).max(20),
+      description: z.string().nullable(),
+      sequence: z
+        .array(z.number().int().min(1))
+        .min(2)
+        .refine((arr) => arr.length % 2 === 0, { message: 'Sequence must have an even number of segments' }),
+      offCode: z.string().min(1).max(10),
+      isActive: z.boolean(),
+      sortOrder: z.number().int().min(0),
+    })
+    .partial()
+    .strict()
 
   app.get('/duty-patterns', async (req) => {
-    const { operatorId } = req.query as { operatorId?: string }
-    const filter: Record<string, unknown> = {}
-    if (operatorId) filter.operatorId = operatorId
+    const operatorId = req.operatorId
+    const filter: Record<string, unknown> = { operatorId }
     return DutyPattern.find(filter).sort({ sortOrder: 1, code: 1 }).lean()
   })
 
@@ -2268,7 +2602,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     if (raw.code) raw.code = (raw.code as string).toUpperCase()
     const parsed = dpCreateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
     const body = parsed.data
@@ -2282,7 +2616,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
       _id: id,
       ...body,
       cycleDays,
-      sortOrder: body.sortOrder ?? ((maxSort?.sortOrder ?? 0) + 10),
+      sortOrder: body.sortOrder ?? (maxSort?.sortOrder ?? 0) + 10,
       createdAt: new Date().toISOString(),
     })
     return reply.code(201).send(doc.toObject())
@@ -2294,7 +2628,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     if (raw.code) raw.code = (raw.code as string).toUpperCase()
     const parsed = dpUpdateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
     const body: Record<string, unknown> = { ...parsed.data, updatedAt: new Date().toISOString() }
@@ -2321,11 +2655,35 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     if (count > 0) return reply.code(409).send({ error: 'Patterns already exist' })
 
     const defaults = [
-      { code: '52', description: 'Standard 5-on 2-off weekly rotation', sequence: [5, 2], offCode: 'DO', isActive: true },
-      { code: '5243', description: 'Extended rotation with mid-cycle break', sequence: [5, 2, 4, 3], offCode: 'DO', isActive: true },
+      {
+        code: '52',
+        description: 'Standard 5-on 2-off weekly rotation',
+        sequence: [5, 2],
+        offCode: 'DO',
+        isActive: true,
+      },
+      {
+        code: '5243',
+        description: 'Extended rotation with mid-cycle break',
+        sequence: [5, 2, 4, 3],
+        offCode: 'DO',
+        isActive: true,
+      },
       { code: '77', description: 'Equal time 7-on 7-off rotation', sequence: [7, 7], offCode: 'DO', isActive: true },
-      { code: '4331', description: 'Short haul pattern with split rest', sequence: [4, 3, 3, 1], offCode: 'DO', isActive: true },
-      { code: '6242', description: 'Long haul crew rotation pattern', sequence: [6, 2, 4, 2], offCode: 'RDO', isActive: false },
+      {
+        code: '4331',
+        description: 'Short haul pattern with split rest',
+        sequence: [4, 3, 3, 1],
+        offCode: 'DO',
+        isActive: true,
+      },
+      {
+        code: '6242',
+        description: 'Long haul crew rotation pattern',
+        sequence: [6, 2, 4, 2],
+        offCode: 'RDO',
+        isActive: false,
+      },
     ]
     const rows = defaults.map((d, i) => ({
       _id: crypto.randomUUID(),
@@ -2341,22 +2699,23 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
   // ─── MPP Lead Time Groups ──────────────────────────────────
 
-  const ltGroupCreateSchema = z.object({
-    operatorId: z.string().min(1),
-    label: z.string().min(1).max(80),
-    description: z.string().nullable().optional(),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-    code: z.string().min(1).max(6),
-    crewType: z.enum(['cockpit', 'cabin', 'other']).optional().default('cockpit'),
-    sortOrder: z.number().int().min(0).optional(),
-  }).strict()
+  const ltGroupCreateSchema = z
+    .object({
+      operatorId: z.string().min(1),
+      label: z.string().min(1).max(80),
+      description: z.string().nullable().optional(),
+      color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+      code: z.string().min(1).max(6),
+      crewType: z.enum(['cockpit', 'cabin', 'other']).optional().default('cockpit'),
+      sortOrder: z.number().int().min(0).optional(),
+    })
+    .strict()
 
   const ltGroupUpdateSchema = ltGroupCreateSchema.omit({ operatorId: true }).partial().strict()
 
   app.get('/mpp-lead-time-groups', async (req) => {
-    const { operatorId } = req.query as { operatorId?: string }
-    const filter: Record<string, unknown> = {}
-    if (operatorId) filter.operatorId = operatorId
+    const operatorId = req.operatorId
+    const filter: Record<string, unknown> = { operatorId }
     return MppLeadTimeGroup.find(filter).sort({ crewType: 1, sortOrder: 1 }).lean()
   })
 
@@ -2364,13 +2723,24 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     const raw = req.body as Record<string, unknown>
     if (raw.code) raw.code = (raw.code as string).toUpperCase()
     const parsed = ltGroupCreateSchema.safeParse(raw)
-    if (!parsed.success) return reply.code(400).send({ error: 'Validation failed', details: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`) })
+    if (!parsed.success)
+      return reply
+        .code(400)
+        .send({
+          error: 'Validation failed',
+          details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+        })
     const body = parsed.data
     const existing = await MppLeadTimeGroup.findOne({ operatorId: body.operatorId, code: body.code }).lean()
     if (existing) return reply.code(409).send({ error: `Group code '${body.code}' already exists` })
     const maxSort = await MppLeadTimeGroup.findOne({ operatorId: body.operatorId }).sort({ sortOrder: -1 }).lean()
     const id = crypto.randomUUID()
-    const doc = await MppLeadTimeGroup.create({ _id: id, ...body, sortOrder: body.sortOrder ?? ((maxSort?.sortOrder ?? 0) + 10), createdAt: new Date().toISOString() })
+    const doc = await MppLeadTimeGroup.create({
+      _id: id,
+      ...body,
+      sortOrder: body.sortOrder ?? (maxSort?.sortOrder ?? 0) + 10,
+      createdAt: new Date().toISOString(),
+    })
     return reply.code(201).send(doc.toObject())
   })
 
@@ -2379,8 +2749,18 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     const raw = req.body as Record<string, unknown>
     if (raw.code) raw.code = (raw.code as string).toUpperCase()
     const parsed = ltGroupUpdateSchema.safeParse(raw)
-    if (!parsed.success) return reply.code(400).send({ error: 'Validation failed', details: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`) })
-    const doc = await MppLeadTimeGroup.findByIdAndUpdate(id, { $set: { ...parsed.data, updatedAt: new Date().toISOString() } }, { new: true }).lean()
+    if (!parsed.success)
+      return reply
+        .code(400)
+        .send({
+          error: 'Validation failed',
+          details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+        })
+    const doc = await MppLeadTimeGroup.findByIdAndUpdate(
+      id,
+      { $set: { ...parsed.data, updatedAt: new Date().toISOString() } },
+      { new: true },
+    ).lean()
     if (!doc) return reply.code(404).send({ error: 'Group not found' })
     return doc
   })
@@ -2396,22 +2776,24 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
   // ─── MPP Lead Time Items ──────────────────────────────────
 
-  const ltItemCreateSchema = z.object({
-    operatorId: z.string().min(1),
-    groupId: z.string().min(1),
-    label: z.string().min(1).max(120),
-    valueMonths: z.number().int().min(1).max(120),
-    note: z.string().nullable().optional(),
-    consumedBy: z.string().nullable().optional(),
-    sortOrder: z.number().int().min(0).optional(),
-  }).strict()
+  const ltItemCreateSchema = z
+    .object({
+      operatorId: z.string().min(1),
+      groupId: z.string().min(1),
+      label: z.string().min(1).max(120),
+      valueMonths: z.number().int().min(1).max(120),
+      note: z.string().nullable().optional(),
+      consumedBy: z.string().nullable().optional(),
+      sortOrder: z.number().int().min(0).optional(),
+    })
+    .strict()
 
   const ltItemUpdateSchema = ltItemCreateSchema.omit({ operatorId: true }).partial().strict()
 
   app.get('/mpp-lead-time-items', async (req) => {
-    const { operatorId, groupId } = req.query as { operatorId?: string; groupId?: string }
-    const filter: Record<string, unknown> = {}
-    if (operatorId) filter.operatorId = operatorId
+    const operatorId = req.operatorId
+    const { groupId } = req.query as { groupId?: string }
+    const filter: Record<string, unknown> = { operatorId }
     if (groupId) filter.groupId = groupId
     return MppLeadTimeItem.find(filter).sort({ sortOrder: 1 }).lean()
   })
@@ -2419,19 +2801,40 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
   app.post('/mpp-lead-time-items', async (req, reply) => {
     const raw = req.body as Record<string, unknown>
     const parsed = ltItemCreateSchema.safeParse(raw)
-    if (!parsed.success) return reply.code(400).send({ error: 'Validation failed', details: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`) })
+    if (!parsed.success)
+      return reply
+        .code(400)
+        .send({
+          error: 'Validation failed',
+          details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+        })
     const body = parsed.data
     const maxSort = await MppLeadTimeItem.findOne({ groupId: body.groupId }).sort({ sortOrder: -1 }).lean()
     const id = crypto.randomUUID()
-    const doc = await MppLeadTimeItem.create({ _id: id, ...body, sortOrder: body.sortOrder ?? ((maxSort?.sortOrder ?? 0) + 10), createdAt: new Date().toISOString() })
+    const doc = await MppLeadTimeItem.create({
+      _id: id,
+      ...body,
+      sortOrder: body.sortOrder ?? (maxSort?.sortOrder ?? 0) + 10,
+      createdAt: new Date().toISOString(),
+    })
     return reply.code(201).send(doc.toObject())
   })
 
   app.patch('/mpp-lead-time-items/:id', async (req, reply) => {
     const { id } = req.params as { id: string }
     const parsed = ltItemUpdateSchema.safeParse(req.body)
-    if (!parsed.success) return reply.code(400).send({ error: 'Validation failed', details: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`) })
-    const doc = await MppLeadTimeItem.findByIdAndUpdate(id, { $set: { ...parsed.data, updatedAt: new Date().toISOString() } }, { new: true }).lean()
+    if (!parsed.success)
+      return reply
+        .code(400)
+        .send({
+          error: 'Validation failed',
+          details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+        })
+    const doc = await MppLeadTimeItem.findByIdAndUpdate(
+      id,
+      { $set: { ...parsed.data, updatedAt: new Date().toISOString() } },
+      { new: true },
+    ).lean()
     if (!doc) return reply.code(404).send({ error: 'Item not found' })
     return doc
   })
@@ -2452,13 +2855,39 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const now = new Date().toISOString()
     const groups = [
-      { code: 'PER', label: 'External Recruitment', description: 'New pilots joining from outside the organisation', color: '#7c3aed', crewType: 'cockpit' as const, sortOrder: 10 },
-      { code: 'PIN', label: 'Internal Movement', description: 'Upgrades and fleet changes within existing pilot pool', color: '#0891b2', crewType: 'cockpit' as const, sortOrder: 20 },
-      { code: 'CCP', label: 'Cabin Crew', description: 'Initial courses, upgrades, and fleet transitions for cabin crew', color: '#be185d', crewType: 'cabin' as const, sortOrder: 30 },
+      {
+        code: 'PER',
+        label: 'External Recruitment',
+        description: 'New pilots joining from outside the organisation',
+        color: '#7c3aed',
+        crewType: 'cockpit' as const,
+        sortOrder: 10,
+      },
+      {
+        code: 'PIN',
+        label: 'Internal Movement',
+        description: 'Upgrades and fleet changes within existing pilot pool',
+        color: '#0891b2',
+        crewType: 'cockpit' as const,
+        sortOrder: 20,
+      },
+      {
+        code: 'CCP',
+        label: 'Cabin Crew',
+        description: 'Initial courses, upgrades, and fleet transitions for cabin crew',
+        color: '#be185d',
+        crewType: 'cabin' as const,
+        sortOrder: 30,
+      },
     ]
     const items = [
       { groupCode: 'PER', label: 'Direct Entry Captain (AOC)', valueMonths: 6, consumedBy: 'MPP · AOC Captain event' },
-      { groupCode: 'PER', label: 'First Officer — External Hire (AOC)', valueMonths: 5, consumedBy: 'MPP · AOC FO event' },
+      {
+        groupCode: 'PER',
+        label: 'First Officer — External Hire (AOC)',
+        valueMonths: 5,
+        consumedBy: 'MPP · AOC FO event',
+      },
       { groupCode: 'PER', label: 'Cadet — Ab Initio (CDT)', valueMonths: 16, consumedBy: 'MPP · CDT event' },
       { groupCode: 'PIN', label: 'Crew Upgrade FO → Captain (CUG)', valueMonths: 4, consumedBy: 'MPP · CUG event' },
       { groupCode: 'PIN', label: 'Cross-Crew Qualification (CCQ)', valueMonths: 3, consumedBy: 'MPP · CCQ event' },
@@ -2467,10 +2896,10 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
       { groupCode: 'CCP', label: 'Cabin Fleet Type Training', valueMonths: 1, consumedBy: 'MPP · CC Fleet event' },
     ]
 
-    const groupDocs = groups.map(g => ({ _id: crypto.randomUUID(), operatorId, ...g, createdAt: now }))
+    const groupDocs = groups.map((g) => ({ _id: crypto.randomUUID(), operatorId, ...g, createdAt: now }))
     await MppLeadTimeGroup.insertMany(groupDocs)
 
-    const codeToId = new Map(groupDocs.map(g => [g.code, g._id]))
+    const codeToId = new Map(groupDocs.map((g) => [g.code, g._id]))
     const itemDocs = items.map((it, i) => ({
       _id: crypto.randomUUID(),
       operatorId,
@@ -2493,49 +2922,53 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     debriefMinutes: z.number().nullable().optional().default(null),
   })
 
-  const carrierCreateSchema = z.object({
-    operatorId: z.string().min(1),
-    iataCode: z.string().min(1).max(2),
-    icaoCode: z.string().max(3).nullable().optional().default(null),
-    name: z.string().min(1),
-    category: z.enum(['Air', 'Ground', 'Other']).optional().default('Air'),
-    vendorNumber: z.string().nullable().optional().default(null),
-    contactName: z.string().nullable().optional().default(null),
-    contactPosition: z.string().nullable().optional().default(null),
-    phone: z.string().nullable().optional().default(null),
-    email: z.string().nullable().optional().default(null),
-    sita: z.string().nullable().optional().default(null),
-    website: z.string().nullable().optional().default(null),
-    defaultCurrency: z.string().nullable().optional().default(null),
-    capacity: z.number().nullable().optional().default(null),
-    cockpitTimes: reportDebriefSchema.nullable().optional().default(null),
-    cabinTimes: reportDebriefSchema.nullable().optional().default(null),
-    isActive: z.boolean().optional().default(true),
-  }).strict()
+  const carrierCreateSchema = z
+    .object({
+      operatorId: z.string().min(1),
+      iataCode: z.string().min(1).max(2),
+      icaoCode: z.string().max(3).nullable().optional().default(null),
+      name: z.string().min(1),
+      category: z.enum(['Air', 'Ground', 'Other']).optional().default('Air'),
+      vendorNumber: z.string().nullable().optional().default(null),
+      contactName: z.string().nullable().optional().default(null),
+      contactPosition: z.string().nullable().optional().default(null),
+      phone: z.string().nullable().optional().default(null),
+      email: z.string().nullable().optional().default(null),
+      sita: z.string().nullable().optional().default(null),
+      website: z.string().nullable().optional().default(null),
+      defaultCurrency: z.string().nullable().optional().default(null),
+      capacity: z.number().nullable().optional().default(null),
+      cockpitTimes: reportDebriefSchema.nullable().optional().default(null),
+      cabinTimes: reportDebriefSchema.nullable().optional().default(null),
+      isActive: z.boolean().optional().default(true),
+    })
+    .strict()
 
-  const carrierUpdateSchema = z.object({
-    iataCode: z.string().min(1).max(2),
-    icaoCode: z.string().max(3).nullable(),
-    name: z.string().min(1),
-    category: z.enum(['Air', 'Ground', 'Other']),
-    vendorNumber: z.string().nullable(),
-    contactName: z.string().nullable(),
-    contactPosition: z.string().nullable(),
-    phone: z.string().nullable(),
-    email: z.string().nullable(),
-    sita: z.string().nullable(),
-    website: z.string().nullable(),
-    defaultCurrency: z.string().nullable(),
-    capacity: z.number().nullable(),
-    cockpitTimes: reportDebriefSchema.nullable(),
-    cabinTimes: reportDebriefSchema.nullable(),
-    isActive: z.boolean(),
-  }).partial().strict()
+  const carrierUpdateSchema = z
+    .object({
+      iataCode: z.string().min(1).max(2),
+      icaoCode: z.string().max(3).nullable(),
+      name: z.string().min(1),
+      category: z.enum(['Air', 'Ground', 'Other']),
+      vendorNumber: z.string().nullable(),
+      contactName: z.string().nullable(),
+      contactPosition: z.string().nullable(),
+      phone: z.string().nullable(),
+      email: z.string().nullable(),
+      sita: z.string().nullable(),
+      website: z.string().nullable(),
+      defaultCurrency: z.string().nullable(),
+      capacity: z.number().nullable(),
+      cockpitTimes: reportDebriefSchema.nullable(),
+      cabinTimes: reportDebriefSchema.nullable(),
+      isActive: z.boolean(),
+    })
+    .partial()
+    .strict()
 
   app.get('/carrier-codes', async (req) => {
-    const { operatorId } = req.query as { operatorId?: string }
-    const filter: Record<string, unknown> = {}
-    if (operatorId) filter.operatorId = operatorId
+    const operatorId = req.operatorId
+    const filter: Record<string, unknown> = { operatorId }
     return CarrierCode.find(filter).sort({ iataCode: 1 }).lean()
   })
 
@@ -2553,7 +2986,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const parsed = carrierCreateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -2578,7 +3011,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     const parsed = carrierUpdateSchema.safeParse(raw)
     if (!parsed.success) {
-      const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
 
@@ -2647,9 +3080,11 @@ function mapAviowikiResponse(data: Record<string, any>) {
   const runways = rawRunways.map((r: any) => ({
     identifier: r.ident ?? r.identifier ?? r.name ?? 'Unknown',
     lengthM: r.length_m != null ? Number(r.length_m) : null,
-    lengthFt: r.length_ft != null ? Number(r.length_ft) : (r.length_m != null ? Math.round(Number(r.length_m) / 0.3048) : null),
+    lengthFt:
+      r.length_ft != null ? Number(r.length_ft) : r.length_m != null ? Math.round(Number(r.length_m) / 0.3048) : null,
     widthM: r.width_m != null ? Number(r.width_m) : null,
-    widthFt: r.width_ft != null ? Number(r.width_ft) : (r.width_m != null ? Math.round(Number(r.width_m) / 0.3048) : null),
+    widthFt:
+      r.width_ft != null ? Number(r.width_ft) : r.width_m != null ? Math.round(Number(r.width_m) / 0.3048) : null,
     surface: r.surface ?? null,
     ilsCategory: null,
     lighting: r.lighted === true || r.lighted === 1,

@@ -1,4 +1,5 @@
-export { api, setApiBaseUrl, getApiBaseUrl } from './client'
+export { api, setApiBaseUrl, getApiBaseUrl, setAuthCallbacks } from './client'
+export type { LoginResponse, RefreshResponse } from './client'
 export type {
   Flight,
   AirportRef,
@@ -56,4 +57,13 @@ export type {
   ScheduleMessageQuery,
   ScheduleMessageStats,
   ScheduleMessageSnapshot,
+  SlotCoordinatedAirport,
+  SlotSeriesRef,
+  SlotDateRef,
+  SlotMessageRef,
+  SlotActionLogRef,
+  SlotPortfolioStats,
+  SlotUtilizationSummary,
+  SlotCalendarWeekRef,
+  SlotFleetAirportStats,
 } from './client'

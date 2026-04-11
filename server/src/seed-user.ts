@@ -1,9 +1,11 @@
 import 'dotenv/config'
+import { validateServerEnv } from '@skyhub/env'
+const env = validateServerEnv()
 import { connectDB } from './db/connection.js'
 import { User } from './models/User.js'
 
 async function seedUser() {
-  await connectDB()
+  await connectDB(env.MONGODB_URI)
 
   const userId = 'skyhub-admin-001'
 

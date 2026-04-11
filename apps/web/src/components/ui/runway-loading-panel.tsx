@@ -13,7 +13,15 @@ export function RunwayLoadingPanel({ percent, label }: RunwayLoadingPanelProps) 
   const isDark = theme === "dark"
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center">
+    <div
+      className="flex-1 flex flex-col items-center justify-center rounded-2xl"
+      style={{
+        background: isDark ? "rgba(25,25,33,0.85)" : "rgba(255,255,255,0.85)",
+        border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)"}`,
+        backdropFilter: "blur(20px)",
+        boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+      }}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/skyhub-logo.png"

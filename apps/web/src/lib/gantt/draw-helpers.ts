@@ -491,18 +491,23 @@ export function drawSlotIndicators(
     const status = bar.flight.slotStatus
     if (!status) continue
 
-    // Use risk-level color if available, otherwise fall back to slot status color
+    // Hide "safe" flags to reduce visual noise — only show close / at_risk
     const riskLevel = bar.flight.slotRiskLevel
+    if (riskLevel === 'safe') continue
+
+    // Use risk-level color if available, otherwise fall back to slot status color
     const color = riskLevel ? SLOT_RISK_COLORS[riskLevel] : SLOT_STATUS_COLORS[status]
     if (!color) continue
 
-    // Skip bars that are too narrow or outside viewport
+    // Skip bars outside viewport
     // Note: canvas is already translated by (-sx, -sy), so use bar coords directly
-    if (bar.width < 30) continue
     if (bar.x + bar.width < sx || bar.x > sx + vw || bar.y + bar.height < sy || bar.y > sy + vh) continue
 
-    // Slightly larger flag for at-risk flights
-    const flagSize = riskLevel === 'at_risk' ? 14 : FLAG_SIZE
+    // Slightly larger flag for at-risk flights, clamped so tiny bars
+    // don't get a flag that overflows the bar
+    const baseFlag = riskLevel === 'at_risk' ? 14 : FLAG_SIZE
+    const flagSize = Math.max(4, Math.min(baseFlag, bar.width, bar.height))
+    const radius = Math.min(BAR_RADIUS, flagSize)
 
     // Top-right corner of the bar
     const rx = bar.x + bar.width
@@ -517,8 +522,8 @@ export function drawSlotIndicators(
 
     ctx.beginPath()
     ctx.moveTo(rx - flagSize, ty)
-    ctx.lineTo(rx - BAR_RADIUS, ty)
-    ctx.arc(rx - BAR_RADIUS, ty + BAR_RADIUS, BAR_RADIUS, -Math.PI / 2, 0)
+    ctx.lineTo(rx - radius, ty)
+    ctx.arc(rx - radius, ty + radius, radius, -Math.PI / 2, 0)
     ctx.lineTo(rx, ty + flagSize)
     ctx.closePath()
 

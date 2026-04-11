@@ -5,7 +5,7 @@ import { useScheduleGridStore } from "@/stores/use-schedule-grid-store";
 import { Dropdown } from "@/components/ui/dropdown";
 import {
   Trash2, Scissors, Copy, ClipboardPaste, Bold, Italic, Underline,
-  Plus, Minus, Search, Replace, Upload, Download, Save, SaveAll, GitBranch, MessageSquare,
+  Plus, Minus, Search, Replace, Upload, Download, Save, SaveAll, GitBranch, MessageSquare, FileText,
   ChevronUp, ChevronDown,
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
@@ -25,6 +25,7 @@ interface RibbonToolbarProps {
   onExport?: () => void;
   onScenario?: () => void;
   onMessage?: () => void;
+  onSsimExport?: () => void;
   onFind?: () => void;
   onReplace?: () => void;
   onSaveAs?: () => void;
@@ -37,7 +38,7 @@ interface RibbonToolbarProps {
 
 export function RibbonToolbar({
   onAddFlight, onInsertFlight, onDeleteFlight, onSave,
-  onImport, onExport, onScenario, onMessage, onFind, onReplace, onSaveAs,
+  onImport, onExport, onScenario, onMessage, onSsimExport, onFind, onReplace, onSaveAs,
   hasDirty, hasSelection, saving, rowHeight, onRowHeightChange,
 }: RibbonToolbarProps) {
   const { theme } = useTheme();
@@ -96,6 +97,7 @@ export function RibbonToolbar({
     // Scenario & Message
     { icon: GitBranch, label: "Scenario", tooltip: "Scenario", onClick: onScenario },
     { icon: MessageSquare, label: "ASM/SSM", tooltip: "ASM/SSM", onClick: onMessage },
+    { icon: FileText, label: "SSIM", tooltip: "SSIM", onClick: onSsimExport },
   ];
 
   return (
@@ -158,7 +160,8 @@ export function RibbonToolbar({
           <Divider isDark={isDark} />
           <UtilitySections
             onSave={onSave} onImport={onImport} onExport={onExport}
-            onScenario={onScenario} onMessage={onMessage} onFind={onFind} onReplace={onReplace} onSaveAs={onSaveAs}
+            onScenario={onScenario} onMessage={onMessage} onSsimExport={onSsimExport}
+            onFind={onFind} onReplace={onReplace} onSaveAs={onSaveAs}
             hasDirty={hasDirty} saving={saving}
           />
 

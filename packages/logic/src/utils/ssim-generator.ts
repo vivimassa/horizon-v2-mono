@@ -37,6 +37,10 @@ export interface SSIMFlightRecord {
   arrUtcOffset: string       // +HHMM or -HHMM (5 chars)
   aircraftTypeIata: string   // 3-char IATA aircraft type
   seatConfig?: Record<string, number>  // e.g. { C: 12, Y: 365 }
+  /** Next leg in the rotation cycle — IATA carrier of the onward flight */
+  onwardAirlineCode?: string
+  /** Next leg flight number (numeric) */
+  onwardFlightNumber?: number
 }
 
 // ---- Constants --------------------------------------------------------------
@@ -52,11 +56,14 @@ export { ICAO_TO_IATA_AIRCRAFT }
 
 /** Format ISO date "YYYY-MM-DD" -> SSIM date "DDMMMYY" */
 export function formatSsimDate(isoDate: string): string {
-  if (!isoDate || isoDate.length < 10) return '       '
-  const parts = isoDate.split('-')
-  const year = parseInt(parts[0], 10)
-  const month = parseInt(parts[1], 10) - 1
-  const day = parts[2]
+  if (!isoDate || typeof isoDate !== 'string') return '       '
+  // Accept "YYYY-MM-DD" or "YYYY-MM-DDTHH:mm:ss..."; reject anything else
+  const m = isoDate.slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return '       '
+  const year = parseInt(m[1], 10)
+  const month = parseInt(m[2], 10) - 1
+  const day = m[3]
+  if (month < 0 || month > 11) return '       '
   const yy = String(year % 100).padStart(2, '0')
   return `${day}${MONTHS[month]}${yy}`
 }
@@ -64,10 +71,11 @@ export function formatSsimDate(isoDate: string): string {
 /** Format seat config { C: 12, Y: 365 } -> "C012Y365" (padded 3-digit counts) */
 export function formatSeatConfig(config: Record<string, number>): string {
   if (!config || Object.keys(config).length === 0) return ''
+  // Canonical IATA cabin order: F (First), C/J (Business), W (Premium Economy), Y (Economy).
+  // Anything outside the canonical set sorts last, alphabetically.
+  const order = ['F', 'C', 'J', 'W', 'Y']
   return Object.entries(config)
     .sort(([a], [b]) => {
-      // Standard order: F, C, W, Y
-      const order = ['F', 'C', 'W', 'Y']
       const ai = order.indexOf(a)
       const bi = order.indexOf(b)
       if (ai >= 0 && bi >= 0) return ai - bi
@@ -197,7 +205,14 @@ function generateType3(flight: SSIMFlightRecord, serialNumber: number): string {
   const seatStr = flight.seatConfig ? formatSeatConfig(flight.seatConfig) : ''
   const serial = padLeft(String(serialNumber), 6).replace(/ /g, '0')
 
-  return buildLine([
+  // Onward flight (next leg in rotation cycle) — pos 128-133
+  // Layout: 128-129 = onward IATA carrier (2 char), 130-133 = flight number (4 digits, zero-padded)
+  const onwardCode = flight.onwardAirlineCode ? padRight(flight.onwardAirlineCode, 2) : ''
+  const onwardFlightNum = flight.onwardFlightNumber
+    ? padLeft(String(flight.onwardFlightNumber), 4).replace(/ /g, '0')
+    : ''
+
+  const segments: { pos: number; value: string }[] = [
     { pos: 0, value: '3' },
     { pos: 1, value: flight.suffix || ' ' },
     { pos: 2, value: airline3 },
@@ -219,7 +234,11 @@ function generateType3(flight: SSIMFlightRecord, serialNumber: number): string {
     { pos: 72, value: acType },
     { pos: 172, value: padRight(seatStr, 20) },
     { pos: 194, value: serial },
-  ])
+  ]
+  if (onwardCode) segments.push({ pos: 128, value: onwardCode })
+  if (onwardFlightNum) segments.push({ pos: 130, value: onwardFlightNum })
+
+  return buildLine(segments)
 }
 
 function generateType5(airlineCode: string, lastFlightSerial: number, totalRecordCount: number): string {

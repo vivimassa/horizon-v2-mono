@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Replace, Upload, Download, Save, SaveAll, GitBranch, MessageSquare } from "lucide-react";
+import { Search, Replace, Upload, Download, Save, SaveAll, GitBranch, MessageSquare, FileText } from "lucide-react";
 import { RibbonButton } from "./ribbon-button";
 import { RibbonSection } from "./flight-section";
 import { useTheme } from "@/components/theme-provider";
@@ -21,6 +21,7 @@ interface Props {
   onExport?: () => void;
   onScenario?: () => void;
   onMessage?: () => void;
+  onSsimExport?: () => void;
   onFind?: () => void;
   onReplace?: () => void;
   onSaveAs?: () => void;
@@ -28,7 +29,7 @@ interface Props {
   saving: boolean;
 }
 
-export function UtilitySections({ onSave, onImport, onExport, onScenario, onMessage, onFind, onReplace, onSaveAs, hasDirty, saving }: Props) {
+export function UtilitySections({ onSave, onImport, onExport, onScenario, onMessage, onSsimExport, onFind, onReplace, onSaveAs, hasDirty, saving }: Props) {
   return (
     <>
       <RibbonSection label="Editing">
@@ -60,6 +61,7 @@ export function UtilitySections({ onSave, onImport, onExport, onScenario, onMess
 
       <RibbonSection label="Message">
         <RibbonButton icon={MessageSquare} label="ASM/SSM" onClick={onMessage} />
+        <RibbonButton icon={FileText} label="SSIM" onClick={onSsimExport} />
       </RibbonSection>
     </>
   );

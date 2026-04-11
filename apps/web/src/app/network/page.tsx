@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useTheme } from "@/components/theme-provider";
 import { colors, accentTint, type Palette as PaletteType } from "@skyhub/ui/theme";
@@ -9,15 +10,25 @@ import {
   PenLine,
   GanttChart,
   Clock,
-  PlayCircle,
+  Handshake,
   Link2,
-  Timer,
   Plane,
+  Send,
   MessageSquare,
-  PackageOpen,
+  BarChart3,
+  Calendar,
+  CalendarDays,
+  FileText,
+  ArrowLeftRight,
+  Grid3X3,
+  PlaneTakeoff,
+  TrendingUp,
   ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+
+/* ── Types ── */
 
 interface CardDef {
   code: string;
@@ -35,10 +46,19 @@ interface SectionDef {
   cards: CardDef[];
 }
 
+interface ReportGroupDef {
+  code: string;
+  label: string;
+  icon: LucideIcon;
+  cards: CardDef[];
+}
+
+/* ── Data ── */
+
 const SECTIONS: SectionDef[] = [
   {
     num: "I",
-    label: "Schedule Planning",
+    label: "Schedule Build",
     icon: PenLine,
     color: "#1e40af",
     cards: [
@@ -49,24 +69,60 @@ const SECTIONS: SectionDef[] = [
   },
   {
     num: "II",
-    label: "Schedule Administration",
-    icon: PlayCircle,
+    label: "Partners & Charter",
+    icon: Handshake,
     color: "#7c3aed",
     cards: [
-      { code: "1.1.4", label: "Codeshare Manager", desc: "Partner designators & marketing carriers", icon: Link2, href: "/network/control/codeshare-manager" },
-      { code: "1.1.5", label: "Charter Manager", desc: "Ad-hoc and charter flight operations", icon: Plane, href: "/network/control/charter-manager" },
+      { code: "1.2.1", label: "Codeshare Manager", desc: "Partner designators & marketing carriers", icon: Link2, href: "/network/control/codeshare-manager" },
+      { code: "1.2.2", label: "Charter Manager", desc: "Ad-hoc and charter flight operations", icon: Plane, href: "/network/control/charter-manager" },
     ],
   },
   {
     num: "III",
-    label: "Schedule Distribution",
-    icon: MessageSquare,
+    label: "Distribution",
+    icon: Send,
     color: "#0f766e",
     cards: [
-      { code: "1.1.7", label: "Schedule Messaging", desc: "ASM/SSM messages for partners and GDS", icon: MessageSquare, href: "/network/distribution/messaging" },
+      { code: "1.3.1", label: "Schedule Messaging", desc: "ASM/SSM messages for partners and GDS", icon: MessageSquare, href: "/network/control/schedule-messaging" },
     ],
   },
 ];
+
+const REPORT_SECTION_COLOR = "#b45309";
+
+const REPORT_GROUPS: ReportGroupDef[] = [
+  {
+    code: "1.4.1",
+    label: "Schedule Reports",
+    icon: Calendar,
+    cards: [
+      { code: "1.4.1.1", label: "Daily Flight Schedule", desc: "Daily flight list with times, tail & type assignment", icon: CalendarDays, href: "/network/reports/daily-schedule" },
+      { code: "1.4.1.2", label: "Frequency Analysis", desc: "Flight frequencies by day-of-week & seasonal patterns", icon: BarChart3, href: "/network/reports/frequency-analysis" },
+      { code: "1.4.1.3", label: "Schedule Summary", desc: "Season overview — fleet deployment & capacity trends", icon: FileText, href: "/network/reports/schedule-summary" },
+      { code: "1.4.1.4", label: "Public Timetable", desc: "Passenger-facing timetable by route with local times", icon: Clock, href: "/network/reports/public-timetable" },
+    ],
+  },
+  {
+    code: "1.4.2",
+    label: "Route & Network",
+    icon: Globe,
+    cards: [
+      { code: "1.4.2.1", label: "Route Summary", desc: "City pairs with block time, frequency & capacity", icon: ArrowLeftRight, href: "/network/reports/route-summary" },
+      { code: "1.4.2.2", label: "Route Matrix", desc: "Station-pair heatmap — frequency, seats & ASK", icon: Grid3X3, href: "/network/reports/route-matrix" },
+      { code: "1.4.2.3", label: "Airport Activity", desc: "Departures, arrivals & peak hours per station", icon: PlaneTakeoff, href: "/network/reports/airport-activity" },
+    ],
+  },
+  {
+    code: "1.4.3",
+    label: "Market",
+    icon: TrendingUp,
+    cards: [
+      { code: "1.4.3.1", label: "Market Analysis", desc: "O&D market stats, competition & capacity analysis", icon: TrendingUp, href: "/network/reports/market-analysis" },
+    ],
+  },
+];
+
+/* ── Page ── */
 
 export default function NetworkPage() {
   const { theme } = useTheme();
@@ -88,20 +144,23 @@ export default function NetworkPage() {
             Network Control
           </h1>
           <p className="text-[13px] leading-tight" style={{ color: palette.textSecondary }}>
-            Schedule planning, administration, and distribution
+            Build, partner, distribute, and analyze your schedule
           </p>
         </div>
       </div>
 
-      {/* Sections — 3 columns */}
-      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+      {/* Sections — 4 columns */}
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
         {SECTIONS.map((section) => (
           <DomainSection key={section.num} section={section} palette={palette} isDark={isDark} />
         ))}
+        <ReportsSection palette={palette} isDark={isDark} />
       </div>
     </div>
   );
 }
+
+/* ── Standard section (I, II, III) ── */
 
 function DomainSection({ section, palette, isDark }: { section: SectionDef; palette: PaletteType; isDark: boolean }) {
   const SectionIcon = section.icon;
@@ -123,6 +182,122 @@ function DomainSection({ section, palette, isDark }: { section: SectionDef; pale
     </section>
   );
 }
+
+/* ── Reports section (IV) with accordion sub-groups ── */
+
+function ReportsSection({ palette, isDark }: { palette: PaletteType; isDark: boolean }) {
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+
+  const toggle = (code: string) => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+  };
+
+  return (
+    <section>
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-1 h-7 rounded-full" style={{ background: REPORT_SECTION_COLOR }} />
+        <div className="w-7 h-7 rounded-md flex items-center justify-center"
+          style={{ background: accentTint(REPORT_SECTION_COLOR, isDark ? 0.15 : 0.1) }}>
+          <BarChart3 size={15} color={REPORT_SECTION_COLOR} strokeWidth={1.8} />
+        </div>
+        <span className="text-[15px] font-semibold" style={{ color: palette.text }}>Reports</span>
+      </div>
+      <div className="flex flex-col gap-3">
+        {REPORT_GROUPS.map((group) => (
+          <ReportAccordion
+            key={group.code}
+            group={group}
+            isOpen={openGroups.has(group.code)}
+            onToggle={() => toggle(group.code)}
+            palette={palette}
+            isDark={isDark}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ── Accordion group header + children ── */
+
+function ReportAccordion({
+  group, isOpen, onToggle, palette, isDark,
+}: {
+  group: ReportGroupDef; isOpen: boolean; onToggle: () => void; palette: PaletteType; isDark: boolean;
+}) {
+  const Icon = group.icon;
+  return (
+    <div
+      className="rounded-xl transition-all duration-150"
+      style={{
+        background: isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.7)",
+        border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
+        boxShadow: isDark ? "0 1px 3px rgba(0,0,0,0.3)" : "0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)",
+      }}
+    >
+      {/* Accordion header */}
+      <button onClick={onToggle} className="w-full px-4 py-4 cursor-pointer text-left">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+            style={{ background: accentTint(REPORT_SECTION_COLOR, isDark ? 0.15 : 0.1) }}>
+            <Icon size={16} color={REPORT_SECTION_COLOR} strokeWidth={1.8} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[13px] font-semibold leading-tight" style={{ color: palette.text }}>{group.label}</div>
+            <div className="text-[13px] leading-snug mt-0.5" style={{ color: palette.textTertiary }}>
+              {group.cards.length} report{group.cards.length > 1 ? "s" : ""}
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="font-mono text-[13px] font-semibold" style={{ color: palette.textTertiary }}>{group.code}</span>
+            <ChevronDown
+              size={14}
+              strokeWidth={1.8}
+              className="transition-transform duration-200"
+              style={{
+                color: palette.textTertiary,
+                transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+              }}
+            />
+          </div>
+        </div>
+      </button>
+
+      {/* Accordion children — inside the same card */}
+      {isOpen && (
+        <div className="flex flex-col px-4 pb-3 pt-0 pl-8 border-t"
+          style={{ borderColor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)" }}>
+          {group.cards.map((card) => (
+            <ReportItem key={card.code} card={card} palette={palette} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Minimal report row ── */
+
+function ReportItem({ card, palette }: { card: CardDef; palette: PaletteType }) {
+  const Icon = card.icon;
+  return (
+    <Link href={card.href} className="group flex items-center gap-2 py-1.5">
+      <Icon size={13} color={REPORT_SECTION_COLOR} strokeWidth={1.8} className="shrink-0" />
+      <span className="text-[13px] leading-tight flex-1 truncate" style={{ color: palette.text }}>{card.label}</span>
+      <span className="font-mono text-[13px]" style={{ color: palette.textTertiary }}>{card.code}</span>
+      <ChevronRight size={11} strokeWidth={1.8}
+        className="transition-transform duration-150 group-hover:translate-x-0.5"
+        style={{ color: palette.textTertiary }} />
+    </Link>
+  );
+}
+
+/* ── Shared card component ── */
 
 function EntityCard({ card, sectionColor, palette, isDark }: { card: CardDef; sectionColor: string; palette: PaletteType; isDark: boolean }) {
   const Icon = card.icon;
@@ -151,10 +326,10 @@ function EntityCard({ card, sectionColor, palette, isDark }: { card: CardDef; se
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-[13px] font-semibold leading-tight" style={{ color: palette.text }}>{card.label}</div>
-            <div className="text-[11px] leading-snug mt-0.5 truncate" style={{ color: palette.textTertiary }}>{card.desc}</div>
+            <div className="text-[13px] leading-snug mt-0.5 truncate" style={{ color: palette.textTertiary }}>{card.desc}</div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            <span className="font-mono text-[10px] font-semibold" style={{ color: palette.textTertiary }}>{card.code}</span>
+            <span className="font-mono text-[13px] font-semibold" style={{ color: palette.textTertiary }}>{card.code}</span>
             <ChevronRight size={13} strokeWidth={1.8}
               className="transition-transform duration-150 group-hover:translate-x-0.5"
               style={{ color: palette.textTertiary }} />

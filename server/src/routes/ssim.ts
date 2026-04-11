@@ -3,8 +3,25 @@ import ExcelJS from 'exceljs'
 import type { FastifyInstance } from 'fastify'
 import { ScheduledFlight } from '../models/ScheduledFlight.js'
 import { Operator } from '../models/Operator.js'
+import { AircraftType } from '../models/AircraftType.js'
+import { LopaConfig } from '../models/LopaConfig.js'
 import { parseSsimExcel, type ParsedFlight } from '../utils/ssim-parser.js'
 import { generateSsimExcel } from '../utils/ssim-exporter.js'
+import { generateSSIM, type SSIMFlightRecord, type SSIMExportOptions } from '@skyhub/logic/src/utils/ssim-generator'
+
+// ── IANA timezone → ±HHMM offset string ───────────────────────────────────
+// Uses the platform Intl API so no extra dependency is needed.
+function tzOffsetString(timeZone: string, at: Date): string {
+  try {
+    const fmt = new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'longOffset' })
+    const part = fmt.formatToParts(at).find(p => p.type === 'timeZoneName')?.value ?? 'GMT+00:00'
+    const m = part.match(/GMT([+-])(\d{2}):?(\d{2})/)
+    if (!m) return '+0000'
+    return `${m[1]}${m[2]}${m[3]}`
+  } catch {
+    return '+0000'
+  }
+}
 
 // ── Rotation Grouping ────────────────────────────────────────────────────
 // Chain flights into rotation cycles based on station continuity:
@@ -155,23 +172,174 @@ export async function ssimRoutes(app: FastifyInstance): Promise<void> {
     }
   })
 
-  // ── Export to Excel ──
+  // ── Export to Excel or IATA SSIM Chapter 7 text ──
   app.get('/ssim/export', async (req, reply) => {
     const q = req.query as Record<string, string>
-    if (!q.operatorId || !q.seasonCode) return reply.code(400).send({ error: 'operatorId and seasonCode required' })
+    if (!q.operatorId) return reply.code(400).send({ error: 'operatorId required' })
 
     const filter: Record<string, unknown> = {
       operatorId: q.operatorId,
-      seasonCode: q.seasonCode,
       isActive: { $ne: false },
     }
+    if (q.seasonCode) filter.seasonCode = q.seasonCode
     if (q.scenarioId) filter.scenarioId = q.scenarioId
 
     const flights = await ScheduledFlight.find(filter).sort({ sortOrder: 1, stdUtc: 1 }).lean()
 
-    // Get operator date format (lookup by code, or fallback to first active)
+    // Get operator (date format, IATA code, name, timezone)
     const op = await Operator.findOne({ $or: [{ code: q.operatorId }, { isActive: true }] }).lean()
     const dateFormat = (op?.dateFormat as string) ?? 'DD/MM/YYYY'
+
+    // ── SSIM Chapter 7 (fixed-width 200-char) text format ──
+    if (q.format === 'ssim') {
+      if (!op) return reply.code(404).send({ error: 'Operator not found' })
+
+      const timeMode = q.timeMode === 'utc' ? 'utc' : 'local'  // default local
+      const opOffset = timeMode === 'utc'
+        ? '+0000'
+        : tzOffsetString(op.timezone as string, new Date())
+
+      // Derive season span from the flight set (min/max of effective dates)
+      let seasonStart = ''
+      let seasonEnd = ''
+      for (const f of flights) {
+        const from = (f.effectiveFrom as string) ?? ''
+        const until = (f.effectiveUntil as string) ?? ''
+        if (from && (!seasonStart || from < seasonStart)) seasonStart = from
+        if (until && (!seasonEnd || until > seasonEnd)) seasonEnd = until
+      }
+
+      const airlineCode = (op.iataCode as string) || ''
+      const airlineName = (op.name as string) || ''
+
+      // ── Aircraft type ICAO → IATA lookup ──
+      // SSIM Record 3 wants the IATA 3-char equipment code (e.g. "320", "321", "350", "380"),
+      // not the ICAO code (A320 / A321 / A350 / A380). Build a map from the AircraftType
+      // master data so each flight resolves its proper IATA code at write-time.
+      const distinctTypes = Array.from(
+        new Set(flights.map((f) => (f.aircraftTypeIcao as string) || '').filter(Boolean)),
+      )
+      const acTypeDocs = distinctTypes.length
+        ? await AircraftType.find({
+            operatorId: q.operatorId,
+            $or: [
+              { icaoType: { $in: distinctTypes } },
+              { iataType: { $in: distinctTypes } },
+            ],
+          }).lean()
+        : []
+      const icaoToIata = new Map<string, string>()
+      for (const t of acTypeDocs) {
+        const iata = ((t.iataType as string) || '').trim()
+        if (!iata) continue
+        if (t.icaoType) icaoToIata.set(t.icaoType as string, iata)
+        // Self-map so an already-IATA code in the flight row still resolves
+        icaoToIata.set(iata, iata)
+      }
+      const resolveIataAcType = (raw: string): string => {
+        if (!raw) return ''
+        return icaoToIata.get(raw) ?? raw.slice(0, 3)
+      }
+
+      // ── LOPA (seat configuration) lookup ──
+      // SSIM Record 3 positions 172-191 hold the cabin configuration (e.g. "C008Y162").
+      // LopaConfig is keyed by ICAO aircraft type. When multiple configs exist for the
+      // same type we prefer the one flagged isDefault, then fall back to the first match.
+      const lopas = distinctTypes.length
+        ? await LopaConfig.find({
+            operatorId: q.operatorId,
+            aircraftType: { $in: distinctTypes },
+            isActive: { $ne: false },
+          }).lean()
+        : []
+      const lopaByType = new Map<string, Record<string, number>>()
+      for (const l of lopas) {
+        const key = l.aircraftType as string
+        const existing = lopaByType.get(key)
+        // First write wins UNLESS we find an isDefault entry, which always wins.
+        if (existing && !l.isDefault) continue
+        const cabins = (l.cabins as Array<{ classCode: string; seats: number }>) || []
+        const cfg: Record<string, number> = {}
+        for (const c of cabins) {
+          // Map operator's "J" (Business) to IATA SSIM canonical "C" so the output
+          // matches what downstream GDS systems expect. F / W / Y pass through unchanged.
+          const code = c.classCode === 'J' ? 'C' : c.classCode
+          if (code && c.seats > 0) cfg[code] = (cfg[code] || 0) + c.seats
+        }
+        lopaByType.set(key, cfg)
+      }
+      const resolveSeatConfig = (icaoType: string): Record<string, number> | undefined => {
+        if (!icaoType) return undefined
+        const cfg = lopaByType.get(icaoType)
+        return cfg && Object.keys(cfg).length > 0 ? cfg : undefined
+      }
+
+      // Build rotation index: rotationId → seq → flight, so each leg can look up its onward.
+      const byRotation = new Map<string, Map<number, typeof flights[number]>>()
+      for (const f of flights) {
+        const rid = f.rotationId as string | null
+        const seq = f.rotationSequence as number | null
+        if (!rid || seq == null) continue
+        let m = byRotation.get(rid)
+        if (!m) { m = new Map(); byRotation.set(rid, m) }
+        m.set(seq, f)
+      }
+      const onwardOf = (f: typeof flights[number]): typeof flights[number] | undefined => {
+        const rid = f.rotationId as string | null
+        const seq = f.rotationSequence as number | null
+        if (!rid || seq == null) return undefined
+        return byRotation.get(rid)?.get(seq + 1)
+      }
+
+      const records: SSIMFlightRecord[] = flights.map((f) => {
+        const onward = onwardOf(f)
+        return ({
+        airlineCode: ((f.airlineCode as string) || airlineCode).trim(),
+        flightNumber: parseInt((f.flightNumber as string) || '0', 10) || 0,
+        itineraryVariation: '01',
+        legSequence: '01',
+        serviceType: ((f.serviceType as string) || 'J').slice(0, 1),
+        periodStart: (f.effectiveFrom as string) || seasonStart,
+        periodEnd: (f.effectiveUntil as string) || seasonEnd,
+        // ScheduledFlight stores daysOfWeek as a 7-char string ("1234567" or with spaces)
+        daysOfOperation: ((f.daysOfWeek as string) || '       ').padEnd(7, ' ').slice(0, 7),
+        depStation: (f.depStation as string) || '',
+        stdUtc: (f.stdUtc as string) || '0000',
+        depUtcOffset: opOffset,
+        arrStation: (f.arrStation as string) || '',
+        staUtc: (f.staUtc as string) || '0000',
+        arrUtcOffset: opOffset,
+        aircraftTypeIata: resolveIataAcType((f.aircraftTypeIcao as string) || ''),
+        seatConfig: resolveSeatConfig((f.aircraftTypeIcao as string) || ''),
+        onwardAirlineCode: onward
+          ? ((onward.airlineCode as string) || airlineCode).trim() || undefined
+          : undefined,
+        onwardFlightNumber: onward
+          ? (parseInt((onward.flightNumber as string) || '0', 10) || undefined)
+          : undefined,
+      })
+      })
+
+      const options: SSIMExportOptions = {
+        airlineCode,
+        airlineName,
+        seasonStart,
+        seasonEnd,
+        actionCode: 'N',
+        creator: 'SKYHUB  ',
+      }
+
+      const text = generateSSIM(records, options)
+      const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+      const seasonPart = q.seasonCode ? `${q.seasonCode}_` : ''
+      const filename = `SSIM_${airlineCode || 'OP'}_${seasonPart}${timeMode.toUpperCase()}_${stamp}.ssim`
+
+      reply.header('Content-Type', 'text/plain; charset=utf-8')
+      reply.header('Content-Disposition', `attachment; filename="${filename}"`)
+      return reply.send(text)
+    }
+
+    // ── Default: Excel export ──
 
     const buffer = await generateSsimExcel(
       flights.map(f => ({

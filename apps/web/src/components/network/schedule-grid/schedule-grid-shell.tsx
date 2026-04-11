@@ -17,6 +17,7 @@ import { FilterPanel, type FilterParams } from "./filter-panel";
 import { FindReplaceDialog } from "./find-replace-dialog";
 import { ImportDialog } from "./import-dialog";
 import { ExportDialog } from "./export-dialog";
+import { SsimExportDialog } from "./ssim-export-dialog";
 import { ScenarioPanel } from "./scenario-panel";
 import { MessageDialog } from "./message-dialog";
 import { Plus, RefreshCw } from "lucide-react";
@@ -59,6 +60,7 @@ export function ScheduleGridShell() {
   const [showReplace, setShowReplace] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showSsimExport, setShowSsimExport] = useState(false);
   const [showScenarios, setShowScenarios] = useState(false);
   const [scenarioAutoCreate, setScenarioAutoCreate] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
@@ -384,6 +386,16 @@ export function ScheduleGridShell() {
             <ExportDialog seasonCode="" scenarioId={activeScenarioId ?? undefined} flightCount={rows.length} dateFrom={filterDateFrom} dateTo={filterDateTo} onClose={() => setShowExport(false)} />
           )}
 
+          {/* SSIM export dialog */}
+          {showSsimExport && (
+            <SsimExportDialog
+              seasonCode=""
+              scenarioId={activeScenarioId ?? undefined}
+              flightCount={rows.length}
+              onClose={() => setShowSsimExport(false)}
+            />
+          )}
+
           {/* Scenario panel */}
           {showScenarios && (
             <ScenarioPanel seasonCode="" activeScenarioId={activeScenarioId} onSelectScenario={setActiveScenarioId} onClose={() => { setShowScenarios(false); setScenarioAutoCreate(false); }} autoCreate={scenarioAutoCreate} />
@@ -429,6 +441,7 @@ export function ScheduleGridShell() {
             onExport={() => setShowExport(true)}
             onScenario={() => setShowScenarios(true)}
             onMessage={() => setShowMessages(true)}
+            onSsimExport={() => setShowSsimExport(true)}
             onFind={() => setShowFind(true)}
             onReplace={() => setShowReplace(true)}
             onSaveAs={() => { setScenarioAutoCreate(true); setShowScenarios(true); }}

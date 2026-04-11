@@ -70,7 +70,8 @@
       "Bash(xargs -I {} basename {})",
       "Bash(git -C /c/Users/vivim/horizon-v2-mono diff --staged)",
       "Bash(git -C /c/Users/vivim/horizon-v2-mono diff)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Bash(echo \"EXIT: $?\")"
     ]
   },
   "enableAllProjectMcpServers": true,

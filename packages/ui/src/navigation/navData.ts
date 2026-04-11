@@ -50,27 +50,40 @@ export const NAV_TREE: NavModuleData[] = [
     key: 'network', label: 'Network', num: '1', iconName: 'Globe',
     sections: [
       {
-        key: 'schedule', label: 'Schedule', num: '1.1', iconName: 'Calendar',
+        key: 'schedule-build', label: 'Schedule Build', num: '1.1', iconName: 'Calendar',
         pages: [
           { key: 'schedule-grid', label: 'Scheduling XL', num: '1.1.1', route: '/network/control/schedule-grid', iconName: 'LayoutGrid', desc: 'Excel-style flight schedule editor' },
           { key: 'gantt', label: 'Gantt Chart', num: '1.1.2', route: '/network/schedule/gantt', iconName: 'GanttChart', desc: 'Visual timeline' },
           { key: 'slot-manager', label: 'Slot Planning', num: '1.1.3', route: '/network/schedule/slot-manager', iconName: 'Clock', desc: 'Airport slot allocations & IATA 80/20' },
-          { key: 'codeshare-manager', label: 'Codeshare Manager', num: '1.1.4', route: '/network/control/codeshare-manager', iconName: 'Link2', desc: 'Codeshare agreements & partner flight designators' },
-          { key: 'charter-manager', label: 'Charter Manager', num: '1.1.5', route: '/network/control/charter-manager', iconName: 'PlaneTakeoff', desc: 'Charter & ad-hoc flight operations' },
-          { key: 'schedule-messaging', label: 'Schedule Messaging', num: '1.1.6', route: '/network/control/schedule-messaging', iconName: 'MessageSquare', desc: 'ASM/SSM inbound & outbound message management' },
         ],
       },
       {
-        key: 'commercial', label: 'Commercial', num: '2.3', iconName: 'Handshake',
+        key: 'partners-charter', label: 'Partners & Charter', num: '1.2', iconName: 'Handshake',
         pages: [
-          { key: 'aircraft-routes', label: 'Aircraft Routes', num: '2.3.3', route: '/network/commercial/aircraft-routes', iconName: 'Globe', desc: 'Route-tail assignment' },
+          { key: 'codeshare-manager', label: 'Codeshare Manager', num: '1.2.1', route: '/network/control/codeshare-manager', iconName: 'Link2', desc: 'Codeshare agreements & partner flight designators' },
+          { key: 'charter-manager', label: 'Charter Manager', num: '1.2.2', route: '/network/control/charter-manager', iconName: 'PlaneTakeoff', desc: 'Charter & ad-hoc flight operations' },
         ],
       },
       {
-        key: 'distribution', label: 'Distribution', num: '2.4', iconName: 'Send',
+        key: 'distribution', label: 'Distribution', num: '1.3', iconName: 'Send',
         pages: [
-          { key: 'publish', label: 'Publish', num: '2.4.1', route: '/network/distribution/publish', iconName: 'Send', desc: 'Publish & distribute' },
-          { key: 'ssim-messaging', label: 'SSIM Messaging', num: '2.4.2', route: '/network/distribution/ssim-messaging', iconName: 'MessageSquare', desc: 'SSIM/SSM distribution' },
+          { key: 'schedule-messaging', label: 'Schedule Messaging', num: '1.3.1', route: '/network/control/schedule-messaging', iconName: 'MessageSquare', desc: 'ASM/SSM inbound & outbound message management' },
+        ],
+      },
+      {
+        key: 'reports', label: 'Reports', num: '1.4', iconName: 'BarChart3',
+        pages: [
+          // 1.4.1 — Schedule Reports
+          { key: 'daily-schedule', label: 'Daily Flight Schedule', num: '1.4.1.1', route: '/network/reports/daily-schedule', iconName: 'CalendarDays', desc: 'Daily flight list with times, tail & type assignment', group: 'Schedule Reports', groupIconName: 'Calendar' },
+          { key: 'frequency-analysis', label: 'Frequency Analysis', num: '1.4.1.2', route: '/network/reports/frequency-analysis', iconName: 'BarChart3', desc: 'Flight frequencies by day-of-week & seasonal patterns', group: 'Schedule Reports', groupIconName: 'Calendar' },
+          { key: 'schedule-summary', label: 'Schedule Summary', num: '1.4.1.3', route: '/network/reports/schedule-summary', iconName: 'FileText', desc: 'Season overview — fleet deployment & capacity trends', group: 'Schedule Reports', groupIconName: 'Calendar' },
+          { key: 'public-timetable', label: 'Public Timetable', num: '1.4.1.4', route: '/network/reports/public-timetable', iconName: 'Clock', desc: 'Passenger-facing timetable by route with local times', group: 'Schedule Reports', groupIconName: 'Calendar' },
+          // 1.4.2 — Route & Network
+          { key: 'route-summary', label: 'Route Summary', num: '1.4.2.1', route: '/network/reports/route-summary', iconName: 'ArrowLeftRight', desc: 'City pairs with block time, frequency & capacity', group: 'Route & Network', groupIconName: 'Globe' },
+          { key: 'route-matrix', label: 'Route Matrix', num: '1.4.2.2', route: '/network/reports/route-matrix', iconName: 'Grid3X3', desc: 'Station-pair heatmap — frequency, seats & ASK', group: 'Route & Network', groupIconName: 'Globe' },
+          { key: 'airport-activity', label: 'Airport Activity', num: '1.4.2.3', route: '/network/reports/airport-activity', iconName: 'PlaneTakeoff', desc: 'Departures, arrivals & peak hours per station', group: 'Route & Network', groupIconName: 'Globe' },
+          // 1.4.3 — Market
+          { key: 'market-analysis', label: 'Market Analysis', num: '1.4.3.1', route: '/network/reports/market-analysis', iconName: 'TrendingUp', desc: 'O&D market stats, competition & capacity analysis', group: 'Market', groupIconName: 'TrendingUp' },
         ],
       },
     ],

@@ -1145,9 +1145,19 @@ export const api = {
     request<{ success: boolean }>(`/scenarios/${id}`, { method: 'DELETE' }),
 
   // ─── SSIM Import/Export ────────────────────────────────
-  exportSsim: (params: { operatorId: string; seasonCode: string; scenarioId?: string }) => {
+  exportSsim: (params: {
+    operatorId: string
+    seasonCode: string
+    scenarioId?: string
+    /** 'xlsx' (default — Excel) or 'ssim' (IATA Chapter 7 fixed-width text) */
+    format?: 'xlsx' | 'ssim'
+    /** Only used when format='ssim'. 'local' uses operator timezone offset; 'utc' uses +0000. */
+    timeMode?: 'local' | 'utc'
+  }) => {
     const p = new URLSearchParams({ operatorId: params.operatorId, seasonCode: params.seasonCode })
     if (params.scenarioId) p.set('scenarioId', params.scenarioId)
+    if (params.format) p.set('format', params.format)
+    if (params.timeMode) p.set('timeMode', params.timeMode)
     return fetch(`${getApiBaseUrl()}/ssim/export?${p.toString()}`).then(r => r.blob())
   },
 

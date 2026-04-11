@@ -8,6 +8,7 @@ import { Breadcrumb } from '@/components/Breadcrumb'
 import { ThemeProvider } from '@/components/theme-provider'
 import { DisplayProvider } from '@/components/display-provider'
 import { UserProvider } from '@/components/user-provider'
+import { AuthProvider } from '@/components/auth-provider'
 import { AnimatedBodyBg } from '@/components/AnimatedBodyBg'
 
 const inter = Inter({ subsets: ['latin'] })

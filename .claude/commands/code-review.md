@@ -34,6 +34,7 @@ npm test 2>&1 | tail -10
 ## Then delegate to code-reviewer agent for deep review
 
 Focus areas:
+
 - operatorId on every query
 - UTC-only timestamps
 - Design system compliance (palette tokens, typography, corner radius)

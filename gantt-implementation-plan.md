@@ -44,6 +44,7 @@
 ## Phase 1 — Server API + Types
 
 ### Context
+
 The Gantt needs a dedicated endpoint that joins ScheduledFlights + AircraftRegistrations + AircraftTypes and expands date patterns into concrete per-date flight instances. The existing `/flights` endpoint returns FlightInstances (operational) but the Gantt primarily works with ScheduledFlights (planning).
 
 ### Task
@@ -55,6 +56,7 @@ GET /gantt/flights?operatorId=X&from=2026-04-07&to=2026-04-10&scenarioId=Y
 ```
 
 Logic:
+
 1. Query `ScheduledFlight.find({ operatorId, scenarioId, status: { $in: ['draft','active'] }, effectiveFrom: { $lte: to }, effectiveUntil: { $gte: from } })`
 2. Query `AircraftRegistration.find({ operatorId, isActive: true })` — include all, even unassigned
 3. Query `AircraftType.find({ operatorId, isActive: true })`
@@ -62,6 +64,7 @@ Logic:
 5. Return `{ flights: GanttFlight[], aircraft: GanttAircraft[], aircraftTypes: GanttAircraftType[] }`
 
 Response shapes:
+
 ```typescript
 interface GanttFlight {
   id: string              // scheduledFlight._id + "|" + operatingDate
@@ -99,6 +102,7 @@ interface GanttAircraftType {
 ```
 
 **1b. Add assign/unassign endpoints:**
+
 ```
 PATCH /gantt/assign   { flightIds: string[], registration: string }
 PATCH /gantt/unassign { flightIds: string[] }
@@ -138,12 +142,14 @@ interface RowLayout {
 ```
 
 ### Design Rules
+
 - operatorId on every query
 - All times in UTC milliseconds
 - DOW expansion: 1=Monday (ISO), match against `daysOfWeek` string where char position = day number
 - Use Zod validation on query params
 
 ### Acceptance Criteria
+
 - [ ] `GET /gantt/flights` returns expanded flights for a 4-day period with correct DOW filtering
 - [ ] Response includes joined aircraft type ICAO on each aircraft record
 - [ ] `PATCH /gantt/assign` updates aircraftReg on matching ScheduledFlight docs
@@ -155,6 +161,7 @@ interface RowLayout {
 ## Phase 2 — Zustand Store + Pure Logic
 
 ### Context
+
 Replace v1's 60+ useState hooks with a single Zustand store. Also create the pure logic functions for coordinate math.
 
 ### Task
@@ -162,6 +169,7 @@ Replace v1's 60+ useState hooks with a single Zustand store. Also create the pur
 **2a. Create `apps/web/src/stores/use-gantt-store.ts`**
 
 Slices:
+
 ```typescript
 interface GanttState {
   // Data
@@ -172,11 +180,11 @@ interface GanttState {
 
   // View
   zoomLevel: ZoomLevel
-  startDate: Date                    // left edge of visible window
-  periodFrom: string | null          // committed period
+  startDate: Date // left edge of visible window
+  periodFrom: string | null // committed period
   periodTo: string | null
-  rowHeightLevel: number             // 0=compact, 1=default, 2=large, 3=xlarge
-  collapsedTypes: Set<string>        // collapsed AC type ICAOs
+  rowHeightLevel: number // 0=compact, 1=default, 2=large, 3=xlarge
+  collapsedTypes: Set<string> // collapsed AC type ICAOs
   colorMode: ColorMode
   barLabelMode: BarLabelMode
 
@@ -202,6 +210,7 @@ Use sliced selectors pattern — components subscribe to only the slice they nee
 **2b. Create `apps/web/src/lib/gantt/time-axis.ts`**
 
 Pure functions:
+
 - `getZoomConfig(zoom: ZoomLevel) → { days: number, hoursPerTick: number }`
 - `computePixelsPerHour(containerWidth: number, zoomDays: number) → number`
 - `getTickPositions(startDate: Date, totalDays: number, hoursPerTick: number, pph: number) → TickMark[]`
@@ -212,6 +221,7 @@ Pure functions:
 Pure function: takes `(flights, aircraft, aircraftTypes, collapsedTypes, rowHeight, pph, startDate)` and returns `{ rows: RowLayout[], bars: BarLayout[] }`.
 
 Logic:
+
 1. Group aircraft by type ICAO
 2. For each group: emit a group header row, then one row per aircraft (skip if collapsed)
 3. For each aircraft row: find flights where `aircraftReg === registration`, compute x/width from stdUtc/staUtc relative to startDate using pph
@@ -226,17 +236,20 @@ Pure function: `hitTest(x: number, y: number, bars: BarLayout[]) → string | nu
 Pure function: `getBarColor(flight: GanttFlight, colorMode: ColorMode, acTypeColors: Map<string,string>, isDark: boolean) → { bg: string, text: string }`
 
 Status-mode colors:
+
 - active + assigned → emerald-500/70
 - active + unassigned → amber-500/65
 - draft + assigned → blue-500/65
 - draft + unassigned → slate-500/55
 
 ### Design Rules
+
 - Zero React imports in `lib/gantt/*.ts` — these are pure TS
 - Store uses `immer` middleware for immutable updates on Sets
 - All coordinate math uses UTC milliseconds, never local time
 
 ### Acceptance Criteria
+
 - [ ] Store hydrates from API response and re-renders only subscribed slices
 - [ ] `layout-engine` produces correct bar x/width for flights spanning midnight UTC
 - [ ] `hit-testing` returns correct flight ID for coordinates within a bar
@@ -248,6 +261,7 @@ Status-mode colors:
 ## Phase 3 — Page Shell + Filter Panel + Toolbar
 
 ### Context
+
 Build the page layout, filter sidebar, and toolbar. No Gantt canvas yet — just the frame with a placeholder.
 
 ### Task
@@ -259,6 +273,7 @@ Minimal page that renders `<GanttShell />`. Fetches initial data on mount using 
 **3b. Create `gantt-shell.tsx`**
 
 Layout orchestrator:
+
 ```
 ┌──────────────────────────────────────────────┐
 │ gantt-filter-panel │ gantt-toolbar            │
@@ -273,6 +288,7 @@ Filter panel is collapsible (280px → 0 with transition).
 **3c. Create `gantt-filter-panel.tsx`**
 
 Contents (top to bottom):
+
 1. Period selector: two date inputs (From / To) + "Go" button (accent primary)
 2. Aircraft type filter: multi-select with color swatches per type
 3. Schedule status toggles: Published ✓, Finalized ✓, Draft ✓
@@ -292,6 +308,7 @@ Right: search input, label toggle (Flight No ↔ Sector), settings gear, fullscr
 Single 24px line: flight count, aircraft count, zoom level, utilization %, UTC time, period range, sync status.
 
 ### Design Rules
+
 - Follow SkyHub v2 design system: colors from `useTheme()`, no hardcoded hex in components
 - All icons from `lucide-react` via the `<Icon>` wrapper
 - Filter panel inputs use the existing SkyHub input/select components if available, otherwise raw Tailwind
@@ -299,6 +316,7 @@ Single 24px line: flight count, aircraft count, zoom level, utilization %, UTC t
 - Glass effect on toolbar: `backdrop-blur-[20px] bg-[rgba(27,27,33,0.8)]`
 
 ### Acceptance Criteria
+
 - [ ] Page loads at `/network/schedule/gantt` with filter panel, toolbar, and placeholder body
 - [ ] Period selector triggers API fetch via store
 - [ ] AC type filter updates store → will re-layout when canvas exists
@@ -313,6 +331,7 @@ Single 24px line: flight count, aircraft count, zoom level, utilization %, UTC t
 ## Phase 4 — Canvas2D Renderer
 
 ### Context
+
 The core of the Gantt — render flight bars, grid lines, time header, now-line, and group headers onto an HTML `<canvas>` element. This replaces v1's DOM-based absolute positioning with canvas drawing for performance.
 
 ### Task
@@ -320,6 +339,7 @@ The core of the Gantt — render flight bars, grid lines, time header, now-line,
 **4a. Create `gantt-canvas.tsx`**
 
 Component that:
+
 1. Uses a `<canvas>` element with `ref`
 2. On mount / resize: set canvas size to container size × devicePixelRatio
 3. Subscribe to store: `flights`, `aircraft`, `zoomLevel`, `startDate`, `rowHeightLevel`, `collapsedTypes`, `colorMode`, `selectedFlightIds`, `hoveredFlightId`
@@ -344,18 +364,21 @@ Draw day labels and hour ticks on the top portion of the canvas (or a separate h
 The canvas content is wider than the viewport. Use a scroll container `<div>` around the canvas with `overflow-x: auto`. Sync the header and row-label positions with `scrollLeft`.
 
 **Performance techniques:**
+
 - Only draw bars within the visible horizontal scroll range (horizontal virtualization)
 - Use `requestAnimationFrame` for draw calls
 - Cache `pixelsPerHour` in a ref, recompute only on zoom/resize
 - Batch fill operations: set `fillStyle` once per color group, draw all bars of that color
 
 **Mouse events on canvas:**
+
 - `onMouseMove`: call `hitTest(x, y)` → update `hoveredFlightId` in store
 - `onClick`: call `hitTest(x, y)` → update selection in store (Ctrl/Cmd for multi-select)
 - `onContextMenu`: call `hitTest(x, y)` → open context menu at cursor position
 - `onWheel`: horizontal scroll OR zoom (Ctrl+wheel = zoom)
 
 ### Design Rules
+
 - Canvas text: use Inter 11px for bar labels, JetBrains Mono 10px for flight numbers, 9px for TAT labels
 - Minimum bar width: 2px (degenerate case at 28D zoom)
 - Bar corner radius: 4px (use `roundRect` API)
@@ -364,6 +387,7 @@ The canvas content is wider than the viewport. Use a scroll container `<div>` ar
 - DevicePixelRatio: always multiply canvas dimensions by `window.devicePixelRatio` for sharp text
 
 ### Acceptance Criteria
+
 - [ ] Canvas renders 200+ bars across 8 aircraft rows at 60fps
 - [ ] Horizontal scroll syncs between canvas body, time header, and row labels
 - [ ] Now-line position updates every 60 seconds
@@ -379,6 +403,7 @@ The canvas content is wider than the viewport. Use a scroll container `<div>` ar
 ## Phase 5 — Interactions (Tooltip, Context Menu, Detail Panel)
 
 ### Context
+
 Overlay DOM elements on top of the canvas for rich UI that canvas can't handle well (text selection, animations, complex layouts).
 
 ### Task
@@ -394,6 +419,7 @@ Show with 100ms delay, hide immediately on mouse leave.
 **5b. Create `gantt-context-menu.tsx`**
 
 Right-click menu with glass panel background. Items:
+
 - View Flight Details
 - Assign to Aircraft… (opens picker)
 - Unassign from Aircraft
@@ -405,6 +431,7 @@ Right-click menu with glass panel background. Items:
 **5c. Create `gantt-detail-panel.tsx`**
 
 Fixed position bottom-right (320px wide). Shows when a flight is selected. Contains:
+
 - Flight number (large mono heading)
 - Route, times, block time
 - Aircraft assignment
@@ -421,6 +448,7 @@ Auto-hides when selection is cleared.
 Sync horizontal scroll with the canvas.
 
 ### Design Rules
+
 - Tooltip max-width: 220px, glass-panel background, border-radius 12px
 - Context menu: min-width 200px, 8px item padding, hover highlight
 - Detail panel: glass-panel, rounded-xl, shadow-2xl
@@ -428,6 +456,7 @@ Sync horizontal scroll with the canvas.
 - Histogram bars: 2px gap, rounded-top-sm, same horizontal scale as canvas
 
 ### Acceptance Criteria
+
 - [ ] Tooltip appears on hover with correct flight data, repositions to stay within viewport
 - [ ] Context menu opens on right-click, closes on click-outside or Escape
 - [ ] Detail panel slides in when flight selected, slides out when deselected
@@ -439,6 +468,7 @@ Sync horizontal scroll with the canvas.
 ## Phase 6 — Tail Assignment (Drag & Drop)
 
 ### Context
+
 The killer feature — drag a flight bar from one aircraft row to another to reassign tail numbers. This is what makes the Gantt an assignment tool, not just a viewer.
 
 ### Task
@@ -446,6 +476,7 @@ The killer feature — drag a flight bar from one aircraft row to another to rea
 **6a. Implement drag-and-drop on canvas:**
 
 On `mousedown` on a bar:
+
 1. Set drag state in store: `{ flightId, originRow, startX, startY }`
 2. Draw ghost bar at origin (dashed outline, transparent)
 3. On `mousemove`: draw dragged bar following cursor Y position, snap to nearest row
@@ -471,6 +502,7 @@ When multiple bars are selected and one is dragged, all selected bars move toget
 If the target aircraft already has a conflicting flight (time overlap), show a confirmation dialog before proceeding.
 
 ### Design Rules
+
 - Dragged bar opacity: 0.65, scale: 1.03
 - Ghost placeholder at origin: dashed border, transparent fill
 - Drop target row: subtle highlight (primary/5% tint)
@@ -478,6 +510,7 @@ If the target aircraft already has a conflicting flight (time overlap), show a c
 - Cursor changes: grab → grabbing during drag
 
 ### Acceptance Criteria
+
 - [ ] Drag flight from one aircraft row to another → updates in DB
 - [ ] Ghost placeholder visible at origin during drag
 - [ ] Multi-select drag moves all selected bars
@@ -489,14 +522,14 @@ If the target aircraft already has a conflicting flight (time overlap), show a c
 
 ## Build Order Summary
 
-| Phase | Description | Dependencies | Est. effort |
-|-------|-------------|--------------|-------------|
-| 1 | Server API + Types | Existing models | Small |
-| 2 | Store + Pure Logic | Phase 1 types | Medium |
-| 3 | Page Shell + UI Frame | Phase 2 store | Medium |
-| 4 | Canvas Renderer | Phase 2 + 3 | Large (biggest phase) |
-| 5 | Interactions | Phase 4 | Medium |
-| 6 | Drag & Drop Assignment | Phase 4 + 5 | Medium |
+| Phase | Description            | Dependencies    | Est. effort           |
+| ----- | ---------------------- | --------------- | --------------------- |
+| 1     | Server API + Types     | Existing models | Small                 |
+| 2     | Store + Pure Logic     | Phase 1 types   | Medium                |
+| 3     | Page Shell + UI Frame  | Phase 2 store   | Medium                |
+| 4     | Canvas Renderer        | Phase 2 + 3     | Large (biggest phase) |
+| 5     | Interactions           | Phase 4         | Medium                |
+| 6     | Drag & Drop Assignment | Phase 4 + 5     | Medium                |
 
 Execute sequentially. Git commit between each phase. Verify each phase works before starting the next.
 

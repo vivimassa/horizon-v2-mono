@@ -20,11 +20,11 @@ NEVER:   Mix UTC and local in the same calculation
 
 Every timestamp variable and field MUST declare its timezone context in its name:
 
-| Suffix | Meaning | Example |
-|--------|---------|---------|
-| `Utc` | UTC milliseconds | `stdUtc`, `ataUtc`, `dutyStartUtc` |
-| `Local` | Operator-local display string | `depTimeLocal`, `arrDateLocal` |
-| `Ms` | Duration in milliseconds | `restMs`, `dutyMs`, `delayMs` |
+| Suffix  | Meaning                       | Example                            |
+| ------- | ----------------------------- | ---------------------------------- |
+| `Utc`   | UTC milliseconds              | `stdUtc`, `ataUtc`, `dutyStartUtc` |
+| `Local` | Operator-local display string | `depTimeLocal`, `arrDateLocal`     |
+| `Ms`    | Duration in milliseconds      | `restMs`, `dutyMs`, `delayMs`      |
 
 **NEVER** use ambiguous names like `departureTime`, `arrivalDate`, `startTime`.
 
@@ -125,11 +125,11 @@ export function msToHours(ms: number): number {
 
 Vietnam (Asia/Ho_Chi_Minh) is UTC+7. This creates dangerous date boundaries:
 
-| Local Time | UTC Time | Trap |
-|-----------|----------|------|
-| 00:00 local | 17:00 UTC previous day | Flight "today" is UTC "yesterday" |
-| 06:59 local | 23:59 UTC previous day | Still previous UTC date |
-| 07:00 local | 00:00 UTC same day | First moment where local = UTC date |
+| Local Time  | UTC Time               | Trap                                |
+| ----------- | ---------------------- | ----------------------------------- |
+| 00:00 local | 17:00 UTC previous day | Flight "today" is UTC "yesterday"   |
+| 06:59 local | 23:59 UTC previous day | Still previous UTC date             |
+| 07:00 local | 00:00 UTC same day     | First moment where local = UTC date |
 
 **Rule:** NEVER derive operating date from UTC date. Always use `getOperatingDate(utcMs, 'Asia/Ho_Chi_Minh')`.
 
@@ -158,18 +158,19 @@ function barWidth(stdUtc: number, staUtc: number, pixelsPerMs: number): number {
 const today = new Date().toISOString().split('T')[0]
 
 // FORBIDDEN — mixing local and UTC
-const localHour = new Date(utcMs).getHours()  // Uses device timezone!
+const localHour = new Date(utcMs).getHours() // Uses device timezone!
 
 // FORBIDDEN — ambiguous duration
-const restHours = 10  // 10 what? UTC hours? Local hours?
+const restHours = 10 // 10 what? UTC hours? Local hours?
 
 // CORRECT
-const restMs = 10 * 3600000  // 10 hours in milliseconds — unambiguous
+const restMs = 10 * 3600000 // 10 hours in milliseconds — unambiguous
 ```
 
 ## Test Requirements
 
 Every function that touches timestamps MUST have tests for:
+
 1. Normal case (mid-day flight)
 2. UTC midnight boundary (flight crossing 00:00 UTC)
 3. Vietnam date boundary (00:00-06:59 local / 17:00-23:59 UTC)

@@ -1,7 +1,7 @@
 ---
 name: build-error-resolver
 description: Expo/React Native and Fastify build error specialist. Use when build fails, Metro bundler errors, TypeScript errors, or native module issues occur. Fixes build errors only — no refactoring, no architecture changes.
-tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
+tools: ['Read', 'Write', 'Edit', 'Bash', 'Grep', 'Glob']
 model: sonnet
 ---
 
@@ -33,12 +33,15 @@ turbo build                                      # Turborepo build all packages
 ## Workflow
 
 ### 1. Collect All Errors
+
 - Run `npx tsc --noEmit` for each workspace (app, server, packages)
 - Categorize: TypeScript, Metro bundler, native module, dependency, config
 - Prioritize: build-blocking first → type errors → warnings
 
 ### 2. Fix Strategy (MINIMAL CHANGES)
+
 For each error:
+
 1. Read the error message — understand expected vs actual
 2. Find the minimal fix (type annotation, null check, import fix)
 3. Verify fix doesn't break other code — rerun tsc
@@ -46,50 +49,51 @@ For each error:
 
 ### 3. Common Expo/RN Fixes
 
-| Error | Fix |
-|-------|-----|
-| `Unable to resolve module` | Check Metro config, clear cache: `npx expo start --clear` |
-| `Invariant Violation: Native module cannot be null` | Use development build, not Expo Go |
-| `ViewPropTypes will be removed` | Upgrade deprecated package or add patch |
-| `Cannot find module '@shopify/react-native-skia'` | Rebuild development build: `npx expo prebuild --clean` |
-| `Multiple Skia versions` | Check for duplicate Skia in node_modules |
-| `WatermelonDB: Database adapter error` | Check native module linking, rebuild |
-| `Reanimated: Plugin not found` | Add `react-native-reanimated/plugin` to babel.config.js |
-| `Gesture Handler: No native module` | Run `npx expo prebuild --clean` |
+| Error                                               | Fix                                                       |
+| --------------------------------------------------- | --------------------------------------------------------- |
+| `Unable to resolve module`                          | Check Metro config, clear cache: `npx expo start --clear` |
+| `Invariant Violation: Native module cannot be null` | Use development build, not Expo Go                        |
+| `ViewPropTypes will be removed`                     | Upgrade deprecated package or add patch                   |
+| `Cannot find module '@shopify/react-native-skia'`   | Rebuild development build: `npx expo prebuild --clean`    |
+| `Multiple Skia versions`                            | Check for duplicate Skia in node_modules                  |
+| `WatermelonDB: Database adapter error`              | Check native module linking, rebuild                      |
+| `Reanimated: Plugin not found`                      | Add `react-native-reanimated/plugin` to babel.config.js   |
+| `Gesture Handler: No native module`                 | Run `npx expo prebuild --clean`                           |
 
 ### 4. Common Fastify Fixes
 
-| Error | Fix |
-|-------|-----|
+| Error                          | Fix                                                             |
+| ------------------------------ | --------------------------------------------------------------- |
 | `Cannot find module 'fastify'` | Check workspace dependencies, `npm install` in server workspace |
-| `Mongoose connection failed` | Check MongoDB Atlas connection string, IP whitelist |
-| `Schema validation error` | Update Zod schema to match request/response shape |
-| `Route already declared` | Duplicate route prefix — check route registration |
-| `CORS error` | Add `@fastify/cors` with correct origin config |
+| `Mongoose connection failed`   | Check MongoDB Atlas connection string, IP whitelist             |
+| `Schema validation error`      | Update Zod schema to match request/response shape               |
+| `Route already declared`       | Duplicate route prefix — check route registration               |
+| `CORS error`                   | Add `@fastify/cors` with correct origin config                  |
 
 ### 5. Common TypeScript Fixes
 
-| Error | Fix |
-|-------|-----|
-| `implicitly has 'any' type` | Add type annotation |
-| `Object is possibly 'undefined'` | Optional chaining `?.` or null check |
-| `Property does not exist` | Add to interface or use optional `?` |
-| `Cannot find module` | Fix import path or install missing package |
-| `Type 'X' not assignable to 'Y'` | Fix the type mismatch |
-| `Hook called conditionally` | Move hooks to top level |
+| Error                            | Fix                                        |
+| -------------------------------- | ------------------------------------------ |
+| `implicitly has 'any' type`      | Add type annotation                        |
+| `Object is possibly 'undefined'` | Optional chaining `?.` or null check       |
+| `Property does not exist`        | Add to interface or use optional `?`       |
+| `Cannot find module`             | Fix import path or install missing package |
+| `Type 'X' not assignable to 'Y'` | Fix the type mismatch                      |
+| `Hook called conditionally`      | Move hooks to top level                    |
 
 ### 6. Monorepo / Turborepo Fixes
 
-| Error | Fix |
-|-------|-----|
-| `Package not found in workspace` | Check `packages/` directory, run `turbo build` |
-| `Circular dependency` | Restructure imports, check `turbo.json` pipeline |
-| `Cache miss on all tasks` | Clear turbo cache: `turbo clean` |
-| `TypeScript project references` | Check tsconfig.json `references` array |
+| Error                            | Fix                                              |
+| -------------------------------- | ------------------------------------------------ |
+| `Package not found in workspace` | Check `packages/` directory, run `turbo build`   |
+| `Circular dependency`            | Restructure imports, check `turbo.json` pipeline |
+| `Cache miss on all tasks`        | Clear turbo cache: `turbo clean`                 |
+| `TypeScript project references`  | Check tsconfig.json `references` array           |
 
 ## DO and DON'T
 
 **DO:**
+
 - Add type annotations where missing
 - Add null checks where needed
 - Fix imports/exports
@@ -98,6 +102,7 @@ For each error:
 - Update type definitions
 
 **DON'T:**
+
 - Refactor unrelated code
 - Change architecture
 - Add new features

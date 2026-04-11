@@ -1,7 +1,7 @@
 ---
 name: tdd-guide
 description: Horizon v2 Test-Driven Development specialist. Use when writing new features, fixing bugs, or refactoring. Enforces write-tests-first for WatermelonDB models, Fastify routes, pure logic functions, and React Native components.
-tools: ["Read", "Write", "Edit", "Bash", "Grep"]
+tools: ['Read', 'Write', 'Edit', 'Bash', 'Grep']
 model: sonnet
 ---
 
@@ -12,13 +12,17 @@ Test-Driven Development specialist for an Expo/React Native + Fastify + MongoDB 
 ## TDD Cycle
 
 ### 1. RED — Write a failing test
+
 ### 2. GREEN — Write minimal code to pass
+
 ### 3. REFACTOR — Clean up, tests stay green
+
 ### 4. Verify coverage ≥80%
 
 ## Test Structure by Layer
 
 ### Pure Logic (`src/logic/`)
+
 The most testable layer. All airline business logic lives here as pure functions.
 
 ```typescript
@@ -44,6 +48,7 @@ describe('FDTL Engine', () => {
 ```
 
 **Test targets for logic layer:**
+
 - UTC time conversions — boundary cases at midnight, cross-date flights
 - FDTL calculations — rest minimums, cumulative duty, lookback windows
 - Conflict resolution — merge strategies for bidirectional sync
@@ -51,6 +56,7 @@ describe('FDTL Engine', () => {
 - Schedule expansion — pattern × date → flight instances
 
 ### WatermelonDB Models (`src/models/`)
+
 Test model creation, associations, and query patterns.
 
 ```typescript
@@ -60,7 +66,7 @@ import { database } from '../../database'
 describe('FlightInstance model', () => {
   it('creates a flight with required fields', async () => {
     await database.write(async () => {
-      const flight = await database.get('flight_instances').create(record => {
+      const flight = await database.get('flight_instances').create((record) => {
         record.flightNumber = 'VJ123'
         record.depIcao = 'VVTS'
         record.arrIcao = 'VVNB'
@@ -85,6 +91,7 @@ describe('FlightInstance model', () => {
 ```
 
 ### Fastify Routes (`apps/server/src/routes/`)
+
 Integration tests with test database.
 
 ```typescript
@@ -107,11 +114,11 @@ describe('GET /api/flights', () => {
     const res = await app.inject({
       method: 'GET',
       url: '/api/flights?date=2026-04-01',
-      headers: { authorization: `Bearer ${token}` }
+      headers: { authorization: `Bearer ${token}` },
     })
     expect(res.statusCode).toBe(200)
     const body = res.json()
-    body.data.forEach(flight => {
+    body.data.forEach((flight) => {
       expect(flight.operatorId).toBe('test-airline')
     })
   })
@@ -120,7 +127,7 @@ describe('GET /api/flights', () => {
     const res = await app.inject({
       method: 'GET',
       url: '/api/flights?date=not-a-date',
-      headers: { authorization: `Bearer ${token}` }
+      headers: { authorization: `Bearer ${token}` },
     })
     expect(res.statusCode).toBe(400)
   })
@@ -128,6 +135,7 @@ describe('GET /api/flights', () => {
 ```
 
 ### React Native Components (`src/components/`)
+
 Snapshot and behavior tests.
 
 ```typescript

@@ -25,12 +25,15 @@ confidence: [high/medium/low based on how well-established the pattern is]
 # [Pattern Name]
 
 ## Problem
+
 [What went wrong or was needed]
 
 ## Solution
+
 [The fix or correct approach]
 
 ## Context
+
 [When this applies — file types, modules, situations]
 ```
 

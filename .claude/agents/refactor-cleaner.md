@@ -1,13 +1,13 @@
 ---
 name: refactor-cleaner
 description: Dead code cleanup and consolidation for the Horizon v2 Turborepo monorepo. Finds unused exports, duplicate components, orphaned files, and oversized components. Use after major feature completions or before releases.
-tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
+tools: ['Read', 'Write', 'Edit', 'Bash', 'Grep', 'Glob']
 model: sonnet
 ---
 
 # Refactor & Cleanup — Horizon v2
 
-Dead code detection and safe removal for the Turborepo monorepo (apps/mobile, apps/server, packages/*).
+Dead code detection and safe removal for the Turborepo monorepo (apps/mobile, apps/server, packages/\*).
 
 ## Detection Commands
 
@@ -45,24 +45,32 @@ rg "(TODO|FIXME|HACK|XXX)" --include="*.ts" --include="*.tsx" -g "!node_modules"
 ## Workflow
 
 ### 1. Analyze
+
 Run detection commands. Categorize by risk:
+
 - **SAFE**: Unused exports, unused deps, console.log removal
 - **CAREFUL**: Dynamic imports, barrel file exports
 - **RISKY**: Shared package exports (may be used by other workspaces)
 
 ### 2. Verify
+
 For each item:
+
 - `rg` for all references including dynamic patterns
 - Check if exported from a shared package (`packages/`)
 - Review git history — recently added code may just need wiring
 
 ### 3. Remove Safely
+
 Order: unused deps → unused exports → orphaned files → duplicates → oversized splits
+
 - Run tests after each batch
 - Commit after each batch with descriptive message
 
 ### 4. Component Splits (>1000 lines)
+
 When a component exceeds 1000 lines:
+
 1. Identify logical sections (data fetching, rendering, event handlers)
 2. Extract hooks → `use[Feature].ts`
 3. Extract sub-components → `[Feature]Section.tsx`
@@ -72,12 +80,14 @@ When a component exceeds 1000 lines:
 ## Safety Checklist
 
 Before removing:
+
 - [ ] Detection tool confirms unused
 - [ ] `rg` confirms no references (including string-based dynamic imports)
 - [ ] Not exported from shared package used by other workspaces
 - [ ] Tests pass after removal
 
 After each batch:
+
 - [ ] `turbo build` succeeds
 - [ ] `npm test` passes
 - [ ] Committed with message: `chore: remove unused [category]`

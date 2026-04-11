@@ -7,35 +7,37 @@ description: Enforce Horizon v2 performance and code quality guardrails on every
 
 ## Component Size Limits (ENFORCED)
 
-| Metric | Limit | Action at Limit |
-|--------|-------|-----------------|
+| Metric                      | Limit       | Action at Limit                          |
+| --------------------------- | ----------- | ---------------------------------------- |
 | `.tsx/.jsx` component lines | **400 max** | Split into shell + sub-components + hook |
-| `.ts/.js` logic/util lines | **600 max** | Split into focused modules |
-| useState hooks | **8 max** | Extract to Zustand store |
-| useEffect hooks | **5 max** | Consolidate or extract to custom hook |
-| Props | **12 max** | Group into typed objects or use context |
-| Inline computations | **3 max** | Extract to useMemo or pure function |
+| `.ts/.js` logic/util lines  | **600 max** | Split into focused modules               |
+| useState hooks              | **8 max**   | Extract to Zustand store                 |
+| useEffect hooks             | **5 max**   | Consolidate or extract to custom hook    |
+| Props                       | **12 max**  | Group into typed objects or use context  |
+| Inline computations         | **3 max**   | Extract to useMemo or pure function      |
 
 ### Warning Thresholds
+
 - **300 lines (.tsx)**: Plan your split — you're approaching the 400-line limit
 - **6 useState**: Start consolidating related state into objects
 - **200 lines in a single function**: Extract helper functions
 
 ## State Management Tiers
 
-| Complexity | Approach | Example |
-|-----------|----------|---------|
-| Single component, 1-3 values | `useState` | Toggle visibility, form input |
-| Single component, 4-10 values | `useReducer` or consolidated state object | Multi-step form |
-| Shared across 2-3 components | Props + context | Theme, auth user |
-| Shared across module | Zustand store (sliced selectors) | Flight list filters, Gantt viewport |
-| Global app state | Zustand store | Theme, auth, sync status, offline queue |
+| Complexity                    | Approach                                  | Example                                 |
+| ----------------------------- | ----------------------------------------- | --------------------------------------- |
+| Single component, 1-3 values  | `useState`                                | Toggle visibility, form input           |
+| Single component, 4-10 values | `useReducer` or consolidated state object | Multi-step form                         |
+| Shared across 2-3 components  | Props + context                           | Theme, auth user                        |
+| Shared across module          | Zustand store (sliced selectors)          | Flight list filters, Gantt viewport     |
+| Global app state              | Zustand store                             | Theme, auth, sync status, offline queue |
 
 ### Zustand Best Practices
+
 ```typescript
 // GOOD — sliced selectors prevent unnecessary re-renders
-const flights = useFlightStore(s => s.flights)
-const filters = useFlightStore(s => s.filters)
+const flights = useFlightStore((s) => s.flights)
+const filters = useFlightStore((s) => s.filters)
 
 // BAD — re-renders on ANY store change
 const store = useFlightStore()
@@ -77,6 +79,7 @@ All timeline/Gantt rendering uses `@shopify/react-native-skia`. NEVER use View-b
 ## Offline-First Architecture
 
 ### Data Flow
+
 ```
 User Action → Local Write (WatermelonDB/SQLite)
                  ↓
@@ -90,6 +93,7 @@ User Action → Local Write (WatermelonDB/SQLite)
 ```
 
 ### Rules
+
 - Every read comes from WatermelonDB FIRST, then refreshes from sync
 - Every write goes to WatermelonDB FIRST, then queues for push
 - UI must work with only local data (no spinners blocking critical screens)
@@ -135,6 +139,7 @@ import { FlightCard } from '../common/FlightCard'
 ## Pre-Commit Mental Checklist
 
 Before every commit, verify:
+
 - [ ] No component exceeds 400 lines (.tsx) / 600 lines (.ts)
 - [ ] No file has >8 useState hooks
 - [ ] FlatList has getItemLayout + React.memo renderItem

@@ -17,6 +17,7 @@ Before writing custom code, systematically search for existing solutions.
 ## Search Order
 
 ### 1. Search the Codebase
+
 ```bash
 # Does this already exist in our repo?
 rg "functionName\|ClassName\|keyword" apps/ packages/ --include="*.ts" --include="*.tsx"
@@ -36,6 +37,7 @@ ls src/models/
 ```
 
 ### 2. Search Shared Packages
+
 ```bash
 # Check what's already in our monorepo packages
 ls packages/
@@ -43,7 +45,9 @@ cat packages/shared/src/index.ts  # If exists
 ```
 
 ### 3. Search npm / Expo Ecosystem
+
 For React Native, prefer packages with:
+
 - Expo SDK compatibility (check `expo install` support)
 - Active maintenance (updated within 6 months)
 - No native module requirements (or compatible with development builds)
@@ -51,21 +55,22 @@ For React Native, prefer packages with:
 
 **Priority packages for common needs:**
 
-| Need | Package | Notes |
-|------|---------|-------|
-| Date/time | `date-fns` | Tree-shakeable, UTC-friendly |
-| Validation | `zod` | Shared between client and server |
-| HTTP client | Built-in `fetch` | No extra dep needed in RN |
-| State management | `zustand` | Already in stack |
-| Local DB | `@nozbe/watermelondb` | Already in stack |
-| Charts | `victory-native` or `react-native-skia` | Skia preferred for Gantt |
-| Maps | `react-native-maps` | For world map view |
-| Gestures | `react-native-gesture-handler` | Already in stack |
-| Animations | `react-native-reanimated` | Already in stack |
-| Icons | `lucide-react-native` | Design system standard |
-| Forms | Manual with Zod | No form library needed |
+| Need             | Package                                 | Notes                            |
+| ---------------- | --------------------------------------- | -------------------------------- |
+| Date/time        | `date-fns`                              | Tree-shakeable, UTC-friendly     |
+| Validation       | `zod`                                   | Shared between client and server |
+| HTTP client      | Built-in `fetch`                        | No extra dep needed in RN        |
+| State management | `zustand`                               | Already in stack                 |
+| Local DB         | `@nozbe/watermelondb`                   | Already in stack                 |
+| Charts           | `victory-native` or `react-native-skia` | Skia preferred for Gantt         |
+| Maps             | `react-native-maps`                     | For world map view               |
+| Gestures         | `react-native-gesture-handler`          | Already in stack                 |
+| Animations       | `react-native-reanimated`               | Already in stack                 |
+| Icons            | `lucide-react-native`                   | Design system standard           |
+| Forms            | Manual with Zod                         | No form library needed           |
 
 ### 4. Check Expo Compatibility
+
 ```bash
 # Verify package works with Expo
 npx expo install <package-name>  # Uses compatible version
@@ -74,12 +79,12 @@ npx expo doctor                   # Check for issues
 
 ## Decision Matrix
 
-| Signal | Action |
-|--------|--------|
-| Already exists in our codebase | **Reuse** — import and use |
-| Exact match, Expo-compatible, maintained | **Adopt** — `npx expo install` |
-| Partial match, good foundation | **Extend** — install + thin wrapper |
-| Nothing suitable | **Build** — write custom, informed by research |
+| Signal                                   | Action                                         |
+| ---------------------------------------- | ---------------------------------------------- |
+| Already exists in our codebase           | **Reuse** — import and use                     |
+| Exact match, Expo-compatible, maintained | **Adopt** — `npx expo install`                 |
+| Partial match, good foundation           | **Extend** — install + thin wrapper            |
+| Nothing suitable                         | **Build** — write custom, informed by research |
 
 ## Anti-Patterns
 

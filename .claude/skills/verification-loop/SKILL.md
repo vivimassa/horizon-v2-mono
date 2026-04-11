@@ -17,6 +17,7 @@ Run all quality gates in sequence. Stop and fix at any failure before continuing
 ## Verification Phases
 
 ### Phase 1: Build
+
 ```bash
 # Monorepo build
 turbo build 2>&1 | tail -20
@@ -25,6 +26,7 @@ turbo build 2>&1 | tail -20
 ```
 
 ### Phase 2: TypeScript
+
 ```bash
 # All workspaces
 npx tsc --noEmit --pretty 2>&1 | head -30
@@ -34,18 +36,21 @@ cd apps/server && npx tsc --noEmit --pretty 2>&1 | head -30
 ```
 
 ### Phase 3: Lint
+
 ```bash
 npx eslint apps/mobile/src --ext .ts,.tsx 2>&1 | head -30
 npx eslint apps/server/src --ext .ts 2>&1 | head -30
 ```
 
 ### Phase 4: Tests
+
 ```bash
 npm test -- --coverage 2>&1 | tail -50
 # Target: 80% minimum coverage
 ```
 
 ### Phase 5: Horizon Convention Scan
+
 ```bash
 # Hardcoded colors (should use palette tokens)
 rg "#[0-9a-fA-F]{3,8}" --include="*.tsx" apps/mobile/src/components/ -g "!*.test.*" | grep -v "// theme" | head -10
@@ -73,6 +78,7 @@ rg "(departure|arrival|start|end)Time[^ULM]" --include="*.ts" --include="*.tsx" 
 ```
 
 ### Phase 6: Security Quick Scan
+
 ```bash
 # Secrets in code
 rg "(api[_-]?key|secret|password|token)\s*[:=]\s*['\"]" --include="*.ts" --include="*.tsx" -g "!*.test.*" -g "!*.example*" | head -10
@@ -85,6 +91,7 @@ npm audit --audit-level=high 2>&1 | tail -10
 ```
 
 ### Phase 7: Diff Review
+
 ```bash
 git diff --stat
 git diff HEAD~1 --name-only
@@ -114,6 +121,7 @@ Issues to Fix:
 ## Integration with Agents
 
 If verification fails:
+
 - **Build errors** → invoke `build-error-resolver` agent
 - **Type errors** → invoke `build-error-resolver` agent
 - **Test failures** → invoke `tdd-guide` agent

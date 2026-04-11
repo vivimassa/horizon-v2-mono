@@ -35,35 +35,23 @@ export const ListItem = memo(function ListItem({
 }: ListItemProps) {
   const { palette, accentColor } = useTheme()
 
-  const activeStyle = isActive
-    ? { backgroundColor: accentTint(accentColor, 0.08) }
-    : undefined
+  const activeStyle = isActive ? { backgroundColor: accentTint(accentColor, 0.08) } : undefined
 
   const content = (
-    <View
-      className="flex-row items-center px-3 py-2.5 min-h-[44px]"
-      style={activeStyle}
-    >
-      {leftElement ?? (leftIcon ? (
-        <View className="w-9 items-center mr-2">
-          <Icon icon={leftIcon} size="md" accentActive={isActive} />
-        </View>
-      ) : null)}
+    <View className="flex-row items-center px-3 py-2.5 min-h-[44px]" style={activeStyle}>
+      {leftElement ??
+        (leftIcon ? (
+          <View className="w-9 items-center mr-2">
+            <Icon icon={leftIcon} size="md" accentActive={isActive} />
+          </View>
+        ) : null)}
 
       <View className="flex-1 mr-2">
-        <Text
-          className="text-[13px] font-medium"
-          style={{ color: palette.text }}
-          numberOfLines={1}
-        >
+        <Text className="text-[13px] font-medium" style={{ color: palette.text }} numberOfLines={1}>
           {title}
         </Text>
         {subtitle ? (
-          <Text
-            className="text-[11px] mt-0.5"
-            style={{ color: palette.textSecondary }}
-            numberOfLines={1}
-          >
+          <Text className="text-[13px] mt-0.5" style={{ color: palette.textSecondary }} numberOfLines={1}>
             {subtitle}
           </Text>
         ) : null}
@@ -71,21 +59,12 @@ export const ListItem = memo(function ListItem({
 
       {rightElement}
 
-      {showChevron ? (
-        <ChevronRight
-          size={16}
-          color={palette.textTertiary}
-          strokeWidth={1.75}
-        />
-      ) : null}
+      {showChevron ? <ChevronRight size={16} color={palette.textTertiary} strokeWidth={1.75} /> : null}
     </View>
   )
 
   const separator = !isLast ? (
-    <View
-      className="ml-12 mr-3"
-      style={{ height: 0.5, backgroundColor: palette.border }}
-    />
+    <View className="ml-12 mr-3" style={{ height: 0.5, backgroundColor: palette.border }} />
   ) : null
 
   if (onPress) {
@@ -94,9 +73,7 @@ export const ListItem = memo(function ListItem({
         <Pressable
           onPress={onPress}
           accessibilityRole="button"
-          style={({ pressed }) =>
-            pressed ? { backgroundColor: palette.backgroundHover } : undefined
-          }
+          style={({ pressed }) => (pressed ? { backgroundColor: palette.backgroundHover } : undefined)}
         >
           {content}
         </Pressable>

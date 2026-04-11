@@ -35,19 +35,16 @@ export function Tooltip({ content, children, delay = 400 }: TooltipProps) {
   }, [])
 
   useEffect(() => {
-    return () => { if (timerRef.current) clearTimeout(timerRef.current) }
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
   }, [])
 
   if (!content) return <>{children}</>
 
   return (
     <>
-      <div
-        ref={triggerRef}
-        onMouseEnter={show}
-        onMouseLeave={hide}
-        style={{ display: 'contents' }}
-      >
+      <div ref={triggerRef} onMouseEnter={show} onMouseLeave={hide} style={{ display: 'contents' }}>
         {children}
       </div>
       {visible && <TooltipPortal x={coords.x} y={coords.y} content={content} />}
@@ -58,7 +55,9 @@ export function Tooltip({ content, children, delay = 400 }: TooltipProps) {
 function TooltipPortal({ x, y, content }: { x: number; y: number; content: string }) {
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   if (!mounted || typeof document === 'undefined') return null
 
@@ -82,16 +81,12 @@ function TooltipPortal({ x, y, content }: { x: number; y: number; content: strin
         style={{
           padding: '6px 12px',
           borderRadius: 8,
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: 500,
           whiteSpace: 'nowrap',
-          boxShadow: isDark
-            ? '0 4px 16px rgba(0,0,0,0.4)'
-            : '0 4px 16px rgba(0,0,0,0.15)',
+          boxShadow: isDark ? '0 4px 16px rgba(0,0,0,0.4)' : '0 4px 16px rgba(0,0,0,0.15)',
           backdropFilter: 'blur(20px) saturate(1.6)',
-          background: isDark
-            ? 'rgba(244,244,245,0.92)'
-            : 'rgba(24,24,27,0.88)',
+          background: isDark ? 'rgba(244,244,245,0.92)' : 'rgba(24,24,27,0.88)',
           color: isDark ? '#18181b' : '#fafafa',
         }}
       >
@@ -105,9 +100,7 @@ function TooltipPortal({ x, y, content }: { x: number; y: number; content: strin
           margin: '0 auto',
           borderLeft: '5px solid transparent',
           borderRight: '5px solid transparent',
-          borderTop: isDark
-            ? '5px solid rgba(244,244,245,0.92)'
-            : '5px solid rgba(24,24,27,0.88)',
+          borderTop: isDark ? '5px solid rgba(244,244,245,0.92)' : '5px solid rgba(24,24,27,0.88)',
         }}
       />
     </div>

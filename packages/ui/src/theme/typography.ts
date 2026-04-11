@@ -1,13 +1,9 @@
 // SkyHub — Typography Tokens
-// NEVER go below 11px for any entry
+// NEVER go below 13px for any entry (user memory: feedback_min_font_size.md)
 
 interface TypographyStyle {
   fontSize: number
-  fontWeight:
-    | '400'
-    | '500'
-    | '600'
-    | '700'
+  fontWeight: '400' | '500' | '600' | '700'
   lineHeight: number
   letterSpacing?: number
   textTransform?: 'uppercase' | 'lowercase' | 'capitalize' | 'none'
@@ -52,21 +48,21 @@ export const typography = {
     lineHeight: 20,
   },
   fieldLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '500',
     lineHeight: 16,
     letterSpacing: 0.5,
     textTransform: 'uppercase' as const,
   },
   caption: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '400',
-    lineHeight: 16,
+    lineHeight: 18,
   },
   badge: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
-    lineHeight: 14,
+    lineHeight: 16,
   },
   cardTitle: {
     fontSize: 13,
@@ -74,9 +70,9 @@ export const typography = {
     lineHeight: 18,
   },
   cardDescription: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '400',
-    lineHeight: 14,
+    lineHeight: 18,
   },
   stat: {
     fontSize: 18,
@@ -89,9 +85,9 @@ export const typography = {
     lineHeight: 32,
   },
   tabLabel: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
-    lineHeight: 14,
+    lineHeight: 16,
   },
 } satisfies Record<string, TypographyStyle>
 

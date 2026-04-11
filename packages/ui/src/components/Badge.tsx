@@ -33,10 +33,7 @@ export function Badge({ label, variant = 'default' }: BadgeProps) {
 
   return (
     <View className="rounded-md px-2 py-0.5" style={{ backgroundColor: bg }}>
-      <Text
-        className="text-[11px] font-semibold"
-        style={{ color: textColor, lineHeight: 14 }}
-      >
+      <Text className="text-[13px] font-semibold" style={{ color: textColor, lineHeight: 16 }}>
         {String(label)}
       </Text>
     </View>

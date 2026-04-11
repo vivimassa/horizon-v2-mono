@@ -15,29 +15,17 @@ interface EmptyStateProps {
   onAction?: () => void
 }
 
-export function EmptyState({
-  icon,
-  title,
-  subtitle,
-  actionLabel,
-  onAction,
-}: EmptyStateProps) {
+export function EmptyState({ icon, title, subtitle, actionLabel, onAction }: EmptyStateProps) {
   const { palette } = useTheme()
 
   return (
     <View className="items-center justify-center py-10 px-6">
       <Icon icon={icon} size="xl" color={palette.textTertiary} />
-      <Text
-        className="text-[14px] font-medium mt-3 text-center"
-        style={{ color: palette.textSecondary }}
-      >
+      <Text className="text-[14px] font-medium mt-3 text-center" style={{ color: palette.textSecondary }}>
         {title}
       </Text>
       {subtitle ? (
-        <Text
-          className="text-[12px] mt-1 text-center"
-          style={{ color: palette.textTertiary }}
-        >
+        <Text className="text-[13px] mt-1 text-center" style={{ color: palette.textTertiary }}>
           {subtitle}
         </Text>
       ) : null}

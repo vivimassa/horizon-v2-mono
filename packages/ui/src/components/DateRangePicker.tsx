@@ -42,7 +42,13 @@ function isInRange(iso: string, from: string, to: string): boolean {
 }
 
 export const DateRangePicker = memo(function DateRangePicker({
-  from, to, onChangeFrom, onChangeTo, accent, palette, isDark,
+  from,
+  to,
+  onChangeFrom,
+  onChangeTo,
+  accent,
+  palette,
+  isDark,
 }: DateRangePickerProps) {
   const [picking, setPicking] = useState<'from' | 'to'>('from')
 
@@ -90,33 +96,44 @@ export const DateRangePicker = memo(function DateRangePicker({
     return cells
   }, [viewYear, viewMonth])
 
-  const handleDayPress = useCallback((iso: string) => {
-    if (picking === 'from') {
-      onChangeFrom(iso)
-      onChangeTo('')
-      setPicking('to')
-    } else {
-      if (iso < from) {
-        // Auto-swap
-        onChangeTo(from)
+  const handleDayPress = useCallback(
+    (iso: string) => {
+      if (picking === 'from') {
         onChangeFrom(iso)
+        onChangeTo('')
+        setPicking('to')
       } else {
-        onChangeTo(iso)
+        if (iso < from) {
+          // Auto-swap
+          onChangeTo(from)
+          onChangeFrom(iso)
+        } else {
+          onChangeTo(iso)
+        }
+        setPicking('from')
       }
-      setPicking('from')
-    }
-  }, [picking, from, onChangeFrom, onChangeTo])
+    },
+    [picking, from, onChangeFrom, onChangeTo],
+  )
 
   const prevMonth = () => {
-    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1) }
-    else setViewMonth(m => m - 1)
+    if (viewMonth === 0) {
+      setViewMonth(11)
+      setViewYear((y) => y - 1)
+    } else setViewMonth((m) => m - 1)
   }
   const nextMonth = () => {
-    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1) }
-    else setViewMonth(m => m + 1)
+    if (viewMonth === 11) {
+      setViewMonth(0)
+      setViewYear((y) => y + 1)
+    } else setViewMonth((m) => m + 1)
   }
 
-  const handleClear = () => { onChangeFrom(''); onChangeTo(''); setPicking('from') }
+  const handleClear = () => {
+    onChangeFrom('')
+    onChangeTo('')
+    setPicking('from')
+  }
   const handleToday = () => {
     setViewYear(now.getFullYear())
     setViewMonth(now.getMonth())
@@ -133,67 +150,97 @@ export const DateRangePicker = memo(function DateRangePicker({
     <View>
       {/* From / To pills */}
       <View className="flex-row" style={{ gap: 6, marginBottom: 8 }}>
-        <Pressable onPress={() => setPicking('from')}
+        <Pressable
+          onPress={() => setPicking('from')}
           className="flex-1 flex-row items-center justify-center rounded-lg"
           style={{
             height: 36,
-            backgroundColor: picking === 'from' ? pillActiveBg : (from ? pillInactiveBg : pillInactiveBg),
+            backgroundColor: picking === 'from' ? pillActiveBg : from ? pillInactiveBg : pillInactiveBg,
             borderWidth: picking === 'from' ? 0 : 1,
             borderColor: from ? accent : pillBorder,
             gap: 5,
-          }}>
-          <CalendarDays size={13} color={picking === 'from' ? '#fff' : (from ? accent : palette.textTertiary)} strokeWidth={1.8} />
-          <Text style={{
-            fontSize: 13, fontWeight: '600', fontFamily: 'monospace',
-            color: picking === 'from' ? '#fff' : (from ? palette.text : palette.textTertiary),
-          }}>
+          }}
+        >
+          <CalendarDays
+            size={13}
+            color={picking === 'from' ? '#fff' : from ? accent : palette.textTertiary}
+            strokeWidth={1.8}
+          />
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: '600',
+              fontFamily: 'monospace',
+              color: picking === 'from' ? '#fff' : from ? palette.text : palette.textTertiary,
+            }}
+          >
             {from ? formatDisplay(from) : 'From\u2026'}
           </Text>
         </Pressable>
 
-        <Pressable onPress={() => setPicking('to')}
+        <Pressable
+          onPress={() => setPicking('to')}
           className="flex-1 flex-row items-center justify-center rounded-lg"
           style={{
             height: 36,
-            backgroundColor: picking === 'to' ? pillActiveBg : (to ? pillInactiveBg : pillInactiveBg),
+            backgroundColor: picking === 'to' ? pillActiveBg : to ? pillInactiveBg : pillInactiveBg,
             borderWidth: picking === 'to' ? 0 : 1,
             borderColor: to ? accent : pillBorder,
             gap: 5,
-          }}>
-          <CalendarDays size={13} color={picking === 'to' ? '#fff' : (to ? accent : palette.textTertiary)} strokeWidth={1.8} />
-          <Text style={{
-            fontSize: 13, fontWeight: '600', fontFamily: 'monospace',
-            color: picking === 'to' ? '#fff' : (to ? palette.text : palette.textTertiary),
-          }}>
+          }}
+        >
+          <CalendarDays
+            size={13}
+            color={picking === 'to' ? '#fff' : to ? accent : palette.textTertiary}
+            strokeWidth={1.8}
+          />
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: '600',
+              fontFamily: 'monospace',
+              color: picking === 'to' ? '#fff' : to ? palette.text : palette.textTertiary,
+            }}
+          >
             {to ? formatDisplay(to) : 'To\u2026'}
           </Text>
         </Pressable>
       </View>
 
       {/* Calendar */}
-      <View className="rounded-xl" style={{
-        backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
-        borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-        padding: 8,
-      }}>
+      <View
+        className="rounded-xl"
+        style={{
+          backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+          borderWidth: 1,
+          borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+          padding: 8,
+        }}
+      >
         {/* Month navigation */}
         <View className="flex-row items-center justify-between" style={{ marginBottom: 8 }}>
-          <Pressable onPress={prevMonth} className="items-center justify-center active:opacity-60"
-            style={{ width: 32, height: 32 }}>
+          <Pressable
+            onPress={prevMonth}
+            className="items-center justify-center active:opacity-60"
+            style={{ width: 32, height: 32 }}
+          >
             <ChevronLeft size={16} color={palette.textSecondary} strokeWidth={2} />
           </Pressable>
           <Text style={{ fontSize: 14, fontWeight: '600', color: palette.text }}>{monthLabel}</Text>
-          <Pressable onPress={nextMonth} className="items-center justify-center active:opacity-60"
-            style={{ width: 32, height: 32 }}>
+          <Pressable
+            onPress={nextMonth}
+            className="items-center justify-center active:opacity-60"
+            style={{ width: 32, height: 32 }}
+          >
             <ChevronRight size={16} color={palette.textSecondary} strokeWidth={2} />
           </Pressable>
         </View>
 
         {/* Day-of-week headers */}
         <View className="flex-row" style={{ marginBottom: 4 }}>
-          {DAYS.map(d => (
+          {DAYS.map((d) => (
             <View key={d} style={{ flex: 1, alignItems: 'center', paddingVertical: 2 }}>
-              <Text style={{ fontSize: 11, fontWeight: '600', color: palette.textTertiary }}>{d}</Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: palette.textTertiary }}>{d}</Text>
             </View>
           ))}
         </View>
@@ -223,24 +270,35 @@ export const DateRangePicker = memo(function DateRangePicker({
                 cellBg = rangeTint
               }
 
-              const textColor = (isFrom || isTo) ? '#fff'
-                : !cell.isCurrentMonth ? palette.textTertiary
-                : palette.text
+              const textColor = isFrom || isTo ? '#fff' : !cell.isCurrentMonth ? palette.textTertiary : palette.text
 
               return (
-                <Pressable key={colIdx} onPress={() => handleDayPress(cell.iso)}
+                <Pressable
+                  key={colIdx}
+                  onPress={() => handleDayPress(cell.iso)}
                   className="items-center justify-center"
                   style={{
-                    flex: 1, height: 36,
+                    flex: 1,
+                    height: 36,
                     backgroundColor: cellBg,
                     ...borderRadiusStyle,
-                  }}>
-                  <Text style={{ fontSize: 13, fontWeight: (isFrom || isTo) ? '700' : '500', color: textColor }}>
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: isFrom || isTo ? '700' : '500', color: textColor }}>
                     {cell.day}
                   </Text>
                   {/* Today dot */}
                   {isToday && !isFrom && !isTo && (
-                    <View style={{ position: 'absolute', bottom: 3, width: 4, height: 4, borderRadius: 2, backgroundColor: accent }} />
+                    <View
+                      style={{
+                        position: 'absolute',
+                        bottom: 3,
+                        width: 4,
+                        height: 4,
+                        borderRadius: 2,
+                        backgroundColor: accent,
+                      }}
+                    />
                   )}
                 </Pressable>
               )
@@ -249,7 +307,15 @@ export const DateRangePicker = memo(function DateRangePicker({
         ))}
 
         {/* Footer */}
-        <View className="flex-row items-center justify-between" style={{ marginTop: 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}>
+        <View
+          className="flex-row items-center justify-between"
+          style={{
+            marginTop: 8,
+            paddingTop: 6,
+            borderTopWidth: 1,
+            borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+          }}
+        >
           <Pressable onPress={handleClear} className="active:opacity-60">
             <Text style={{ fontSize: 13, fontWeight: '500', color: palette.textSecondary }}>Clear</Text>
           </Pressable>

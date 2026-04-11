@@ -16,14 +16,7 @@ interface NavTileProps {
   onPress: () => void
 }
 
-export const NavTile = memo(function NavTile({
-  label,
-  num,
-  icon: IconComponent,
-  color,
-  count,
-  onPress,
-}: NavTileProps) {
+export const NavTile = memo(function NavTile({ label, num, icon: IconComponent, color, count, onPress }: NavTileProps) {
   const { palette } = useTheme()
 
   return (
@@ -47,7 +40,7 @@ export const NavTile = memo(function NavTile({
           top: 8,
           right: 8,
           fontFamily: 'monospace',
-          fontSize: 10,
+          fontSize: 13,
           fontWeight: '700',
           color: palette.textTertiary,
           letterSpacing: -0.3,
@@ -75,10 +68,7 @@ export const NavTile = memo(function NavTile({
 
       {/* Page count (for section tiles) */}
       {count !== undefined && (
-        <Text
-          className="text-[11px] mt-0.5"
-          style={{ color: palette.textSecondary }}
-        >
+        <Text className="text-[13px] mt-0.5" style={{ color: palette.textSecondary }}>
           {count} {count === 1 ? 'page' : 'pages'}
         </Text>
       )}

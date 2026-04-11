@@ -2,12 +2,7 @@
 // Wraps Gluestack Button for accessibility with SkyHub visual design
 import React from 'react'
 import { View } from 'react-native'
-import {
-  Button as GButton,
-  ButtonText,
-  ButtonSpinner,
-  ButtonIcon,
-} from '../gluestack/button'
+import { Button as GButton, ButtonText, ButtonSpinner, ButtonIcon } from '../gluestack/button'
 import { useTheme } from '../hooks/useTheme'
 import { accentTint } from '../theme/colors'
 import { shadowStyles } from '../theme/shadows'
@@ -15,7 +10,7 @@ import type { LucideIcon } from '../theme/icons'
 
 interface ButtonProps {
   title: string
-  variant?: 'primary' | 'secondary' | 'ghost' | 'destructive'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'destructive' | 'affirmative'
   size?: 'sm' | 'md'
   onPress: () => void
   disabled?: boolean
@@ -25,6 +20,7 @@ interface ButtonProps {
 
 const RED = '#dc2626'
 const RED_TINT = 'rgba(220,38,38,0.1)'
+const GREEN = '#06C270'
 const WHITE = '#ffffff'
 
 export function Button({
@@ -72,6 +68,11 @@ export function Button({
       spinnerColor = RED
       shadow = {}
       break
+    case 'affirmative':
+      bgStyle = { backgroundColor: GREEN }
+      textColor = WHITE
+      spinnerColor = WHITE
+      break
   }
 
   return (
@@ -91,17 +92,9 @@ export function Button({
       ) : (
         <>
           {leftIcon ? (
-            <ButtonIcon
-              as={leftIcon}
-              size={size === 'sm' ? 16 : 18}
-              color={textColor}
-              className="mr-1.5"
-            />
+            <ButtonIcon as={leftIcon} size={size === 'sm' ? 16 : 18} color={textColor} className="mr-1.5" />
           ) : null}
-          <ButtonText
-            className={`${textSize} font-semibold`}
-            style={{ color: textColor }}
-          >
+          <ButtonText className={`${textSize} font-semibold`} style={{ color: textColor }}>
             {title}
           </ButtonText>
         </>

@@ -9,7 +9,7 @@ import type { BackgroundPreset } from '../stores/useThemeStore'
 // Lazy-load AnimatedBackground to avoid crashing when reanimated native modules
 // aren't available (e.g. in Expo Go without dev client)
 const AnimatedBackground = React.lazy(() =>
-  import('./AnimatedBackground').then((m) => ({ default: m.AnimatedBackground }))
+  import('./AnimatedBackground').then((m) => ({ default: m.AnimatedBackground })),
 )
 
 interface PageShellProps {
@@ -36,17 +36,11 @@ export function PageShell({
   const header = (
     <View className="flex-row items-center px-4 pt-3 pb-2">
       <View className="flex-1">
-        <Text
-          className="text-[20px] font-semibold"
-          style={{ color: palette.text, lineHeight: 26 }}
-        >
+        <Text className="text-[20px] font-semibold" style={{ color: palette.text, lineHeight: 26 }}>
           {title}
         </Text>
         {subtitle ? (
-          <Text
-            className="text-[12px] mt-0.5"
-            style={{ color: palette.textSecondary }}
-          >
+          <Text className="text-[13px] mt-0.5" style={{ color: palette.textSecondary }}>
             {subtitle}
           </Text>
         ) : null}
@@ -56,11 +50,7 @@ export function PageShell({
   )
 
   const content = scrollable ? (
-    <ScrollView
-      className="flex-1"
-      contentContainerClassName="px-4 pb-4 pt-2"
-      showsVerticalScrollIndicator={false}
-    >
+    <ScrollView className="flex-1" contentContainerClassName="px-4 pb-4 pt-2" showsVerticalScrollIndicator={false}>
       {children}
     </ScrollView>
   ) : (
@@ -77,7 +67,7 @@ export function PageShell({
     return (
       <SafeAreaView
         className={`flex-1 ${animClass}`}
-        style={preset === 'none' ? { background: fallbackBg } as any : undefined}
+        style={preset === 'none' ? ({ background: fallbackBg } as any) : undefined}
         edges={['top']}
       >
         {header}
@@ -89,11 +79,7 @@ export function PageShell({
   // Native: use Reanimated + LinearGradient for animated backgrounds
   if (preset !== 'none') {
     const staticFallback = (
-      <SafeAreaView
-        className="flex-1"
-        style={{ backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }}
-        edges={['top']}
-      >
+      <SafeAreaView className="flex-1" style={{ backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }} edges={['top']}>
         {header}
         {content}
       </SafeAreaView>
@@ -115,11 +101,7 @@ export function PageShell({
 
   // Fallback: static background
   return (
-    <SafeAreaView
-      className="flex-1"
-      style={{ backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }}
-      edges={['top']}
-    >
+    <SafeAreaView className="flex-1" style={{ backgroundColor: isDark ? '#1a1a1a' : '#ffffff' }} edges={['top']}>
       {header}
       {content}
     </SafeAreaView>
@@ -132,7 +114,9 @@ class ReanimatedErrorBoundary extends React.Component<
   { hasError: boolean }
 > {
   state = { hasError: false }
-  static getDerivedStateFromError() { return { hasError: true } }
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
   render() {
     return this.state.hasError ? this.props.fallback : this.props.children
   }

@@ -23,6 +23,7 @@ import { colors, accentTint, type Palette as PaletteType } from '@skyhub/ui/them
 import { useTheme } from '@/components/theme-provider'
 import { useUser } from '@/components/user-provider'
 import { userApi } from '@/lib/api'
+import { authedFetch } from '@/lib/authed-fetch'
 import { WEB_LAYOUT } from '@/lib/fonts'
 import { useDisplay } from '@/components/display-provider'
 
@@ -189,12 +190,12 @@ export default function ProfilePage() {
       const previewUrl = URL.createObjectURL(file)
       setAvatarUrl(previewUrl)
 
-      // Upload to server
+      // Upload to server (avatar userId now comes from the JWT, not a query param)
       try {
         const formData = new FormData()
         formData.append('avatar', file)
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
-        const res = await fetch(`${API_BASE}/users/me/avatar?userId=skyhub-admin-001`, {
+        const res = await authedFetch(`${API_BASE}/users/me/avatar`, {
           method: 'POST',
           body: formData,
         })

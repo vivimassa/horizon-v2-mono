@@ -22,6 +22,11 @@ export function getApiBaseUrl(): string {
 
 interface AuthCallbacks {
   getAccessToken: () => string | null
+  /** Return the current refresh token (for auto-refresh on 401). */
+  getRefreshToken?: () => string | null
+  /** Persist a newly-issued token pair after an auto-refresh. */
+  onTokenRefresh?: (access: string, refresh: string) => void
+  /** Called when auth is definitively lost (refresh fails or 401 on a public-style route). */
   onAuthFailure: () => void
 }
 
@@ -30,6 +35,41 @@ let _authCallbacks: AuthCallbacks | null = null
 /** Called once at app startup to wire token storage + 401 handling. */
 export function setAuthCallbacks(callbacks: AuthCallbacks) {
   _authCallbacks = callbacks
+}
+
+// Single-flight refresh: if 10 requests all 401 at once, we only want ONE
+// /auth/refresh call in flight. All 10 await the same promise, then retry
+// with the new access token.
+let _refreshInFlight: Promise<{ accessToken: string; refreshToken: string }> | null = null
+
+async function refreshAccessToken(): Promise<{ accessToken: string; refreshToken: string } | null> {
+  const refreshToken = _authCallbacks?.getRefreshToken?.()
+  if (!refreshToken) return null
+
+  if (!_refreshInFlight) {
+    _refreshInFlight = (async () => {
+      // Raw fetch so we don't recurse through request() on the refresh call
+      // itself (which would 401-loop if the refresh token is dead).
+      const res = await fetch(`${_baseUrl}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      })
+      if (!res.ok) throw new Error('refresh failed')
+      return (await res.json()) as { accessToken: string; refreshToken: string }
+    })().finally(() => {
+      // Clear after resolution so the next 401 (much later) triggers a new refresh.
+      _refreshInFlight = null
+    })
+  }
+
+  try {
+    const pair = await _refreshInFlight
+    _authCallbacks?.onTokenRefresh?.(pair.accessToken, pair.refreshToken)
+    return pair
+  } catch {
+    return null
+  }
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -42,10 +82,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  const res = await fetch(`${_baseUrl}${path}`, {
-    ...init,
-    headers,
-  })
+  let res = await fetch(`${_baseUrl}${path}`, { ...init, headers })
+
+  // Auto-refresh on 401 (except for auth endpoints themselves — those are
+  // managed directly by the auth provider and a 401 there means real failure).
+  if (res.status === 401 && !path.startsWith('/auth/')) {
+    const pair = await refreshAccessToken()
+    if (pair) {
+      const retryHeaders = { ...headers, Authorization: `Bearer ${pair.accessToken}` }
+      res = await fetch(`${_baseUrl}${path}`, { ...init, headers: retryHeaders })
+    }
+  }
 
   if (res.status === 401) {
     _authCallbacks?.onAuthFailure()

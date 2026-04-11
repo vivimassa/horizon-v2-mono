@@ -32,8 +32,14 @@ function AuthGate() {
     // Wire the API client to the auth store — one-time setup.
     setAuthCallbacks({
       getAccessToken: () => useAuthStore.getState().accessToken,
+      getRefreshToken: () => useAuthStore.getState().refreshToken ?? tokenStorage.getRefreshToken(),
+      onTokenRefresh: (access, refresh) => {
+        tokenStorage.setTokens(access, refresh)
+        useAuthStore.getState().setTokens(access, refresh)
+      },
       onAuthFailure: () => {
         tokenStorage.clearTokens()
+        tokenStorage.setBiometricEnabled(false)
         useAuthStore.getState().logout()
       },
     })

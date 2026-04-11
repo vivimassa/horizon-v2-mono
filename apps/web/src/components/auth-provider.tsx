@@ -124,6 +124,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return null
         }
       },
+      getRefreshToken: () => {
+        if (typeof window === 'undefined') return null
+        try {
+          return window.localStorage.getItem(REFRESH_KEY)
+        } catch {
+          return null
+        }
+      },
+      onTokenRefresh: (access, refresh) => {
+        writeTokens(access, refresh)
+      },
       onAuthFailure: () => {
         clearTokens()
         setUser(null)
@@ -171,6 +182,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       router.replace('/')
     }
   }, [isLoading, isAuthenticated, pathname, router])
+
+  // Gate children on auth state: don't render protected routes until bootstrap
+  // finishes. Prevents shell components from mounting and firing api.xxx()
+  // calls in the brief window between page load and /auth/refresh resolving.
+  const onPublicPath = PUBLIC_PATHS.some((p) => pathname?.startsWith(p))
+
+  if (isLoading) {
+    return <div className="h-screen w-screen bg-hz-bg" />
+  }
+  if (!isAuthenticated && !onPublicPath) {
+    // The redirect useEffect above will route to /login — render nothing
+    // in the meantime so nothing in the subtree fires an API call.
+    return <div className="h-screen w-screen bg-hz-bg" />
+  }
 
   return <AuthCtx.Provider value={{ user, isAuthenticated, isLoading, login, logout }}>{children}</AuthCtx.Provider>
 }

@@ -1,6 +1,8 @@
 import { Stack } from 'expo-router'
+import { useAppTheme } from '../../../providers/ThemeProvider'
 
 export default function GroundOpsLayout() {
+  const { palette } = useAppTheme()
   return (
     <Stack
       screenOptions={{
@@ -9,6 +11,7 @@ export default function GroundOpsLayout() {
         gestureDirection: 'horizontal',
         animation: 'slide_from_right',
         fullScreenGestureEnabled: true,
+        contentStyle: { backgroundColor: palette.background },
       }}
     />
   )

@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { getApiBaseUrl } from '@skyhub/api'
+import { authedFetch } from '@/lib/authed-fetch'
 import { useGanttStore } from '@/stores/use-gantt-store'
 import { useOperatorStore } from '@/stores/use-operator-store'
 
@@ -68,7 +69,7 @@ export function AircraftPopover() {
       return
     }
     const operatorId = useOperatorStore.getState().operator?._id ?? ''
-    fetch(
+    authedFetch(
       `${getApiBaseUrl()}/gantt/aircraft-detail?operatorId=${operatorId}&registration=${encodeURIComponent(pop.registration)}`,
     )
       .then((r) => (r.ok ? r.json() : null))

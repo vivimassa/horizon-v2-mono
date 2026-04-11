@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { api, setApiBaseUrl, type OperatorRef } from '@skyhub/api'
+import { api, getApiBaseUrl, setApiBaseUrl, type OperatorRef } from '@skyhub/api'
+import { authedFetch } from '@/lib/authed-fetch'
 import { MasterDetailLayout } from '@/components/layout'
 import { useTheme } from '@/components/theme-provider'
 import { colors, accentTint, type Palette as PaletteType } from '@skyhub/ui/theme'
@@ -546,7 +547,7 @@ function LogoUploadSection({
       try {
         const form = new FormData()
         form.append('logo', file)
-        const res = await fetch(`http://localhost:3002/operators/${operator._id}/logo`, {
+        const res = await authedFetch(`${getApiBaseUrl()}/operators/${operator._id}/logo`, {
           method: 'POST',
           body: form,
         })
@@ -569,7 +570,7 @@ function LogoUploadSection({
     setUploading(true)
     setError('')
     try {
-      await fetch(`http://localhost:3002/operators/${operator._id}/logo`, { method: 'DELETE' })
+      await authedFetch(`${getApiBaseUrl()}/operators/${operator._id}/logo`, { method: 'DELETE' })
       onRefresh()
       window.dispatchEvent(new Event('operator-logo-changed'))
     } catch (err: any) {

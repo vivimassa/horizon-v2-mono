@@ -1,45 +1,20 @@
 /**
  * API client for Sky Hub web app.
- * All calls go to the Fastify server.
+ * All calls go to the Fastify server via authedFetch, which attaches the
+ * access token and auto-refreshes once on 401.
  */
+
+import { authedFetch } from './authed-fetch'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
 
-// Auth token read from localStorage on every request. The auth provider
-// writes to this key on login; reading here keeps the module browser-only.
-const ACCESS_TOKEN_KEY = 'skyhub.accessToken'
-
-function getAccessToken(): string | null {
-  if (typeof window === 'undefined') return null
-  try {
-    return window.localStorage.getItem(ACCESS_TOKEN_KEY)
-  } catch {
-    return null
-  }
-}
-
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options?.headers as Record<string, string> | undefined),
+  const headers = new Headers(options?.headers)
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
   }
-  const token = getAccessToken()
-  if (token && !headers['Authorization']) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  const res = await fetch(url, {
-    ...options,
-    headers,
-  })
-  if (res.status === 401 && typeof window !== 'undefined') {
-    try {
-      window.localStorage.removeItem(ACCESS_TOKEN_KEY)
-      window.localStorage.removeItem('skyhub.refreshToken')
-    } catch {}
-    // Surface as a specific error so auth provider can route to /login
-    throw new Error('Unauthorized')
-  }
+  const res = await authedFetch(url, { ...options, headers })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(err.error || `API ${res.status}`)

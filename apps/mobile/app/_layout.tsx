@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import { Slot } from 'expo-router'
 import { View, ActivityIndicator } from 'react-native'
 import { api, setAuthCallbacks } from '@skyhub/api'
-import { useAuthStore, useTheme } from '@skyhub/ui'
+import { useAuthStore, useTheme, QueryProvider } from '@skyhub/ui'
 import { ThemeProvider, useAppTheme } from '../providers/ThemeProvider'
 import { UserProvider } from '../providers/UserProvider'
 import { tokenStorage } from '../src/lib/token-storage'
@@ -87,8 +87,10 @@ function ThemedRoot() {
 
 export default function Layout() {
   return (
-    <ThemeProvider>
-      <ThemedRoot />
-    </ThemeProvider>
+    <QueryProvider>
+      <ThemeProvider>
+        <ThemedRoot />
+      </ThemeProvider>
+    </QueryProvider>
   )
 }

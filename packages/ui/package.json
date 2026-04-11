@@ -24,8 +24,12 @@
     "react-native-svg": "^15.15.4",
     "zustand": "^5.0.12"
   },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.0.0"
+  },
   "devDependencies": {
     "@skyhub/eslint-config": "*",
+    "@tanstack/react-query": "^5.97.0",
     "@types/react": "^19.2.14",
     "nativewind": "^4.2.3",
     "typescript": "~5.7.0"

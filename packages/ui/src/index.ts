@@ -34,6 +34,9 @@ export { DateRangePicker } from './components/DateRangePicker'
 export { DropdownSelect } from './components/DropdownSelect'
 export { MultiSelect } from './components/MultiSelect'
 
+// ── Providers ──
+export { QueryProvider } from './providers/QueryProvider'
+
 // ── Gluestack Primitives ──
 export * from './gluestack'
 

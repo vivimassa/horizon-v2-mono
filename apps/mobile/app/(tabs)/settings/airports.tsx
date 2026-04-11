@@ -1,8 +1,7 @@
 import { useState, useMemo, useCallback, memo } from 'react'
-import { useFocusEffect } from '@react-navigation/native'
 import { View, SectionList, Pressable } from 'react-native'
 import { useRouter } from 'expo-router'
-import { api, type AirportRef } from '@skyhub/api'
+import { useAirports, type AirportRef } from '@skyhub/api'
 import { ListScreenHeader, SearchInput, Text, Divider, EmptyState, domainIcons } from '@skyhub/ui'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
@@ -18,26 +17,10 @@ interface CountrySection {
 
 export default function AirportsList() {
   const { palette, isDark, accent } = useAppTheme()
-  const [airports, setAirports] = useState<AirportRef[]>([])
+  const { data: airports = [], isLoading: loading } = useAirports()
   const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const router = useRouter()
-
-  const fetchAirports = useCallback(() => {
-    setLoading(true)
-    api
-      .getAirports()
-      .then(setAirports)
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [])
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchAirports()
-    }, [fetchAirports]),
-  )
 
   const toggleGroup = useCallback((title: string) => {
     setCollapsed((prev) => {

@@ -67,3 +67,7 @@ export type {
   SlotCalendarWeekRef,
   SlotFleetAirportStats,
 } from './client'
+
+// ─── React Query layer ───
+export { queryKeys } from './query-keys'
+export * from './hooks'

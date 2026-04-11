@@ -12,8 +12,12 @@
   "dependencies": {
     "@skyhub/types": "*"
   },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.0.0"
+  },
   "devDependencies": {
     "@skyhub/eslint-config": "*",
+    "@tanstack/react-query": "^5.97.0",
     "typescript": "~5.7.0"
   }
 }

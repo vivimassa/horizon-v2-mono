@@ -23,6 +23,9 @@ import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { api } from '@skyhub/api'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { useUser } from '../../../providers/UserProvider'
+import { tokenStorage } from '../../../src/lib/token-storage'
+import { biometricLabel, checkBiometricAvailable, promptBiometric } from '../../../src/lib/biometric-gate'
+import type { AuthenticationType } from 'expo-local-authentication'
 
 const ACCENT = '#1e40af'
 
@@ -62,15 +65,75 @@ export default function SecurityScreen() {
   const [showNew, setShowNew] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [twoFactor, setTwoFactor] = useState(false)
-  const [biometric, setBiometric] = useState(false)
+  const [biometric, setBiometric] = useState(() => tokenStorage.isBiometricEnabled())
+  const [biometricAvailable, setBiometricAvailable] = useState(false)
+  const [biometricReason, setBiometricReason] = useState<'hardware' | 'enrollment' | null>(null)
+  const [biometricName, setBiometricName] = useState('Biometrics')
 
-  // Sync from API
+  // Sync 2FA from API (biometric is local-first; see below)
   React.useEffect(() => {
     if (user) {
       setTwoFactor(user.security.twoFactorEnabled)
-      setBiometric(user.security.biometricEnabled)
     }
   }, [user])
+
+  // Device capability check — runs once on mount.
+  React.useEffect(() => {
+    let cancelled = false
+    checkBiometricAvailable().then((cap) => {
+      if (cancelled) return
+      if (cap.available) {
+        setBiometricAvailable(true)
+        setBiometricReason(null)
+        setBiometricName(biometricLabel(cap.types as AuthenticationType[]))
+      } else {
+        setBiometricAvailable(false)
+        setBiometricReason(cap.reason)
+        // If the device loses biometric support, clear the local flag so
+        // the next boot doesn't block behind a prompt that can never succeed.
+        if (tokenStorage.isBiometricEnabled()) {
+          tokenStorage.setBiometricEnabled(false)
+          setBiometric(false)
+        }
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const toggleBiometric = useCallback(async () => {
+    const next = !biometric
+    if (next) {
+      if (!biometricAvailable) {
+        Alert.alert(
+          `${biometricName} unavailable`,
+          biometricReason === 'hardware'
+            ? 'This device does not support biometric authentication.'
+            : 'Enroll a face or fingerprint in your device settings first, then try again.',
+        )
+        return
+      }
+      const ok = await promptBiometric(`Enable ${biometricName} for SkyHub`)
+      if (!ok) return // user cancelled — no state change
+      tokenStorage.setBiometricEnabled(true)
+      setBiometric(true)
+      try {
+        await api.updateSecurity({ biometricEnabled: true })
+      } catch {
+        // best effort — local flag is the source of truth for the boot gate
+      }
+    } else {
+      tokenStorage.setBiometricEnabled(false)
+      setBiometric(false)
+      try {
+        await api.updateSecurity({ biometricEnabled: false })
+      } catch {
+        // same
+      }
+    }
+    refetch()
+  }, [biometric, biometricAvailable, biometricReason, biometricName, refetch])
   const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
@@ -161,15 +224,19 @@ export default function SecurityScreen() {
 
       <AuthToggleCard
         icon={ScanFace}
-        title={biometric ? 'Biometric Enabled' : 'Biometric Disabled'}
-        subtitle={biometric ? 'Face ID or fingerprint active' : 'Use Face ID or fingerprint to sign in'}
+        title={biometric ? `${biometricName} Enabled` : `${biometricName} Disabled`}
+        subtitle={
+          !biometricAvailable
+            ? biometricReason === 'hardware'
+              ? 'Not supported on this device'
+              : 'Enroll a face or fingerprint in your device settings'
+            : biometric
+              ? `Use ${biometricName} on next sign-in`
+              : `Sign in faster with ${biometricName}`
+        }
         on={biometric}
-        onToggle={async () => {
-          const next = !biometric
-          setBiometric(next)
-          await api.updateSecurity({ biometricEnabled: next })
-          refetch()
-        }}
+        onToggle={toggleBiometric}
+        disabled={!biometricAvailable}
         color={biometric ? ACCENT : palette.textSecondary}
         palette={palette}
         isDark={isDark}
@@ -371,6 +438,7 @@ function AuthToggleCard({
   palette,
   isDark,
   fonts,
+  disabled = false,
 }: {
   icon: LucideIcon
   title: string
@@ -381,15 +449,17 @@ function AuthToggleCard({
   palette: Palette
   isDark: boolean
   fonts: any
+  disabled?: boolean
 }) {
   return (
     <Pressable
-      onPress={onToggle}
+      onPress={disabled ? undefined : onToggle}
       className="flex-row items-center rounded-2xl border mb-4 active:opacity-80"
       style={{
         padding: 16,
         backgroundColor: on ? accentTint(color, isDark ? 0.1 : 0.05) : palette.card,
         borderColor: on ? accentTint(color, 0.2) : palette.cardBorder,
+        opacity: disabled ? 0.5 : 1,
       }}
     >
       <Icon size={22} color={color} strokeWidth={1.8} />

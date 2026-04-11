@@ -8,6 +8,7 @@ import { useAuthStore, useTheme, QueryProvider } from '@skyhub/ui'
 import { ThemeProvider, useAppTheme } from '../providers/ThemeProvider'
 import { UserProvider } from '../providers/UserProvider'
 import { tokenStorage } from '../src/lib/token-storage'
+import { promptBiometric } from '../src/lib/biometric-gate'
 import LoginScreen from './login'
 
 function AuthedShell() {
@@ -44,21 +45,35 @@ function AuthGate() {
       return
     }
 
-    api
-      .refreshToken(stored)
-      .then(async ({ accessToken, refreshToken }) => {
+    const bootstrap = async () => {
+      // Biometric gate — only if the user opted in last time. On cancel or
+      // failure we fall through to the login screen *without* clearing the
+      // stored tokens, so the next password login can re-enable biometrics
+      // without forcing a full re-enrollment.
+      if (tokenStorage.isBiometricEnabled()) {
+        const ok = await promptBiometric('Sign in to SkyHub')
+        if (!ok) {
+          useAuthStore.getState().setLoading(false)
+          return
+        }
+      }
+
+      try {
+        const { accessToken, refreshToken } = await api.refreshToken(stored)
         tokenStorage.setTokens(accessToken, refreshToken)
         useAuthStore.getState().setTokens(accessToken, refreshToken)
         const user = await api.getMe()
         useAuthStore.getState().setUser(user as never)
-      })
-      .catch(() => {
+      } catch {
         tokenStorage.clearTokens()
+        tokenStorage.setBiometricEnabled(false)
         useAuthStore.getState().logout()
-      })
-      .finally(() => {
+      } finally {
         useAuthStore.getState().setLoading(false)
-      })
+      }
+    }
+
+    void bootstrap()
   }, [])
 
   if (isLoading) {

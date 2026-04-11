@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { validateServerEnv } from '@skyhub/env'
+import { validateServerEnv } from '@skyhub/env/server'
 const env = validateServerEnv()
 import { connectDB } from './db/connection.js'
 import { User } from './models/User.js'

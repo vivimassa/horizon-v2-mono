@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import bcrypt from 'bcryptjs'
 import { User } from '../models/User.js'
-import { getServerEnv } from '@skyhub/env'
+import { getServerEnv } from '@skyhub/env/server'
 
 interface LoginBody {
   email: string

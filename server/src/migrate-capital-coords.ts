@@ -3,7 +3,7 @@
  * Run: npx tsx src/migrate-capital-coords.ts
  */
 import 'dotenv/config'
-import { validateServerEnv } from '@skyhub/env'
+import { validateServerEnv } from '@skyhub/env/server'
 const env = validateServerEnv()
 import { connectDB } from './db/connection.js'
 import { Country } from './models/Country.js'

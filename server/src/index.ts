@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { validateServerEnv } from '@skyhub/env'
+import { validateServerEnv } from '@skyhub/env/server'
 const env = validateServerEnv()
 import path from 'node:path'
 import fs from 'node:fs'

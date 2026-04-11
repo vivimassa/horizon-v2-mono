@@ -1,6 +1,6 @@
 import Constants from 'expo-constants'
 import { setApiBaseUrl } from '@skyhub/api'
-import { validateClientEnv } from '@skyhub/env'
+import { validateClientEnv } from '@skyhub/env/client'
 
 const API_PORT = 3002
 

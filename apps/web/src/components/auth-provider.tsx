@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import { setAuthCallbacks } from '@skyhub/api'
 
 interface AuthUser {
   _id: string
@@ -110,6 +111,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (bootstrapped.current) return
     bootstrapped.current = true
+
+    // Wire @skyhub/api's request() to read the token from localStorage so that
+    // any code importing from @skyhub/api (use-schedule-ref-store, etc.) sends
+    // the Bearer header automatically and reacts to 401 by clearing tokens.
+    setAuthCallbacks({
+      getAccessToken: () => {
+        if (typeof window === 'undefined') return null
+        try {
+          return window.localStorage.getItem(ACCESS_KEY)
+        } catch {
+          return null
+        }
+      },
+      onAuthFailure: () => {
+        clearTokens()
+        setUser(null)
+        setIsAuthenticated(false)
+      },
+    })
     ;(async () => {
       const { refresh } = readTokens()
       if (!refresh) {

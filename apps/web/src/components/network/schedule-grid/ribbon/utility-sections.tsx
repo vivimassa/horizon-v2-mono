@@ -1,35 +1,47 @@
-"use client";
+'use client'
 
-import { Search, Replace, Upload, Download, Save, SaveAll, GitBranch, MessageSquare, FileText } from "lucide-react";
-import { RibbonButton } from "./ribbon-button";
-import { RibbonSection } from "./flight-section";
-import { useTheme } from "@/components/theme-provider";
+import { Search, Replace, Upload, Download, Save, SaveAll, GitBranch, MessageSquare, FileText } from 'lucide-react'
+import { RibbonButton } from './ribbon-button'
+import { RibbonSection } from './flight-section'
+import { useTheme } from '@/components/theme-provider'
 
 function Divider() {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
   return (
     <div className="self-stretch shrink-0 flex items-center py-4">
-      <div style={{ width: 1, height: '60%', background: isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)" }} />
+      <div style={{ width: 1, height: '60%', background: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)' }} />
     </div>
-  );
+  )
 }
 
 interface Props {
-  onSave: () => void;
-  onImport?: () => void;
-  onExport?: () => void;
-  onScenario?: () => void;
-  onMessage?: () => void;
-  onSsimExport?: () => void;
-  onFind?: () => void;
-  onReplace?: () => void;
-  onSaveAs?: () => void;
-  hasDirty: boolean;
-  saving: boolean;
+  onSave: () => void
+  onImport?: () => void
+  onExport?: () => void
+  onScenario?: () => void
+  onMessage?: () => void
+  onSsimExport?: () => void
+  onFind?: () => void
+  onReplace?: () => void
+  onSaveAs?: () => void
+  hasDirty: boolean
+  saving: boolean
 }
 
-export function UtilitySections({ onSave, onImport, onExport, onScenario, onMessage, onSsimExport, onFind, onReplace, onSaveAs, hasDirty, saving }: Props) {
+export function UtilitySections({
+  onSave,
+  onImport,
+  onExport,
+  onScenario,
+  onMessage,
+  onSsimExport,
+  onFind,
+  onReplace,
+  onSaveAs,
+  hasDirty,
+  saving,
+}: Props) {
   return (
     <>
       <RibbonSection label="Editing">
@@ -64,5 +76,5 @@ export function UtilitySections({ onSave, onImport, onExport, onScenario, onMess
         <RibbonButton icon={FileText} label="SSIM" onClick={onSsimExport} />
       </RibbonSection>
     </>
-  );
+  )
 }

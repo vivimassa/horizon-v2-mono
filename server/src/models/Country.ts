@@ -24,7 +24,7 @@ const countrySchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'countries',
-  }
+  },
 )
 
 countrySchema.index({ name: 1 })

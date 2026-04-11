@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { create } from 'zustand'
 import { api } from '@skyhub/api'
@@ -16,7 +16,10 @@ interface ScheduleMessagingState {
 
   // Filters
   filters: Omit<ScheduleMessageQuery, 'operatorId'>
-  setFilter: <K extends keyof Omit<ScheduleMessageQuery, 'operatorId'>>(key: K, value: Omit<ScheduleMessageQuery, 'operatorId'>[K]) => void
+  setFilter: <K extends keyof Omit<ScheduleMessageQuery, 'operatorId'>>(
+    key: K,
+    value: Omit<ScheduleMessageQuery, 'operatorId'>[K],
+  ) => void
   resetFilters: () => void
 
   // Pagination
@@ -57,7 +60,7 @@ export const useScheduleMessagingStore = create<ScheduleMessagingState>((set, ge
 
   filters: { ...DEFAULT_FILTERS },
   setFilter: (key, value) => {
-    set(s => ({ filters: { ...s.filters, [key]: value } }))
+    set((s) => ({ filters: { ...s.filters, [key]: value } }))
   },
   resetFilters: () => set({ filters: { ...DEFAULT_FILTERS }, page: 1 }),
 
@@ -73,7 +76,7 @@ export const useScheduleMessagingStore = create<ScheduleMessagingState>((set, ge
 
   selectedIds: new Set(),
   toggleSelected: (id) => {
-    set(s => {
+    set((s) => {
       const next = new Set(s.selectedIds)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -81,7 +84,7 @@ export const useScheduleMessagingStore = create<ScheduleMessagingState>((set, ge
     })
   },
   selectAll: () => {
-    set(s => ({ selectedIds: new Set(s.messages.map(m => m._id)) }))
+    set((s) => ({ selectedIds: new Set(s.messages.map((m) => m._id)) }))
   },
   clearSelection: () => set({ selectedIds: new Set() }),
 
@@ -115,14 +118,15 @@ export const useScheduleMessagingStore = create<ScheduleMessagingState>((set, ge
     }
   },
 
-  reset: () => set({
-    messages: [],
-    stats: null,
-    totalCount: 0,
-    dataLoaded: false,
-    filters: { ...DEFAULT_FILTERS },
-    page: 1,
-    selectedIds: new Set(),
-    activeSection: 'log',
-  }),
+  reset: () =>
+    set({
+      messages: [],
+      stats: null,
+      totalCount: 0,
+      dataLoaded: false,
+      filters: { ...DEFAULT_FILTERS },
+      page: 1,
+      selectedIds: new Set(),
+      activeSection: 'log',
+    }),
 }))

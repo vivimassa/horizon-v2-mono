@@ -70,7 +70,7 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     if (!parsed.success) {
       return reply.code(400).send({
         error: 'Validation failed',
-        details: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`),
+        details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
       })
     }
     const { operatorId, from, to, scenarioId, acTypeFilter, statusFilter } = parsed.data
@@ -82,27 +82,32 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       isActive: { $ne: false },
     }
     if (scenarioId) sfFilter.scenarioId = scenarioId
-    sfFilter.status = statusFilter
-      ? { $in: statusFilter.split(',') }
-      : { $ne: 'cancelled' }
+    sfFilter.status = statusFilter ? { $in: statusFilter.split(',') } : { $ne: 'cancelled' }
     if (acTypeFilter) {
       sfFilter.aircraftTypeIcao = { $in: acTypeFilter.split(',') }
     }
 
     // Parallel queries — include FlightInstance overlays for per-date assignments
-    const [scheduledFlights, registrations, acTypes, instances, operator, lopaConfigs, cabinClasses] = await Promise.all([
-      ScheduledFlight.find(sfFilter).lean(),
-      AircraftRegistration.find({ operatorId, isActive: true }).lean(),
-      AircraftType.find({ operatorId, isActive: true }).lean(),
-      // Extend range by 7 days before 'from' to cover flights with departureDayOffset lookback
-      FlightInstance.find(
-        { operatorId, operatingDate: { $gte: new Date(new Date(from + 'T00:00:00Z').getTime() - 7 * DAY_MS).toISOString().slice(0, 10), $lte: to } },
-        { _id: 1, 'tail.registration': 1, 'tail.icaoType': 1, status: 1 }
-      ).lean(),
-      Operator.findById(operatorId, { countryIso2: 1 }).lean(),
-      LopaConfig.find({ operatorId, isActive: true }, { _id: 1, aircraftType: 1, cabins: 1, isDefault: 1 }).lean(),
-      CabinClass.find({ operatorId, isActive: true }, { code: 1, sortOrder: 1 }).sort({ sortOrder: 1 }).lean(),
-    ])
+    const [scheduledFlights, registrations, acTypes, instances, operator, lopaConfigs, cabinClasses] =
+      await Promise.all([
+        ScheduledFlight.find(sfFilter).lean(),
+        AircraftRegistration.find({ operatorId, isActive: true }).lean(),
+        AircraftType.find({ operatorId, isActive: true }).lean(),
+        // Extend range by 7 days before 'from' to cover flights with departureDayOffset lookback
+        FlightInstance.find(
+          {
+            operatorId,
+            operatingDate: {
+              $gte: new Date(new Date(from + 'T00:00:00Z').getTime() - 7 * DAY_MS).toISOString().slice(0, 10),
+              $lte: to,
+            },
+          },
+          { _id: 1, 'tail.registration': 1, 'tail.icaoType': 1, status: 1 },
+        ).lean(),
+        Operator.findById(operatorId, { countryIso2: 1 }).lean(),
+        LopaConfig.find({ operatorId, isActive: true }, { _id: 1, aircraftType: 1, cabins: 1, isDefault: 1 }).lean(),
+        CabinClass.find({ operatorId, isActive: true }, { code: 1, sortOrder: 1 }).sort({ sortOrder: 1 }).lean(),
+      ])
 
     const operatorCountry = (operator?.countryIso2 as string) ?? null
 
@@ -116,11 +121,11 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // AC type lookup by _id
-    const acTypeMap = new Map(acTypes.map(t => [t._id, t]))
+    const acTypeMap = new Map(acTypes.map((t) => [t._id, t]))
 
     // LOPA lookup: registration lopaConfigId → config, fallback to type default
-    const lopaById = new Map(lopaConfigs.map(l => [l._id, l]))
-    const lopaDefaultByType = new Map<string, typeof lopaConfigs[0]>()
+    const lopaById = new Map(lopaConfigs.map((l) => [l._id, l]))
+    const lopaDefaultByType = new Map<string, (typeof lopaConfigs)[0]>()
     for (const l of lopaConfigs) {
       if (l.isDefault && !lopaDefaultByType.has(l.aircraftType)) lopaDefaultByType.set(l.aircraftType, l)
     }
@@ -164,10 +169,10 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
         // Per-date: check FlightInstance for overrides or cancellation
         const compositeId = `${sf._id}|${opDate}`
         const inst = instanceMap.get(compositeId)
-        if (inst?.cancelled) continue              // removed from this date
+        if (inst?.cancelled) continue // removed from this date
         const aircraftReg = inst
-          ? inst.reg                                // explicit per-date assignment (or null if unassigned)
-          : (sf.aircraftReg as string) ?? null      // fallback to pattern default
+          ? inst.reg // explicit per-date assignment (or null if unassigned)
+          : ((sf.aircraftReg as string) ?? null) // fallback to pattern default
 
         flights.push({
           id: compositeId,
@@ -195,7 +200,7 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     flights.sort((a, b) => a.stdUtc - b.stdUtc)
 
     // ── Slot status + utilization join ──
-    const sfIds = [...new Set(flights.map(f => f.scheduledFlightId).filter(Boolean))]
+    const sfIds = [...new Set(flights.map((f) => f.scheduledFlightId).filter(Boolean))]
     if (sfIds.length > 0) {
       const slotSeriesDocs = await SlotSeries.find(
         { linkedScheduledFlightId: { $in: sfIds } },
@@ -218,15 +223,20 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
 
       // Batch utilization aggregation for all series (past dates only)
       const todayISO = new Date().toISOString().split('T')[0]
-      const utilAgg = seriesIds.length > 0 ? await SlotDate.aggregate([
-        { $match: { seriesId: { $in: seriesIds }, slotDate: { $lte: todayISO } } },
-        { $group: {
-          _id: '$seriesId',
-          total: { $sum: 1 },
-          operated: { $sum: { $cond: [{ $eq: ['$operationStatus', 'operated'] }, 1, 0] } },
-          jnus: { $sum: { $cond: [{ $eq: ['$operationStatus', 'jnus'] }, 1, 0] } },
-        }},
-      ]) : []
+      const utilAgg =
+        seriesIds.length > 0
+          ? await SlotDate.aggregate([
+              { $match: { seriesId: { $in: seriesIds }, slotDate: { $lte: todayISO } } },
+              {
+                $group: {
+                  _id: '$seriesId',
+                  total: { $sum: 1 },
+                  operated: { $sum: { $cond: [{ $eq: ['$operationStatus', 'operated'] }, 1, 0] } },
+                  jnus: { $sum: { $cond: [{ $eq: ['$operationStatus', 'jnus'] }, 1, 0] } },
+                },
+              },
+            ])
+          : []
 
       const utilMap = new Map<string, { pct: number; operated: number; jnus: number; total: number }>()
       for (const row of utilAgg) {
@@ -255,16 +265,19 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
 
     // Aircraft with joined type info, sorted by type then registration
     const aircraft = registrations
-      .map(r => {
+      .map((r) => {
         const t = acTypeMap.get(r.aircraftTypeId)
         // Resolve LOPA: registration's config → type default → null
-        const lopa = (r.lopaConfigId ? lopaById.get(r.lopaConfigId) : null)
-          ?? (t?.icaoType ? lopaDefaultByType.get(t.icaoType) : null)
+        const lopa =
+          (r.lopaConfigId ? lopaById.get(r.lopaConfigId) : null) ??
+          (t?.icaoType ? lopaDefaultByType.get(t.icaoType) : null)
         // Build seat config using ALL cabin classes (sorted by sortOrder), showing 0 for missing classes
         let seatConfig: string | null = null
         if (lopa?.cabins?.length && cabinClasses.length > 0) {
-          const lopaCabinMap = new Map((lopa.cabins as { classCode: string; seats: number }[]).map(c => [c.classCode, c.seats]))
-          seatConfig = cabinClasses.map(cc => lopaCabinMap.get(cc.code as string) ?? 0).join('/')
+          const lopaCabinMap = new Map(
+            (lopa.cabins as { classCode: string; seats: number }[]).map((c) => [c.classCode, c.seats]),
+          )
+          seatConfig = cabinClasses.map((cc) => lopaCabinMap.get(cc.code as string) ?? 0).join('/')
         }
         return {
           id: r._id,
@@ -279,12 +292,13 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
           seatConfig,
         }
       })
-      .sort((a, b) =>
-        (a.aircraftTypeIcao ?? '').localeCompare(b.aircraftTypeIcao ?? '')
-        || a.registration.localeCompare(b.registration)
+      .sort(
+        (a, b) =>
+          (a.aircraftTypeIcao ?? '').localeCompare(b.aircraftTypeIcao ?? '') ||
+          a.registration.localeCompare(b.registration),
       )
 
-    const aircraftTypes = acTypes.map(t => ({
+    const aircraftTypes = acTypes.map((t) => ({
       id: t._id,
       icaoType: t.icaoType,
       name: t.name,
@@ -300,10 +314,13 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
 
     // Build station → country map for DOM/INT determination
     const allStations = new Set<string>()
-    for (const f of flights) { allStations.add(f.depStation); allStations.add(f.arrStation) }
+    for (const f of flights) {
+      allStations.add(f.depStation)
+      allStations.add(f.arrStation)
+    }
     const airports = await Airport.find(
       { $or: [{ icaoCode: { $in: [...allStations] } }, { iataCode: { $in: [...allStations] } }] },
-      { icaoCode: 1, iataCode: 1, countryIso2: 1, utcOffsetHours: 1 }
+      { icaoCode: 1, iataCode: 1, countryIso2: 1, utcOffsetHours: 1 },
     ).lean()
     const stationCountryMap: Record<string, string> = {}
     const stationUtcOffsetMap: Record<string, number> = {}
@@ -333,13 +350,13 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     if (!parsed.success) {
       return reply.code(400).send({
         error: 'Validation failed',
-        details: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`),
+        details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
       })
     }
     const { operatorId, flightIds, registration } = parsed.data
 
     // Lightweight assign — just write the tail
-    const bulkOps = flightIds.map(id => {
+    const bulkOps = flightIds.map((id) => {
       const [sfId, opDate] = id.split('|')
       return {
         updateOne: {
@@ -371,10 +388,12 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
   // ── PATCH /gantt/bulk-assign — batch assign multiple registrations in one request ──
   const bulkAssignSchema = z.object({
     operatorId: z.string().min(1),
-    assignments: z.array(z.object({
-      registration: z.string().min(1),
-      flightIds: z.array(z.string().min(1)),
-    })),
+    assignments: z.array(
+      z.object({
+        registration: z.string().min(1),
+        flightIds: z.array(z.string().min(1)),
+      }),
+    ),
   })
 
   app.patch('/gantt/bulk-assign', async (req, reply) => {
@@ -382,13 +401,13 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     if (!parsed.success) {
       return reply.code(400).send({
         error: 'Validation failed',
-        details: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`),
+        details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
       })
     }
     const { operatorId, assignments } = parsed.data
 
     // Lightweight bulk assign — V1 pattern: just write the tail, nothing else
-    const allFlightIds = assignments.flatMap(a => a.flightIds)
+    const allFlightIds = assignments.flatMap((a) => a.flightIds)
 
     // Build minimal bulk ops — no ScheduledFlight lookup needed
     const bulkOps: any[] = []
@@ -424,7 +443,9 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
         const result = await FlightInstance.bulkWrite(chunk, { ordered: false })
         totalUpserted += result.upsertedCount
         totalModified += result.modifiedCount
-        app.log.info(`bulk-assign chunk ${i / 5000 + 1}: ${chunk.length} ops → ${result.upsertedCount} upserted, ${result.modifiedCount} modified`)
+        app.log.info(
+          `bulk-assign chunk ${i / 5000 + 1}: ${chunk.length} ops → ${result.upsertedCount} upserted, ${result.modifiedCount} modified`,
+        )
       }
     }
 
@@ -437,7 +458,9 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
 
     const expected = bulkOps.length
     if (verifyCount < expected) {
-      app.log.warn(`bulk-assign verification: expected ${expected} assigned, found ${verifyCount} (${expected - verifyCount} missing)`)
+      app.log.warn(
+        `bulk-assign verification: expected ${expected} assigned, found ${verifyCount} (${expected - verifyCount} missing)`,
+      )
     }
 
     resolveIataCodes(operatorId, allFlightIds)
@@ -450,7 +473,7 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     if (!parsed.success) {
       return reply.code(400).send({
         error: 'Validation failed',
-        details: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`),
+        details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
       })
     }
     const { operatorId, flightIds } = parsed.data
@@ -461,7 +484,14 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       const chunk = flightIds.slice(i, i + 5000)
       const result = await FlightInstance.updateMany(
         { _id: { $in: chunk }, operatorId },
-        { $set: { 'tail.registration': null, 'tail.icaoType': null, status: 'scheduled', 'syncMeta.updatedAt': Date.now() } }
+        {
+          $set: {
+            'tail.registration': null,
+            'tail.icaoType': null,
+            status: 'scheduled',
+            'syncMeta.updatedAt': Date.now(),
+          },
+        },
       )
       totalModified += result.modifiedCount
     }
@@ -480,13 +510,13 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     if (!parsed.success) {
       return reply.code(400).send({
         error: 'Validation failed',
-        details: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`),
+        details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
       })
     }
     const { operatorId, flightIds } = parsed.data
 
     // Lightweight cancel — just set status
-    const bulkOps = flightIds.map(id => {
+    const bulkOps = flightIds.map((id) => {
       const [sfId, opDate] = id.split('|')
       return {
         updateOne: {
@@ -567,21 +597,30 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     // Find linked slot series
     const linkedSeries = await SlotSeries.find(
       { linkedScheduledFlightId: { $in: [...sfDatePairs.keys()] } },
-      { _id: 1, linkedScheduledFlightId: 1, airportIata: 1, arrivalFlightNumber: 1, departureFlightNumber: 1, seasonCode: 1 },
+      {
+        _id: 1,
+        linkedScheduledFlightId: 1,
+        airportIata: 1,
+        arrivalFlightNumber: 1,
+        departureFlightNumber: 1,
+        seasonCode: 1,
+      },
     ).lean()
 
     if (!linkedSeries.length) return { impacts: [] }
 
     // Get utilization for each series
-    const seriesIds = linkedSeries.map(s => s._id as string)
+    const seriesIds = linkedSeries.map((s) => s._id as string)
     const utilAgg = await SlotDate.aggregate([
       { $match: { seriesId: { $in: seriesIds } } },
-      { $group: {
-        _id: '$seriesId',
-        total: { $sum: 1 },
-        operated: { $sum: { $cond: [{ $eq: ['$operationStatus', 'operated'] }, 1, 0] } },
-        jnus: { $sum: { $cond: [{ $eq: ['$operationStatus', 'jnus'] }, 1, 0] } },
-      }},
+      {
+        $group: {
+          _id: '$seriesId',
+          total: { $sum: 1 },
+          operated: { $sum: { $cond: [{ $eq: ['$operationStatus', 'operated'] }, 1, 0] } },
+          jnus: { $sum: { $cond: [{ $eq: ['$operationStatus', 'jnus'] }, 1, 0] } },
+        },
+      },
     ])
     const utilMap = new Map(utilAgg.map((r: Record<string, unknown>) => [r._id as string, r]))
 
@@ -599,46 +638,48 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Look up airport names
-    const airportIatas = [...new Set(linkedSeries.map(s => s.airportIata))]
+    const airportIatas = [...new Set(linkedSeries.map((s) => s.airportIata))]
     const airports = await Airport.find(
       { iataCode: { $in: airportIatas } },
       { iataCode: 1, name: 1, coordinationLevel: 1 },
     ).lean()
-    const airportMap = new Map(airports.map(a => [a.iataCode, a]))
+    const airportMap = new Map(airports.map((a) => [a.iataCode, a]))
 
     // Build impact results
-    const impacts = linkedSeries.map(ss => {
-      const util = utilMap.get(ss._id as string) as Record<string, number> | undefined
-      const total = (util?.total ?? 0) as number
-      const operated = (util?.operated ?? 0) as number
-      const jnusCount = (util?.jnus ?? 0) as number
-      const cancelledCount = cancelCountMap.get(ss._id as string) ?? 0
-      const currentPct = total > 0 ? Math.round(((operated + jnusCount) / total) * 100) : 0
-      const afterPct = total > 0 ? Math.round(((operated + jnusCount - cancelledCount) / total) * 100) : 0
-      const airport = airportMap.get(ss.airportIata) as Record<string, unknown> | undefined
+    const impacts = linkedSeries
+      .map((ss) => {
+        const util = utilMap.get(ss._id as string) as Record<string, number> | undefined
+        const total = (util?.total ?? 0) as number
+        const operated = (util?.operated ?? 0) as number
+        const jnusCount = (util?.jnus ?? 0) as number
+        const cancelledCount = cancelCountMap.get(ss._id as string) ?? 0
+        const currentPct = total > 0 ? Math.round(((operated + jnusCount) / total) * 100) : 0
+        const afterPct = total > 0 ? Math.round(((operated + jnusCount - cancelledCount) / total) * 100) : 0
+        const airport = airportMap.get(ss.airportIata) as Record<string, unknown> | undefined
 
-      // Determine next season
-      const seasonType = (ss.seasonCode as string)?.[0]
-      const seasonNum = parseInt((ss.seasonCode as string)?.slice(1) || '26', 10)
-      const nextSeason = seasonType === 'S' ? `W${seasonNum}` : `S${seasonNum + 1}`
+        // Determine next season
+        const seasonType = (ss.seasonCode as string)?.[0]
+        const seasonNum = parseInt((ss.seasonCode as string)?.slice(1) || '26', 10)
+        const nextSeason = seasonType === 'S' ? `W${seasonNum}` : `S${seasonNum + 1}`
 
-      return {
-        seriesId: ss._id,
-        airportIata: ss.airportIata,
-        airportName: (airport?.name as string) ?? ss.airportIata,
-        coordinationLevel: (airport?.coordinationLevel as number) ?? 3,
-        flightNumber: (ss.arrivalFlightNumber || ss.departureFlightNumber || '') as string,
-        currentPct,
-        afterPct: Math.max(0, afterPct),
-        operated,
-        jnus: jnusCount,
-        total,
-        cancelledCount,
-        willBreachThreshold: currentPct >= 80 && afterPct < 80,
-        isAlreadyAtRisk: currentPct < 80,
-        nextSeason,
-      }
-    }).filter(i => i.cancelledCount > 0) // Only include series actually impacted
+        return {
+          seriesId: ss._id,
+          airportIata: ss.airportIata,
+          airportName: (airport?.name as string) ?? ss.airportIata,
+          coordinationLevel: (airport?.coordinationLevel as number) ?? 3,
+          flightNumber: (ss.arrivalFlightNumber || ss.departureFlightNumber || '') as string,
+          currentPct,
+          afterPct: Math.max(0, afterPct),
+          operated,
+          jnus: jnusCount,
+          total,
+          cancelledCount,
+          willBreachThreshold: currentPct >= 80 && afterPct < 80,
+          isAlreadyAtRisk: currentPct < 80,
+          nextSeason,
+        }
+      })
+      .filter((i) => i.cancelledCount > 0) // Only include series actually impacted
 
     return { impacts }
   })
@@ -657,14 +698,14 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     if (!parsed.success) {
       return reply.code(400).send({
         error: 'Validation failed',
-        details: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`),
+        details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
       })
     }
     const { operatorId, aFlightIds, aRegistration, bFlightIds, bRegistration } = parsed.data
 
     // Lightweight swap — just write tails, no SF lookup needed
     const buildOps = (flightIds: string[], toReg: string | null) =>
-      flightIds.map(id => {
+      flightIds.map((id) => {
         const [sfId, opDate] = id.split('|')
         return {
           updateOne: {
@@ -699,7 +740,10 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     periodTo: z.string().min(1),
     config: z.object({ preset: z.string(), method: z.string() }),
     stats: z.object({
-      totalFlights: z.number(), assigned: z.number(), overflow: z.number(), chainBreaks: z.number(),
+      totalFlights: z.number(),
+      assigned: z.number(),
+      overflow: z.number(),
+      chainBreaks: z.number(),
       totalFuelKg: z.number().nullable().optional(),
       baselineFuelKg: z.number().nullable().optional(),
       fuelSavingsPercent: z.number().nullable().optional(),
@@ -707,18 +751,28 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     assignments: z.array(z.object({ flightId: z.string(), registration: z.string() })),
     overflowFlightIds: z.array(z.string()),
     chainBreaks: z.array(z.object({ flightId: z.string(), prevArr: z.string(), nextDep: z.string() })),
-    typeBreakdown: z.array(z.object({
-      icaoType: z.string(), typeName: z.string(),
-      totalFlights: z.number(), assigned: z.number(), overflow: z.number(),
-      totalBlockHours: z.number(), aircraftCount: z.number(), avgBhPerDay: z.number(),
-    })),
+    typeBreakdown: z.array(
+      z.object({
+        icaoType: z.string(),
+        typeName: z.string(),
+        totalFlights: z.number(),
+        assigned: z.number(),
+        overflow: z.number(),
+        totalBlockHours: z.number(),
+        aircraftCount: z.number(),
+        avgBhPerDay: z.number(),
+      }),
+    ),
     elapsedMs: z.number(),
   })
 
   app.post('/gantt/optimizer/runs', async (req, reply) => {
     const parsed = saveRunSchema.safeParse(req.body)
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'Validation failed', details: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`) })
+      return reply.code(400).send({
+        error: 'Validation failed',
+        details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+      })
     }
     const id = crypto.randomUUID()
     await OptimizerRun.create({ _id: id, ...parsed.data, createdAt: new Date().toISOString() })
@@ -733,8 +787,10 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     }
     const runs = await OptimizerRun.find(
       { operatorId: q.operatorId, periodFrom: q.periodFrom, periodTo: q.periodTo },
-      { assignments: 0 } // exclude large assignments array from list
-    ).sort({ createdAt: -1 }).lean()
+      { assignments: 0 }, // exclude large assignments array from list
+    )
+      .sort({ createdAt: -1 })
+      .lean()
     return runs
   })
 
@@ -777,7 +833,9 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
           await FlightInstance.updateOne({ _id: inst._id }, { $set: update })
         }
       }
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
   }
 
   // ── GET /gantt/flight-detail — full flight data for Flight Information dialog ──
@@ -791,8 +849,7 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     if (!sf) return reply.code(404).send({ error: 'ScheduledFlight not found' })
 
     // Parallel joins — station codes may be ICAO (VVTS) or IATA (SGN)
-    const findAirport = (code: string) =>
-      Airport.findOne({ $or: [{ icaoCode: code }, { iataCode: code }] }).lean()
+    const findAirport = (code: string) => Airport.findOne({ $or: [{ icaoCode: code }, { iataCode: code }] }).lean()
 
     // Look up FlightInstance by composite ID first (preferred), fallback to flightNumber+date
     const compositeId = `${q.sfId}|${q.opDate}`
@@ -809,19 +866,29 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       sf.aircraftTypeIcao
         ? AircraftType.findOne({ operatorId: q.operatorId, icaoType: sf.aircraftTypeIcao }).lean()
         : null,
-      tailReg
-        ? AircraftRegistration.findOne({ operatorId: q.operatorId, registration: tailReg }).lean()
-        : null,
+      tailReg ? AircraftRegistration.findOne({ operatorId: q.operatorId, registration: tailReg }).lean() : null,
       sf.aircraftTypeIcao
-        ? LopaConfig.findOne({ operatorId: q.operatorId, aircraftType: sf.aircraftTypeIcao, isDefault: true, isActive: true }).lean()
+        ? LopaConfig.findOne({
+            operatorId: q.operatorId,
+            aircraftType: sf.aircraftTypeIcao,
+            isDefault: true,
+            isActive: true,
+          }).lean()
         : null,
     ])
 
-    const fmtAirport = (a: typeof depAirport) => a ? {
-      icaoCode: a.icaoCode, iataCode: a.iataCode ?? null,
-      name: a.name, city: a.city ?? null, country: a.country ?? null,
-      timezone: a.timezone, utcOffsetHours: a.utcOffsetHours ?? null,
-    } : null
+    const fmtAirport = (a: typeof depAirport) =>
+      a
+        ? {
+            icaoCode: a.icaoCode,
+            iataCode: a.iataCode ?? null,
+            name: a.name,
+            city: a.city ?? null,
+            country: a.country ?? null,
+            timezone: a.timezone,
+            utcOffsetHours: a.utcOffsetHours ?? null,
+          }
+        : null
 
     // Expand STD/STA to epoch ms for the operating date
     const dayMs = new Date(q.opDate + 'T00:00:00Z').getTime()
@@ -852,19 +919,24 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       arrivalDayOffset: arrOffset,
 
       aircraftTypeIcao: sf.aircraftTypeIcao ?? null,
-      aircraftType: acType ? {
-        icaoType: acType.icaoType, name: acType.name,
-        category: acType.category ?? 'narrow_body',
-        paxCapacity: acType.paxCapacity ?? null,
-        manufacturer: acType.manufacturer ?? null,
-      } : null,
+      aircraftType: acType
+        ? {
+            icaoType: acType.icaoType,
+            name: acType.name,
+            category: acType.category ?? 'narrow_body',
+            paxCapacity: acType.paxCapacity ?? null,
+            manufacturer: acType.manufacturer ?? null,
+          }
+        : null,
       aircraftReg: tailReg,
-      aircraft: acReg ? {
-        registration: acReg.registration,
-        serialNumber: acReg.serialNumber ?? null,
-        homeBaseIcao: acReg.homeBaseIcao ?? null,
-        status: acReg.status,
-      } : null,
+      aircraft: acReg
+        ? {
+            registration: acReg.registration,
+            serialNumber: acReg.serialNumber ?? null,
+            homeBaseIcao: acReg.homeBaseIcao ?? null,
+            status: acReg.status,
+          }
+        : null,
 
       hasInstance: !!instance,
       estimated: {
@@ -889,27 +961,53 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
         gate: instance?.arrInfo?.gate ?? null,
         stand: instance?.arrInfo?.stand ?? null,
       },
-      pax: instance?.pax ? {
-        adultExpected: instance.pax.adultExpected ?? null,
-        adultActual: instance.pax.adultActual ?? null,
-        childExpected: instance.pax.childExpected ?? null,
-        childActual: instance.pax.childActual ?? null,
-        infantExpected: instance.pax.infantExpected ?? null,
-        infantActual: instance.pax.infantActual ?? null,
-      } : null,
-      fuel: instance?.fuel ? {
-        initial: instance.fuel.initial ?? null,
-        uplift: instance.fuel.uplift ?? null,
-        burn: instance.fuel.burn ?? null,
-        flightPlan: instance.fuel.flightPlan ?? null,
-      } : null,
-      cargo: (instance?.cargo ?? []).map(c => ({ category: c.category, weight: c.weight ?? null, pieces: c.pieces ?? null })),
-      delays: (instance?.delays ?? []).map(d => ({ code: d.code, minutes: d.minutes, reason: d.reason ?? '', category: d.category ?? '' })),
-      crew: (instance?.crew ?? []).map(c => ({ employeeId: c.employeeId, role: c.role, name: c.name })),
-      memos: (instance?.memos ?? []).map(m => ({ id: m.id, category: m.category ?? 'general', content: m.content, author: m.author ?? '', pinned: !!m.pinned, createdAt: m.createdAt ?? '' })),
+      pax: instance?.pax
+        ? {
+            adultExpected: instance.pax.adultExpected ?? null,
+            adultActual: instance.pax.adultActual ?? null,
+            childExpected: instance.pax.childExpected ?? null,
+            childActual: instance.pax.childActual ?? null,
+            infantExpected: instance.pax.infantExpected ?? null,
+            infantActual: instance.pax.infantActual ?? null,
+          }
+        : null,
+      fuel: instance?.fuel
+        ? {
+            initial: instance.fuel.initial ?? null,
+            uplift: instance.fuel.uplift ?? null,
+            burn: instance.fuel.burn ?? null,
+            flightPlan: instance.fuel.flightPlan ?? null,
+          }
+        : null,
+      cargo: (instance?.cargo ?? []).map((c) => ({
+        category: c.category,
+        weight: c.weight ?? null,
+        pieces: c.pieces ?? null,
+      })),
+      delays: (instance?.delays ?? []).map((d) => ({
+        code: d.code,
+        minutes: d.minutes,
+        reason: d.reason ?? '',
+        category: d.category ?? '',
+      })),
+      crew: (instance?.crew ?? []).map((c) => ({ employeeId: c.employeeId, role: c.role, name: c.name })),
+      memos: (instance?.memos ?? []).map((m) => ({
+        id: m.id,
+        category: m.category ?? 'general',
+        content: m.content,
+        author: m.author ?? '',
+        pinned: !!m.pinned,
+        createdAt: m.createdAt ?? '',
+      })),
       connections: {
-        outgoing: (instance?.connections?.outgoing ?? []).map(c => ({ flightNumber: c.flightNumber, pax: c.pax ?? 0 })),
-        incoming: (instance?.connections?.incoming ?? []).map(c => ({ flightNumber: c.flightNumber, pax: c.pax ?? 0 })),
+        outgoing: (instance?.connections?.outgoing ?? []).map((c) => ({
+          flightNumber: c.flightNumber,
+          pax: c.pax ?? 0,
+        })),
+        incoming: (instance?.connections?.incoming ?? []).map((c) => ({
+          flightNumber: c.flightNumber,
+          pax: c.pax ?? 0,
+        })),
       },
 
       status: sf.status,
@@ -925,11 +1023,13 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       createdAt: sf.createdAt ?? null,
       updatedAt: sf.updatedAt ?? null,
 
-      lopa: lopa ? {
-        configName: lopa.configName,
-        totalSeats: lopa.totalSeats,
-        cabins: (lopa.cabins ?? []).map(c => ({ classCode: c.classCode, seats: c.seats })),
-      } : null,
+      lopa: lopa
+        ? {
+            configName: lopa.configName,
+            totalSeats: lopa.totalSeats,
+            cabins: (lopa.cabins ?? []).map((c) => ({ classCode: c.classCode, seats: c.seats })),
+          }
+        : null,
     }
   })
 
@@ -994,11 +1094,7 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       syncMeta: { updatedAt: Date.now(), version: 1 },
     }
 
-    await FlightInstance.findOneAndUpdate(
-      { _id: compositeId },
-      { $set: update },
-      { upsert: true, new: true }
-    )
+    await FlightInstance.findOneAndUpdate({ _id: compositeId }, { $set: update }, { upsert: true, new: true })
 
     return { success: true, id: compositeId }
   })
@@ -1017,12 +1113,17 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     const lopa = acReg.lopaConfigId
       ? await LopaConfig.findById(acReg.lopaConfigId).lean()
       : acType?.icaoType
-        ? await LopaConfig.findOne({ operatorId: q.operatorId, aircraftType: acType.icaoType, isDefault: true, isActive: true }).lean()
+        ? await LopaConfig.findOne({
+            operatorId: q.operatorId,
+            aircraftType: acType.icaoType,
+            isDefault: true,
+            isActive: true,
+          }).lean()
         : null
 
     // Fetch cabin class definitions for colors + sort order
     const cabinClasses = await CabinClass.find({ operatorId: q.operatorId, isActive: true }).lean()
-    const cabinClassMap = new Map(cabinClasses.map(c => [c.code, c]))
+    const cabinClassMap = new Map(cabinClasses.map((c) => [c.code, c]))
 
     return {
       registration: acReg.registration,
@@ -1034,16 +1135,23 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       homeBaseIcao: acReg.homeBaseIcao ?? null,
       variant: acReg.variant ?? null,
       imageUrl: acReg.imageUrl ?? null,
-      lopa: lopa ? {
-        configName: lopa.configName,
-        totalSeats: lopa.totalSeats,
-        cabins: (lopa.cabins ?? [])
-          .map(c => {
-            const cls = cabinClassMap.get(c.classCode)
-            return { classCode: c.classCode, seats: c.seats, color: cls?.color ?? null, sortOrder: cls?.sortOrder ?? 99 }
-          })
-          .sort((a, b) => a.sortOrder - b.sortOrder),
-      } : null,
+      lopa: lopa
+        ? {
+            configName: lopa.configName,
+            totalSeats: lopa.totalSeats,
+            cabins: (lopa.cabins ?? [])
+              .map((c) => {
+                const cls = cabinClassMap.get(c.classCode)
+                return {
+                  classCode: c.classCode,
+                  seats: c.seats,
+                  color: cls?.color ?? null,
+                  sortOrder: cls?.sortOrder ?? 99,
+                }
+              })
+              .sort((a, b) => a.sortOrder - b.sortOrder),
+          }
+        : null,
     }
   })
 }

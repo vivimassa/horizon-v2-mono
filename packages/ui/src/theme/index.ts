@@ -1,11 +1,4 @@
-export {
-  colors,
-  accentTint,
-  getStatusColors,
-  glass,
-  type Palette,
-  type StatusKey,
-} from './colors'
+export { colors, accentTint, getStatusColors, glass, type Palette, type StatusKey } from './colors'
 export { typography, type TypographyKey } from './typography'
 export { shadowClasses, shadowStyles, type ShadowLevel, type ShadowKey } from './shadows'
 export { domainIcons, type DomainIconName, type LucideIcon } from './icons'

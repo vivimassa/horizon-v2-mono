@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useEffect, useState, useCallback } from 'react'
 import { useTheme } from '@/components/theme-provider'
@@ -18,8 +18,8 @@ import { AgreementDialog } from './agreement-dialog'
 export function CodeshareShell() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
-  const loadOperator = useOperatorStore(s => s.loadOperator)
-  const operator = useOperatorStore(s => s.operator)
+  const loadOperator = useOperatorStore((s) => s.loadOperator)
+  const operator = useOperatorStore((s) => s.operator)
   const runway = useRunwayLoading()
 
   // Data state
@@ -34,55 +34,67 @@ export function CodeshareShell() {
   // Dialog state
   const [newDialogOpen, setNewDialogOpen] = useState(false)
 
-  useEffect(() => { loadOperator() }, [loadOperator])
+  useEffect(() => {
+    loadOperator()
+  }, [loadOperator])
 
   // Called when user clicks Go in the filter panel
-  const handleGo = useCallback(async (f: CodeshareFilterState) => {
-    setFilters(f)
-    const data = await runway.run(async () => {
-      const opId = getOperatorId()
-      const all = await api.getCodeshareAgreements(opId)
-      return all
-    }, 'Loading codeshare agreements\u2026', 'Agreements loaded')
+  const handleGo = useCallback(
+    async (f: CodeshareFilterState) => {
+      setFilters(f)
+      const data = await runway.run(
+        async () => {
+          const opId = getOperatorId()
+          const all = await api.getCodeshareAgreements(opId)
+          return all
+        },
+        'Loading codeshare agreements\u2026',
+        'Agreements loaded',
+      )
 
-    // Client-side filtering
-    let filtered = data as CodeshareAgreementRef[]
+      // Client-side filtering
+      let filtered = data as CodeshareAgreementRef[]
 
-    // Date range filter — keep agreements whose effective window overlaps the filter period
-    if (f.dateFrom) {
-      filtered = filtered.filter(a => !a.effectiveUntil || a.effectiveUntil >= f.dateFrom)
-    }
-    if (f.dateTo) {
-      filtered = filtered.filter(a => a.effectiveFrom <= f.dateTo)
-    }
+      // Date range filter — keep agreements whose effective window overlaps the filter period
+      if (f.dateFrom) {
+        filtered = filtered.filter((a) => !a.effectiveUntil || a.effectiveUntil >= f.dateFrom)
+      }
+      if (f.dateTo) {
+        filtered = filtered.filter((a) => a.effectiveFrom <= f.dateTo)
+      }
 
-    // Status filter
-    if (f.status) {
-      filtered = filtered.filter(a => a.status === f.status)
-    }
+      // Status filter
+      if (f.status) {
+        filtered = filtered.filter((a) => a.status === f.status)
+      }
 
-    // Agreement type filter
-    if (f.agreementType) {
-      filtered = filtered.filter(a => a.agreementType === f.agreementType)
-    }
+      // Agreement type filter
+      if (f.agreementType) {
+        filtered = filtered.filter((a) => a.agreementType === f.agreementType)
+      }
 
-    setAgreements(filtered)
-    setDataLoaded(true)
-    setSelectedId(filtered.length > 0 ? filtered[0]._id : null)
-  }, [runway])
+      setAgreements(filtered)
+      setDataLoaded(true)
+      setSelectedId(filtered.length > 0 ? filtered[0]._id : null)
+    },
+    [runway],
+  )
 
   const handleDataChanged = useCallback(() => {
     // Re-run filters with current filter state
     if (filters) handleGo(filters)
-    else setRefreshKey(k => k + 1)
+    else setRefreshKey((k) => k + 1)
   }, [filters, handleGo])
 
-  const handleAgreementCreated = useCallback((id: string) => {
-    setSelectedId(id)
-    handleDataChanged()
-  }, [handleDataChanged])
+  const handleAgreementCreated = useCallback(
+    (id: string) => {
+      setSelectedId(id)
+      handleDataChanged()
+    },
+    [handleDataChanged],
+  )
 
-  const selectedAgreement = agreements.find(a => a._id === selectedId) ?? null
+  const selectedAgreement = agreements.find((a) => a._id === selectedId) ?? null
   const operatorCode = operator?.iataCode || operator?.code || 'XX'
 
   const glassBg = isDark ? 'rgba(25,25,33,0.85)' : 'rgba(255,255,255,0.85)'
@@ -93,11 +105,7 @@ export function CodeshareShell() {
     <div className="h-full flex gap-3 p-3">
       {/* Left filter panel */}
       <div className="shrink-0 h-full">
-        <CodeshareFilterPanel
-          forceCollapsed={dataLoaded}
-          loading={runway.active}
-          onGo={handleGo}
-        />
+        <CodeshareFilterPanel forceCollapsed={dataLoaded} loading={runway.active} onGo={handleGo} />
       </div>
 
       {/* Main content */}
@@ -105,10 +113,7 @@ export function CodeshareShell() {
         {/* Toolbar */}
         {!runway.active && dataLoaded && (
           <div className="shrink-0 rounded-2xl overflow-hidden" style={glassStyle}>
-            <CodeshareToolbar
-              hasSelection={!!selectedAgreement}
-              onNewAgreement={() => setNewDialogOpen(true)}
-            />
+            <CodeshareToolbar hasSelection={!!selectedAgreement} onNewAgreement={() => setNewDialogOpen(true)} />
           </div>
         )}
 
@@ -132,10 +137,13 @@ export function CodeshareShell() {
               {/* Detail panel */}
               {!selectedAgreement ? (
                 <div className="flex-1 flex items-center justify-center">
-                  <EmptyPanel message={agreements.length === 0
-                    ? 'No agreements match your filters. Try adjusting the date range or status.'
-                    : 'Select a partner airline to view agreement details'
-                  } />
+                  <EmptyPanel
+                    message={
+                      agreements.length === 0
+                        ? 'No agreements match your filters. Try adjusting the date range or status.'
+                        : 'Select a partner airline to view agreement details'
+                    }
+                  />
                 </div>
               ) : (
                 <AgreementDetailPanel
@@ -152,12 +160,7 @@ export function CodeshareShell() {
 
       {/* New agreement dialog */}
       {newDialogOpen && (
-        <AgreementDialog
-          open
-          onOpenChange={setNewDialogOpen}
-          isDark={isDark}
-          onCreated={handleAgreementCreated}
-        />
+        <AgreementDialog open onOpenChange={setNewDialogOpen} isDark={isDark} onCreated={handleAgreementCreated} />
       )}
     </div>
   )

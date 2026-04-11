@@ -8,11 +8,7 @@
  * Pure functions — no side effects, no I/O, no framework dependencies.
  */
 
-import type {
-  AsmParsed,
-  AsmGenerateInput,
-  AsmActionCode,
-} from '@skyhub/types'
+import type { AsmParsed, AsmGenerateInput, AsmActionCode } from '@skyhub/types'
 
 export { ASM_ACTION_CODES } from '@skyhub/types'
 
@@ -28,9 +24,7 @@ function parseSsimDate(s: string): string {
   const yy = s.length >= 7 ? s.slice(5, 7) : ''
   const monthIdx = MONTHS.indexOf(mmm)
   if (monthIdx < 0) return ''
-  const year = yy
-    ? (parseInt(yy) < 70 ? 2000 + parseInt(yy) : 1900 + parseInt(yy))
-    : new Date().getFullYear()
+  const year = yy ? (parseInt(yy) < 70 ? 2000 + parseInt(yy) : 1900 + parseInt(yy)) : new Date().getFullYear()
   return `${year}-${String(monthIdx + 1).padStart(2, '0')}-${dd}`
 }
 
@@ -52,9 +46,7 @@ function formatHHMM(val: string | undefined): string {
 
 // ── Valid action codes (for parsing) ────────────────────────
 
-const ACTION_CODES: readonly string[] = [
-  'NEW', 'TIM', 'CNL', 'EQT', 'CON', 'RIN', 'RPL', 'FLT', 'SKD', 'RRT',
-]
+const ACTION_CODES: readonly string[] = ['NEW', 'TIM', 'CNL', 'EQT', 'CON', 'RIN', 'RPL', 'FLT', 'SKD', 'RRT']
 
 // ── Human-readable labels ───────────────────────────────────
 
@@ -96,7 +88,11 @@ export function parseAsmMessage(raw: string): AsmParsed {
     errors: [],
   }
 
-  const lines = raw.trim().split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+  const lines = raw
+    .trim()
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
   if (lines.length === 0) {
     result.errors.push('Empty message')
     return result
@@ -116,11 +112,7 @@ export function parseAsmMessage(raw: string): AsmParsed {
   }
 
   // Line 3: Optional message reference (contains digits and letters, often has E or /)
-  if (
-    lineIdx < lines.length &&
-    /\d/.test(lines[lineIdx]) &&
-    !ACTION_CODES.includes(lines[lineIdx].split(/\s/)[0])
-  ) {
+  if (lineIdx < lines.length && /\d/.test(lines[lineIdx]) && !ACTION_CODES.includes(lines[lineIdx].split(/\s/)[0])) {
     lineIdx++
   }
 
@@ -164,13 +156,9 @@ export function parseAsmMessage(raw: string): AsmParsed {
         lineIdx++
         // Next line may be period: "ddMMM ddMMM 1234567"
         if (lineIdx < lines.length) {
-          const periodMatch = lines[lineIdx].match(
-            /(\d{2}[A-Z]{3}(?:\d{2})?)\s+(\d{2}[A-Z]{3}(?:\d{2})?)\s+(\d{1,7})/
-          )
+          const periodMatch = lines[lineIdx].match(/(\d{2}[A-Z]{3}(?:\d{2})?)\s+(\d{2}[A-Z]{3}(?:\d{2})?)\s+(\d{1,7})/)
           if (periodMatch) {
-            result.flightDate = parseSsimDate(
-              periodMatch[1].length === 5 ? periodMatch[1] + '26' : periodMatch[1]
-            )
+            result.flightDate = parseSsimDate(periodMatch[1].length === 5 ? periodMatch[1] + '26' : periodMatch[1])
             lineIdx++
           }
         }

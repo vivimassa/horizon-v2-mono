@@ -38,23 +38,13 @@ export function xToUtc(x: number, startMs: number, pph: number): number {
  * Generate tick marks for the time header.
  * Returns both day boundary ticks (major) and hour ticks (minor).
  */
-export function computeTicks(
-  startMs: number,
-  periodDays: number,
-  pph: number,
-  zoom: ZoomLevel,
-): TickMark[] {
+export function computeTicks(startMs: number, periodDays: number, pph: number, zoom: ZoomLevel): TickMark[] {
   const { hoursPerTick } = ZOOM_CONFIG[zoom]
   const ticks: TickMark[] = []
   const totalHours = periodDays * 24
 
   // Auto-adjust tick spacing based on pixels-per-hour to avoid label overlap
-  const effectiveTickHours = pph > 40 ? 1
-    : pph > 15 ? 2
-    : pph > 8 ? 6
-    : pph > 3 ? 12
-    : pph > 1 ? 24
-    : 168
+  const effectiveTickHours = pph > 40 ? 1 : pph > 15 ? 2 : pph > 8 ? 6 : pph > 3 ? 12 : pph > 1 ? 24 : 168
   const tickH = Math.max(hoursPerTick, effectiveTickHours)
 
   for (let h = 0; h < totalHours; h += tickH) {
@@ -86,11 +76,7 @@ export function computeTicks(
  * X position of the now-line.
  * Returns null if current time is outside the visible period.
  */
-export function computeNowLineX(
-  startMs: number,
-  periodDays: number,
-  pph: number,
-): number | null {
+export function computeNowLineX(startMs: number, periodDays: number, pph: number): number | null {
   const now = Date.now()
   const endMs = startMs + periodDays * 86_400_000
   if (now < startMs || now > endMs) return null

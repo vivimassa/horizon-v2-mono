@@ -66,7 +66,10 @@ function log(emoji: string, msg: string) {
 
 async function migrateOperators() {
   const rows = await fetchAll('operators', '*', 'code')
-  if (rows.length === 0) { log('⚠', 'No operators found'); return 0 }
+  if (rows.length === 0) {
+    log('⚠', 'No operators found')
+    return 0
+  }
 
   const docs = rows.map((r: any) => ({
     _id: r.id,
@@ -93,7 +96,10 @@ async function migrateOperators() {
 
 async function migrateCountries() {
   const rows = await fetchAll('countries', '*', 'name')
-  if (rows.length === 0) { log('⚠', 'No countries found'); return 0 }
+  if (rows.length === 0) {
+    log('⚠', 'No countries found')
+    return 0
+  }
 
   const docs = rows.map((r: any) => ({
     _id: r.id,
@@ -125,9 +131,12 @@ async function migrateAirports() {
   const rows = await fetchAll(
     'airports',
     '*, countries(name, iso_code_2, flag_emoji), timezone_zones(iana_timezone)',
-    'icao_code'
+    'icao_code',
   )
-  if (rows.length === 0) { log('⚠', 'No airports found'); return 0 }
+  if (rows.length === 0) {
+    log('⚠', 'No airports found')
+    return 0
+  }
 
   const docs = rows.map((r: any) => {
     const country = r.countries || {}
@@ -178,7 +187,10 @@ async function migrateAirports() {
 
 async function migrateAircraftTypes() {
   const rows = await fetchAll('aircraft_types', '*', 'icao_type')
-  if (rows.length === 0) { log('⚠', 'No aircraft types found'); return 0 }
+  if (rows.length === 0) {
+    log('⚠', 'No aircraft types found')
+    return 0
+  }
 
   const docs = rows.map((r: any) => ({
     _id: r.id,
@@ -231,7 +243,10 @@ async function migrateAircraftTypes() {
 
 async function migrateDelayCodes() {
   const rows = await fetchAll('delay_codes', '*', 'code')
-  if (rows.length === 0) { log('⚠', 'No delay codes found'); return 0 }
+  if (rows.length === 0) {
+    log('⚠', 'No delay codes found')
+    return 0
+  }
 
   const docs = rows.map((r: any) => ({
     _id: r.id,
@@ -252,7 +267,10 @@ async function migrateDelayCodes() {
 
 async function migrateFlightServiceTypes() {
   const rows = await fetchAll('flight_service_types', '*', 'code')
-  if (rows.length === 0) { log('⚠', 'No flight service types found'); return 0 }
+  if (rows.length === 0) {
+    log('⚠', 'No flight service types found')
+    return 0
+  }
 
   const docs = rows.map((r: any) => ({
     _id: r.id,
@@ -272,7 +290,10 @@ async function migrateFlightServiceTypes() {
 
 async function migrateCrewPositions() {
   const rows = await fetchAll('crew_positions', '*', 'rank_order')
-  if (rows.length === 0) { log('⚠', 'No crew positions found'); return 0 }
+  if (rows.length === 0) {
+    log('⚠', 'No crew positions found')
+    return 0
+  }
 
   const docs = rows.map((r: any) => ({
     _id: r.id,
@@ -297,7 +318,10 @@ async function migrateCrewPositions() {
 
 async function migrateExpiryCodeCategories() {
   const rows = await fetchAll('expiry_code_categories', '*', 'sort_order')
-  if (rows.length === 0) { log('⚠', 'No expiry code categories found'); return 0 }
+  if (rows.length === 0) {
+    log('⚠', 'No expiry code categories found')
+    return 0
+  }
 
   const docs = rows.map((r: any) => ({
     _id: r.id,
@@ -317,7 +341,10 @@ async function migrateExpiryCodeCategories() {
 
 async function migrateExpiryCodes() {
   const rows = await fetchAll('expiry_codes', '*', 'sort_order')
-  if (rows.length === 0) { log('⚠', 'No expiry codes found'); return 0 }
+  if (rows.length === 0) {
+    log('⚠', 'No expiry codes found')
+    return 0
+  }
 
   const docs = rows.map((r: any) => ({
     _id: r.id,

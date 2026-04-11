@@ -3,18 +3,18 @@ import mongoose, { Schema, type InferSchemaType } from 'mongoose'
 const runwaySchema = new Schema(
   {
     _id: { type: String, required: true },
-    identifier: { type: String, required: true },   // e.g. "08L/26R"
+    identifier: { type: String, required: true }, // e.g. "08L/26R"
     lengthM: { type: Number, default: null },
     lengthFt: { type: Number, default: null },
     widthM: { type: Number, default: null },
     widthFt: { type: Number, default: null },
-    surface: { type: String, default: null },        // e.g. "ASPHALT", "CONCRETE"
-    ilsCategory: { type: String, default: null },    // e.g. "CAT I", "CAT II", "CAT III"
+    surface: { type: String, default: null }, // e.g. "ASPHALT", "CONCRETE"
+    ilsCategory: { type: String, default: null }, // e.g. "CAT I", "CAT II", "CAT III"
     lighting: { type: Boolean, default: false },
-    status: { type: String, default: 'active' },     // active | closed | under-construction
+    status: { type: String, default: 'active' }, // active | closed | under-construction
     notes: { type: String, default: null },
   },
-  { _id: false, timestamps: false }
+  { _id: false, timestamps: false },
 )
 
 const airportSchema = new Schema(
@@ -62,7 +62,7 @@ const airportSchema = new Schema(
 
     // Slot control
     isSlotControlled: { type: Boolean, default: false },
-    coordinationLevel: { type: Number, default: null },       // 1 | 2 | 3
+    coordinationLevel: { type: Number, default: null }, // 1 | 2 | 3
     slotsPerHourDay: { type: Number, default: null },
     slotsPerHourNight: { type: Number, default: null },
     coordinatorName: { type: String, default: null },
@@ -87,7 +87,7 @@ const airportSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'airports',
-  }
+  },
 )
 
 airportSchema.index({ iataCode: 1 })

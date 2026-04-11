@@ -8,12 +8,12 @@ import { useAppTheme } from '../../providers/ThemeProvider'
 const ACCENT = '#1e40af'
 
 const MOCK_KPIS = [
-  { label: "Today's Flights", value: '284',    change: '+12',  trend: 'up'      as const, color: ACCENT },
-  { label: 'On-Time Rate',    value: '91.2%',  change: '+2.1%',trend: 'up'      as const, color: '#16a34a' },
-  { label: 'Active Disruptions', value: '7',   change: '+3',   trend: 'up'      as const, color: '#dc2626' },
-  { label: 'Crew Available',  value: '1,842',  change: '+28',  trend: 'up'      as const, color: '#7c3aed' },
+  { label: "Today's Flights", value: '284', change: '+12', trend: 'up' as const, color: ACCENT },
+  { label: 'On-Time Rate', value: '91.2%', change: '+2.1%', trend: 'up' as const, color: '#16a34a' },
+  { label: 'Active Disruptions', value: '7', change: '+3', trend: 'up' as const, color: '#dc2626' },
+  { label: 'Crew Available', value: '1,842', change: '+28', trend: 'up' as const, color: '#7c3aed' },
   { label: 'Aircraft Serviceable', value: '98/102', change: '\u2014', trend: 'neutral' as const, color: '#0f766e' },
-  { label: 'Avg Delay',       value: '14m',    change: '-3m',  trend: 'down'    as const, color: '#b45309' },
+  { label: 'Avg Delay', value: '14m', change: '-3m', trend: 'down' as const, color: '#b45309' },
 ]
 
 const MOCK_FLIGHTS: { id: string; flight: string; route: string; std: string; status: StatusKey }[] = [
@@ -31,13 +31,7 @@ const TrendIcon = ({ trend }: { trend: 'up' | 'down' | 'neutral' }) => {
   return <Minus size={12} color="#888888" strokeWidth={2} />
 }
 
-const KpiCard = memo(function KpiCard({
-  item,
-  palette,
-}: {
-  item: typeof MOCK_KPIS[number]
-  palette: Palette
-}) {
+const KpiCard = memo(function KpiCard({ item, palette }: { item: (typeof MOCK_KPIS)[number]; palette: Palette }) {
   return (
     <View
       className="flex-1 rounded-xl border p-3 m-1 shadow-sm"
@@ -46,10 +40,14 @@ const KpiCard = memo(function KpiCard({
       <Text className="text-[18px] font-semibold mb-1" style={{ color: item.color }}>
         {item.value}
       </Text>
-      <Text className="text-[12px] mb-1.5" style={{ color: palette.textSecondary }}>{item.label}</Text>
+      <Text className="text-[12px] mb-1.5" style={{ color: palette.textSecondary }}>
+        {item.label}
+      </Text>
       <View className="flex-row items-center gap-1">
         <TrendIcon trend={item.trend} />
-        <Text className="text-[11px]" style={{ color: palette.textSecondary }}>{item.change}</Text>
+        <Text className="text-[11px]" style={{ color: palette.textSecondary }}>
+          {item.change}
+        </Text>
       </View>
     </View>
   )
@@ -60,22 +58,30 @@ const FlightRow = memo(function FlightRow({
   palette,
   isDark,
 }: {
-  item: typeof MOCK_FLIGHTS[number]
+  item: (typeof MOCK_FLIGHTS)[number]
   palette: Palette
   isDark: boolean
 }) {
   const s = getStatusColors(item.status, isDark)
   const statusLabels: Record<StatusKey, string> = {
-    onTime: 'On Time', delayed: 'Delayed', cancelled: 'Cancelled',
-    departed: 'Departed', diverted: 'Diverted', scheduled: 'Scheduled',
+    onTime: 'On Time',
+    delayed: 'Delayed',
+    cancelled: 'Cancelled',
+    departed: 'Departed',
+    diverted: 'Diverted',
+    scheduled: 'Scheduled',
   }
   return (
     <View className="flex-row items-center px-3 py-2.5 min-h-[44px]">
       <Text className="text-[13px] font-bold w-16" style={{ color: palette.text }}>
         {item.flight}
       </Text>
-      <Text className="text-[13px] flex-1" style={{ color: palette.textSecondary }}>{item.route}</Text>
-      <Text className="text-[12px] mr-3" style={{ color: palette.textSecondary }}>{item.std}</Text>
+      <Text className="text-[13px] flex-1" style={{ color: palette.textSecondary }}>
+        {item.route}
+      </Text>
+      <Text className="text-[12px] mr-3" style={{ color: palette.textSecondary }}>
+        {item.std}
+      </Text>
       <View className="rounded-md px-2 py-0.5" style={{ backgroundColor: s.bg }}>
         <Text className="text-[11px] font-semibold" style={{ color: s.text }}>
           {statusLabels[item.status]}
@@ -89,21 +95,32 @@ export default function HomeScreen() {
   const { isDark, palette } = useAppTheme()
 
   const today = new Date().toLocaleDateString('en-GB', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
   })
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
       <View className="flex-row items-center justify-between px-4 pt-3 pb-2">
         <View>
-          <Text className="text-[20px] font-semibold" style={{ color: palette.text }}>Home</Text>
+          <Text className="text-[20px] font-semibold" style={{ color: palette.text }}>
+            Home
+          </Text>
           <Text className="text-[12px]" style={{ color: palette.textSecondary }}>
             {today} {'\u2022'} Sky Hub
           </Text>
         </View>
         <Image
           source={require('../../assets/skyhub-logo.png')}
-          style={{ width: 150, height: 40, opacity: isDark ? 0.85 : 0.9, marginRight: -30, tintColor: isDark ? '#ffffff' : undefined }}
+          style={{
+            width: 150,
+            height: 40,
+            opacity: isDark ? 0.85 : 0.9,
+            marginRight: -30,
+            tintColor: isDark ? '#ffffff' : undefined,
+          }}
           resizeMode="contain"
         />
       </View>
@@ -124,10 +141,7 @@ export default function HomeScreen() {
             </View>
 
             <View className="flex-row items-center mt-2 mb-2">
-              <View
-                className="w-[3px] h-4 rounded-full mr-2"
-                style={{ backgroundColor: ACCENT }}
-              />
+              <View className="w-[3px] h-4 rounded-full mr-2" style={{ backgroundColor: ACCENT }} />
               <Text className="text-[15px] font-bold" style={{ color: palette.text, letterSpacing: -0.3 }}>
                 Today's Flights
               </Text>

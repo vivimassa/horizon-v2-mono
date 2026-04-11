@@ -1,21 +1,16 @@
-"use client";
+'use client'
 
-import { Loader2 } from "lucide-react";
+import { Loader2 } from 'lucide-react'
 
 interface GoButtonProps {
-  onClick: () => void;
-  loading?: boolean;
-  label?: string;
-  disabled?: boolean;
+  onClick: () => void
+  loading?: boolean
+  label?: string
+  disabled?: boolean
 }
 
 /** Primary action button — pinned in SelectionPanel footer */
-export function GoButton({
-  onClick,
-  loading = false,
-  label = "Go",
-  disabled = false,
-}: GoButtonProps) {
+export function GoButton({ onClick, loading = false, label = 'Go', disabled = false }: GoButtonProps) {
   return (
     <button
       type="button"
@@ -26,5 +21,5 @@ export function GoButton({
       {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
       {label}
     </button>
-  );
+  )
 }

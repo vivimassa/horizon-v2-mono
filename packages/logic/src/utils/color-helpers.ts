@@ -11,7 +11,9 @@ export interface HSL {
 
 /** Parse "#RRGGBB" or "#RGB" to HSL. */
 export function hexToHSL(hex: string): HSL {
-  let r = 0, g = 0, b = 0
+  let r = 0,
+    g = 0,
+    b = 0
   const h = hex.replace('#', '')
   if (h.length === 3) {
     r = parseInt(h[0] + h[0], 16) / 255
@@ -33,9 +35,15 @@ export function hexToHSL(hex: string): HSL {
     const d = max - min
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
     switch (max) {
-      case r: hue = ((g - b) / d + (g < b ? 6 : 0)) / 6; break
-      case g: hue = ((b - r) / d + 2) / 6; break
-      case b: hue = ((r - g) / d + 4) / 6; break
+      case r:
+        hue = ((g - b) / d + (g < b ? 6 : 0)) / 6
+        break
+      case g:
+        hue = ((b - r) / d + 2) / 6
+        break
+      case b:
+        hue = ((r - g) / d + 4) / 6
+        break
     }
   }
 
@@ -56,15 +64,39 @@ export function hslToHex(hsl: HSL): string {
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
   const m = ln - c / 2
 
-  let r = 0, g = 0, b = 0
-  if (h < 60) { r = c; g = x; b = 0 }
-  else if (h < 120) { r = x; g = c; b = 0 }
-  else if (h < 180) { r = 0; g = c; b = x }
-  else if (h < 240) { r = 0; g = x; b = c }
-  else if (h < 300) { r = x; g = 0; b = c }
-  else { r = c; g = 0; b = x }
+  let r = 0,
+    g = 0,
+    b = 0
+  if (h < 60) {
+    r = c
+    g = x
+    b = 0
+  } else if (h < 120) {
+    r = x
+    g = c
+    b = 0
+  } else if (h < 180) {
+    r = 0
+    g = c
+    b = x
+  } else if (h < 240) {
+    r = 0
+    g = x
+    b = c
+  } else if (h < 300) {
+    r = x
+    g = 0
+    b = c
+  } else {
+    r = c
+    g = 0
+    b = x
+  }
 
-  const toHex = (n: number) => Math.round((n + m) * 255).toString(16).padStart(2, '0')
+  const toHex = (n: number) =>
+    Math.round((n + m) * 255)
+      .toString(16)
+      .padStart(2, '0')
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`
 }
 
@@ -94,9 +126,7 @@ export function getBarTextColor(bgHex: string, isDark: boolean): string {
   const hsl = hexToHSL(bgHex)
   // Vivid / medium-dark fill (e.g. blue-500 at L~60): needs white/light text
   if (hsl.l <= 65 && hsl.s > 30) {
-    return isDark
-      ? hslToHex({ h: hsl.h, s: Math.min(hsl.s, 30), l: 92 })
-      : '#ffffff'
+    return isDark ? hslToHex({ h: hsl.h, s: Math.min(hsl.s, 30), l: 92 }) : '#ffffff'
   }
   if (isDark) {
     return hslToHex({ h: hsl.h, s: Math.min(hsl.s, 40), l: 80 })
@@ -146,5 +176,5 @@ export function getContrastTextColor(bgHex: string, isDark: boolean): string {
 /** Default color settings for bar fills. */
 export const DEFAULT_BAR_COLORS = {
   unassigned: '#DBEAFE', // blue-100 (pale)
-  assigned: '#3B82F6',   // blue-500 (strong)
+  assigned: '#3B82F6', // blue-500 (strong)
 }

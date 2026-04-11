@@ -16,7 +16,7 @@ const crewComplementSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'crewComplements',
-  }
+  },
 )
 
 crewComplementSchema.index({ operatorId: 1, aircraftTypeIcao: 1, templateKey: 1 }, { unique: true })

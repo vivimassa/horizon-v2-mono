@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Globe, TrendingUp, AlertTriangle, CheckCircle, ChevronDown, ChevronRight } from 'lucide-react'
@@ -23,7 +23,13 @@ interface FleetOverviewProps {
 const GRID_COLS = '28px 56px 40px 1fr 70px 70px 70px 70px 70px 160px'
 
 export function FleetOverview({
-  airports, fleetStats, seasonCode, onSelectAirport, isDark, viewMode = 'list', searchQuery = '',
+  airports,
+  fleetStats,
+  seasonCode,
+  onSelectAirport,
+  isDark,
+  viewMode = 'list',
+  searchQuery = '',
 }: FleetOverviewProps) {
   const palette = isDark ? colors.dark : colors.light
   const accent = MODULE_THEMES.network.accent
@@ -38,10 +44,9 @@ export function FleetOverview({
   const sorted = useMemo(() => {
     const q = searchQuery.toLowerCase()
     const filtered = q
-      ? fleetStats.filter(s => {
+      ? fleetStats.filter((s) => {
           const airport = nameMap.get(s.airportIata)
-          return s.airportIata.toLowerCase().includes(q)
-            || (airport?.name.toLowerCase().includes(q))
+          return s.airportIata.toLowerCase().includes(q) || airport?.name.toLowerCase().includes(q)
         })
       : fleetStats
     return [...filtered].sort((a, b) => a.utilizationPct - b.utilizationPct)
@@ -49,7 +54,10 @@ export function FleetOverview({
 
   // Fleet-wide KPIs
   const totals = useMemo(() => {
-    let series = 0, confirmed = 0, atRisk = 0, pending = 0
+    let series = 0,
+      confirmed = 0,
+      atRisk = 0,
+      pending = 0
     for (const s of fleetStats) {
       series += s.totalSeries
       confirmed += s.confirmed
@@ -70,18 +78,28 @@ export function FleetOverview({
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Fleet KPI strip */}
       <div className="flex gap-2.5 px-5 pt-4 pb-3 shrink-0">
-        {kpis.map(k => {
+        {kpis.map((k) => {
           const Icon = k.icon
           return (
-            <div key={k.label} className="flex-1 flex items-center gap-3 rounded-xl px-3.5 py-3"
+            <div
+              key={k.label}
+              className="flex-1 flex items-center gap-3 rounded-xl px-3.5 py-3"
               style={{
                 background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.025)',
                 border: `1px solid ${glassBorder}`,
-              }}>
+              }}
+            >
               <Icon size={16} style={{ color: k.color }} />
               <div>
-                <div className="text-[18px] font-bold leading-tight" style={{ color: k.color }}>{k.value}</div>
-                <div className="text-[13px] uppercase tracking-wide font-medium" style={{ color: palette.textSecondary }}>{k.label}</div>
+                <div className="text-[18px] font-bold leading-tight" style={{ color: k.color }}>
+                  {k.value}
+                </div>
+                <div
+                  className="text-[13px] uppercase tracking-wide font-medium"
+                  style={{ color: palette.textSecondary }}
+                >
+                  {k.label}
+                </div>
               </div>
             </div>
           )
@@ -91,11 +109,13 @@ export function FleetOverview({
       {viewMode === 'list' ? (
         <>
           {/* Column header */}
-          <div className="grid items-center px-5 py-2 shrink-0"
+          <div
+            className="grid items-center px-5 py-2 shrink-0"
             style={{
               gridTemplateColumns: GRID_COLS,
               borderBottom: `1px solid ${glassBorder}`,
-            }}>
+            }}
+          >
             <span /> {/* chevron */}
             <ColHeader text="IATA" palette={palette} />
             <ColHeader text="Lvl" palette={palette} />
@@ -110,7 +130,7 @@ export function FleetOverview({
 
           {/* Accordion rows */}
           <div className="flex-1 overflow-auto">
-            {sorted.map(stats => {
+            {sorted.map((stats) => {
               const airport = nameMap.get(stats.airportIata)
               if (!airport) return null
               return (
@@ -132,7 +152,7 @@ export function FleetOverview({
         /* Card grid view */
         <div className="flex-1 overflow-auto px-5 pb-5 pt-3">
           <div className="grid grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
-            {sorted.map(stats => {
+            {sorted.map((stats) => {
               const airport = nameMap.get(stats.airportIata)
               if (!airport) return null
               const pct = stats.utilizationPct
@@ -150,23 +170,43 @@ export function FleetOverview({
                     background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)',
                     border: `1px solid ${isAtRisk ? 'rgba(255,59,59,0.15)' : glassBorder}`,
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = accentTint(accent, 0.3) }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = isAtRisk ? 'rgba(255,59,59,0.15)' : glassBorder }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = accentTint(accent, 0.3)
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = isAtRisk ? 'rgba(255,59,59,0.15)' : glassBorder
+                  }}
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-2 h-2 rounded-full" style={{ background: levelColor }} />
-                    <span className="text-[15px] font-bold" style={{ color: palette.text }}>{stats.airportIata}</span>
-                    <span className="text-[13px] font-semibold px-1 rounded" style={{ background: `${levelColor}15`, color: levelColor }}>
+                    <span className="text-[15px] font-bold" style={{ color: palette.text }}>
+                      {stats.airportIata}
+                    </span>
+                    <span
+                      className="text-[13px] font-semibold px-1 rounded"
+                      style={{ background: `${levelColor}15`, color: levelColor }}
+                    >
                       L{airport.coordinationLevel}
                     </span>
                     <span className="flex-1" />
-                    <ChevronRight size={14} className="transition-transform group-hover:translate-x-0.5" style={{ color: palette.textTertiary }} />
+                    <ChevronRight
+                      size={14}
+                      className="transition-transform group-hover:translate-x-0.5"
+                      style={{ color: palette.textTertiary }}
+                    />
                   </div>
-                  <div className="text-[13px] truncate mb-3" style={{ color: palette.textTertiary }}>{airport.name}</div>
+                  <div className="text-[13px] truncate mb-3" style={{ color: palette.textTertiary }}>
+                    {airport.name}
+                  </div>
                   <div className="flex items-center gap-2 mb-2.5">
-                    <div className="flex-1 h-1.5 rounded-full overflow-hidden"
-                      style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}>
-                      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: pctColor }} />
+                    <div
+                      className="flex-1 h-1.5 rounded-full overflow-hidden"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}
+                    >
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${pct}%`, background: pctColor }}
+                      />
                     </div>
                     <span className="text-[13px] font-bold" style={{ color: pctColor }}>
                       {stats.totalDates > 0 ? `${pct}%` : '\u2014'}
@@ -189,8 +229,12 @@ export function FleetOverview({
       {sorted.length === 0 && (
         <div className="text-center py-16">
           <Globe size={32} style={{ color: palette.textTertiary, opacity: 0.3 }} className="mx-auto mb-3" />
-          <div className="text-[14px]" style={{ color: palette.textSecondary }}>No slot series for {seasonCode}</div>
-          <div className="text-[13px] mt-1" style={{ color: palette.textTertiary }}>Select an airport and import from schedule to get started</div>
+          <div className="text-[14px]" style={{ color: palette.textSecondary }}>
+            No slot series for {seasonCode}
+          </div>
+          <div className="text-[13px] mt-1" style={{ color: palette.textTertiary }}>
+            Select an airport and import from schedule to get started
+          </div>
         </div>
       )}
     </div>
@@ -201,8 +245,10 @@ export function FleetOverview({
 
 function ColHeader({ text, palette, align }: { text: string; palette: { textTertiary: string }; align?: string }) {
   return (
-    <span className="text-[13px] font-medium uppercase tracking-wide"
-      style={{ color: palette.textTertiary, textAlign: align as any }}>
+    <span
+      className="text-[13px] font-medium uppercase tracking-wide"
+      style={{ color: palette.textTertiary, textAlign: align as any }}
+    >
       {text}
     </span>
   )
@@ -210,7 +256,15 @@ function ColHeader({ text, palette, align }: { text: string; palette: { textTert
 
 /* ── Airport Accordion Row ── */
 
-function AirportAccordionRow({ stats, airport, seasonCode, isDark, palette, glassBorder, accent }: {
+function AirportAccordionRow({
+  stats,
+  airport,
+  seasonCode,
+  isDark,
+  palette,
+  glassBorder,
+  accent,
+}: {
   stats: SlotFleetAirportStats
   airport: SlotCoordinatedAirport
   seasonCode: string
@@ -246,7 +300,7 @@ function AirportAccordionRow({ stats, airport, seasonCode, isDark, palette, glas
   const pct = stats.utilizationPct
   const pctColor = pct < 80 ? '#FF3B3B' : pct < 85 ? '#FF8800' : '#06C270'
   const levelColor = airport.coordinationLevel === 3 ? '#06C270' : '#FF8800'
-  const utilMap = new Map(utilization.map(u => [u.seriesId, u]))
+  const utilMap = new Map(utilization.map((u) => [u.seriesId, u]))
 
   return (
     <div style={{ borderBottom: `1px solid ${glassBorder}` }}>
@@ -256,23 +310,33 @@ function AirportAccordionRow({ stats, airport, seasonCode, isDark, palette, glas
         onClick={() => setExpanded(!expanded)}
         className="w-full grid items-center px-5 py-2.5 text-left transition-colors"
         style={{ gridTemplateColumns: GRID_COLS }}
-        onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }}
-        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'transparent'
+        }}
       >
         {/* Chevron */}
-        {expanded
-          ? <ChevronDown size={14} style={{ color: palette.textSecondary }} />
-          : <ChevronRight size={14} style={{ color: palette.textSecondary }} />
-        }
+        {expanded ? (
+          <ChevronDown size={14} style={{ color: palette.textSecondary }} />
+        ) : (
+          <ChevronRight size={14} style={{ color: palette.textSecondary }} />
+        )}
 
         {/* IATA code */}
         <div className="flex items-center gap-1.5">
           <div className="w-2 h-2 rounded-full shrink-0" style={{ background: levelColor }} />
-          <span className="text-[14px] font-bold" style={{ color: palette.text }}>{stats.airportIata}</span>
+          <span className="text-[14px] font-bold" style={{ color: palette.text }}>
+            {stats.airportIata}
+          </span>
         </div>
 
         {/* Level badge */}
-        <span className="text-[13px] font-semibold px-1 rounded inline-block w-fit" style={{ background: `${levelColor}15`, color: levelColor }}>
+        <span
+          className="text-[13px] font-semibold px-1 rounded inline-block w-fit"
+          style={{ background: `${levelColor}15`, color: levelColor }}
+        >
           L{airport.coordinationLevel}
         </span>
 
@@ -287,29 +351,43 @@ function AirportAccordionRow({ stats, airport, seasonCode, isDark, palette, glas
         </span>
 
         {/* Confirmed */}
-        <span className="text-[14px] font-semibold text-center" style={{ color: stats.confirmed > 0 ? '#06C270' : palette.textTertiary }}>
+        <span
+          className="text-[14px] font-semibold text-center"
+          style={{ color: stats.confirmed > 0 ? '#06C270' : palette.textTertiary }}
+        >
           {stats.confirmed}
         </span>
 
         {/* Offered */}
-        <span className="text-[14px] font-semibold text-center" style={{ color: stats.offered > 0 ? '#FF8800' : palette.textTertiary }}>
+        <span
+          className="text-[14px] font-semibold text-center"
+          style={{ color: stats.offered > 0 ? '#FF8800' : palette.textTertiary }}
+        >
           {stats.offered}
         </span>
 
         {/* Waitlisted */}
-        <span className="text-[14px] font-semibold text-center" style={{ color: stats.waitlisted > 0 ? '#7c3aed' : palette.textTertiary }}>
+        <span
+          className="text-[14px] font-semibold text-center"
+          style={{ color: stats.waitlisted > 0 ? '#7c3aed' : palette.textTertiary }}
+        >
           {stats.waitlisted}
         </span>
 
         {/* Refused */}
-        <span className="text-[14px] font-semibold text-center" style={{ color: stats.refused > 0 ? '#FF3B3B' : palette.textTertiary }}>
+        <span
+          className="text-[14px] font-semibold text-center"
+          style={{ color: stats.refused > 0 ? '#FF3B3B' : palette.textTertiary }}
+        >
           {stats.refused}
         </span>
 
         {/* Utilization bar */}
         <div className="flex items-center gap-2">
-          <div className="flex-1 h-[5px] rounded-full overflow-hidden"
-            style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}>
+          <div
+            className="flex-1 h-[5px] rounded-full overflow-hidden"
+            style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}
+          >
             <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: pctColor }} />
           </div>
           <span className="text-[13px] font-bold w-[36px] text-right" style={{ color: pctColor }}>
@@ -320,14 +398,20 @@ function AirportAccordionRow({ stats, airport, seasonCode, isDark, palette, glas
 
       {/* Expanded: series list */}
       {expanded && (
-        <div className="pl-10 pr-5 pb-3"
-          style={{ background: isDark ? 'rgba(255,255,255,0.015)' : 'rgba(0,0,0,0.01)' }}>
+        <div
+          className="pl-10 pr-5 pb-3"
+          style={{ background: isDark ? 'rgba(255,255,255,0.015)' : 'rgba(0,0,0,0.01)' }}
+        >
           {!loaded ? (
-            <div className="py-4 text-[13px]" style={{ color: palette.textTertiary }}>Loading series...</div>
+            <div className="py-4 text-[13px]" style={{ color: palette.textTertiary }}>
+              Loading series...
+            </div>
           ) : series.length === 0 ? (
-            <div className="py-4 text-[13px]" style={{ color: palette.textTertiary }}>No slot series at this airport</div>
+            <div className="py-4 text-[13px]" style={{ color: palette.textTertiary }}>
+              No slot series at this airport
+            </div>
           ) : (
-            series.map(s => (
+            series.map((s) => (
               <UnifiedSeriesRow
                 key={s._id}
                 series={s}
@@ -348,7 +432,9 @@ function StatusDot({ label, value, color }: { label: string; value: number; colo
     <div className="flex items-center gap-1">
       <div className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
       <span style={{ color }}>{value}</span>
-      <span className="opacity-60" style={{ color }}>{label}</span>
+      <span className="opacity-60" style={{ color }}>
+        {label}
+      </span>
     </div>
   )
 }

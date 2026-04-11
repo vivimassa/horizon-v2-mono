@@ -5,8 +5,5 @@
 export function getCountryFlag(isoCode: string): string {
   if (!isoCode || isoCode.length !== 2) return ''
   const code = isoCode.toUpperCase()
-  return String.fromCodePoint(
-    0x1f1e6 + code.charCodeAt(0) - 65,
-    0x1f1e6 + code.charCodeAt(1) - 65
-  )
+  return String.fromCodePoint(0x1f1e6 + code.charCodeAt(0) - 65, 0x1f1e6 + code.charCodeAt(1) - 65)
 }

@@ -1,19 +1,19 @@
-"use client";
+'use client'
 
-import { useCallback } from "react";
-import type { HoldKey } from "@/types/cargo";
-import { getAircraftImage, AIRCRAFT_CARGO_CONFIGS } from "@/config/aircraft-cargo";
-import { CompartmentOverlay } from "./CompartmentOverlay";
+import { useCallback } from 'react'
+import type { HoldKey } from '@/types/cargo'
+import { getAircraftImage, AIRCRAFT_CARGO_CONFIGS } from '@/config/aircraft-cargo'
+import { CompartmentOverlay } from './CompartmentOverlay'
 
 interface AircraftSliderProps {
-  aircraftType: string;
-  activeHold: HoldKey;
-  onSelectHold: (key: HoldKey) => void;
-  accent: string;
-  isDark: boolean;
-  onDotRef?: (el: HTMLButtonElement | null) => void;
-  showBox?: boolean;
-  overviewMode?: boolean;
+  aircraftType: string
+  activeHold: HoldKey
+  onSelectHold: (key: HoldKey) => void
+  accent: string
+  isDark: boolean
+  onDotRef?: (el: HTMLButtonElement | null) => void
+  showBox?: boolean
+  overviewMode?: boolean
 }
 
 export function AircraftSlider({
@@ -26,34 +26,34 @@ export function AircraftSlider({
   showBox = true,
   overviewMode = false,
 }: AircraftSliderProps) {
-  const imageSrc = getAircraftImage(aircraftType);
-  const config = AIRCRAFT_CARGO_CONFIGS["A321"];
-  const zones = config?.zones ?? [];
+  const imageSrc = getAircraftImage(aircraftType)
+  const config = AIRCRAFT_CARGO_CONFIGS['A321']
+  const zones = config?.zones ?? []
 
   const activeRef = useCallback(
-    (el: HTMLButtonElement | null) => { onDotRef?.(el); },
+    (el: HTMLButtonElement | null) => {
+      onDotRef?.(el)
+    },
     [onDotRef],
-  );
+  )
 
   return (
     <div className="relative flex-1 flex items-center justify-center overflow-visible">
-      <div className="relative" style={{ width: "100%", maxHeight: "100%" }}>
+      <div className="relative" style={{ width: '100%', maxHeight: '100%' }}>
         <img
           src={imageSrc}
           alt={`${aircraftType} full aircraft`}
           className="w-full h-full object-contain select-none"
           draggable={false}
           style={{
-            filter: overviewMode
-              ? "drop-shadow(-12px -8px 18px rgba(0,0,0,0.35))"
-              : "none",
-            transition: "filter 1.2s cubic-bezier(0.16, 1, 0.3, 1)",
+            filter: overviewMode ? 'drop-shadow(-12px -8px 18px rgba(0,0,0,0.35))' : 'none',
+            transition: 'filter 1.2s cubic-bezier(0.16, 1, 0.3, 1)',
           }}
         />
 
         {/* Overview mode: all boxes visible but dimmed */}
         {overviewMode && (
-          <div style={{ opacity: 0.3, transition: "opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1)" }}>
+          <div style={{ opacity: 0.3, transition: 'opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1)' }}>
             {zones.map((zone) => (
               <div
                 key={zone.holdKey}
@@ -63,8 +63,8 @@ export function AircraftSlider({
                   left: zone.left,
                   width: zone.width,
                   height: zone.height,
-                  border: `1.5px dashed ${isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.2)"}`,
-                  background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)",
+                  border: `1.5px dashed ${isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'}`,
+                  background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
                 }}
               />
             ))}
@@ -73,7 +73,7 @@ export function AircraftSlider({
 
         {/* Active mode: interactive overlays */}
         {!overviewMode && (
-          <div style={{ opacity: showBox ? 1 : 0, transition: "opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1)" }}>
+          <div style={{ opacity: showBox ? 1 : 0, transition: 'opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1)' }}>
             {zones.map((zone) => (
               <CompartmentOverlay
                 key={zone.holdKey}
@@ -88,5 +88,5 @@ export function AircraftSlider({
         )}
       </div>
     </div>
-  );
+  )
 }

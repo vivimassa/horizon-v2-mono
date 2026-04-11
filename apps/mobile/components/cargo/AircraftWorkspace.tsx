@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { View, Image, Animated, Easing, LayoutChangeEvent, ScrollView, NativeSyntheticEvent, NativeScrollEvent } from 'react-native'
+import type { LayoutChangeEvent, NativeSyntheticEvent, NativeScrollEvent } from 'react-native'
+import { View, Image, Animated, Easing, ScrollView } from 'react-native'
 import type { HoldKey } from '../../types/cargo'
 import { AIRCRAFT_CARGO_CONFIGS, HOLD_IMAGE_OFFSETS } from '../../config/aircraft-cargo'
 import { CompartmentOverlay } from './CompartmentOverlay'
@@ -66,7 +67,7 @@ export function AircraftWorkspace({
     if (!hasSelection || containerSize.height === 0) return
 
     const offsetPercent = HOLD_IMAGE_OFFSETS[activeHold]
-    const holdCenterY = (50 - offsetPercent) / 100 * imageHeight
+    const holdCenterY = ((50 - offsetPercent) / 100) * imageHeight
     const scrollTo = Math.max(0, holdCenterY - containerSize.height / 2)
 
     setTimeout(() => {
@@ -99,12 +100,13 @@ export function AircraftWorkspace({
 
   // Calculate connector line endpoints
   const activeZone = zones.find((z) => z.holdKey === activeHold)
-  let lineFromX = 0, lineFromY = 0
+  let lineFromX = 0,
+    lineFromY = 0
   if (activeZone && imageSize.height > 0 && containerSize.width > 0) {
     // Image is 85% width, centered
     const imageLeft = containerSize.width * 0.075
-    const zoneCenterX = imageLeft + (activeZone.left + activeZone.width / 2) / 100 * imageSize.width
-    const zoneCenterY = (activeZone.top + activeZone.height / 2) / 100 * imageSize.height - scrollY
+    const zoneCenterX = imageLeft + ((activeZone.left + activeZone.width / 2) / 100) * imageSize.width
+    const zoneCenterY = ((activeZone.top + activeZone.height / 2) / 100) * imageSize.height - scrollY
     lineFromX = zoneCenterX
     lineFromY = zoneCenterY
   }
@@ -115,10 +117,11 @@ export function AircraftWorkspace({
 
   return (
     <View
-      className={fullScreen ? "" : "rounded-xl overflow-hidden mb-4"}
-      style={fullScreen
-        ? { flex: 1, backgroundColor: isDark ? '#1a1a20' : '#e0e4ea' }
-        : { height, backgroundColor: isDark ? '#1a1a20' : '#e0e4ea' }
+      className={fullScreen ? '' : 'rounded-xl overflow-hidden mb-4'}
+      style={
+        fullScreen
+          ? { flex: 1, backgroundColor: isDark ? '#1a1a20' : '#e0e4ea' }
+          : { height, backgroundColor: isDark ? '#1a1a20' : '#e0e4ea' }
       }
       onLayout={onContainerLayout}
     >
@@ -149,15 +152,8 @@ export function AircraftWorkspace({
               justifyContent: 'center',
             }}
           >
-            <View
-              style={{ width: '85%', height: '100%', position: 'relative' }}
-              onLayout={onImageLayout}
-            >
-              <Image
-                source={aircraftImage}
-                style={{ width: '100%', height: '100%' }}
-                resizeMode="contain"
-              />
+            <View style={{ width: '85%', height: '100%', position: 'relative' }} onLayout={onImageLayout}>
+              <Image source={aircraftImage} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
 
               {hasSelection && imageSize.width > 0 && (
                 <Animated.View

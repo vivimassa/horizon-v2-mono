@@ -3,8 +3,12 @@ import { useGanttStore } from '@/stores/use-gantt-store'
 
 /** Set by GanttShell to toggle search panel */
 let _toggleSearch: (() => void) | null = null
-export function registerSearchToggle(fn: () => void) { _toggleSearch = fn }
-export function unregisterSearchToggle() { _toggleSearch = null }
+export function registerSearchToggle(fn: () => void) {
+  _toggleSearch = fn
+}
+export function unregisterSearchToggle() {
+  _toggleSearch = null
+}
 
 export function useGanttKeyboard() {
   useEffect(() => {
@@ -27,7 +31,7 @@ export function useGanttKeyboard() {
         e.preventDefault()
         if (state.selectedFlightIds.size > 0 && state.layout) {
           const [firstId] = state.selectedFlightIds
-          const bar = state.layout.bars.find(b => b.flightId === firstId)
+          const bar = state.layout.bars.find((b) => b.flightId === firstId)
           const row = bar ? state.layout.rows[bar.row] : null
           if (row?.registration) {
             const flightIds = [...state.selectedFlightIds]
@@ -107,17 +111,51 @@ export function useGanttKeyboard() {
       }
 
       if (e.key === 'Escape') {
-        if (state.cancelDialog) { state.closeCancelDialog(); return }
-        if (state.swapDialog) { state.closeSwapDialog(); state.exitSwapMode(); return }
-        if (state.swapMode) { state.exitSwapMode(); return }
-        if (state.flightInfoDialogId) { state.closeFlightInfo(); return }
-        if (state.rotationPopover) { state.closeRotationPopover(); return }
-        if (state.dailySummaryPopover) { state.closeDailySummary(); return }
-        if (state.aircraftPopover) { state.closeAircraftPopover(); return }
-        if (state.rowContextMenu) { state.closeRowContextMenu(); return }
-        if (state.dayContextMenu) { state.closeDayContextMenu(); return }
-        if (state.aircraftContextMenu) { state.closeAircraftContextMenu(); return }
-        if (state.contextMenu) { state.closeContextMenu(); return }
+        if (state.cancelDialog) {
+          state.closeCancelDialog()
+          return
+        }
+        if (state.swapDialog) {
+          state.closeSwapDialog()
+          state.exitSwapMode()
+          return
+        }
+        if (state.swapMode) {
+          state.exitSwapMode()
+          return
+        }
+        if (state.flightInfoDialogId) {
+          state.closeFlightInfo()
+          return
+        }
+        if (state.rotationPopover) {
+          state.closeRotationPopover()
+          return
+        }
+        if (state.dailySummaryPopover) {
+          state.closeDailySummary()
+          return
+        }
+        if (state.aircraftPopover) {
+          state.closeAircraftPopover()
+          return
+        }
+        if (state.rowContextMenu) {
+          state.closeRowContextMenu()
+          return
+        }
+        if (state.dayContextMenu) {
+          state.closeDayContextMenu()
+          return
+        }
+        if (state.aircraftContextMenu) {
+          state.closeAircraftContextMenu()
+          return
+        }
+        if (state.contextMenu) {
+          state.closeContextMenu()
+          return
+        }
       }
     }
 

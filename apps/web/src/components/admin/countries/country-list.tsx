@@ -1,18 +1,18 @@
-"use client";
+'use client'
 
-import type { CountryRef } from "@skyhub/api";
-import { Search } from "lucide-react";
-import { CountryFlag } from "@/components/ui/country-flag";
+import type { CountryRef } from '@skyhub/api'
+import { Search } from 'lucide-react'
+import { CountryFlag } from '@/components/ui/country-flag'
 
 interface CountryListProps {
-  countries: CountryRef[];
-  totalCount: number;
-  filteredCount: number;
-  selected: CountryRef | null;
-  onSelect: (country: CountryRef) => void;
-  search: string;
-  onSearchChange: (value: string) => void;
-  loading: boolean;
+  countries: CountryRef[]
+  totalCount: number
+  filteredCount: number
+  selected: CountryRef | null
+  onSelect: (country: CountryRef) => void
+  search: string
+  onSearchChange: (value: string) => void
+  loading: boolean
 }
 
 export function CountryList({
@@ -55,15 +55,15 @@ export function CountryList({
         ) : (
           <div className="space-y-0.5">
             {countries.map((country) => {
-              const isSelected = selected?._id === country._id;
+              const isSelected = selected?._id === country._id
               return (
                 <button
                   key={country._id}
                   onClick={() => onSelect(country)}
                   className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 ${
                     isSelected
-                      ? "border-l-[3px] border-l-module-accent bg-module-accent/[0.08]"
-                      : "border-l-[3px] border-l-transparent hover:bg-hz-border/30"
+                      ? 'border-l-[3px] border-l-module-accent bg-module-accent/[0.08]'
+                      : 'border-l-[3px] border-l-transparent hover:bg-hz-border/30'
                   }`}
                 >
                   <span className="shrink-0 w-6 flex items-center justify-center">
@@ -80,11 +80,11 @@ export function CountryList({
                     </div>
                   </div>
                 </button>
-              );
+              )
             })}
           </div>
         )}
       </div>
     </div>
-  );
+  )
 }

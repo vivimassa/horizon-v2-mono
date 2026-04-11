@@ -24,7 +24,13 @@ interface ContractDetailPanelProps {
   isDark: boolean
 }
 
-export function ContractDetailPanel({ contract, onAddFlight, onFlightChanged, onContractUpdated, isDark }: ContractDetailPanelProps) {
+export function ContractDetailPanel({
+  contract,
+  onAddFlight,
+  onFlightChanged,
+  onContractUpdated,
+  isDark,
+}: ContractDetailPanelProps) {
   const [tab, setTab] = useState<TabKey>('flights')
 
   if (!contract) {
@@ -42,16 +48,19 @@ export function ContractDetailPanel({ contract, onAddFlight, onFlightChanged, on
     <div className="flex-1 flex flex-col min-h-0">
       {/* Tab bar */}
       <div className="flex gap-1 px-5 shrink-0" style={{ borderBottom: `1px solid ${sectionBorder}` }}>
-        {TABS.map(t => (
+        {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
             className="px-4 py-3 text-[13px] font-semibold transition-colors relative"
-            style={{ color: tab === t.key ? (isDark ? '#5B8DEF' : '#1e40af') : (isDark ? '#8F90A6' : '#555770') }}
+            style={{ color: tab === t.key ? (isDark ? '#5B8DEF' : '#1e40af') : isDark ? '#8F90A6' : '#555770' }}
           >
             {t.label}
             {tab === t.key && (
-              <div className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full" style={{ background: isDark ? '#5B8DEF' : '#1e40af' }} />
+              <div
+                className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full"
+                style={{ background: isDark ? '#5B8DEF' : '#1e40af' }}
+              />
             )}
           </button>
         ))}
@@ -62,15 +71,9 @@ export function ContractDetailPanel({ contract, onAddFlight, onFlightChanged, on
         {tab === 'flights' && (
           <FlightsTab contract={contract} onAddFlight={onAddFlight} onFlightChanged={onFlightChanged} isDark={isDark} />
         )}
-        {tab === 'details' && (
-          <DetailsTab contract={contract} isDark={isDark} />
-        )}
-        {tab === 'costs' && (
-          <CostsTab contract={contract} isDark={isDark} />
-        )}
-        {tab === 'notes' && (
-          <NotesTab contract={contract} onUpdated={onContractUpdated} isDark={isDark} />
-        )}
+        {tab === 'details' && <DetailsTab contract={contract} isDark={isDark} />}
+        {tab === 'costs' && <CostsTab contract={contract} isDark={isDark} />}
+        {tab === 'notes' && <NotesTab contract={contract} onUpdated={onContractUpdated} isDark={isDark} />}
       </div>
     </div>
   )

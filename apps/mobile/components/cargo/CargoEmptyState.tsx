@@ -13,9 +13,7 @@ export function CargoEmptyState({ palette }: CargoEmptyStateProps) {
       <Text style={{ fontSize: 14, fontWeight: '500', color: palette.textSecondary, marginTop: 12 }}>
         Select a flight
       </Text>
-      <Text style={{ fontSize: 12, color: palette.textTertiary, marginTop: 4 }}>
-        Tap the search bar above
-      </Text>
+      <Text style={{ fontSize: 12, color: palette.textTertiary, marginTop: 4 }}>Tap the search bar above</Text>
     </View>
   )
 }

@@ -1,39 +1,35 @@
-"use client";
+'use client'
 
-import { useState, useCallback } from "react";
-import type { ActivityCodeGroupRef, ActivityCodeRef } from "@skyhub/api";
-import {
-  FLAG_CATEGORIES,
-  FLAG_LABELS,
-  type ActivityFlag,
-} from "@skyhub/constants";
-import { Pencil, Save, X, Trash2, Lock, Archive } from "lucide-react";
+import { useState, useCallback } from 'react'
+import type { ActivityCodeGroupRef, ActivityCodeRef } from '@skyhub/api'
+import { FLAG_CATEGORIES, FLAG_LABELS, type ActivityFlag } from '@skyhub/constants'
+import { Pencil, Save, X, Trash2, Lock, Archive } from 'lucide-react'
 
 interface Props {
-  code: ActivityCodeRef | null;
-  groups: ActivityCodeGroupRef[];
-  defaultGroupId?: string | null;
-  onSave?: (id: string, data: Partial<ActivityCodeRef>) => Promise<void>;
-  onDelete?: (id: string) => Promise<void>;
-  onCreate?: (data: Partial<ActivityCodeRef>) => Promise<void>;
-  onCancelCreate?: () => void;
-  onUpdateFlags?: (id: string, flags: string[]) => Promise<void>;
-  onUpdatePositions?: (id: string, positions: string[]) => Promise<void>;
+  code: ActivityCodeRef | null
+  groups: ActivityCodeGroupRef[]
+  defaultGroupId?: string | null
+  onSave?: (id: string, data: Partial<ActivityCodeRef>) => Promise<void>
+  onDelete?: (id: string) => Promise<void>
+  onCreate?: (data: Partial<ActivityCodeRef>) => Promise<void>
+  onCancelCreate?: () => void
+  onUpdateFlags?: (id: string, flags: string[]) => Promise<void>
+  onUpdatePositions?: (id: string, positions: string[]) => Promise<void>
 }
 
 // ── Helpers ──
 function minutesToHHMM(min: number | null | undefined): string {
-  if (min == null) return "";
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  if (min == null) return ''
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
 function hhmmToMinutes(val: string): number | null {
-  if (!val) return null;
-  const [h, m] = val.split(":").map(Number);
-  if (isNaN(h) || isNaN(m)) return null;
-  return h * 60 + m;
+  if (!val) return null
+  const [h, m] = val.split(':').map(Number)
+  if (isNaN(h) || isNaN(m)) return null
+  return h * 60 + m
 }
 
 export function ActivityCodeDetail({
@@ -47,78 +43,72 @@ export function ActivityCodeDetail({
   onUpdateFlags,
   onUpdatePositions,
 }: Props) {
-  const [tab, setTab] = useState<"general" | "credits">("general");
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [draft, setDraft] = useState<Partial<ActivityCodeRef>>({});
+  const [tab, setTab] = useState<'general' | 'credits'>('general')
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [draft, setDraft] = useState<Partial<ActivityCodeRef>>({})
 
   // Create form state
   const [createForm, setCreateForm] = useState({
-    code: "",
-    name: "",
-    description: "",
-    groupId: defaultGroupId ?? groups[0]?._id ?? "",
-  });
+    code: '',
+    name: '',
+    description: '',
+    groupId: defaultGroupId ?? groups[0]?._id ?? '',
+  })
 
-  const isCreate = code === null;
-  const isSystem = code?.isSystem ?? false;
+  const isCreate = code === null
+  const isSystem = code?.isSystem ?? false
 
-  const group = code
-    ? groups.find((g) => g._id === code.groupId)
-    : groups.find((g) => g._id === createForm.groupId);
+  const group = code ? groups.find((g) => g._id === code.groupId) : groups.find((g) => g._id === createForm.groupId)
 
   // Draft getter
   const getVal = <K extends keyof ActivityCodeRef>(key: K): ActivityCodeRef[K] | undefined =>
-    code ? ((key in draft ? (draft as Record<string, unknown>)[key] : code[key]) as ActivityCodeRef[K]) : undefined;
+    code ? ((key in draft ? (draft as Record<string, unknown>)[key] : code[key]) as ActivityCodeRef[K]) : undefined
 
   const handleFieldChange = (key: string, value: unknown) => {
-    setDraft((prev) => ({ ...prev, [key]: value }));
-  };
+    setDraft((prev) => ({ ...prev, [key]: value }))
+  }
 
   const handleSave = async () => {
-    if (!code || !onSave) return;
-    setSaving(true);
+    if (!code || !onSave) return
+    setSaving(true)
     try {
-      await onSave(code._id, draft);
-      setEditing(false);
-      setDraft({});
+      await onSave(code._id, draft)
+      setEditing(false)
+      setDraft({})
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
-  };
+  }
 
   const handleCreate = async () => {
-    if (!onCreate) return;
-    if (!createForm.code.trim() || !createForm.name.trim()) return;
-    setSaving(true);
+    if (!onCreate) return
+    if (!createForm.code.trim() || !createForm.name.trim()) return
+    setSaving(true)
     try {
       await onCreate({
         groupId: createForm.groupId,
         code: createForm.code.toUpperCase(),
         name: createForm.name,
         description: createForm.description || null,
-      });
+      })
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
-  };
+  }
 
   const handleFlagToggle = async (flag: ActivityFlag) => {
-    if (!code || !onUpdateFlags || isSystem) return;
-    const current = code.flags ?? [];
-    const next = current.includes(flag)
-      ? current.filter((f) => f !== flag)
-      : [...current, flag];
-    await onUpdateFlags(code._id, next);
-  };
+    if (!code || !onUpdateFlags || isSystem) return
+    const current = code.flags ?? []
+    const next = current.includes(flag) ? current.filter((f) => f !== flag) : [...current, flag]
+    await onUpdateFlags(code._id, next)
+  }
 
   // ── Create form ──
   if (isCreate) {
     return (
       <div className="p-6 space-y-4">
-        <h3 className="text-[18px] font-semibold text-hz-text">
-          New Activity Code
-        </h3>
+        <h3 className="text-[18px] font-semibold text-hz-text">New Activity Code</h3>
 
         <div className="grid grid-cols-2 gap-4 max-w-lg">
           <div>
@@ -127,9 +117,7 @@ export function ActivityCodeDetail({
             </label>
             <select
               value={createForm.groupId}
-              onChange={(e) =>
-                setCreateForm((p) => ({ ...p, groupId: e.target.value }))
-              }
+              onChange={(e) => setCreateForm((p) => ({ ...p, groupId: e.target.value }))}
               className="w-full px-2 py-1.5 rounded-lg border border-hz-border bg-hz-card text-[13px] text-hz-text"
             >
               {groups.map((g) => (
@@ -162,9 +150,7 @@ export function ActivityCodeDetail({
             </label>
             <input
               value={createForm.name}
-              onChange={(e) =>
-                setCreateForm((p) => ({ ...p, name: e.target.value }))
-              }
+              onChange={(e) => setCreateForm((p) => ({ ...p, name: e.target.value }))}
               maxLength={60}
               placeholder="e.g. Flight Duty"
               className="w-full px-2 py-1.5 rounded-lg border border-hz-border bg-hz-card text-[13px] text-hz-text outline-none"
@@ -176,9 +162,7 @@ export function ActivityCodeDetail({
             </label>
             <textarea
               value={createForm.description}
-              onChange={(e) =>
-                setCreateForm((p) => ({ ...p, description: e.target.value }))
-              }
+              onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
               rows={2}
               className="w-full px-2 py-1.5 rounded-lg border border-hz-border bg-hz-card text-[13px] text-hz-text outline-none resize-none"
             />
@@ -188,13 +172,11 @@ export function ActivityCodeDetail({
         <div className="flex gap-2">
           <button
             onClick={handleCreate}
-            disabled={
-              saving || !createForm.code.trim() || !createForm.name.trim()
-            }
+            disabled={saving || !createForm.code.trim() || !createForm.name.trim()}
             className="px-4 py-1.5 rounded-lg text-[13px] font-semibold text-white disabled:opacity-40"
-            style={{ backgroundColor: "#1e40af" }}
+            style={{ backgroundColor: '#1e40af' }}
           >
-            {saving ? "Creating..." : "Create"}
+            {saving ? 'Creating...' : 'Create'}
           </button>
           {onCancelCreate && (
             <button
@@ -206,15 +188,15 @@ export function ActivityCodeDetail({
           )}
         </div>
       </div>
-    );
+    )
   }
 
   // ── Detail view ──
-  const codeColor = code.color ?? group?.color ?? "#6b7280";
-  const hasSimFlag = (code.flags ?? []).includes("is_simulator");
-  const hasDayOffFlag = (code.flags ?? []).includes("is_day_off");
-  const groupCode = group?.code ?? "";
-  const hideDuration = groupCode === "LEAVE" || groupCode === "SICK";
+  const codeColor = code.color ?? group?.color ?? '#6b7280'
+  const hasSimFlag = (code.flags ?? []).includes('is_simulator')
+  const hasDayOffFlag = (code.flags ?? []).includes('is_day_off')
+  const groupCode = group?.code ?? ''
+  const hideDuration = groupCode === 'LEAVE' || groupCode === 'SICK'
 
   return (
     <div className="flex flex-col h-full">
@@ -233,13 +215,11 @@ export function ActivityCodeDetail({
             <div className="flex items-center gap-2 mt-0.5">
               <span
                 className="px-1.5 py-0.5 rounded text-[13px] font-mono font-semibold text-white"
-                style={{ backgroundColor: group?.color ?? "#6b7280" }}
+                style={{ backgroundColor: group?.color ?? '#6b7280' }}
               >
                 {group?.code}
               </span>
-              <span className="text-[13px] text-hz-text-secondary">
-                {group?.name}
-              </span>
+              <span className="text-[13px] text-hz-text-secondary">{group?.name}</span>
               {isSystem && (
                 <span className="flex items-center gap-0.5 text-[13px] text-hz-text-tertiary">
                   <Lock className="h-3 w-3" /> System
@@ -258,15 +238,15 @@ export function ActivityCodeDetail({
                       onClick={handleSave}
                       disabled={saving}
                       className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[13px] font-medium text-white"
-                      style={{ backgroundColor: "#7c3aed" }}
+                      style={{ backgroundColor: '#7c3aed' }}
                     >
                       <Save className="h-3.5 w-3.5" />
-                      {saving ? "Saving..." : "Save"}
+                      {saving ? 'Saving...' : 'Save'}
                     </button>
                     <button
                       onClick={() => {
-                        setEditing(false);
-                        setDraft({});
+                        setEditing(false)
+                        setDraft({})
                       }}
                       className="p-1.5 rounded-lg hover:bg-hz-card"
                     >
@@ -281,10 +261,7 @@ export function ActivityCodeDetail({
                     >
                       <Pencil className="h-3.5 w-3.5" /> Edit
                     </button>
-                    <button
-                      onClick={() => onDelete?.(code._id)}
-                      className="p-1.5 rounded-lg hover:bg-red-500/10"
-                    >
+                    <button onClick={() => onDelete?.(code._id)} className="p-1.5 rounded-lg hover:bg-red-500/10">
                       <Trash2 className="h-4 w-4 text-red-400" />
                     </button>
                   </>
@@ -311,24 +288,24 @@ export function ActivityCodeDetail({
 
       {/* Tabs */}
       <div className="flex gap-0 px-6 mt-3 border-b border-hz-border shrink-0">
-        {(["general", "credits"] as const).map((t) => (
+        {(['general', 'credits'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-2 text-[13px] font-semibold border-b-2 transition-colors ${
               tab === t
-                ? "text-hz-text border-b-[#1e40af]"
-                : "text-hz-text-secondary border-b-transparent hover:text-hz-text"
+                ? 'text-hz-text border-b-[#1e40af]'
+                : 'text-hz-text-secondary border-b-transparent hover:text-hz-text'
             }`}
           >
-            {t === "general" ? "General" : "Credit Hours"}
+            {t === 'general' ? 'General' : 'Credit Hours'}
           </button>
         ))}
       </div>
 
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
-        {tab === "general" ? (
+        {tab === 'general' ? (
           <GeneralTab
             code={code}
             groups={groups}
@@ -344,17 +321,11 @@ export function ActivityCodeDetail({
             hasSimFlag={hasSimFlag}
           />
         ) : (
-          <CreditsTab
-            code={code}
-            editing={editing}
-            isSystem={isSystem}
-            getVal={getVal}
-            onChange={handleFieldChange}
-          />
+          <CreditsTab code={code} editing={editing} isSystem={isSystem} getVal={getVal} onChange={handleFieldChange} />
         )}
       </div>
     </div>
-  );
+  )
 }
 
 // ── General Tab ──
@@ -372,18 +343,18 @@ function GeneralTab({
   hasDayOffFlag,
   hasSimFlag,
 }: {
-  code: ActivityCodeRef;
-  groups: ActivityCodeGroupRef[];
-  group: ActivityCodeGroupRef | null;
-  editing: boolean;
-  isSystem: boolean;
-  draft: Partial<ActivityCodeRef>;
-  getVal: <K extends keyof ActivityCodeRef>(key: K) => ActivityCodeRef[K] | undefined;
-  onChange: (key: string, value: unknown) => void;
-  onFlagToggle: (flag: ActivityFlag) => void;
-  hideDuration: boolean;
-  hasDayOffFlag: boolean;
-  hasSimFlag: boolean;
+  code: ActivityCodeRef
+  groups: ActivityCodeGroupRef[]
+  group: ActivityCodeGroupRef | null
+  editing: boolean
+  isSystem: boolean
+  draft: Partial<ActivityCodeRef>
+  getVal: <K extends keyof ActivityCodeRef>(key: K) => ActivityCodeRef[K] | undefined
+  onChange: (key: string, value: unknown) => void
+  onFlagToggle: (flag: ActivityFlag) => void
+  hideDuration: boolean
+  hasDayOffFlag: boolean
+  hasSimFlag: boolean
 }) {
   return (
     <div className="space-y-5">
@@ -392,22 +363,20 @@ function GeneralTab({
         <FieldBlock label="Code">
           {editing && !isSystem ? (
             <input
-              value={(getVal("code") as string) ?? ""}
-              onChange={(e) => onChange("code", e.target.value.toUpperCase())}
+              value={(getVal('code') as string) ?? ''}
+              onChange={(e) => onChange('code', e.target.value.toUpperCase())}
               maxLength={8}
               className="w-full px-2 py-1.5 rounded-lg border border-hz-border bg-hz-card text-[13px] font-mono text-hz-text outline-none"
             />
           ) : (
-            <span className="text-[13px] font-mono font-bold text-hz-text">
-              {code.code}
-            </span>
+            <span className="text-[13px] font-mono font-bold text-hz-text">{code.code}</span>
           )}
         </FieldBlock>
         <FieldBlock label="Group">
           {editing && !isSystem ? (
             <select
-              value={(getVal("groupId") as string) ?? ""}
-              onChange={(e) => onChange("groupId", e.target.value)}
+              value={(getVal('groupId') as string) ?? ''}
+              onChange={(e) => onChange('groupId', e.target.value)}
               className="w-full px-2 py-1.5 rounded-lg border border-hz-border bg-hz-card text-[13px] text-hz-text"
             >
               {groups.map((g) => (
@@ -429,8 +398,8 @@ function GeneralTab({
         <FieldBlock label="Name">
           {editing && !isSystem ? (
             <input
-              value={(getVal("name") as string) ?? ""}
-              onChange={(e) => onChange("name", e.target.value)}
+              value={(getVal('name') as string) ?? ''}
+              onChange={(e) => onChange('name', e.target.value)}
               maxLength={60}
               className="w-full px-2 py-1.5 rounded-lg border border-hz-border bg-hz-card text-[13px] text-hz-text outline-none"
             />
@@ -443,13 +412,13 @@ function GeneralTab({
             <div className="flex items-center gap-2">
               <input
                 type="color"
-                value={(getVal("color") as string) ?? group?.color ?? "#6b7280"}
-                onChange={(e) => onChange("color", e.target.value)}
+                value={(getVal('color') as string) ?? group?.color ?? '#6b7280'}
+                onChange={(e) => onChange('color', e.target.value)}
                 className="w-8 h-8 rounded border border-hz-border cursor-pointer"
               />
               {code.color && (
                 <button
-                  onClick={() => onChange("color", null)}
+                  onClick={() => onChange('color', null)}
                   className="text-[13px] text-hz-text-secondary hover:text-hz-text"
                 >
                   Reset
@@ -460,7 +429,7 @@ function GeneralTab({
             <div
               className="w-8 h-8 rounded border border-hz-border"
               style={{
-                backgroundColor: code.color ?? group?.color ?? "#6b7280",
+                backgroundColor: code.color ?? group?.color ?? '#6b7280',
               }}
             />
           )}
@@ -471,15 +440,13 @@ function GeneralTab({
       <FieldBlock label="Description">
         {editing && !isSystem ? (
           <textarea
-            value={(getVal("description") as string) ?? ""}
-            onChange={(e) => onChange("description", e.target.value || null)}
+            value={(getVal('description') as string) ?? ''}
+            onChange={(e) => onChange('description', e.target.value || null)}
             rows={2}
             className="w-full px-2 py-1.5 rounded-lg border border-hz-border bg-hz-card text-[13px] text-hz-text outline-none resize-none max-w-lg"
           />
         ) : (
-          <span className="text-[13px] text-hz-text-secondary">
-            {code.description || "—"}
-          </span>
+          <span className="text-[13px] text-hz-text-secondary">{code.description || '—'}</span>
         )}
       </FieldBlock>
 
@@ -489,8 +456,8 @@ function GeneralTab({
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
-              checked={getVal("isActive") as boolean}
-              onChange={(e) => onChange("isActive", e.target.checked)}
+              checked={getVal('isActive') as boolean}
+              onChange={(e) => onChange('isActive', e.target.checked)}
               className="rounded"
             />
             <span className="text-[13px] text-hz-text">Active</span>
@@ -498,8 +465,8 @@ function GeneralTab({
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
-              checked={getVal("isArchived") as boolean}
-              onChange={(e) => onChange("isArchived", e.target.checked)}
+              checked={getVal('isArchived') as boolean}
+              onChange={(e) => onChange('isArchived', e.target.checked)}
               className="rounded"
             />
             <span className="text-[13px] text-hz-text">Archived</span>
@@ -513,18 +480,14 @@ function GeneralTab({
           {editing && !isSystem ? (
             <input
               type="text"
-              value={minutesToHHMM(getVal("defaultDurationMin") as number | null)}
-              onChange={(e) =>
-                onChange("defaultDurationMin", hhmmToMinutes(e.target.value))
-              }
+              value={minutesToHHMM(getVal('defaultDurationMin') as number | null)}
+              onChange={(e) => onChange('defaultDurationMin', hhmmToMinutes(e.target.value))}
               placeholder="HH:MM"
               className="w-24 px-2 py-1.5 rounded-lg border border-hz-border bg-hz-card text-[13px] font-mono text-hz-text outline-none"
             />
           ) : (
             <span className="text-[13px] font-mono text-hz-text">
-              {code.defaultDurationMin
-                ? minutesToHHMM(code.defaultDurationMin)
-                : "—"}
+              {code.defaultDurationMin ? minutesToHHMM(code.defaultDurationMin) : '—'}
             </span>
           )}
         </FieldBlock>
@@ -532,27 +495,18 @@ function GeneralTab({
 
       {/* ── Behavioral Flags ── */}
       <div>
-        <h4 className="text-[14px] font-bold uppercase tracking-wider text-hz-text-secondary mb-3">
-          Behavioral Flags
-        </h4>
+        <h4 className="text-[14px] font-bold uppercase tracking-wider text-hz-text-secondary mb-3">Behavioral Flags</h4>
         <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
           {FLAG_CATEGORIES.map((cat) => (
-            <div
-              key={cat.label}
-              className="rounded-xl border border-hz-border p-3 space-y-2"
-            >
-              <p className="text-[13px] font-semibold text-hz-text-secondary uppercase tracking-wider">
-                {cat.label}
-              </p>
+            <div key={cat.label} className="rounded-xl border border-hz-border p-3 space-y-2">
+              <p className="text-[13px] font-semibold text-hz-text-secondary uppercase tracking-wider">{cat.label}</p>
               {cat.flags.map((flag) => {
-                const active = (code.flags ?? []).includes(flag);
+                const active = (code.flags ?? []).includes(flag)
                 return (
                   <label
                     key={flag}
                     className={`flex items-center gap-2 ${
-                      isSystem
-                        ? "cursor-not-allowed opacity-60"
-                        : "cursor-pointer"
+                      isSystem ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
                     }`}
                   >
                     <input
@@ -562,11 +516,9 @@ function GeneralTab({
                       disabled={isSystem}
                       className="rounded"
                     />
-                    <span className="text-[13px] text-hz-text">
-                      {FLAG_LABELS[flag]}
-                    </span>
+                    <span className="text-[13px] text-hz-text">{FLAG_LABELS[flag]}</span>
                   </label>
-                );
+                )
               })}
             </div>
           ))}
@@ -582,52 +534,42 @@ function GeneralTab({
           <label className="flex items-center gap-2 cursor-pointer mb-2">
             <input
               type="checkbox"
-              checked={getVal("requiresTime") as boolean}
+              checked={getVal('requiresTime') as boolean}
               onChange={(e) => {
-                if (!editing || isSystem) return;
-                onChange("requiresTime", e.target.checked);
+                if (!editing || isSystem) return
+                onChange('requiresTime', e.target.checked)
               }}
               disabled={!editing || isSystem}
               className="rounded"
             />
-            <span className="text-[13px] text-hz-text">
-              Requires time input
-            </span>
+            <span className="text-[13px] text-hz-text">Requires time input</span>
           </label>
-          {(getVal("requiresTime") as boolean) && (
+          {(getVal('requiresTime') as boolean) && (
             <div className="grid grid-cols-2 gap-4 max-w-xs ml-6">
               <FieldBlock label="Default Start">
                 {editing && !isSystem ? (
                   <input
                     type="text"
-                    value={(getVal("defaultStartTime") as string) ?? ""}
-                    onChange={(e) =>
-                      onChange("defaultStartTime", e.target.value || null)
-                    }
+                    value={(getVal('defaultStartTime') as string) ?? ''}
+                    onChange={(e) => onChange('defaultStartTime', e.target.value || null)}
                     placeholder="HH:MM"
                     className="w-full px-2 py-1.5 rounded-lg border border-hz-border bg-hz-card text-[13px] font-mono text-hz-text outline-none"
                   />
                 ) : (
-                  <span className="text-[13px] font-mono text-hz-text">
-                    {code.defaultStartTime || "—"}
-                  </span>
+                  <span className="text-[13px] font-mono text-hz-text">{code.defaultStartTime || '—'}</span>
                 )}
               </FieldBlock>
               <FieldBlock label="Default End">
                 {editing && !isSystem ? (
                   <input
                     type="text"
-                    value={(getVal("defaultEndTime") as string) ?? ""}
-                    onChange={(e) =>
-                      onChange("defaultEndTime", e.target.value || null)
-                    }
+                    value={(getVal('defaultEndTime') as string) ?? ''}
+                    onChange={(e) => onChange('defaultEndTime', e.target.value || null)}
                     placeholder="HH:MM"
                     className="w-full px-2 py-1.5 rounded-lg border border-hz-border bg-hz-card text-[13px] font-mono text-hz-text outline-none"
                   />
                 ) : (
-                  <span className="text-[13px] font-mono text-hz-text">
-                    {code.defaultEndTime || "—"}
-                  </span>
+                  <span className="text-[13px] font-mono text-hz-text">{code.defaultEndTime || '—'}</span>
                 )}
               </FieldBlock>
             </div>
@@ -645,35 +587,27 @@ function GeneralTab({
             <FieldBlock label="Platform">
               {editing && !isSystem ? (
                 <input
-                  value={(getVal("simPlatform") as string) ?? ""}
-                  onChange={(e) =>
-                    onChange("simPlatform", e.target.value || null)
-                  }
+                  value={(getVal('simPlatform') as string) ?? ''}
+                  onChange={(e) => onChange('simPlatform', e.target.value || null)}
                   placeholder="e.g. Boeing 737-800 FFS Level D"
                   className="w-full px-2 py-1.5 rounded-lg border border-hz-border bg-hz-card text-[13px] text-hz-text outline-none"
                 />
               ) : (
-                <span className="text-[13px] text-hz-text">
-                  {code.simPlatform || "—"}
-                </span>
+                <span className="text-[13px] text-hz-text">{code.simPlatform || '—'}</span>
               )}
             </FieldBlock>
             <FieldBlock label="Standard Duration">
               {editing && !isSystem ? (
                 <input
                   type="text"
-                  value={minutesToHHMM(getVal("simDurationMin") as number | null)}
-                  onChange={(e) =>
-                    onChange("simDurationMin", hhmmToMinutes(e.target.value))
-                  }
+                  value={minutesToHHMM(getVal('simDurationMin') as number | null)}
+                  onChange={(e) => onChange('simDurationMin', hhmmToMinutes(e.target.value))}
                   placeholder="HH:MM"
                   className="w-full px-2 py-1.5 rounded-lg border border-hz-border bg-hz-card text-[13px] font-mono text-hz-text outline-none"
                 />
               ) : (
                 <span className="text-[13px] font-mono text-hz-text">
-                  {code.simDurationMin
-                    ? minutesToHHMM(code.simDurationMin)
-                    : "—"}
+                  {code.simDurationMin ? minutesToHHMM(code.simDurationMin) : '—'}
                 </span>
               )}
             </FieldBlock>
@@ -681,7 +615,7 @@ function GeneralTab({
         </div>
       )}
     </div>
-  );
+  )
 }
 
 // ── Credits Tab ──
@@ -692,11 +626,11 @@ function CreditsTab({
   getVal,
   onChange,
 }: {
-  code: ActivityCodeRef;
-  editing: boolean;
-  isSystem: boolean;
-  getVal: <K extends keyof ActivityCodeRef>(key: K) => ActivityCodeRef[K] | undefined;
-  onChange: (key: string, value: unknown) => void;
+  code: ActivityCodeRef
+  editing: boolean
+  isSystem: boolean
+  getVal: <K extends keyof ActivityCodeRef>(key: K) => ActivityCodeRef[K] | undefined
+  onChange: (key: string, value: unknown) => void
 }) {
   return (
     <div className="space-y-5">
@@ -706,19 +640,14 @@ function CreditsTab({
             <input
               type="number"
               step="0.05"
-              value={(getVal("creditRatio") as number) ?? ""}
-              onChange={(e) =>
-                onChange(
-                  "creditRatio",
-                  e.target.value ? parseFloat(e.target.value) : null
-                )
-              }
+              value={(getVal('creditRatio') as number) ?? ''}
+              onChange={(e) => onChange('creditRatio', e.target.value ? parseFloat(e.target.value) : null)}
               placeholder="e.g. 1.25"
               className="w-full px-2 py-1.5 rounded-lg border border-hz-border bg-hz-card text-[13px] font-mono text-hz-text outline-none"
             />
           ) : (
             <span className="text-[13px] font-mono text-hz-text">
-              {code.creditRatio != null ? `${code.creditRatio}x` : "—"}
+              {code.creditRatio != null ? `${code.creditRatio}x` : '—'}
             </span>
           )}
         </FieldBlock>
@@ -726,18 +655,14 @@ function CreditsTab({
           {editing && !isSystem ? (
             <input
               type="text"
-              value={minutesToHHMM(getVal("creditFixedMin") as number | null)}
-              onChange={(e) =>
-                onChange("creditFixedMin", hhmmToMinutes(e.target.value))
-              }
+              value={minutesToHHMM(getVal('creditFixedMin') as number | null)}
+              onChange={(e) => onChange('creditFixedMin', hhmmToMinutes(e.target.value))}
               placeholder="HH:MM"
               className="w-full px-2 py-1.5 rounded-lg border border-hz-border bg-hz-card text-[13px] font-mono text-hz-text outline-none"
             />
           ) : (
             <span className="text-[13px] font-mono text-hz-text">
-              {code.creditFixedMin
-                ? minutesToHHMM(code.creditFixedMin)
-                : "—"}
+              {code.creditFixedMin ? minutesToHHMM(code.creditFixedMin) : '—'}
             </span>
           )}
         </FieldBlock>
@@ -746,19 +671,14 @@ function CreditsTab({
             <input
               type="number"
               step="0.05"
-              value={(getVal("payRatio") as number) ?? ""}
-              onChange={(e) =>
-                onChange(
-                  "payRatio",
-                  e.target.value ? parseFloat(e.target.value) : null
-                )
-              }
+              value={(getVal('payRatio') as number) ?? ''}
+              onChange={(e) => onChange('payRatio', e.target.value ? parseFloat(e.target.value) : null)}
               placeholder="e.g. 1.0"
               className="w-full px-2 py-1.5 rounded-lg border border-hz-border bg-hz-card text-[13px] font-mono text-hz-text outline-none"
             />
           ) : (
             <span className="text-[13px] font-mono text-hz-text">
-              {code.payRatio != null ? `${code.payRatio}x` : "—"}
+              {code.payRatio != null ? `${code.payRatio}x` : '—'}
             </span>
           )}
         </FieldBlock>
@@ -767,18 +687,14 @@ function CreditsTab({
           {editing && !isSystem ? (
             <input
               type="text"
-              value={minutesToHHMM(getVal("minRestBeforeMin") as number | null)}
-              onChange={(e) =>
-                onChange("minRestBeforeMin", hhmmToMinutes(e.target.value))
-              }
+              value={minutesToHHMM(getVal('minRestBeforeMin') as number | null)}
+              onChange={(e) => onChange('minRestBeforeMin', hhmmToMinutes(e.target.value))}
               placeholder="HH:MM"
               className="w-full px-2 py-1.5 rounded-lg border border-hz-border bg-hz-card text-[13px] font-mono text-hz-text outline-none"
             />
           ) : (
             <span className="text-[13px] font-mono text-hz-text">
-              {code.minRestBeforeMin
-                ? minutesToHHMM(code.minRestBeforeMin)
-                : "—"}
+              {code.minRestBeforeMin ? minutesToHHMM(code.minRestBeforeMin) : '—'}
             </span>
           )}
         </FieldBlock>
@@ -786,46 +702,33 @@ function CreditsTab({
           {editing && !isSystem ? (
             <input
               type="text"
-              value={minutesToHHMM(getVal("minRestAfterMin") as number | null)}
-              onChange={(e) =>
-                onChange("minRestAfterMin", hhmmToMinutes(e.target.value))
-              }
+              value={minutesToHHMM(getVal('minRestAfterMin') as number | null)}
+              onChange={(e) => onChange('minRestAfterMin', hhmmToMinutes(e.target.value))}
               placeholder="HH:MM"
               className="w-full px-2 py-1.5 rounded-lg border border-hz-border bg-hz-card text-[13px] font-mono text-hz-text outline-none"
             />
           ) : (
             <span className="text-[13px] font-mono text-hz-text">
-              {code.minRestAfterMin
-                ? minutesToHHMM(code.minRestAfterMin)
-                : "—"}
+              {code.minRestAfterMin ? minutesToHHMM(code.minRestAfterMin) : '—'}
             </span>
           )}
         </FieldBlock>
       </div>
 
       <p className="text-[13px] text-hz-text-tertiary max-w-lg leading-relaxed">
-        Credit ratio multiplies block hours to derive credit hours. Override
-        sets fixed credit time regardless of block. Rest periods enforced by
-        FDTL rule engine.
+        Credit ratio multiplies block hours to derive credit hours. Override sets fixed credit time regardless of block.
+        Rest periods enforced by FDTL rule engine.
       </p>
     </div>
-  );
+  )
 }
 
 // ── FieldBlock helper ──
-function FieldBlock({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function FieldBlock({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">
-        {label}
-      </p>
+      <p className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1">{label}</p>
       {children}
     </div>
-  );
+  )
 }

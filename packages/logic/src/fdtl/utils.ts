@@ -1,6 +1,5 @@
 // ─── FDTL Utility Helpers ────────────────────────────────────────────────────
 
-
 /**
  * Convert minutes to "H:MM" display string.
  * e.g. 840 → "14:00", 570 → "9:30"
@@ -67,16 +66,14 @@ export function isMoreRestrictive(
 }
 
 // Aliases used by engine / validator consumers
-export const parseDuration  = displayToMinutes   // "H:MM" → minutes
-export const formatDuration = minutesToDisplay   // minutes → "H:MM"
+export const parseDuration = displayToMinutes // "H:MM" → minutes
+export const formatDuration = minutesToDisplay // minutes → "H:MM"
 
 /**
  * Group an array of rule parameters by their subcategory field.
  * Returns an object mapping subcategory → array of rules, in insertion order.
  */
-export function groupBySubcategory<T extends { subcategory: string }>(
-  rules: T[],
-): Record<string, T[]> {
+export function groupBySubcategory<T extends { subcategory: string }>(rules: T[]): Record<string, T[]> {
   const groups: Record<string, T[]> = {}
   for (const rule of rules) {
     const key = rule.subcategory || 'general'

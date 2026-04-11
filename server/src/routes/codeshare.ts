@@ -47,41 +47,46 @@ const mappingUpdateSchema = mappingCreateSchema.partial().omit({ agreementId: tr
 
 const bulkMappingsSchema = z.object({
   agreementId: z.string().min(1),
-  mappings: z.array(z.object({
-    operatingFlightNumber: z.string().min(1),
-    marketingFlightNumber: z.string().min(1),
-    departureIata: z.string().min(3),
-    arrivalIata: z.string().min(3),
-    daysOfOperation: z.string().optional().default('1234567'),
-    effectiveFrom: z.string().min(1),
-    effectiveUntil: z.string().nullable().optional(),
-  })),
-  cabinAllocations: z.array(z.object({
-    cabinCode: z.string().min(1),
-    allocatedSeats: z.number().min(0),
-    releaseHours: z.number().min(0).optional().default(72),
-  })).optional(),
+  mappings: z.array(
+    z.object({
+      operatingFlightNumber: z.string().min(1),
+      marketingFlightNumber: z.string().min(1),
+      departureIata: z.string().min(3),
+      arrivalIata: z.string().min(3),
+      daysOfOperation: z.string().optional().default('1234567'),
+      effectiveFrom: z.string().min(1),
+      effectiveUntil: z.string().nullable().optional(),
+    }),
+  ),
+  cabinAllocations: z
+    .array(
+      z.object({
+        cabinCode: z.string().min(1),
+        allocatedSeats: z.number().min(0),
+        releaseHours: z.number().min(0).optional().default(72),
+      }),
+    )
+    .optional(),
 })
 
 const seatAllocationUpsertSchema = z.object({
   mappingId: z.string().min(1),
-  allocations: z.array(z.object({
-    cabinCode: z.string().min(1),
-    allocatedSeats: z.number().min(0),
-    releaseHours: z.number().min(0).optional().default(72),
-  })),
+  allocations: z.array(
+    z.object({
+      cabinCode: z.string().min(1),
+      allocatedSeats: z.number().min(0),
+      releaseHours: z.number().min(0).optional().default(72),
+    }),
+  ),
 })
 
 // ── Routes ──
 
 export async function codeshareRoutes(app: FastifyInstance) {
-
   // ─── GET /codeshare/agreements ───
   app.get('/codeshare/agreements', async (req) => {
     const { operatorId } = operatorQuery.parse(req.query)
-    return CodeshareAgreement.find({ operatorId })
-      .sort({ partnerAirlineName: 1 })
-      .lean()
+    return CodeshareAgreement.find({ operatorId }).sort({ partnerAirlineName: 1 }).lean()
   })
 
   // ─── GET /codeshare/agreements/:id ───
@@ -122,31 +127,35 @@ export async function codeshareRoutes(app: FastifyInstance) {
   app.patch('/codeshare/agreements/:id', async (req) => {
     const { id } = req.params as { id: string }
     const data = agreementUpdateSchema.parse(req.body)
-    await CodeshareAgreement.updateOne({ _id: id }, {
-      $set: {
-        ...data,
-        ...(data.partnerAirlineCode ? { partnerAirlineCode: data.partnerAirlineCode.toUpperCase() } : {}),
-        updatedAt: new Date().toISOString(),
+    await CodeshareAgreement.updateOne(
+      { _id: id },
+      {
+        $set: {
+          ...data,
+          ...(data.partnerAirlineCode ? { partnerAirlineCode: data.partnerAirlineCode.toUpperCase() } : {}),
+          updatedAt: new Date().toISOString(),
+        },
       },
-    })
+    )
     return { ok: true }
   })
 
   // ─── PATCH /codeshare/agreements/:id/suspend ───
   app.patch('/codeshare/agreements/:id/suspend', async (req) => {
     const { id } = req.params as { id: string }
-    await CodeshareAgreement.updateOne({ _id: id }, {
-      $set: { status: 'suspended', updatedAt: new Date().toISOString() },
-    })
+    await CodeshareAgreement.updateOne(
+      { _id: id },
+      {
+        $set: { status: 'suspended', updatedAt: new Date().toISOString() },
+      },
+    )
     return { ok: true }
   })
 
   // ─── GET /codeshare/mappings ───
   app.get('/codeshare/mappings', async (req) => {
     const { agreementId } = agreementQuery.parse(req.query)
-    return CodeshareMapping.find({ agreementId })
-      .sort({ operatingFlightNumber: 1 })
-      .lean()
+    return CodeshareMapping.find({ agreementId }).sort({ operatingFlightNumber: 1 }).lean()
   })
 
   // ─── GET /codeshare/stats ───
@@ -158,10 +167,10 @@ export async function codeshareRoutes(app: FastifyInstance) {
 
     if (!mappings.length) return { mappedFlights: 0, routeCount: 0, weeklySeats: 0 }
 
-    const routes = new Set(mappings.map(m => `${m.departureIata}-${m.arrivalIata}`))
+    const routes = new Set(mappings.map((m) => `${m.departureIata}-${m.arrivalIata}`))
 
     // Get per-cabin allocations for accurate weekly seats
-    const mappingIds = mappings.map(m => m._id)
+    const mappingIds = mappings.map((m) => m._id)
     const allocs = await CodeshareSeatAllocation.find({ mappingId: { $in: mappingIds } })
       .select('mappingId allocatedSeats')
       .lean()
@@ -189,8 +198,10 @@ export async function codeshareRoutes(app: FastifyInstance) {
     }
     if (q.agreementId) {
       const mappings = await CodeshareMapping.find({ agreementId: q.agreementId }).select('_id').lean()
-      const mappingIds = mappings.map(m => m._id)
-      return CodeshareSeatAllocation.find({ mappingId: { $in: mappingIds } }).sort({ cabinCode: 1 }).lean()
+      const mappingIds = mappings.map((m) => m._id)
+      return CodeshareSeatAllocation.find({ mappingId: { $in: mappingIds } })
+        .sort({ cabinCode: 1 })
+        .lean()
     }
     return []
   })
@@ -202,14 +213,14 @@ export async function codeshareRoutes(app: FastifyInstance) {
     // Delete existing
     await CodeshareSeatAllocation.deleteMany({ mappingId })
 
-    const validAllocs = allocations.filter(a => a.allocatedSeats > 0)
+    const validAllocs = allocations.filter((a) => a.allocatedSeats > 0)
     if (validAllocs.length === 0) {
       await CodeshareMapping.updateOne({ _id: mappingId }, { $set: { seatAllocation: null } })
       return { ok: true }
     }
 
     const now = new Date().toISOString()
-    const docs = validAllocs.map(a => ({
+    const docs = validAllocs.map((a) => ({
       _id: crypto.randomUUID(),
       mappingId,
       cabinCode: a.cabinCode,
@@ -235,7 +246,7 @@ export async function codeshareRoutes(app: FastifyInstance) {
       .lean()
     if (!flights.length) return {}
 
-    const icaoCodes = [...new Set(flights.map(f => f.aircraftTypeIcao).filter(Boolean))] as string[]
+    const icaoCodes = [...new Set(flights.map((f) => f.aircraftTypeIcao).filter(Boolean))] as string[]
     if (!icaoCodes.length) return {}
 
     // Get LOPA configs for these aircraft types
@@ -252,8 +263,8 @@ export async function codeshareRoutes(app: FastifyInstance) {
 
     const configByIcao = new Map<string, Record<string, number>>()
     for (const icao of icaoCodes) {
-      const configs = lopas.filter(l => l.aircraftType === icao)
-      const defaultConfig = configs.find(c => c.isDefault) || configs[0]
+      const configs = lopas.filter((l) => l.aircraftType === icao)
+      const defaultConfig = configs.find((c) => c.isDefault) || configs[0]
       if (defaultConfig?.cabins?.length) {
         const cabinConfig: Record<string, number> = {}
         for (const entry of defaultConfig.cabins) {
@@ -267,7 +278,7 @@ export async function codeshareRoutes(app: FastifyInstance) {
       }
       // Fallback: single Y cabin with paxCapacity
       if (!configByIcao.has(icao)) {
-        const acType = acTypes.find(t => t.icaoType === icao)
+        const acType = acTypes.find((t) => t.icaoType === icao)
         if (acType?.paxCapacity && acType.paxCapacity > 0) {
           configByIcao.set(icao, { Y: acType.paxCapacity })
         }
@@ -304,7 +315,7 @@ export async function codeshareRoutes(app: FastifyInstance) {
     const { agreementId, mappings, cabinAllocations } = bulkMappingsSchema.parse(req.body)
     const now = new Date().toISOString()
 
-    const rows = mappings.map(m => ({
+    const rows = mappings.map((m) => ({
       _id: crypto.randomUUID(),
       agreementId,
       operatingFlightNumber: m.operatingFlightNumber,
@@ -322,27 +333,24 @@ export async function codeshareRoutes(app: FastifyInstance) {
 
     const inserted = await CodeshareMapping.insertMany(rows)
 
-    const validAllocs = (cabinAllocations || []).filter(a => a.allocatedSeats > 0)
+    const validAllocs = (cabinAllocations || []).filter((a) => a.allocatedSeats > 0)
     if (validAllocs.length > 0 && inserted.length > 0) {
-      const allocRows = inserted.flatMap(mapping =>
-        validAllocs.map(a => ({
+      const allocRows = inserted.flatMap((mapping) =>
+        validAllocs.map((a) => ({
           _id: crypto.randomUUID(),
           mappingId: mapping._id,
           cabinCode: a.cabinCode,
           allocatedSeats: a.allocatedSeats,
           releaseHours: a.releaseHours ?? 72,
           createdAt: now,
-        }))
+        })),
       )
       await CodeshareSeatAllocation.insertMany(allocRows)
 
       // Update denormalized totals
       const total = validAllocs.reduce((s, a) => s + a.allocatedSeats, 0)
-      const mappingIds = inserted.map(m => m._id)
-      await CodeshareMapping.updateMany(
-        { _id: { $in: mappingIds } },
-        { $set: { seatAllocation: total } }
-      )
+      const mappingIds = inserted.map((m) => m._id)
+      await CodeshareMapping.updateMany({ _id: { $in: mappingIds } }, { $set: { seatAllocation: total } })
     }
 
     return { created: inserted.length }
@@ -352,13 +360,16 @@ export async function codeshareRoutes(app: FastifyInstance) {
   app.patch('/codeshare/mappings/:id', async (req) => {
     const { id } = req.params as { id: string }
     const data = mappingUpdateSchema.parse(req.body)
-    await CodeshareMapping.updateOne({ _id: id }, {
-      $set: {
-        ...data,
-        ...(data.departureIata ? { departureIata: data.departureIata.toUpperCase() } : {}),
-        ...(data.arrivalIata ? { arrivalIata: data.arrivalIata.toUpperCase() } : {}),
+    await CodeshareMapping.updateOne(
+      { _id: id },
+      {
+        $set: {
+          ...data,
+          ...(data.departureIata ? { departureIata: data.departureIata.toUpperCase() } : {}),
+          ...(data.arrivalIata ? { arrivalIata: data.arrivalIata.toUpperCase() } : {}),
+        },
       },
-    })
+    )
     return { ok: true }
   })
 
@@ -377,7 +388,7 @@ export async function codeshareRoutes(app: FastifyInstance) {
       .select('flightNumber depStation arrStation daysOfWeek aircraftTypeIcao effectiveFrom effectiveUntil')
       .sort({ flightNumber: 1 })
       .lean()
-    return flights.map(f => ({
+    return flights.map((f) => ({
       _id: f._id,
       flightNumber: f.flightNumber,
       depStation: f.depStation,
@@ -395,10 +406,8 @@ export async function codeshareRoutes(app: FastifyInstance) {
     const { agreementId } = agreementQuery.parse(q)
     const { operatorId } = operatorQuery.parse(q)
 
-    const existing = await CodeshareMapping.find({ agreementId })
-      .select('operatingFlightNumber')
-      .lean()
-    const mapped = new Set(existing.map(e => e.operatingFlightNumber))
+    const existing = await CodeshareMapping.find({ agreementId }).select('operatingFlightNumber').lean()
+    const mapped = new Set(existing.map((e) => e.operatingFlightNumber))
 
     const flights = await ScheduledFlight.find({ operatorId, scenarioId: null })
       .select('flightNumber depStation arrStation daysOfWeek aircraftTypeIcao effectiveFrom effectiveUntil')
@@ -406,8 +415,8 @@ export async function codeshareRoutes(app: FastifyInstance) {
       .lean()
 
     return flights
-      .filter(f => !mapped.has(f.flightNumber))
-      .map(f => ({
+      .filter((f) => !mapped.has(f.flightNumber))
+      .map((f) => ({
         _id: f._id,
         flightNumber: f.flightNumber,
         depStation: f.depStation,
@@ -430,15 +439,17 @@ export async function codeshareRoutes(app: FastifyInstance) {
       .lean()
     if (!mappings.length) return {}
 
-    const flightNums = [...new Set(mappings.map(m => m.operatingFlightNumber))]
+    const flightNums = [...new Set(mappings.map((m) => m.operatingFlightNumber))]
     const flights = await ScheduledFlight.find({
       ...(operatorId ? { operatorId } : {}),
       flightNumber: { $in: flightNums },
       scenarioId: null,
-    }).select('flightNumber depStation arrStation aircraftTypeIcao').lean()
+    })
+      .select('flightNumber depStation arrStation aircraftTypeIcao')
+      .lean()
 
     const flightMap = new Map(
-      flights.map(f => [f.flightNumber, { dep: f.depStation, arr: f.arrStation, acType: f.aircraftTypeIcao }])
+      flights.map((f) => [f.flightNumber, { dep: f.depStation, arr: f.arrStation, acType: f.aircraftTypeIcao }]),
     )
 
     const result: Record<string, string> = {}
@@ -468,7 +479,7 @@ export async function codeshareRoutes(app: FastifyInstance) {
     if (!flights.length) return {}
 
     // Get pax capacity from AircraftType
-    const icaoCodes = [...new Set(flights.map(f => f.aircraftTypeIcao).filter(Boolean))] as string[]
+    const icaoCodes = [...new Set(flights.map((f) => f.aircraftTypeIcao).filter(Boolean))] as string[]
     const acTypes = await AircraftType.find({ operatorId, icaoType: { $in: icaoCodes } })
       .select('icaoType paxCapacity')
       .lean()
@@ -479,15 +490,17 @@ export async function codeshareRoutes(app: FastifyInstance) {
       aircraftType: { $in: icaoCodes },
       isActive: true,
       isDefault: true,
-    }).select('aircraftType totalSeats').lean()
+    })
+      .select('aircraftType totalSeats')
+      .lean()
 
     const capacityByIcao = new Map<string, number>()
     for (const icao of icaoCodes) {
-      const lopa = lopas.find(l => l.aircraftType === icao)
+      const lopa = lopas.find((l) => l.aircraftType === icao)
       if (lopa?.totalSeats) {
         capacityByIcao.set(icao, lopa.totalSeats)
       } else {
-        const ac = acTypes.find(t => t.icaoType === icao)
+        const ac = acTypes.find((t) => t.icaoType === icao)
         if (ac?.paxCapacity) capacityByIcao.set(icao, ac.paxCapacity)
       }
     }

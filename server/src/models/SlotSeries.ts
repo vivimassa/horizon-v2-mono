@@ -25,7 +25,17 @@ const slotSeriesSchema = new Schema(
     departureServiceType: { type: String, default: null },
     status: {
       type: String,
-      enum: ['draft', 'submitted', 'confirmed', 'offered', 'waitlisted', 'refused', 'conditional', 'cancelled', 'historic'],
+      enum: [
+        'draft',
+        'submitted',
+        'confirmed',
+        'offered',
+        'waitlisted',
+        'refused',
+        'conditional',
+        'cancelled',
+        'historic',
+      ],
       default: 'draft',
       index: true,
     },
@@ -53,7 +63,7 @@ const slotSeriesSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'slotSeries',
-  }
+  },
 )
 
 slotSeriesSchema.index({ operatorId: 1, airportIata: 1, seasonCode: 1 })

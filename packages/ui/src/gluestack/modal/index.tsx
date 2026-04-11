@@ -1,13 +1,7 @@
 // Gluestack-compatible Modal primitive
 // Focus trapping, backdrop dismiss, keyboard accessible
 import React, { createContext, useContext } from 'react'
-import {
-  Modal as RNModal,
-  View,
-  Pressable,
-  Text,
-  type ModalProps as RNModalProps,
-} from 'react-native'
+import { Modal as RNModal, View, Pressable, Text, type ModalProps as RNModalProps } from 'react-native'
 
 const ModalContext = createContext<{ onClose: () => void }>({
   onClose: () => {},
@@ -20,24 +14,11 @@ interface ModalProps {
   closeOnOverlayClick?: boolean
 }
 
-export function Modal({
-  isOpen,
-  onClose,
-  children,
-  closeOnOverlayClick = true,
-}: ModalProps) {
+export function Modal({ isOpen, onClose, children, closeOnOverlayClick = true }: ModalProps) {
   return (
     <ModalContext.Provider value={{ onClose }}>
-      <RNModal
-        visible={isOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={onClose}
-        statusBarTranslucent
-      >
-        <View className="flex-1 justify-center items-center">
-          {children}
-        </View>
+      <RNModal visible={isOpen} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+        <View className="flex-1 justify-center items-center">{children}</View>
       </RNModal>
     </ModalContext.Provider>
   )
@@ -71,23 +52,11 @@ export function ModalContent({
   )
 }
 
-export function ModalHeader({
-  children,
-  className,
-}: {
-  children: React.ReactNode
-  className?: string
-}) {
+export function ModalHeader({ children, className }: { children: React.ReactNode; className?: string }) {
   return <View className={`${className ?? ''}`}>{children}</View>
 }
 
-export function ModalCloseButton({
-  children,
-  className,
-}: {
-  children?: React.ReactNode
-  className?: string
-}) {
+export function ModalCloseButton({ children, className }: { children?: React.ReactNode; className?: string }) {
   const { onClose } = useContext(ModalContext)
   return (
     <Pressable
@@ -102,22 +71,10 @@ export function ModalCloseButton({
   )
 }
 
-export function ModalBody({
-  children,
-  className,
-}: {
-  children: React.ReactNode
-  className?: string
-}) {
+export function ModalBody({ children, className }: { children: React.ReactNode; className?: string }) {
   return <View className={className}>{children}</View>
 }
 
-export function ModalFooter({
-  children,
-  className,
-}: {
-  children: React.ReactNode
-  className?: string
-}) {
+export function ModalFooter({ children, className }: { children: React.ReactNode; className?: string }) {
   return <View className={`flex-row ${className ?? ''}`}>{children}</View>
 }

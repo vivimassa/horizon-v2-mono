@@ -19,18 +19,25 @@ export function UtilizationRiskSummary({ atRisk, close, safe, isDark }: Utilizat
 
   return (
     <div className="flex gap-2.5 px-5 py-3 shrink-0">
-      {cards.map(c => {
+      {cards.map((c) => {
         const Icon = c.icon
         return (
-          <div key={c.label} className="flex-1 flex items-center gap-3 rounded-xl px-3.5 py-2.5"
+          <div
+            key={c.label}
+            className="flex-1 flex items-center gap-3 rounded-xl px-3.5 py-2.5"
             style={{
               background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.025)',
               border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'}`,
-            }}>
+            }}
+          >
             <Icon size={16} style={{ color: c.color }} />
             <div>
-              <div className="text-[16px] font-bold" style={{ color: c.color }}>{c.value}</div>
-              <div className="text-[13px]" style={{ color: palette.textSecondary }}>{c.label}</div>
+              <div className="text-[16px] font-bold" style={{ color: c.color }}>
+                {c.value}
+              </div>
+              <div className="text-[13px]" style={{ color: palette.textSecondary }}>
+                {c.label}
+              </div>
             </div>
           </div>
         )

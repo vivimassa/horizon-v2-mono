@@ -4,10 +4,4 @@
  * use the same AssignableFlight interface.
  */
 
-export {
-  runSimulatedAnnealing,
-  SA_PRESETS,
-  type SAConfig,
-  type SAProgress,
-  type SAResult,
-} from './tail-assignment-sa'
+export { runSimulatedAnnealing, SA_PRESETS, type SAConfig, type SAProgress, type SAResult } from './tail-assignment-sa'

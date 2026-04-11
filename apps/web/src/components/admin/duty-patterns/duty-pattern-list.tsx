@@ -1,40 +1,40 @@
-"use client";
+'use client'
 
-import type { DutyPatternRef } from "@skyhub/api";
-import { Search, Sparkles } from "lucide-react";
+import type { DutyPatternRef } from '@skyhub/api'
+import { Search, Sparkles } from 'lucide-react'
 
 interface DutyPatternListProps {
-  patterns: DutyPatternRef[];
-  totalCount: number;
-  filteredCount: number;
-  selected: DutyPatternRef | null;
-  onSelect: (p: DutyPatternRef) => void;
-  search: string;
-  onSearchChange: (v: string) => void;
-  loading: boolean;
-  onSeed?: () => void;
+  patterns: DutyPatternRef[]
+  totalCount: number
+  filteredCount: number
+  selected: DutyPatternRef | null
+  onSelect: (p: DutyPatternRef) => void
+  search: string
+  onSearchChange: (v: string) => void
+  loading: boolean
+  onSeed?: () => void
 }
 
 function SegmentBar({ sequence }: { sequence: number[] }) {
-  const total = sequence.reduce((a, b) => a + b, 0);
-  if (total === 0) return null;
+  const total = sequence.reduce((a, b) => a + b, 0)
+  if (total === 0) return null
   return (
     <div className="flex w-full h-2.5 rounded-full overflow-hidden">
       {sequence.map((count, i) => {
-        const isOn = i % 2 === 0;
+        const isOn = i % 2 === 0
         return (
           <div
             key={i}
             style={{
               width: `${(count / total) * 100}%`,
-              backgroundColor: isOn ? "#06C270" : "#FF5C5C",
+              backgroundColor: isOn ? '#06C270' : '#FF5C5C',
               opacity: isOn ? 0.7 : 0.35,
             }}
           />
-        );
+        )
       })}
     </div>
-  );
+  )
 }
 
 export function DutyPatternList({
@@ -87,18 +87,18 @@ export function DutyPatternList({
         ) : (
           <div className="space-y-0.5">
             {patterns.map((p) => {
-              const isSelected = selected?._id === p._id;
-              const onDays = p.sequence.reduce((s, n, i) => i % 2 === 0 ? s + n : s, 0);
-              const offDays = p.cycleDays - onDays;
-              const ratio = Math.round((onDays / p.cycleDays) * 100);
+              const isSelected = selected?._id === p._id
+              const onDays = p.sequence.reduce((s, n, i) => (i % 2 === 0 ? s + n : s), 0)
+              const offDays = p.cycleDays - onDays
+              const ratio = Math.round((onDays / p.cycleDays) * 100)
               return (
                 <button
                   key={p._id}
                   onClick={() => onSelect(p)}
                   className={`w-full text-left px-3 py-3 rounded-xl transition-all duration-150 ${
                     isSelected
-                      ? "border-l-[3px] border-l-module-accent bg-module-accent/[0.08]"
-                      : "border-l-[3px] border-l-transparent hover:bg-hz-border/30"
+                      ? 'border-l-[3px] border-l-module-accent bg-module-accent/[0.08]'
+                      : 'border-l-[3px] border-l-transparent hover:bg-hz-border/30'
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-1">
@@ -120,11 +120,11 @@ export function DutyPatternList({
                     <span className="ml-auto font-mono">{ratio}%</span>
                   </div>
                 </button>
-              );
+              )
             })}
           </div>
         )}
       </div>
     </div>
-  );
+  )
 }

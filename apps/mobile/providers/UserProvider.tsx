@@ -42,9 +42,5 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     refetch()
   }, [refetch])
 
-  return (
-    <UserCtx.Provider value={{ user, loading, error, refetch }}>
-      {children}
-    </UserCtx.Provider>
-  )
+  return <UserCtx.Provider value={{ user, loading, error, refetch }}>{children}</UserCtx.Provider>
 }

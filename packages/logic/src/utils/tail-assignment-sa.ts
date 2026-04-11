@@ -4,10 +4,7 @@
  * by exploring random block swaps between aircraft.
  */
 
-import type {
-  AssignableFlight, AssignableAircraft,
-  TailAssignmentResult, ChainBreak,
-} from './tail-assignment'
+import type { AssignableFlight, AssignableAircraft, TailAssignmentResult, ChainBreak } from './tail-assignment'
 import { type AircraftTypeTAT, resolveTatMs, isFlightDomestic } from './tail-assignment'
 
 // ─── Types ────────────────────────────────────────────────────
@@ -62,9 +59,9 @@ export interface SAResult extends TailAssignmentResult {
 
 // Default config presets
 export const SA_PRESETS = {
-  quick:  { timeBudgetMs: 5000,  initialTemp: 5000,  coolingRate: 0.999,  reportIntervalMs: 200 },
-  normal: { timeBudgetMs: 15000, initialTemp: 8000,  coolingRate: 0.9995, reportIntervalMs: 300 },
-  deep:   { timeBudgetMs: 30000, initialTemp: 10000, coolingRate: 0.9998, reportIntervalMs: 500 },
+  quick: { timeBudgetMs: 5000, initialTemp: 5000, coolingRate: 0.999, reportIntervalMs: 200 },
+  normal: { timeBudgetMs: 15000, initialTemp: 8000, coolingRate: 0.9995, reportIntervalMs: 300 },
+  deep: { timeBudgetMs: 30000, initialTemp: 10000, coolingRate: 0.9998, reportIntervalMs: 500 },
 } as const
 
 // ─── Block type for SA (simplified) ──────────────────────────
@@ -130,13 +127,23 @@ function calculateSolutionCost(
 
         // TAT violation cost (directional: prev arrival -> current departure)
         const gapMs = block.startMs - prev.endMs
-        const acType = aircraft.find(a => a.registration === reg)?.icaoType || ''
-        const tatData = tatByType.get(acType) ?? { sched_dd: null, sched_di: null, sched_id: null, sched_ii: null, min_dd: null, min_di: null, min_id: null, min_ii: null, default: 30 }
+        const acType = aircraft.find((a) => a.registration === reg)?.icaoType || ''
+        const tatData = tatByType.get(acType) ?? {
+          sched_dd: null,
+          sched_di: null,
+          sched_id: null,
+          sched_ii: null,
+          min_dd: null,
+          min_di: null,
+          min_id: null,
+          min_ii: null,
+          default: 30,
+        }
         const requiredTat = resolveTatMs(
           tatData,
           isFlightDomestic(prev.arrRouteType),
           isFlightDomestic(block.depRouteType),
-          true // SA uses minimum TAT
+          true, // SA uses minimum TAT
         )
         if (gapMs < requiredTat && gapMs > 0) {
           cost += 3000
@@ -176,7 +183,6 @@ export async function runSimulatedAnnealing(
   allowFamilySub: boolean = false,
   typeFamilyMap: Map<string, string> = new Map(),
 ): Promise<SAResult> {
-
   // Build SA blocks from flights
   const routeBlockMap = new Map<string, AssignableFlight[]>()
 
@@ -211,7 +217,7 @@ export async function runSimulatedAnnealing(
       icaoType: first.aircraftTypeIcao || 'UNKN',
       startMs: toMs(first.date, first.stdMinutes),
       endMs: toMs(last.date, last.staMinutes),
-      pinned: !!blockFlights.find(f => f.aircraftReg),
+      pinned: !!blockFlights.find((f) => f.aircraftReg),
       depRouteType: first.routeType,
       arrRouteType: last.routeType,
     })
@@ -227,18 +233,14 @@ export async function runSimulatedAnnealing(
 
   // Initialize current solution from greedy
   const currentAssignments = new Map(greedy.assignments)
-  const currentOverflow = new Set(greedy.overflow.map(f => f.id))
+  const currentOverflow = new Set(greedy.overflow.map((f) => f.id))
 
   // Moveable blocks (not pinned, not entirely overflow)
-  const moveableBlocks = allBlocks.filter(b =>
-    !b.pinned && b.flights.some(f => currentAssignments.has(f.id))
-  )
+  const moveableBlocks = allBlocks.filter((b) => !b.pinned && b.flights.some((f) => currentAssignments.has(f.id)))
 
   // Calculate initial cost
-  const overflowFlights = flights.filter(f => currentOverflow.has(f.id))
-  const initialCost = calculateSolutionCost(
-    currentAssignments, overflowFlights, allBlocks, aircraft, tatByType
-  )
+  const overflowFlights = flights.filter((f) => currentOverflow.has(f.id))
+  const initialCost = calculateSolutionCost(currentAssignments, overflowFlights, allBlocks, aircraft, tatByType)
   let currentCost = initialCost
   let bestCost = initialCost
   let bestAssignments = new Map(currentAssignments)
@@ -267,7 +269,17 @@ export async function runSimulatedAnnealing(
 
   // Indexed canPlace: only check blocks assigned to target reg (directional TAT)
   function canPlaceIndexed(block: SABlock, reg: string, excludeIds?: Set<string>): boolean {
-    const tatData = tatByType.get(block.icaoType) ?? { sched_dd: null, sched_di: null, sched_id: null, sched_ii: null, min_dd: null, min_di: null, min_id: null, min_ii: null, default: 30 }
+    const tatData = tatByType.get(block.icaoType) ?? {
+      sched_dd: null,
+      sched_di: null,
+      sched_id: null,
+      sched_ii: null,
+      min_dd: null,
+      min_di: null,
+      min_id: null,
+      min_ii: null,
+      default: 30,
+    }
     const regBlockIds = blocksByReg.get(reg)
     if (!regBlockIds) return true
     for (const otherId of Array.from(regBlockIds)) {
@@ -276,11 +288,20 @@ export async function runSimulatedAnnealing(
       const other = blockById.get(otherId)
       if (!other) continue
       // TAT after existing -> before new block
-      const tatAfterOther = resolveTatMs(tatData, isFlightDomestic(other.arrRouteType), isFlightDomestic(block.depRouteType), true)
+      const tatAfterOther = resolveTatMs(
+        tatData,
+        isFlightDomestic(other.arrRouteType),
+        isFlightDomestic(block.depRouteType),
+        true,
+      )
       // TAT after new block -> before existing
-      const tatAfterBlock = resolveTatMs(tatData, isFlightDomestic(block.arrRouteType), isFlightDomestic(other.depRouteType), true)
-      if (block.startMs < other.endMs + tatAfterOther &&
-          other.startMs < block.endMs + tatAfterBlock) {
+      const tatAfterBlock = resolveTatMs(
+        tatData,
+        isFlightDomestic(block.arrRouteType),
+        isFlightDomestic(other.depRouteType),
+        true,
+      )
+      if (block.startMs < other.endMs + tatAfterOther && other.startMs < block.endMs + tatAfterBlock) {
         return false
       }
     }
@@ -322,7 +343,7 @@ export async function runSimulatedAnnealing(
       if (!regA) continue
 
       // Find blocks on other aircraft of compatible type
-      const sameTypeBlocks = moveableBlocks.filter(b => {
+      const sameTypeBlocks = moveableBlocks.filter((b) => {
         const r = currentAssignments.get(b.flights[0].id)
         if (!r || r === regA) return false
         if (b.icaoType === blockA.icaoType) return true
@@ -374,7 +395,6 @@ export async function runSimulatedAnnealing(
         blocksByReg.get(regB)?.delete(blockA.id)
         rejectedSwaps++
       }
-
     } else {
       // ── RELOCATE: move a single block to a different aircraft ──
       const block = moveableBlocks[Math.floor(Math.random() * moveableBlocks.length)]
@@ -401,7 +421,7 @@ export async function runSimulatedAnnealing(
       if (currentReg) blocksByReg.get(currentReg)?.delete(block.id)
       blocksByReg.get(targetAc.registration)?.add(block.id)
 
-      const newOverflowFlights = flights.filter(f => currentOverflow.has(f.id))
+      const newOverflowFlights = flights.filter((f) => currentOverflow.has(f.id))
       const newCost = calculateSolutionCost(currentAssignments, newOverflowFlights, allBlocks, aircraft, tatByType)
       const delta = newCost - currentCost
 
@@ -437,9 +457,7 @@ export async function runSimulatedAnnealing(
     // Report progress periodically
     if (elapsed - (lastReportTime - startTime) > config.reportIntervalMs) {
       lastReportTime = startTime + elapsed
-      const improvement = initialCost > 0
-        ? ((initialCost - bestCost) / initialCost) * 100
-        : 0
+      const improvement = initialCost > 0 ? ((initialCost - bestCost) / initialCost) * 100 : 0
 
       onProgress?.({
         iteration,
@@ -455,13 +473,13 @@ export async function runSimulatedAnnealing(
       })
 
       // Yield to keep UI responsive
-      await new Promise(r => setTimeout(r, 0))
+      await new Promise((r) => setTimeout(r, 0))
     }
   }
 
   // ── Build final result from best solution ──
   const finalAssignments = bestAssignments
-  const finalOverflow = flights.filter(f => bestOverflow.has(f.id))
+  const finalOverflow = flights.filter((f) => bestOverflow.has(f.id))
   const finalChainBreaks: ChainBreak[] = []
 
   // Recalculate chain breaks from final solution
@@ -492,9 +510,7 @@ export async function runSimulatedAnnealing(
   }
 
   const elapsedMs = performance.now() - startTime
-  const improvement = initialCost > 0
-    ? ((initialCost - bestCost) / initialCost) * 100
-    : 0
+  const improvement = initialCost > 0 ? ((initialCost - bestCost) / initialCost) * 100 : 0
 
   return {
     assignments: finalAssignments,

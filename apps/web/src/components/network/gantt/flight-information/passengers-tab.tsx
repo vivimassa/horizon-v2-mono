@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState } from 'react'
 import { PlaneTakeoff, PlaneLanding, Plus, X, Trash2 } from 'lucide-react'
@@ -22,7 +22,14 @@ export function PassengersTab({ data, onUpdate }: PassengersTabProps) {
   const inputBg = isDark ? 'rgba(255,255,255,0.08)' : '#fff'
   const inputBorder = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)'
 
-  const pax = data.pax ?? { adultExpected: null, adultActual: null, childExpected: null, childActual: null, infantExpected: null, infantActual: null }
+  const pax = data.pax ?? {
+    adultExpected: null,
+    adultActual: null,
+    childExpected: null,
+    childActual: null,
+    infantExpected: null,
+    infantActual: null,
+  }
   const totalSeats = data.lopa?.totalSeats ?? data.aircraftType?.paxCapacity ?? null
 
   // Totals
@@ -32,8 +39,16 @@ export function PassengersTab({ data, onUpdate }: PassengersTabProps) {
   const loadPct = totalSeats && totalSeats > 0 ? Math.round((paxOnBoard / totalSeats) * 100) : null
 
   function updatePax(field: keyof NonNullable<FlightDetail['pax']>, value: number | null) {
-    onUpdate(d => {
-      if (!d.pax) d.pax = { adultExpected: null, adultActual: null, childExpected: null, childActual: null, infantExpected: null, infantActual: null }
+    onUpdate((d) => {
+      if (!d.pax)
+        d.pax = {
+          adultExpected: null,
+          adultActual: null,
+          childExpected: null,
+          childActual: null,
+          infantExpected: null,
+          infantActual: null,
+        }
       d.pax[field] = value
     })
   }
@@ -50,11 +65,14 @@ export function PassengersTab({ data, onUpdate }: PassengersTabProps) {
           {/* LOPA cabin config badge */}
           {data.lopa && (
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-[13px] font-mono font-medium px-2 py-0.5 rounded-lg" style={{ background: `${accent}10`, color: accent }}>
+              <span
+                className="text-[13px] font-mono font-medium px-2 py-0.5 rounded-lg"
+                style={{ background: `${accent}10`, color: accent }}
+              >
                 {data.lopa.configName}
               </span>
               <span className="text-[13px]" style={{ color: muted }}>
-                {data.lopa.cabins.map(c => `${c.classCode}${c.seats}`).join(' ')} — {data.lopa.totalSeats} seats
+                {data.lopa.cabins.map((c) => `${c.classCode}${c.seats}`).join(' ')} — {data.lopa.totalSeats} seats
               </span>
             </div>
           )}
@@ -62,37 +80,80 @@ export function PassengersTab({ data, onUpdate }: PassengersTabProps) {
           {/* Column headers */}
           <div className="grid grid-cols-4 gap-3 mb-2">
             <div />
-            <div className="text-[13px] font-bold uppercase text-center" style={{ color: muted }}>Expected</div>
-            <div className="text-[13px] font-bold uppercase text-center" style={{ color: muted }}>Actual</div>
-            <div className="text-[13px] font-bold uppercase text-center" style={{ color: muted }}>Diff</div>
+            <div className="text-[13px] font-bold uppercase text-center" style={{ color: muted }}>
+              Expected
+            </div>
+            <div className="text-[13px] font-bold uppercase text-center" style={{ color: muted }}>
+              Actual
+            </div>
+            <div className="text-[13px] font-bold uppercase text-center" style={{ color: muted }}>
+              Diff
+            </div>
           </div>
 
-          <PaxRow label="Adults (ADT)" expected={pax.adultExpected} actual={pax.adultActual}
-            onExpected={v => updatePax('adultExpected', v)} onActual={v => updatePax('adultActual', v)}
-            inputBg={inputBg} inputBorder={inputBorder} textPrimary={textPrimary} muted={muted} />
-          <PaxRow label="Children (CHD)" expected={pax.childExpected} actual={pax.childActual}
-            onExpected={v => updatePax('childExpected', v)} onActual={v => updatePax('childActual', v)}
-            inputBg={inputBg} inputBorder={inputBorder} textPrimary={textPrimary} muted={muted} />
-          <PaxRow label="Infants (INF)" expected={pax.infantExpected} actual={pax.infantActual}
-            onExpected={v => updatePax('infantExpected', v)} onActual={v => updatePax('infantActual', v)}
-            inputBg={inputBg} inputBorder={inputBorder} textPrimary={textPrimary} muted={muted} />
+          <PaxRow
+            label="Adults (ADT)"
+            expected={pax.adultExpected}
+            actual={pax.adultActual}
+            onExpected={(v) => updatePax('adultExpected', v)}
+            onActual={(v) => updatePax('adultActual', v)}
+            inputBg={inputBg}
+            inputBorder={inputBorder}
+            textPrimary={textPrimary}
+            muted={muted}
+          />
+          <PaxRow
+            label="Children (CHD)"
+            expected={pax.childExpected}
+            actual={pax.childActual}
+            onExpected={(v) => updatePax('childExpected', v)}
+            onActual={(v) => updatePax('childActual', v)}
+            inputBg={inputBg}
+            inputBorder={inputBorder}
+            textPrimary={textPrimary}
+            muted={muted}
+          />
+          <PaxRow
+            label="Infants (INF)"
+            expected={pax.infantExpected}
+            actual={pax.infantActual}
+            onExpected={(v) => updatePax('infantExpected', v)}
+            onActual={(v) => updatePax('infantActual', v)}
+            inputBg={inputBg}
+            inputBorder={inputBorder}
+            textPrimary={textPrimary}
+            muted={muted}
+          />
 
           {/* Totals */}
           <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${cardBorder}` }}>
             <div className="grid grid-cols-4 gap-3 items-center mb-1">
-              <span className="text-[13px] font-bold" style={{ color: textPrimary }}>Revenue Pax</span>
-              <div className="text-center text-[15px] font-mono font-bold" style={{ color: totalExpected ? textPrimary : `${muted}40` }}>
+              <span className="text-[13px] font-bold" style={{ color: textPrimary }}>
+                Revenue Pax
+              </span>
+              <div
+                className="text-center text-[15px] font-mono font-bold"
+                style={{ color: totalExpected ? textPrimary : `${muted}40` }}
+              >
                 {totalExpected || '—'}
               </div>
-              <div className="text-center text-[15px] font-mono font-bold" style={{ color: totalActual ? textPrimary : `${muted}40` }}>
+              <div
+                className="text-center text-[15px] font-mono font-bold"
+                style={{ color: totalActual ? textPrimary : `${muted}40` }}
+              >
                 {totalActual || '—'}
               </div>
               <div />
             </div>
             <div className="grid grid-cols-4 gap-3 items-center">
-              <span className="text-[13px] font-bold" style={{ color: textPrimary }}>Pax on Board</span>
+              <span className="text-[13px] font-bold" style={{ color: textPrimary }}>
+                Pax on Board
+              </span>
               <div />
-              <div className="text-center text-[15px] font-mono font-bold" style={{ color: paxOnBoard ? textPrimary : `${muted}40` }}>
+              <div
+                className="text-center text-[15px] font-mono font-bold"
+                style={{ color: paxOnBoard ? textPrimary : `${muted}40` }}
+              >
                 {paxOnBoard || '—'}
               </div>
               <div />
@@ -101,7 +162,10 @@ export function PassengersTab({ data, onUpdate }: PassengersTabProps) {
         </div>
 
         {/* Load donut */}
-        <div className="col-span-1 rounded-2xl p-4 flex flex-col items-center justify-center" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+        <div
+          className="col-span-1 rounded-2xl p-4 flex flex-col items-center justify-center"
+          style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
+        >
           {(() => {
             const size = 140
             const cx = size / 2
@@ -110,7 +174,8 @@ export function PassengersTab({ data, onUpdate }: PassengersTabProps) {
             const circ = 2 * Math.PI * r
             const fill = loadPct != null ? (loadPct / 100) * circ : 0
             const trackColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
-            const ringColor = loadPct == null ? `${muted}20` : loadPct >= 80 ? '#06C270' : loadPct >= 50 ? '#F59E0B' : accent
+            const ringColor =
+              loadPct == null ? `${muted}20` : loadPct >= 80 ? '#06C270' : loadPct >= 50 ? '#F59E0B' : accent
             // Dot position at the end of the arc
             const angle = loadPct != null ? ((loadPct / 100) * 360 - 90) * (Math.PI / 180) : -Math.PI / 2
             const dotX = cx + r * Math.cos(angle)
@@ -127,27 +192,50 @@ export function PassengersTab({ data, onUpdate }: PassengersTabProps) {
                     </linearGradient>
                     <filter id="donut-glow">
                       <feGaussianBlur stdDeviation="3" result="blur" />
-                      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
                     </filter>
                   </defs>
                   {/* Track */}
                   <circle cx={cx} cy={cx} r={r} fill="none" stroke={trackColor} strokeWidth={stroke} />
                   {/* Fill arc */}
-                  <circle cx={cx} cy={cx} r={r} fill="none" stroke="url(#donut-grad)" strokeWidth={stroke}
-                    strokeDasharray={`${fill} ${circ}`} strokeLinecap="round" transform={`rotate(-90 ${cx} ${cx})`}
+                  <circle
+                    cx={cx}
+                    cy={cx}
+                    r={r}
+                    fill="none"
+                    stroke="url(#donut-grad)"
+                    strokeWidth={stroke}
+                    strokeDasharray={`${fill} ${circ}`}
+                    strokeLinecap="round"
+                    transform={`rotate(-90 ${cx} ${cx})`}
                     filter={fill > 0 ? 'url(#donut-glow)' : undefined}
-                    style={{ transition: 'stroke-dasharray 0.4s ease' }} />
+                    style={{ transition: 'stroke-dasharray 0.4s ease' }}
+                  />
                   {/* End dot */}
                   {fill > 0 && (
-                    <circle cx={dotX} cy={dotY} r={5} fill="#fff"
-                      stroke={ringColor} strokeWidth={2}
-                      style={{ filter: `drop-shadow(0 0 4px ${ringColor}80)` }} />
+                    <circle
+                      cx={dotX}
+                      cy={dotY}
+                      r={5}
+                      fill="#fff"
+                      stroke={ringColor}
+                      strokeWidth={2}
+                      style={{ filter: `drop-shadow(0 0 4px ${ringColor}80)` }}
+                    />
                   )}
                 </svg>
-                <span className="text-[26px] font-mono font-bold" style={{ color: loadPct != null ? textPrimary : `${muted}30` }}>
+                <span
+                  className="text-[26px] font-mono font-bold"
+                  style={{ color: loadPct != null ? textPrimary : `${muted}30` }}
+                >
                   {loadPct != null ? `${loadPct}%` : '—'}
                 </span>
-                <span className="text-[13px] font-bold uppercase tracking-wider" style={{ color: muted }}>Load</span>
+                <span className="text-[13px] font-bold uppercase tracking-wider" style={{ color: muted }}>
+                  Load
+                </span>
                 {totalSeats != null && (
                   <span className="text-[13px] font-mono mt-1" style={{ color: `${muted}50` }}>
                     {paxOnBoard || 0} of {totalSeats}
@@ -162,56 +250,122 @@ export function PassengersTab({ data, onUpdate }: PassengersTabProps) {
       {/* Connections */}
       <div className="grid grid-cols-2 gap-4">
         <ConnectionPanel
-          icon={PlaneTakeoff} title="Outgoing Connections" subtitle="Pax on this flight connecting to..."
+          icon={PlaneTakeoff}
+          title="Outgoing Connections"
+          subtitle="Pax on this flight connecting to..."
           items={data.connections.outgoing}
-          onAdd={(fn, px) => onUpdate(d => { d.connections.outgoing.push({ flightNumber: fn, pax: px }) })}
-          onRemove={i => onUpdate(d => { d.connections.outgoing.splice(i, 1) })}
-          onUpdatePax={(i, px) => onUpdate(d => { d.connections.outgoing[i].pax = px })}
-          cardBg={cardBg} cardBorder={cardBorder} muted={muted} accent={accent}
-          inputBg={inputBg} inputBorder={inputBorder} textPrimary={textPrimary} isDark={isDark}
+          onAdd={(fn, px) =>
+            onUpdate((d) => {
+              d.connections.outgoing.push({ flightNumber: fn, pax: px })
+            })
+          }
+          onRemove={(i) =>
+            onUpdate((d) => {
+              d.connections.outgoing.splice(i, 1)
+            })
+          }
+          onUpdatePax={(i, px) =>
+            onUpdate((d) => {
+              d.connections.outgoing[i].pax = px
+            })
+          }
+          cardBg={cardBg}
+          cardBorder={cardBorder}
+          muted={muted}
+          accent={accent}
+          inputBg={inputBg}
+          inputBorder={inputBorder}
+          textPrimary={textPrimary}
+          isDark={isDark}
         />
         <ConnectionPanel
-          icon={PlaneLanding} title="Incoming Connections" subtitle="Pax connecting from... to this flight"
+          icon={PlaneLanding}
+          title="Incoming Connections"
+          subtitle="Pax connecting from... to this flight"
           items={data.connections.incoming}
-          onAdd={(fn, px) => onUpdate(d => { d.connections.incoming.push({ flightNumber: fn, pax: px }) })}
-          onRemove={i => onUpdate(d => { d.connections.incoming.splice(i, 1) })}
-          onUpdatePax={(i, px) => onUpdate(d => { d.connections.incoming[i].pax = px })}
-          cardBg={cardBg} cardBorder={cardBorder} muted={muted} accent={accent}
-          inputBg={inputBg} inputBorder={inputBorder} textPrimary={textPrimary} isDark={isDark}
+          onAdd={(fn, px) =>
+            onUpdate((d) => {
+              d.connections.incoming.push({ flightNumber: fn, pax: px })
+            })
+          }
+          onRemove={(i) =>
+            onUpdate((d) => {
+              d.connections.incoming.splice(i, 1)
+            })
+          }
+          onUpdatePax={(i, px) =>
+            onUpdate((d) => {
+              d.connections.incoming[i].pax = px
+            })
+          }
+          cardBg={cardBg}
+          cardBorder={cardBorder}
+          muted={muted}
+          accent={accent}
+          inputBg={inputBg}
+          inputBorder={inputBorder}
+          textPrimary={textPrimary}
+          isDark={isDark}
         />
       </div>
     </div>
   )
 }
 
-function PaxRow({ label, expected, actual, onExpected, onActual, inputBg, inputBorder, textPrimary, muted }: {
-  label: string; expected: number | null; actual: number | null
-  onExpected: (v: number | null) => void; onActual: (v: number | null) => void
-  inputBg: string; inputBorder: string; textPrimary: string; muted: string
+function PaxRow({
+  label,
+  expected,
+  actual,
+  onExpected,
+  onActual,
+  inputBg,
+  inputBorder,
+  textPrimary,
+  muted,
+}: {
+  label: string
+  expected: number | null
+  actual: number | null
+  onExpected: (v: number | null) => void
+  onActual: (v: number | null) => void
+  inputBg: string
+  inputBorder: string
+  textPrimary: string
+  muted: string
 }) {
-  const diff = (expected != null && actual != null) ? actual - expected : null
+  const diff = expected != null && actual != null ? actual - expected : null
   const diffColor = diff == null ? `${muted}40` : diff > 0 ? '#06C270' : diff < 0 ? '#E63535' : textPrimary
 
   return (
     <div className="grid grid-cols-4 gap-3 mb-2 items-center">
-      <span className="text-[13px] font-medium" style={{ color: textPrimary }}>{label}</span>
+      <span className="text-[13px] font-medium" style={{ color: textPrimary }}>
+        {label}
+      </span>
       <input
         type="number"
         min={0}
         value={expected ?? ''}
-        onChange={e => onExpected(e.target.value ? parseInt(e.target.value) : null)}
+        onChange={(e) => onExpected(e.target.value ? parseInt(e.target.value) : null)}
         placeholder="—"
         className="h-[36px] text-center rounded-lg text-[14px] font-mono font-bold outline-none"
-        style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: expected != null ? textPrimary : `${muted}40` }}
+        style={{
+          background: inputBg,
+          border: `1px solid ${inputBorder}`,
+          color: expected != null ? textPrimary : `${muted}40`,
+        }}
       />
       <input
         type="number"
         min={0}
         value={actual ?? ''}
-        onChange={e => onActual(e.target.value ? parseInt(e.target.value) : null)}
+        onChange={(e) => onActual(e.target.value ? parseInt(e.target.value) : null)}
         placeholder="—"
         className="h-[36px] text-center rounded-lg text-[14px] font-mono font-bold outline-none"
-        style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: actual != null ? textPrimary : `${muted}40` }}
+        style={{
+          background: inputBg,
+          border: `1px solid ${inputBorder}`,
+          color: actual != null ? textPrimary : `${muted}40`,
+        }}
       />
       <div className="text-center text-[14px] font-mono font-bold" style={{ color: diffColor }}>
         {diff != null ? (diff > 0 ? `+${diff}` : String(diff)) : '—'}
@@ -220,16 +374,38 @@ function PaxRow({ label, expected, actual, onExpected, onActual, inputBg, inputB
   )
 }
 
-function ConnectionPanel({ icon: Icon, title, subtitle, items, onAdd, onRemove, onUpdatePax,
-  cardBg, cardBorder, muted, accent, inputBg, inputBorder, textPrimary, isDark,
+function ConnectionPanel({
+  icon: Icon,
+  title,
+  subtitle,
+  items,
+  onAdd,
+  onRemove,
+  onUpdatePax,
+  cardBg,
+  cardBorder,
+  muted,
+  accent,
+  inputBg,
+  inputBorder,
+  textPrimary,
+  isDark,
 }: {
-  icon: typeof PlaneTakeoff; title: string; subtitle: string
+  icon: typeof PlaneTakeoff
+  title: string
+  subtitle: string
   items: Array<{ flightNumber: string; pax: number }>
   onAdd: (flightNumber: string, pax: number) => void
   onRemove: (index: number) => void
   onUpdatePax: (index: number, pax: number) => void
-  cardBg: string; cardBorder: string; muted: string; accent: string
-  inputBg: string; inputBorder: string; textPrimary: string; isDark: boolean
+  cardBg: string
+  cardBorder: string
+  muted: string
+  accent: string
+  inputBg: string
+  inputBorder: string
+  textPrimary: string
+  isDark: boolean
 }) {
   const [showAdd, setShowAdd] = useState(false)
   const [newFlight, setNewFlight] = useState('')
@@ -238,7 +414,9 @@ function ConnectionPanel({ icon: Icon, title, subtitle, items, onAdd, onRemove, 
   function handleAdd() {
     if (!newFlight.trim()) return
     onAdd(newFlight.trim().toUpperCase(), parseInt(newPax) || 0)
-    setNewFlight(''); setNewPax(''); setShowAdd(false)
+    setNewFlight('')
+    setNewPax('')
+    setShowAdd(false)
   }
 
   const totalPax = items.reduce((sum, c) => sum + c.pax, 0)
@@ -248,7 +426,9 @@ function ConnectionPanel({ icon: Icon, title, subtitle, items, onAdd, onRemove, 
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <Icon size={14} style={{ color: accent }} />
-          <h3 className="text-[14px] font-bold uppercase tracking-[0.15em]" style={{ color: accent }}>{title}</h3>
+          <h3 className="text-[14px] font-bold uppercase tracking-[0.15em]" style={{ color: accent }}>
+            {title}
+          </h3>
         </div>
         <button
           onClick={() => setShowAdd(!showAdd)}
@@ -258,7 +438,9 @@ function ConnectionPanel({ icon: Icon, title, subtitle, items, onAdd, onRemove, 
           <Plus size={14} />
         </button>
       </div>
-      <p className="text-[13px] mb-3" style={{ color: muted }}>{subtitle}</p>
+      <p className="text-[13px] mb-3" style={{ color: muted }}>
+        {subtitle}
+      </p>
 
       {/* Add form */}
       {showAdd && (
@@ -267,7 +449,7 @@ function ConnectionPanel({ icon: Icon, title, subtitle, items, onAdd, onRemove, 
             type="text"
             placeholder="Search flight..."
             value={newFlight}
-            onChange={e => setNewFlight(e.target.value)}
+            onChange={(e) => setNewFlight(e.target.value)}
             autoFocus
             className="flex-1 h-[36px] px-3 rounded-lg text-[13px] font-mono outline-none"
             style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: textPrimary }}
@@ -277,17 +459,26 @@ function ConnectionPanel({ icon: Icon, title, subtitle, items, onAdd, onRemove, 
             min={0}
             placeholder="Pax"
             value={newPax}
-            onChange={e => setNewPax(e.target.value)}
+            onChange={(e) => setNewPax(e.target.value)}
             className="w-[60px] h-[36px] text-center rounded-lg text-[13px] font-mono font-bold outline-none"
             style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: '#E63535' }}
           />
-          <button onClick={handleAdd} className="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0"
-            style={{ background: accent }}>
+          <button
+            onClick={handleAdd}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0"
+            style={{ background: accent }}
+          >
             <Plus size={14} />
           </button>
-          <button onClick={() => { setShowAdd(false); setNewFlight(''); setNewPax('') }}
+          <button
+            onClick={() => {
+              setShowAdd(false)
+              setNewFlight('')
+              setNewPax('')
+            }}
             className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-            style={{ color: muted, border: `1px solid ${inputBorder}` }}>
+            style={{ color: muted, border: `1px solid ${inputBorder}` }}
+          >
             <X size={14} />
           </button>
         </div>
@@ -296,32 +487,47 @@ function ConnectionPanel({ icon: Icon, title, subtitle, items, onAdd, onRemove, 
       {/* Items */}
       {items.length === 0 && !showAdd ? (
         <div className="py-3">
-          <span className="text-[13px] italic" style={{ color: `${muted}60` }}>No connections</span>
+          <span className="text-[13px] italic" style={{ color: `${muted}60` }}>
+            No connections
+          </span>
         </div>
       ) : (
         <div className="space-y-1.5">
           {items.map((c, i) => (
             <div key={i} className="flex items-center gap-2 group">
-              <span className="text-[13px] font-mono font-bold flex-1" style={{ color: textPrimary }}>{c.flightNumber}</span>
+              <span className="text-[13px] font-mono font-bold flex-1" style={{ color: textPrimary }}>
+                {c.flightNumber}
+              </span>
               <input
                 type="number"
                 min={0}
                 value={c.pax || ''}
-                onChange={e => onUpdatePax(i, parseInt(e.target.value) || 0)}
+                onChange={(e) => onUpdatePax(i, parseInt(e.target.value) || 0)}
                 className="w-[50px] h-[30px] text-center rounded-lg text-[13px] font-mono font-bold outline-none"
                 style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: '#E63535' }}
               />
-              <span className="text-[13px]" style={{ color: muted }}>pax</span>
-              <button onClick={() => onRemove(i)}
-                className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-0.5 shrink-0">
+              <span className="text-[13px]" style={{ color: muted }}>
+                pax
+              </span>
+              <button
+                onClick={() => onRemove(i)}
+                className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-0.5 shrink-0"
+              >
                 <Trash2 size={13} style={{ color: '#E63535' }} />
               </button>
             </div>
           ))}
           {items.length > 0 && (
-            <div className="pt-2 mt-1 flex items-center justify-between" style={{ borderTop: `1px solid ${cardBorder}` }}>
-              <span className="text-[13px] font-bold" style={{ color: textPrimary }}>Total</span>
-              <span className="text-[14px] font-mono font-bold" style={{ color: accent }}>{totalPax} pax</span>
+            <div
+              className="pt-2 mt-1 flex items-center justify-between"
+              style={{ borderTop: `1px solid ${cardBorder}` }}
+            >
+              <span className="text-[13px] font-bold" style={{ color: textPrimary }}>
+                Total
+              </span>
+              <span className="text-[14px] font-mono font-bold" style={{ color: accent }}>
+                {totalPax} pax
+              </span>
             </div>
           )}
         </div>

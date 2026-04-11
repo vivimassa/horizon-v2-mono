@@ -38,7 +38,7 @@ const charterFlightSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'charterFlights',
-  }
+  },
 )
 
 charterFlightSchema.index({ contractId: 1, flightDate: 1 })

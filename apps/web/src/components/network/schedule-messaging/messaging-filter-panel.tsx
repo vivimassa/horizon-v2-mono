@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, ChevronDown, Filter, Loader2 } from 'lucide-react'
@@ -39,8 +39,8 @@ export function MessagingFilterPanel({ forceCollapsed = false, loading = false, 
   const isDark = theme === 'dark'
 
   const [collapsed, setCollapsed] = useState(false)
-  const setFilter = useScheduleMessagingStore(s => s.setFilter)
-  const filters = useScheduleMessagingStore(s => s.filters)
+  const setFilter = useScheduleMessagingStore((s) => s.setFilter)
+  const filters = useScheduleMessagingStore((s) => s.filters)
 
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -56,11 +56,11 @@ export function MessagingFilterPanel({ forceCollapsed = false, loading = false, 
   const inputBorder = isDark ? 'rgba(255,255,255,0.20)' : 'rgba(0,0,0,0.20)'
 
   const [mounted, setMounted] = useState(false)
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
-  const activeCount = mounted
-    ? [dateFrom, dateTo, direction, msgType, status, flightNumber].filter(Boolean).length
-    : 0
+  const activeCount = mounted ? [dateFrom, dateTo, direction, msgType, status, flightNumber].filter(Boolean).length : 0
 
   function handleGo() {
     if (direction) setFilter('direction', direction as 'inbound' | 'outbound')
@@ -93,29 +93,49 @@ export function MessagingFilterPanel({ forceCollapsed = false, loading = false, 
       {/* Collapsed view */}
       <div
         className="absolute inset-0 flex flex-col items-center cursor-pointer hover:bg-hz-border/20 transition-colors"
-        onClick={() => { if (collapsed) setCollapsed(false) }}
-        style={{ opacity: collapsed ? 1 : 0, pointerEvents: collapsed ? 'auto' : 'none', transition: 'opacity 200ms ease' }}
+        onClick={() => {
+          if (collapsed) setCollapsed(false)
+        }}
+        style={{
+          opacity: collapsed ? 1 : 0,
+          pointerEvents: collapsed ? 'auto' : 'none',
+          transition: 'opacity 200ms ease',
+        }}
       >
         <div className="h-12 w-full flex items-center justify-center">
           <ChevronRight size={16} className="text-hz-text-secondary" />
         </div>
-        <div className="flex-1 flex items-center justify-center" style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)' }}>
-          <span className="text-[13px] font-semibold uppercase tracking-wider text-hz-text-tertiary whitespace-nowrap">Filters</span>
+        <div
+          className="flex-1 flex items-center justify-center"
+          style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)' }}
+        >
+          <span className="text-[13px] font-semibold uppercase tracking-wider text-hz-text-tertiary whitespace-nowrap">
+            Filters
+          </span>
         </div>
       </div>
 
       {/* Expanded view */}
       <div
         className="flex flex-col h-full min-w-[300px]"
-        style={{ opacity: collapsed ? 0 : 1, pointerEvents: collapsed ? 'none' : 'auto', transition: 'opacity 200ms ease' }}
+        style={{
+          opacity: collapsed ? 0 : 1,
+          pointerEvents: collapsed ? 'none' : 'auto',
+          transition: 'opacity 200ms ease',
+        }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 shrink-0" style={{ minHeight: 48, borderBottom: `1px solid ${sectionBorder}` }}>
+        <div
+          className="flex items-center justify-between px-5 shrink-0"
+          style={{ minHeight: 48, borderBottom: `1px solid ${sectionBorder}` }}
+        >
           <div className="flex items-center gap-2">
             <Filter size={14} className="text-module-accent" />
             <span className="text-[15px] font-bold">Filters</span>
             {activeCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-module-accent text-white text-[13px] font-bold">{activeCount}</span>
+              <span className="px-2 py-0.5 rounded-full bg-module-accent text-white text-[13px] font-bold">
+                {activeCount}
+              </span>
             )}
           </div>
           <button onClick={() => setCollapsed(true)} className="p-1 rounded-md hover:bg-hz-border/30 transition-colors">
@@ -132,24 +152,45 @@ export function MessagingFilterPanel({ forceCollapsed = false, loading = false, 
 
           {/* Direction */}
           <FilterSection label="Direction">
-            <SelectInput value={direction} onChange={setDirection} options={DIRECTIONS} isDark={isDark} inputBg={inputBg} inputBorder={inputBorder} />
+            <SelectInput
+              value={direction}
+              onChange={setDirection}
+              options={DIRECTIONS}
+              isDark={isDark}
+              inputBg={inputBg}
+              inputBorder={inputBorder}
+            />
           </FilterSection>
 
           {/* Message Type */}
           <FilterSection label="Message Type">
-            <SelectInput value={msgType} onChange={setMsgType} options={MSG_TYPES} isDark={isDark} inputBg={inputBg} inputBorder={inputBorder} />
+            <SelectInput
+              value={msgType}
+              onChange={setMsgType}
+              options={MSG_TYPES}
+              isDark={isDark}
+              inputBg={inputBg}
+              inputBorder={inputBorder}
+            />
           </FilterSection>
 
           {/* Status */}
           <FilterSection label="Status">
-            <SelectInput value={status} onChange={setStatus} options={STATUSES} isDark={isDark} inputBg={inputBg} inputBorder={inputBorder} />
+            <SelectInput
+              value={status}
+              onChange={setStatus}
+              options={STATUSES}
+              isDark={isDark}
+              inputBg={inputBg}
+              inputBorder={inputBorder}
+            />
           </FilterSection>
 
           {/* Flight Number */}
           <FilterSection label="Flight Number">
             <input
               value={flightNumber}
-              onChange={e => setFlightNumber(e.target.value.toUpperCase())}
+              onChange={(e) => setFlightNumber(e.target.value.toUpperCase())}
               placeholder="e.g. VJ100"
               className="w-full h-9 px-3 rounded-xl text-[13px] font-mono outline-none"
               style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
@@ -184,22 +225,39 @@ function FilterSection({ label, children }: { label: string; children: React.Rea
   )
 }
 
-function SelectInput({ value, onChange, options, isDark, inputBg, inputBorder }: {
-  value: string; onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-  isDark: boolean; inputBg: string; inputBorder: string;
+function SelectInput({
+  value,
+  onChange,
+  options,
+  isDark,
+  inputBg,
+  inputBorder,
+}: {
+  value: string
+  onChange: (v: string) => void
+  options: { value: string; label: string }[]
+  isDark: boolean
+  inputBg: string
+  inputBorder: string
 }) {
   return (
     <div className="relative">
       <select
         value={value}
-        onChange={e => onChange(e.target.value)}
+        onChange={(e) => onChange(e.target.value)}
         className="w-full h-9 pl-3 pr-8 rounded-xl text-[13px] font-medium appearance-none cursor-pointer outline-none"
         style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
       >
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
       </select>
-      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-hz-text-tertiary" />
+      <ChevronDown
+        size={14}
+        className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-hz-text-tertiary"
+      />
     </div>
   )
 }

@@ -32,14 +32,11 @@ export interface RouteAnalysis {
  * Classify how a set of selected flights relates to a route's leg structure.
  * Determines if the selection is a full route, a head/tail/middle split, or scattered.
  */
-export function classifyRouteSelection(
-  routeData: GanttRouteData,
-  selectedFlightIds: Set<string>
-): RouteAnalysis {
-  const allSeqs = routeData.legs.map(l => l.legSequence)
+export function classifyRouteSelection(routeData: GanttRouteData, selectedFlightIds: Set<string>): RouteAnalysis {
+  const allSeqs = routeData.legs.map((l) => l.legSequence)
   const selectedSeqs = routeData.legs
-    .filter(l => l.flightId && selectedFlightIds.has(l.flightId))
-    .map(l => l.legSequence)
+    .filter((l) => l.flightId && selectedFlightIds.has(l.flightId))
+    .map((l) => l.legSequence)
     .sort((a, b) => a - b)
 
   if (selectedSeqs.length === 0) {
@@ -66,9 +63,7 @@ export function classifyRouteSelection(
   }
 
   // Check contiguity
-  const isContiguous = selectedSeqs.every(
-    (seq, i) => i === 0 || seq === selectedSeqs[i - 1] + 1
-  )
+  const isContiguous = selectedSeqs.every((seq, i) => i === 0 || seq === selectedSeqs[i - 1] + 1)
 
   let classification: RouteClassification
 
@@ -118,7 +113,7 @@ export interface RecommendedOption {
 export function getRecommendedOption(
   classification: RouteClassification,
   allSeqs: number[],
-  selectedSeqs: number[]
+  selectedSeqs: number[],
 ): RecommendedOption | null {
   if (classification === 'FULL_ROUTE' || classification === 'NO_ROUTE') {
     return null
@@ -127,7 +122,7 @@ export function getRecommendedOption(
   if (classification === 'MIDDLE_EXTRACT') {
     // Recommend moving selected + trailing
     const minSelected = Math.min(...selectedSeqs)
-    const movedSequences = allSeqs.filter(s => s >= minSelected)
+    const movedSequences = allSeqs.filter((s) => s >= minSelected)
     return {
       label: 'Move selected + trailing legs',
       description: `Move leg ${minSelected} onward (${movedSequences.length} legs) — fewest chain breaks`,
@@ -139,7 +134,7 @@ export function getRecommendedOption(
     // Recommend the contiguous block spanning min->max of selection
     const minSelected = Math.min(...selectedSeqs)
     const maxSelected = Math.max(...selectedSeqs)
-    const movedSequences = allSeqs.filter(s => s >= minSelected && s <= maxSelected)
+    const movedSequences = allSeqs.filter((s) => s >= minSelected && s <= maxSelected)
     return {
       label: 'Move contiguous block',
       description: `Move legs ${minSelected}-${maxSelected} (${movedSequences.length} legs)`,

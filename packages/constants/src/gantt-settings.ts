@@ -99,9 +99,9 @@ export const DEFAULT_GANTT_SETTINGS: GanttSettingsData = {
   colorAssignment: { unassigned: '#FEE2E2', assigned: '#3B82F6' },
   colorAcType: {},
   colorServiceType: {
-    'C': '#f97316',   // orange-500 — charter flights
-    'P': '#6b7280',   // gray-500 — positioning
-    'G': '#059669',   // emerald-600 — cargo
+    C: '#f97316', // orange-500 — charter flights
+    P: '#6b7280', // gray-500 — positioning
+    G: '#059669', // emerald-600 — cargo
   },
   colorDestType: { domestic: '#3B82F6', international: '#8B5CF6' },
 
@@ -125,15 +125,15 @@ export const DEFAULT_GANTT_SETTINGS: GanttSettingsData = {
   acTypeOrder: [],
 
   costAssumptions: {
-    fuelPricePerKg: 0.80,
+    fuelPricePerKg: 0.8,
     avgRevenuePerSeat: 65,
     avgLoadFactor: 0.88,
     opsCostPerBlockHour: {
-      'A320': 2800,
-      'A321': 3200,
-      'A20N': 2800,
-      'A21N': 3200,
-      'A333': 5500,
+      A320: 2800,
+      A321: 3200,
+      A20N: 2800,
+      A21N: 3200,
+      A333: 5500,
     },
     avgRevenuePerFlight: 12000,
     ferryCostPerChainBreak: 8000,

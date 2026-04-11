@@ -26,7 +26,14 @@ interface ContractFormDialogProps {
   isDark: boolean
 }
 
-export function ContractFormDialog({ open, onOpenChange, contract, onCreated, onUpdated, isDark }: ContractFormDialogProps) {
+export function ContractFormDialog({
+  open,
+  onOpenChange,
+  contract,
+  onCreated,
+  onUpdated,
+  isDark,
+}: ContractFormDialogProps) {
   const palette = isDark ? colors.dark : colors.light
   const isEdit = !!contract
   const [saving, setSaving] = useState(false)
@@ -79,7 +86,7 @@ export function ContractFormDialog({ open, onOpenChange, contract, onCreated, on
   }, [contract])
 
   function update(field: string, value: string) {
-    setForm(f => ({ ...f, [field]: value }))
+    setForm((f) => ({ ...f, [field]: value }))
     setError('')
   }
 
@@ -140,13 +147,25 @@ export function ContractFormDialog({ open, onOpenChange, contract, onCreated, on
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}
-      onClick={e => { if (e.target === e.currentTarget) onOpenChange(false) }}
-      onKeyDown={e => { if (e.key === 'Escape') onOpenChange(false) }}>
-      <div className="w-[680px] max-h-[85vh] rounded-2xl overflow-hidden flex flex-col"
-        style={{ background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: 'blur(24px)' }}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.5)' }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onOpenChange(false)
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onOpenChange(false)
+      }}
+    >
+      <div
+        className="w-[680px] max-h-[85vh] rounded-2xl overflow-hidden flex flex-col"
+        style={{ background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: 'blur(24px)' }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: `1px solid ${glassBorder}` }}>
+        <div
+          className="flex items-center justify-between px-5 py-4 shrink-0"
+          style={{ borderBottom: `1px solid ${glassBorder}` }}
+        >
           <div>
             <h2 className="text-[16px] font-semibold" style={{ color: palette.text }}>
               {isEdit ? 'Edit contract' : 'New charter contract'}
@@ -163,7 +182,10 @@ export function ContractFormDialog({ open, onOpenChange, contract, onCreated, on
         {/* Form */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {error && (
-            <div className="px-3 py-2 rounded-lg text-[13px] font-medium" style={{ background: 'rgba(255,59,59,0.10)', color: isDark ? '#FF5C5C' : '#E63535' }}>
+            <div
+              className="px-3 py-2 rounded-lg text-[13px] font-medium"
+              style={{ background: 'rgba(255,59,59,0.10)', color: isDark ? '#FF5C5C' : '#E63535' }}
+            >
               {error}
             </div>
           )}
@@ -171,62 +193,199 @@ export function ContractFormDialog({ open, onOpenChange, contract, onCreated, on
           {/* Contract identity */}
           <Fieldset label="Contract">
             <div className="grid grid-cols-3 gap-3">
-              <Field label="Contract number *" value={form.contractNumber} onChange={v => update('contractNumber', v)} placeholder="VT-2026-001" mono style={inputStyle} palette={palette} />
-              <SelectField label="Contract type" value={form.contractType} onChange={v => update('contractType', v)}
-                options={CONTRACT_TYPES.map(([k, v]) => ({ value: k, label: v }))} style={inputStyle} palette={palette} />
-              <SelectField label="Catering" value={form.catering} onChange={v => update('catering', v)}
-                options={CATERING_OPTIONS} style={inputStyle} palette={palette} />
+              <Field
+                label="Contract number *"
+                value={form.contractNumber}
+                onChange={(v) => update('contractNumber', v)}
+                placeholder="VT-2026-001"
+                mono
+                style={inputStyle}
+                palette={palette}
+              />
+              <SelectField
+                label="Contract type"
+                value={form.contractType}
+                onChange={(v) => update('contractType', v)}
+                options={CONTRACT_TYPES.map(([k, v]) => ({ value: k, label: v }))}
+                style={inputStyle}
+                palette={palette}
+              />
+              <SelectField
+                label="Catering"
+                value={form.catering}
+                onChange={(v) => update('catering', v)}
+                options={CATERING_OPTIONS}
+                style={inputStyle}
+                palette={palette}
+              />
             </div>
           </Fieldset>
 
           {/* Client */}
           <Fieldset label="Client">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Company name *" value={form.clientName} onChange={v => update('clientName', v)} placeholder="Acme Corp" style={inputStyle} palette={palette} />
-              <Field label="Contact name" value={form.clientContactName} onChange={v => update('clientContactName', v)} style={inputStyle} palette={palette} />
-              <Field label="Email" value={form.clientContactEmail} onChange={v => update('clientContactEmail', v)} type="email" style={inputStyle} palette={palette} />
-              <Field label="Phone" value={form.clientContactPhone} onChange={v => update('clientContactPhone', v)} style={inputStyle} palette={palette} />
+              <Field
+                label="Company name *"
+                value={form.clientName}
+                onChange={(v) => update('clientName', v)}
+                placeholder="Acme Corp"
+                style={inputStyle}
+                palette={palette}
+              />
+              <Field
+                label="Contact name"
+                value={form.clientContactName}
+                onChange={(v) => update('clientContactName', v)}
+                style={inputStyle}
+                palette={palette}
+              />
+              <Field
+                label="Email"
+                value={form.clientContactEmail}
+                onChange={(v) => update('clientContactEmail', v)}
+                type="email"
+                style={inputStyle}
+                palette={palette}
+              />
+              <Field
+                label="Phone"
+                value={form.clientContactPhone}
+                onChange={(v) => update('clientContactPhone', v)}
+                style={inputStyle}
+                palette={palette}
+              />
             </div>
           </Fieldset>
 
           {/* Aircraft & Period */}
           <Fieldset label="Aircraft &amp; Period">
             <div className="grid grid-cols-4 gap-3">
-              <Field label="AC type" value={form.aircraftTypeIcao} onChange={v => update('aircraftTypeIcao', v.toUpperCase())} placeholder="A321" mono maxLength={4} style={inputStyle} palette={palette} />
-              <Field label="Registration" value={form.aircraftRegistration} onChange={v => update('aircraftRegistration', v.toUpperCase())} placeholder="VN-A123" mono style={inputStyle} palette={palette} />
-              <Field label="Start date *" value={form.contractStart} onChange={v => update('contractStart', v)} type="date" style={inputStyle} palette={palette} />
-              <Field label="End date" value={form.contractEnd} onChange={v => update('contractEnd', v)} type="date" style={inputStyle} palette={palette} />
+              <Field
+                label="AC type"
+                value={form.aircraftTypeIcao}
+                onChange={(v) => update('aircraftTypeIcao', v.toUpperCase())}
+                placeholder="A321"
+                mono
+                maxLength={4}
+                style={inputStyle}
+                palette={palette}
+              />
+              <Field
+                label="Registration"
+                value={form.aircraftRegistration}
+                onChange={(v) => update('aircraftRegistration', v.toUpperCase())}
+                placeholder="VN-A123"
+                mono
+                style={inputStyle}
+                palette={palette}
+              />
+              <Field
+                label="Start date *"
+                value={form.contractStart}
+                onChange={(v) => update('contractStart', v)}
+                type="date"
+                style={inputStyle}
+                palette={palette}
+              />
+              <Field
+                label="End date"
+                value={form.contractEnd}
+                onChange={(v) => update('contractEnd', v)}
+                type="date"
+                style={inputStyle}
+                palette={palette}
+              />
             </div>
             <div className="grid grid-cols-3 gap-3 mt-3">
-              <Field label="Pax capacity" value={form.paxCapacity} onChange={v => update('paxCapacity', v)} type="number" style={inputStyle} palette={palette} />
+              <Field
+                label="Pax capacity"
+                value={form.paxCapacity}
+                onChange={(v) => update('paxCapacity', v)}
+                type="number"
+                style={inputStyle}
+                palette={palette}
+              />
             </div>
           </Fieldset>
 
           {/* Commercial */}
           <Fieldset label="Commercial">
             <div className="grid grid-cols-3 gap-3">
-              <Field label="Rate/sector" value={form.ratePerSector} onChange={v => update('ratePerSector', v)} type="number" placeholder="85000" mono style={inputStyle} palette={palette} />
-              <Field label="Rate/block hour" value={form.ratePerBlockHour} onChange={v => update('ratePerBlockHour', v)} type="number" placeholder="4500" mono style={inputStyle} palette={palette} />
-              <SelectField label="Currency" value={form.currency} onChange={v => update('currency', v)}
-                options={CURRENCY_OPTIONS.map(c => ({ value: c, label: c }))} style={inputStyle} palette={palette} />
+              <Field
+                label="Rate/sector"
+                value={form.ratePerSector}
+                onChange={(v) => update('ratePerSector', v)}
+                type="number"
+                placeholder="85000"
+                mono
+                style={inputStyle}
+                palette={palette}
+              />
+              <Field
+                label="Rate/block hour"
+                value={form.ratePerBlockHour}
+                onChange={(v) => update('ratePerBlockHour', v)}
+                type="number"
+                placeholder="4500"
+                mono
+                style={inputStyle}
+                palette={palette}
+              />
+              <SelectField
+                label="Currency"
+                value={form.currency}
+                onChange={(v) => update('currency', v)}
+                options={CURRENCY_OPTIONS.map((c) => ({ value: c, label: c }))}
+                style={inputStyle}
+                palette={palette}
+              />
             </div>
             <div className="grid grid-cols-3 gap-3 mt-3">
-              <Field label="Cancel <14d (%)" value={form.cancelPenalty14d} onChange={v => update('cancelPenalty14d', v)} type="number" style={inputStyle} palette={palette} />
-              <Field label="Cancel <7d (%)" value={form.cancelPenalty7d} onChange={v => update('cancelPenalty7d', v)} type="number" style={inputStyle} palette={palette} />
-              <Field label="Cancel <48h (%)" value={form.cancelPenalty48h} onChange={v => update('cancelPenalty48h', v)} type="number" style={inputStyle} palette={palette} />
+              <Field
+                label="Cancel <14d (%)"
+                value={form.cancelPenalty14d}
+                onChange={(v) => update('cancelPenalty14d', v)}
+                type="number"
+                style={inputStyle}
+                palette={palette}
+              />
+              <Field
+                label="Cancel <7d (%)"
+                value={form.cancelPenalty7d}
+                onChange={(v) => update('cancelPenalty7d', v)}
+                type="number"
+                style={inputStyle}
+                palette={palette}
+              />
+              <Field
+                label="Cancel <48h (%)"
+                value={form.cancelPenalty48h}
+                onChange={(v) => update('cancelPenalty48h', v)}
+                type="number"
+                style={inputStyle}
+                palette={palette}
+              />
             </div>
           </Fieldset>
         </div>
 
         {/* Footer */}
         <div className="flex justify-end gap-2 px-5 py-4 shrink-0" style={{ borderTop: `1px solid ${glassBorder}` }}>
-          <button onClick={() => onOpenChange(false)}
+          <button
+            onClick={() => onOpenChange(false)}
             className="h-9 px-4 rounded-lg text-[13px] font-semibold transition-colors"
-            style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', border: `1px solid ${glassBorder}` }}>
+            style={{
+              background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+              border: `1px solid ${glassBorder}`,
+            }}
+          >
             Cancel
           </button>
-          <button onClick={handleSubmit} disabled={saving}
-            className="h-9 px-4 flex items-center gap-2 rounded-lg text-[13px] font-semibold text-white bg-module-accent hover:opacity-90 transition-opacity disabled:opacity-50">
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="h-9 px-4 flex items-center gap-2 rounded-lg text-[13px] font-semibold text-white bg-module-accent hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
             {saving && <Loader2 size={13} className="animate-spin" />}
             {isEdit ? 'Save changes' : 'Create contract'}
           </button>
@@ -247,17 +406,38 @@ function Fieldset({ label, children }: { label: string; children: React.ReactNod
   )
 }
 
-function Field({ label, value, onChange, placeholder, type = 'text', mono, maxLength, style, palette }: {
-  label: string; value: string; onChange: (v: string) => void
-  placeholder?: string; type?: string; mono?: boolean; maxLength?: number
-  style: Record<string, string>; palette: { text: string; textSecondary: string }
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = 'text',
+  mono,
+  maxLength,
+  style,
+  palette,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  type?: string
+  mono?: boolean
+  maxLength?: number
+  style: Record<string, string>
+  palette: { text: string; textSecondary: string }
 }) {
   return (
     <div>
-      <label className="block text-[13px] font-medium mb-1" style={{ color: palette.textSecondary }}>{label}</label>
+      <label className="block text-[13px] font-medium mb-1" style={{ color: palette.textSecondary }}>
+        {label}
+      </label>
       <input
-        value={value} onChange={e => onChange(e.target.value)}
-        placeholder={placeholder} type={type} maxLength={maxLength}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        type={type}
+        maxLength={maxLength}
         className={`w-full h-10 px-3 rounded-lg text-[13px] outline-none ${mono ? 'font-mono' : ''}`}
         style={style}
       />
@@ -265,20 +445,37 @@ function Field({ label, value, onChange, placeholder, type = 'text', mono, maxLe
   )
 }
 
-function SelectField({ label, value, onChange, options, style, palette }: {
-  label: string; value: string; onChange: (v: string) => void
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  style,
+  palette,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
   options: { value: string; label: string }[]
-  style: Record<string, string>; palette: { text: string; textSecondary: string }
+  style: Record<string, string>
+  palette: { text: string; textSecondary: string }
 }) {
   return (
     <div>
-      <label className="block text-[13px] font-medium mb-1" style={{ color: palette.textSecondary }}>{label}</label>
+      <label className="block text-[13px] font-medium mb-1" style={{ color: palette.textSecondary }}>
+        {label}
+      </label>
       <select
-        value={value} onChange={e => onChange(e.target.value)}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
         className="w-full h-10 px-3 rounded-lg text-[13px] outline-none appearance-none cursor-pointer"
         style={style}
       >
-        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
       </select>
     </div>
   )

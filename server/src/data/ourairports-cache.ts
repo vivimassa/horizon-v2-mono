@@ -52,21 +52,30 @@ export function getStats(): { airports: number; loaded: boolean; lastLoadTime: n
 
 // ── CSV parser ──
 function parseCSV(text: string): Record<string, string>[] {
-  const lines = text.split('\n').filter(l => l.trim())
+  const lines = text.split('\n').filter((l) => l.trim())
   if (lines.length === 0) return []
-  const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim())
-  return lines.slice(1).map(line => {
+  const headers = lines[0].split(',').map((h) => h.replace(/"/g, '').trim())
+  return lines.slice(1).map((line) => {
     const values: string[] = []
     let current = ''
     let inQuotes = false
     for (const ch of line) {
-      if (ch === '"') { inQuotes = !inQuotes; continue }
-      if (ch === ',' && !inQuotes) { values.push(current.trim()); current = ''; continue }
+      if (ch === '"') {
+        inQuotes = !inQuotes
+        continue
+      }
+      if (ch === ',' && !inQuotes) {
+        values.push(current.trim())
+        current = ''
+        continue
+      }
       current += ch
     }
     values.push(current.trim())
     const obj: Record<string, string> = {}
-    headers.forEach((h, i) => { obj[h] = values[i] ?? '' })
+    headers.forEach((h, i) => {
+      obj[h] = values[i] ?? ''
+    })
     return obj
   })
 }
@@ -105,7 +114,7 @@ export async function loadOurAirportsData(): Promise<void> {
 
       // Parse runways for this airport
       const rawRunways = runwaysByAirportId.get(row.id) ?? []
-      const runways: OARunway[] = rawRunways.map(r => {
+      const runways: OARunway[] = rawRunways.map((r) => {
         const lengthFt = Number(r.length_ft) || null
         const widthFt = Number(r.width_ft) || null
         const leIdent = r.le_ident || ''

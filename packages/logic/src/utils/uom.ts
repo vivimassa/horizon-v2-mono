@@ -55,9 +55,14 @@ export function formatDistance(nm: number | null | undefined, unit: DistanceUnit
   if (nm == null) return '\u2014'
   let val: number
   switch (unit) {
-    case 'km': val = nm * NM_TO_KM; break
-    case 'mi': val = nm * NM_TO_MI; break
-    default: val = nm
+    case 'km':
+      val = nm * NM_TO_KM
+      break
+    case 'mi':
+      val = nm * NM_TO_MI
+      break
+    default:
+      val = nm
   }
   return `${val.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${UNIT_LABELS[unit]}`
 }
@@ -67,9 +72,14 @@ export function formatSpeed(kts: number | null | undefined, unit: SpeedUnit): st
   if (kts == null) return '\u2014'
   let val: number
   switch (unit) {
-    case 'km/h': val = kts * KTS_TO_KMH; break
-    case 'mph': val = kts * KTS_TO_MPH; break
-    default: val = kts
+    case 'km/h':
+      val = kts * KTS_TO_KMH
+      break
+    case 'mph':
+      val = kts * KTS_TO_MPH
+      break
+    default:
+      val = kts
   }
   return `${Math.round(val).toLocaleString()} ${UNIT_LABELS[unit]}`
 }
@@ -99,15 +109,22 @@ export function formatTemperature(c: number | null | undefined, unit: Temperatur
 export function formatFuelVolume(
   kg: number | null | undefined,
   unit: FuelVolumeUnit,
-  specificGravity: number = 0.80
+  specificGravity: number = 0.8,
 ): string {
   if (kg == null) return '\u2014'
   let val: number
   switch (unit) {
-    case 'usg': val = kg / KG_PER_USG(specificGravity); break
-    case 'ig': val = kg / KG_PER_IG(specificGravity); break
-    case 'l': val = kg / KG_PER_L(specificGravity); break
-    default: val = kg
+    case 'usg':
+      val = kg / KG_PER_USG(specificGravity)
+      break
+    case 'ig':
+      val = kg / KG_PER_IG(specificGravity)
+      break
+    case 'l':
+      val = kg / KG_PER_L(specificGravity)
+      break
+    default:
+      val = kg
   }
   return `${Math.round(val).toLocaleString()} ${UNIT_LABELS[unit]}`
 }
@@ -129,9 +146,12 @@ export function parseWeight(value: number, unit: WeightUnit): number {
 /** Parse distance input to NM */
 export function parseDistance(value: number, unit: DistanceUnit): number {
   switch (unit) {
-    case 'km': return value / NM_TO_KM
-    case 'mi': return value / NM_TO_MI
-    default: return value
+    case 'km':
+      return value / NM_TO_KM
+    case 'mi':
+      return value / NM_TO_MI
+    default:
+      return value
   }
 }
 
@@ -143,9 +163,12 @@ export function parseLength(value: number, unit: LengthUnit): number {
 /** Parse speed input to knots */
 export function parseSpeed(value: number, unit: SpeedUnit): number {
   switch (unit) {
-    case 'km/h': return value / KTS_TO_KMH
-    case 'mph': return value / KTS_TO_MPH
-    default: return value
+    case 'km/h':
+      return value / KTS_TO_KMH
+    case 'mph':
+      return value / KTS_TO_MPH
+    default:
+      return value
   }
 }
 
@@ -155,16 +178,16 @@ export function parseTemperature(value: number, unit: TemperatureUnit): number {
 }
 
 /** Parse fuel volume input to kg */
-export function parseFuelVolume(
-  value: number,
-  unit: FuelVolumeUnit,
-  specificGravity: number = 0.80
-): number {
+export function parseFuelVolume(value: number, unit: FuelVolumeUnit, specificGravity: number = 0.8): number {
   switch (unit) {
-    case 'usg': return value * KG_PER_USG(specificGravity)
-    case 'ig': return value * KG_PER_IG(specificGravity)
-    case 'l': return value * KG_PER_L(specificGravity)
-    default: return value
+    case 'usg':
+      return value * KG_PER_USG(specificGravity)
+    case 'ig':
+      return value * KG_PER_IG(specificGravity)
+    case 'l':
+      return value * KG_PER_L(specificGravity)
+    default:
+      return value
   }
 }
 

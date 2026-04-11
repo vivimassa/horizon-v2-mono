@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useEffect, useCallback } from 'react'
 import { useTheme } from '@/components/theme-provider'
@@ -17,13 +17,13 @@ export function ScheduleMessagingShell() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const runway = useRunwayLoading()
-  const loadOperator = useOperatorStore(s => s.loadOperator)
-  const operator = useOperatorStore(s => s.operator)
+  const loadOperator = useOperatorStore((s) => s.loadOperator)
+  const operator = useOperatorStore((s) => s.operator)
 
-  const dataLoaded = useScheduleMessagingStore(s => s.dataLoaded)
-  const activeSection = useScheduleMessagingStore(s => s.activeSection)
-  const loadMessages = useScheduleMessagingStore(s => s.loadMessages)
-  const loadStats = useScheduleMessagingStore(s => s.loadStats)
+  const dataLoaded = useScheduleMessagingStore((s) => s.dataLoaded)
+  const activeSection = useScheduleMessagingStore((s) => s.activeSection)
+  const loadMessages = useScheduleMessagingStore((s) => s.loadMessages)
+  const loadStats = useScheduleMessagingStore((s) => s.loadStats)
 
   // Glass styling
   const glassBg = isDark ? 'rgba(25,25,33,0.85)' : 'rgba(255,255,255,0.85)'
@@ -34,12 +34,18 @@ export function ScheduleMessagingShell() {
     backdropFilter: 'blur(24px)',
   }
 
-  useEffect(() => { loadOperator() }, [loadOperator])
+  useEffect(() => {
+    loadOperator()
+  }, [loadOperator])
 
   const handleGo = useCallback(async () => {
-    await runway.run(async () => {
-      await Promise.all([loadMessages(), loadStats()])
-    }, 'Loading messages\u2026', 'Messages loaded')
+    await runway.run(
+      async () => {
+        await Promise.all([loadMessages(), loadStats()])
+      },
+      'Loading messages\u2026',
+      'Messages loaded',
+    )
   }, [runway, loadMessages, loadStats])
 
   const handleRefresh = useCallback(async () => {
@@ -50,24 +56,16 @@ export function ScheduleMessagingShell() {
     <div className="h-full flex gap-3 p-3">
       {/* Left filter panel */}
       <div className="shrink-0 h-full">
-        <MessagingFilterPanel
-          forceCollapsed={dataLoaded}
-          loading={runway.active}
-          onGo={handleGo}
-        />
+        <MessagingFilterPanel forceCollapsed={dataLoaded} loading={runway.active} onGo={handleGo} />
       </div>
 
       {/* Main content */}
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden gap-3">
         {/* Empty state */}
-        {!dataLoaded && !runway.active && (
-          <EmptyPanel />
-        )}
+        {!dataLoaded && !runway.active && <EmptyPanel />}
 
         {/* Loading */}
-        {runway.active && (
-          <RunwayLoadingPanel percent={runway.percent} label={runway.label} />
-        )}
+        {runway.active && <RunwayLoadingPanel percent={runway.percent} label={runway.label} />}
 
         {/* Loaded */}
         {dataLoaded && !runway.active && (
@@ -78,25 +76,14 @@ export function ScheduleMessagingShell() {
             </div>
 
             {/* Content */}
-            <div
-              className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl"
-              style={glassStyle}
-            >
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl" style={glassStyle}>
               {activeSection === 'receive' && (
-                <ReceivePanel
-                  operatorIataCode={operator?.iataCode || 'HZ'}
-                  onApplied={handleRefresh}
-                />
+                <ReceivePanel operatorIataCode={operator?.iataCode || 'HZ'} onApplied={handleRefresh} />
               )}
               {activeSection === 'send' && (
-                <SendPanel
-                  operatorIataCode={operator?.iataCode || 'HZ'}
-                  onSent={handleRefresh}
-                />
+                <SendPanel operatorIataCode={operator?.iataCode || 'HZ'} onSent={handleRefresh} />
               )}
-              {activeSection === 'log' && (
-                <MessageLogTable />
-              )}
+              {activeSection === 'log' && <MessageLogTable />}
             </div>
           </>
         )}

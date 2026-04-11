@@ -35,9 +35,7 @@ export interface MppFleetOverride {
   acCount: number
 }
 
-export type MppEventType =
-  | 'AOC' | 'CUG' | 'CCQ' | 'ACMI' | 'DRY'
-  | 'DOWNSIZE' | 'RESIGN' | 'DELIVERY'
+export type MppEventType = 'AOC' | 'CUG' | 'CCQ' | 'ACMI' | 'DRY' | 'DOWNSIZE' | 'RESIGN' | 'DELIVERY'
 
 export interface MppEvent {
   id: string
@@ -72,7 +70,7 @@ export interface MppCrewPosition {
   id: string
   code: string
   name: string
-  category: string  // 'cockpit' | 'cabin'
+  category: string // 'cockpit' | 'cabin'
   rankOrder: number
   color: string
 }
@@ -94,10 +92,7 @@ export interface GapRow {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-export const MONTHS = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-]
+export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 /** Fallback BH per AC per day when no fleet/schedule data is available. */
 const DEFAULT_BH_PER_AC_DAY = 12
@@ -179,9 +174,7 @@ export function computeMonthlyBH(
     const dailyUtil = utilization.get(icaoType) ?? DEFAULT_BH_PER_AC_DAY
 
     result[icaoType] = Array.from({ length: 12 }, (_, m) => {
-      const override = overrides.find(
-        o => o.aircraftTypeIcao === icaoType && o.monthIndex === m,
-      )
+      const override = overrides.find((o) => o.aircraftTypeIcao === icaoType && o.monthIndex === m)
       const hasSchedule = schedBH[m] > 0
       const days = daysInMonth(m, year)
 
@@ -229,7 +222,7 @@ export function computeMonthlyBH(
  */
 export function computeRequired(
   monthlyBH: Record<string, number[]>,
-  positionSettings: Record<string, MppPositionSettings>,  // keyed by positionId
+  positionSettings: Record<string, MppPositionSettings>, // keyed by positionId
   positions: MppCrewPosition[],
   standardComplements?: Record<string, Record<string, number>>,
   naOtherIsDrain = false,
@@ -237,7 +230,9 @@ export function computeRequired(
   // Sum BH across all active fleets (used by cockpit positions)
   const totalBH = new Array(12).fill(0) as number[]
   for (const bh of Object.values(monthlyBH)) {
-    bh.forEach((v, m) => { totalBH[m] += v })
+    bh.forEach((v, m) => {
+      totalBH[m] += v
+    })
   }
 
   const result: Record<string, number[]> = {}
@@ -246,9 +241,7 @@ export function computeRequired(
     // Attrition (and naOther if classified as drain) are modelled as a headcount
     // drain in computeAvailable — they must NOT also reduce effective availability
     // here, otherwise the same loss is double-counted.
-    const tempNAPct =
-      ps.naSick + ps.naAnnual + ps.naTraining + ps.naMaternity +
-      (naOtherIsDrain ? 0 : ps.naOther)
+    const tempNAPct = ps.naSick + ps.naAnnual + ps.naTraining + ps.naMaternity + (naOtherIsDrain ? 0 : ps.naOther)
     const effectiveAvail = Math.max(0.01, 1 - tempNAPct / 100)
 
     let bhSource: number[]
@@ -257,16 +250,17 @@ export function computeRequired(
       const weighted = new Array(12).fill(0) as number[]
       for (const [icao, bh] of Object.entries(monthlyBH)) {
         const factor = standardComplements[icao]?.[pos.code] ?? 0
-        if (factor > 0) bh.forEach((v, m) => { weighted[m] += v * factor })
+        if (factor > 0)
+          bh.forEach((v, m) => {
+            weighted[m] += v * factor
+          })
       }
       bhSource = weighted
     } else {
       bhSource = totalBH
     }
 
-    result[pos.name] = bhSource.map(bh =>
-      ps.bhTarget <= 0 ? 0 : Math.ceil(bh / (ps.bhTarget * effectiveAvail))
-    )
+    result[pos.name] = bhSource.map((bh) => (ps.bhTarget <= 0 ? 0 : Math.ceil(bh / (ps.bhTarget * effectiveAvail))))
   }
   return result
 }
@@ -314,10 +308,8 @@ export function computeAvailable(
         if (delta['Captain']) delta['Captain'][lagMi] += n
         for (const pos of positions) {
           const n2 = pos.name.toLowerCase()
-          if (!delta['Captain'] && (n2.includes('captain') || n2.includes('cpt')))
-            delta[pos.name][lagMi] += n
-          if (!delta['First Officer'] && (n2.includes('officer') || n2.includes('fo')))
-            delta[pos.name][mi] -= n
+          if (!delta['Captain'] && (n2.includes('captain') || n2.includes('cpt'))) delta[pos.name][lagMi] += n
+          if (!delta['First Officer'] && (n2.includes('officer') || n2.includes('fo'))) delta[pos.name][mi] -= n
         }
         break
 
@@ -349,23 +341,27 @@ export function computeAvailable(
     if (activeFleets && activeFleets.length > 0) {
       for (const f of activeFleets) {
         const arr = fleetMonthly[f]
-        if (arr) arr.forEach((v, m) => { monthlyBase[m] += v })
+        if (arr)
+          arr.forEach((v, m) => {
+            monthlyBase[m] += v
+          })
       }
     } else {
       for (const arr of Object.values(fleetMonthly)) {
-        arr.forEach((v, m) => { monthlyBase[m] += v })
+        arr.forEach((v, m) => {
+          monthlyBase[m] += v
+        })
       }
     }
 
     // Monthly attrition drain: (naAttrition + naOther-if-drain) / 100 / 12
     const ps = positionSettings?.[pos.id]
-    const annualDrainPct =
-      (ps?.naAttrition ?? 0) + (naOtherIsDrain ? (ps?.naOther ?? 0) : 0)
+    const annualDrainPct = (ps?.naAttrition ?? 0) + (naOtherIsDrain ? (ps?.naOther ?? 0) : 0)
     const monthlyAttritionRate = annualDrainPct / 100 / 12
 
     // Roll forward: each month starts from the base headcount for that month,
     // but cumulative attrition and events carry over.
-    let cumulativeAdj = 0  // net cumulative adjustment from attrition + events
+    let cumulativeAdj = 0 // net cumulative adjustment from attrition + events
     result[pos.name] = new Array(12).fill(0)
     for (let m = 0; m < 12; m++) {
       const baseThisMonth = monthlyBase[m]
@@ -386,7 +382,7 @@ export function computeGap(
   available: Record<string, number[]>,
   positions: MppCrewPosition[],
 ): GapRow[] {
-  return positions.map(pos => ({
+  return positions.map((pos) => ({
     position: pos.name,
     positionCode: pos.code,
     positionColor: pos.color,
@@ -404,7 +400,9 @@ export function computeGap(
 export function computeTotalRequired(required: Record<string, number[]>): number[] {
   const total = new Array(12).fill(0) as number[]
   for (const monthly of Object.values(required)) {
-    monthly.forEach((v, m) => { total[m] += v })
+    monthly.forEach((v, m) => {
+      total[m] += v
+    })
   }
   return total
 }
@@ -423,15 +421,16 @@ export function computeAttritionDrain(
   const result: Record<string, number[]> = {}
   for (const pos of positions) {
     const ps = positionSettings[pos.id]
-    const annualDrainPct =
-      (ps?.naAttrition ?? 0) + (naOtherIsDrain ? (ps?.naOther ?? 0) : 0)
+    const annualDrainPct = (ps?.naAttrition ?? 0) + (naOtherIsDrain ? (ps?.naOther ?? 0) : 0)
     const rate = annualDrainPct / 100 / 12
 
     // Sum monthly headcount across all fleets
     const fleetMonthly = startingHeadcount[pos.name] ?? {}
     const monthlyBase = new Array(12).fill(0) as number[]
     for (const arr of Object.values(fleetMonthly)) {
-      arr.forEach((v, m) => { monthlyBase[m] += v })
+      arr.forEach((v, m) => {
+        monthlyBase[m] += v
+      })
     }
 
     result[pos.name] = []
@@ -453,7 +452,7 @@ export function getDefaultLeadMonths(
 ): number {
   const pos = positionName.toLowerCase()
   const find = (keywords: string[]): number | undefined =>
-    leadTimeItems.find(i => keywords.every(k => i.label.toLowerCase().includes(k)))?.valueMonths
+    leadTimeItems.find((i) => keywords.every((k) => i.label.toLowerCase().includes(k)))?.valueMonths
 
   switch (eventType) {
     case 'CUG':
@@ -461,10 +460,8 @@ export function getDefaultLeadMonths(
     case 'CCQ':
       return find(['ccq']) ?? find(['cross']) ?? 3
     case 'AOC':
-      if (pos.includes('captain') || pos.includes('cpt'))
-        return find(['captain', 'aoc']) ?? find(['captain']) ?? 6
-      if (pos.includes('officer') || pos.includes('fo'))
-        return find(['officer', 'aoc']) ?? find(['officer']) ?? 5
+      if (pos.includes('captain') || pos.includes('cpt')) return find(['captain', 'aoc']) ?? find(['captain']) ?? 6
+      if (pos.includes('officer') || pos.includes('fo')) return find(['officer', 'aoc']) ?? find(['officer']) ?? 5
       return find(['cabin', 'initial']) ?? find(['cabin']) ?? 2
     default:
       return 0

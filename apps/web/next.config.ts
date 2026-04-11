@@ -1,7 +1,7 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@skyhub/api", "@skyhub/types", "@skyhub/constants", "@skyhub/ui"],
-};
+  transpilePackages: ['@skyhub/api', '@skyhub/types', '@skyhub/constants', '@skyhub/ui'],
+}
 
-export default nextConfig;
+export default nextConfig

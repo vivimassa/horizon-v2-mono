@@ -16,7 +16,11 @@ const operatorSchema = new Schema(
     mainBaseIcao: { type: String, default: null },
     currencyCode: { type: String, default: null },
     currencySymbol: { type: String, default: null },
-    dateFormat: { type: String, enum: ['DD-MMM-YY', 'DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD', 'DD.MM.YYYY'], default: 'DD-MMM-YY' },
+    dateFormat: {
+      type: String,
+      enum: ['DD-MMM-YY', 'DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD', 'DD.MM.YYYY'],
+      default: 'DD-MMM-YY',
+    },
     enabledModules: [{ type: String }],
     accentColor: { type: String, default: '#1e40af' },
     logoUrl: { type: String, default: null },
@@ -28,7 +32,7 @@ const operatorSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'operators',
-  }
+  },
 )
 
 export type OperatorDoc = InferSchemaType<typeof operatorSchema>

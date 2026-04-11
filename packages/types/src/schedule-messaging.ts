@@ -1,22 +1,13 @@
 // Schedule Messaging types — ASM/SSM message management
 
-export const ASM_ACTION_CODES = [
-  'NEW', 'TIM', 'CNL', 'EQT', 'RRT', 'RIN', 'CON', 'RPL', 'FLT', 'SKD',
-] as const
+export const ASM_ACTION_CODES = ['NEW', 'TIM', 'CNL', 'EQT', 'RRT', 'RIN', 'CON', 'RPL', 'FLT', 'SKD'] as const
 
-export type AsmActionCode = typeof ASM_ACTION_CODES[number]
+export type AsmActionCode = (typeof ASM_ACTION_CODES)[number]
 
 export type MessageDirection = 'inbound' | 'outbound'
 export type MessageType = 'ASM' | 'SSM'
 
-export type MessageStatus =
-  | 'held'
-  | 'pending'
-  | 'sent'
-  | 'applied'
-  | 'rejected'
-  | 'discarded'
-  | 'neutralized'
+export type MessageStatus = 'held' | 'pending' | 'sent' | 'applied' | 'rejected' | 'discarded' | 'neutralized'
 
 /** A schedule message log document (returned by API, matches Mongoose shape) */
 export interface ScheduleMessageLogRef {

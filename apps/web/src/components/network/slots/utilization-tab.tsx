@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, Loader2, AlertTriangle, CheckCircle, AlertCircle } from 'lucide-react'
@@ -38,7 +38,9 @@ export function UtilizationTab({ airport, seasonCode, onDataChanged, isDark }: U
     }
   }, [airport.iataCode, seasonCode])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   async function handleSync() {
     setSyncing(true)
@@ -51,21 +53,29 @@ export function UtilizationTab({ airport, seasonCode, onDataChanged, isDark }: U
     }
   }
 
-  const atRisk = utilization.filter(u => u.isAtRisk).length
-  const close = utilization.filter(u => u.isClose).length
+  const atRisk = utilization.filter((u) => u.isAtRisk).length
+  const close = utilization.filter((u) => u.isClose).length
   const safe = utilization.length - atRisk - close
   const glassBorder = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'
 
   // Build lookup for series metadata
-  const seriesMap = new Map(seriesList.map(s => [s._id, s]))
+  const seriesMap = new Map(seriesList.map((s) => [s._id, s]))
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-h-0">
       {/* Toolbar */}
       <div className="flex items-center gap-3 px-5 py-3 shrink-0" style={{ borderBottom: `1px solid ${glassBorder}` }}>
-        <button type="button" onClick={handleSync} disabled={syncing}
+        <button
+          type="button"
+          onClick={handleSync}
+          disabled={syncing}
           className="h-8 px-3.5 rounded-xl text-[13px] font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50"
-          style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', border: `1px solid ${glassBorder}`, color: palette.text }}>
+          style={{
+            background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+            border: `1px solid ${glassBorder}`,
+            color: palette.text,
+          }}
+        >
           {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
           Sync from flight instances
         </button>
@@ -79,12 +89,10 @@ export function UtilizationTab({ airport, seasonCode, onDataChanged, isDark }: U
 
       {/* Series list */}
       <div className="flex-1 overflow-auto px-5 pb-4">
-        {utilization.map(u => {
+        {utilization.map((u) => {
           const series = seriesMap.get(u.seriesId)
           if (!series) return null
-          return (
-            <UtilizationSeriesRow key={u.seriesId} utilization={u} series={series} isDark={isDark} />
-          )
+          return <UtilizationSeriesRow key={u.seriesId} utilization={u} series={series} isDark={isDark} />
         })}
 
         {utilization.length === 0 && !loading && (

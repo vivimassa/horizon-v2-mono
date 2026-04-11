@@ -15,7 +15,7 @@ const activityCodeGroupSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'activityCodeGroups',
-  }
+  },
 )
 
 activityCodeGroupSchema.index({ operatorId: 1, code: 1 }, { unique: true })
@@ -66,7 +66,7 @@ const activityCodeSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'activityCodes',
-  }
+  },
 )
 
 activityCodeSchema.index({ operatorId: 1, code: 1 }, { unique: true })

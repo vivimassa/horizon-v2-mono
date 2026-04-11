@@ -18,7 +18,7 @@ const slotActionLogSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'slotActionLog',
-  }
+  },
 )
 
 slotActionLogSchema.index({ seriesId: 1, createdAt: 1 })

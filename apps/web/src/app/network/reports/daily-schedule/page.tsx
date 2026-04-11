@@ -1,6 +1,6 @@
-"use client"
+'use client'
 
-import { DailyScheduleShell } from "@/components/network/daily-schedule/daily-schedule-shell"
+import { DailyScheduleShell } from '@/components/network/daily-schedule/daily-schedule-shell'
 
 export default function DailySchedulePage() {
   return (

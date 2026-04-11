@@ -29,7 +29,7 @@ const delayCodeSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'delayCodes',
-  }
+  },
 )
 
 delayCodeSchema.index({ operatorId: 1, code: 1 }, { unique: true })

@@ -15,7 +15,13 @@ interface ExportDialogProps {
 }
 
 export const ExportDialog = memo(function ExportDialog({
-  visible, onClose, operatorId, scenarioId, palette, accent, isDark,
+  visible,
+  onClose,
+  operatorId,
+  scenarioId,
+  palette,
+  accent,
+  isDark,
 }: ExportDialogProps) {
   const [exporting, setExporting] = useState(false)
 
@@ -35,7 +41,9 @@ export const ExportDialog = memo(function ExportDialog({
           const base64 = (reader.result as string).split(',')[1]
           const fileUri = `${FS.cacheDirectory}schedule-export.xlsx`
           await FS.writeAsStringAsync(fileUri, base64, { encoding: FS.EncodingType.Base64 })
-          await Sharing.shareAsync(fileUri, { mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+          await Sharing.shareAsync(fileUri, {
+            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          })
           onClose()
         }
         reader.readAsDataURL(blob)
@@ -54,13 +62,21 @@ export const ExportDialog = memo(function ExportDialog({
     <Modal visible={visible} transparent animationType="fade">
       <Pressable className="flex-1" style={{ backgroundColor: 'rgba(0,0,0,0.3)' }} onPress={onClose}>
         <View className="flex-1 justify-center items-center">
-          <Pressable onPress={() => {}} className="rounded-2xl p-5"
+          <Pressable
+            onPress={() => {}}
+            className="rounded-2xl p-5"
             style={{
               width: 320,
               backgroundColor: isDark ? 'rgba(25,25,33,0.97)' : 'rgba(255,255,255,0.98)',
-              borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-              shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 10,
-            }}>
+              borderWidth: 1,
+              borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+              shadowColor: '#000',
+              shadowOpacity: 0.3,
+              shadowRadius: 20,
+              shadowOffset: { width: 0, height: 8 },
+              elevation: 10,
+            }}
+          >
             <View className="flex-row items-center justify-between mb-4">
               <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>Export SSIM</Text>
               <Pressable onPress={onClose} className="active:opacity-60">
@@ -72,12 +88,17 @@ export const ExportDialog = memo(function ExportDialog({
               Export the current schedule as an Excel (.xlsx) file.
             </Text>
 
-            <Pressable onPress={handleExport} disabled={exporting}
+            <Pressable
+              onPress={handleExport}
+              disabled={exporting}
               className="flex-row items-center justify-center py-3.5 rounded-xl active:opacity-70"
-              style={{ backgroundColor: accent, gap: 8, opacity: exporting ? 0.5 : 1 }}>
-              {exporting
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Download size={16} color="#fff" strokeWidth={2} />}
+              style={{ backgroundColor: accent, gap: 8, opacity: exporting ? 0.5 : 1 }}
+            >
+              {exporting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Download size={16} color="#fff" strokeWidth={2} />
+              )}
               <Text style={{ fontSize: 15, fontWeight: '600', color: '#fff' }}>
                 {exporting ? 'Exporting...' : 'Export & Share'}
               </Text>

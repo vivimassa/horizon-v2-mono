@@ -43,18 +43,9 @@ export function Input({ children, className, style, isDisabled }: InputProps) {
   )
 }
 
-export const InputField = forwardRef<TextInput, InputFieldProps>(
-  function InputField({ className, ...props }, ref) {
-    return (
-      <TextInput
-        ref={ref}
-        className={className}
-        accessibilityRole="none"
-        {...props}
-      />
-    )
-  },
-)
+export const InputField = forwardRef<TextInput, InputFieldProps>(function InputField({ className, ...props }, ref) {
+  return <TextInput ref={ref} className={className} accessibilityRole="none" {...props} />
+})
 
 export function InputSlot({ children, className, onPress }: InputSlotProps) {
   return (
@@ -64,19 +55,6 @@ export function InputSlot({ children, className, onPress }: InputSlotProps) {
   )
 }
 
-export function InputIcon({
-  as: IconComponent,
-  className,
-  size = 18,
-  color,
-  strokeWidth = 1.75,
-}: InputIconProps) {
-  return (
-    <IconComponent
-      size={size}
-      color={color}
-      strokeWidth={strokeWidth}
-      className={className}
-    />
-  )
+export function InputIcon({ as: IconComponent, className, size = 18, color, strokeWidth = 1.75 }: InputIconProps) {
+  return <IconComponent size={size} color={color} strokeWidth={strokeWidth} className={className} />
 }

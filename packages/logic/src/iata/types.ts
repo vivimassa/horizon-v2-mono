@@ -12,27 +12,27 @@ export type MvtActionCode =
   | 'FR' // Forced Return (from airborne)
 
 export interface MvtFlightId {
-  airline: string           // 2-letter IATA code
-  flightNumber: string      // up to 4 digits + optional suffix
-  dayOfMonth: string        // DD
-  registration: string      // tail number (no dashes)
-  station: string           // 3-letter IATA airport code
+  airline: string // 2-letter IATA code
+  flightNumber: string // up to 4 digits + optional suffix
+  dayOfMonth: string // DD
+  registration: string // tail number (no dashes)
+  station: string // 3-letter IATA airport code
 }
 
 export interface MvtEta {
-  time: string              // HHMM
-  destination: string       // 3-letter IATA
+  time: string // HHMM
+  destination: string // 3-letter IATA
 }
 
 export interface MvtDelay {
-  code: string              // 2-digit numeric
-  duration?: string         // HHMM (optional)
+  code: string // 2-digit numeric
+  duration?: string // HHMM (optional)
 }
 
 export interface MvtPassengers {
   total: number
-  noSeatHolders?: number    // infants
-  sectors?: number[]        // multi-sector breakdown
+  noSeatHolders?: number // infants
+  sectors?: number[] // multi-sector breakdown
 }
 
 export interface ParsedMvt {
@@ -40,17 +40,17 @@ export interface ParsedMvt {
   flightId: MvtFlightId
   actionCode: MvtActionCode
   // AD fields
-  offBlocks?: string        // HHMM or DDHHMM
-  airborne?: string         // HHMM or DDHHMM
+  offBlocks?: string // HHMM or DDHHMM
+  airborne?: string // HHMM or DDHHMM
   // AA fields
-  touchdown?: string        // HHMM or DDHHMM
-  onBlocks?: string         // HHMM or DDHHMM
+  touchdown?: string // HHMM or DDHHMM
+  onBlocks?: string // HHMM or DDHHMM
   // ED fields
   estimatedDeparture?: string // DDHHMM
   // NI fields
-  nextInfoTime?: string     // DDHHMM
+  nextInfoTime?: string // DDHHMM
   // RR fields
-  returnTime?: string       // HHMM or DDHHMM
+  returnTime?: string // HHMM or DDHHMM
   // FR fields (same as AA)
   // EA entries
   etas: MvtEta[]
@@ -72,8 +72,8 @@ export interface LdmFlightId {
   dayOfMonth: string
   registration: string
   aircraftType?: string
-  cabinConfig?: string      // e.g. "F16Y129"
-  crewConfig?: string       // e.g. "2/5"
+  cabinConfig?: string // e.g. "F16Y129"
+  crewConfig?: string // e.g. "2/5"
 }
 
 export interface LdmPaxBreakdown {
@@ -87,17 +87,17 @@ export interface LdmPaxBreakdown {
 
 export interface LdmCompartmentLoad {
   compartment: number | string
-  weight: number            // kg
+  weight: number // kg
 }
 
 export interface LdmBaggage {
   pieces: number
-  weight: number            // kg
+  weight: number // kg
 }
 
 export interface LdmDestinationBlock {
-  station: string           // 3-letter IATA
-  paxBreakdown?: string     // raw M/F/C/I or A/C/I string
+  station: string // 3-letter IATA
+  paxBreakdown?: string // raw M/F/C/I or A/C/I string
   totalHoldWeight?: number
   compartments: LdmCompartmentLoad[]
   pax?: LdmPaxBreakdown
@@ -105,17 +105,17 @@ export interface LdmDestinationBlock {
   cargoWeight?: number
   mailWeight?: number
   equipmentWeight?: number
-  specialLoads: string[]    // AVI/5, HUM/1/102, etc.
+  specialLoads: string[] // AVI/5, HUM/1/102, etc.
 }
 
 export interface LdmSupplementary {
-  dow?: number              // Dry Operating Weight
-  zfw?: number              // Zero Fuel Weight
-  tow?: number              // Take-Off Weight
-  tof?: number              // Take-Off Fuel
-  law?: number              // Landing Weight
-  totalSob?: number         // Total Souls On Board
-  raw: string[]             // raw SI lines
+  dow?: number // Dry Operating Weight
+  zfw?: number // Zero Fuel Weight
+  tow?: number // Take-Off Weight
+  tof?: number // Take-Off Fuel
+  law?: number // Landing Weight
+  totalSob?: number // Total Souls On Board
+  raw: string[] // raw SI lines
 }
 
 export interface ParsedLdm {
@@ -129,10 +129,10 @@ export interface ParsedLdm {
 // ─── Envelope ────────────────────────────────────────────────────
 
 export interface TypeBEnvelope {
-  priority?: string         // QU, QK, QD, etc.
-  addresses: string[]       // 7-char IATA addresses
+  priority?: string // QU, QK, QD, etc.
+  addresses: string[] // 7-char IATA addresses
   originator?: string
-  timestamp?: string        // DDHHMM
+  timestamp?: string // DDHHMM
 }
 
 // ─── Union ───────────────────────────────────────────────────────

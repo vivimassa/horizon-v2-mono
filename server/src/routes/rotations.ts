@@ -29,7 +29,7 @@ export async function rotationRoutes(app: FastifyInstance): Promise<void> {
       label: flts[0]?.rotationLabel ?? rotationId.slice(0, 8),
       aircraftTypeIcao: flts[0]?.aircraftTypeIcao,
       flightCount: flts.length,
-      flights: flts.map(f => f._id),
+      flights: flts.map((f) => f._id),
     }))
   })
 
@@ -39,8 +39,11 @@ export async function rotationRoutes(app: FastifyInstance): Promise<void> {
     if (!operatorId || !seasonCode) return reply.code(400).send({ error: 'operatorId and seasonCode required' })
 
     const filter: Record<string, unknown> = {
-      operatorId, seasonCode, isActive: { $ne: false },
-      rotationId: null, status: { $ne: 'cancelled' },
+      operatorId,
+      seasonCode,
+      isActive: { $ne: false },
+      rotationId: null,
+      status: { $ne: 'cancelled' },
     }
     if (scenarioId) filter.scenarioId = scenarioId
 
@@ -73,7 +76,7 @@ export async function rotationRoutes(app: FastifyInstance): Promise<void> {
         let current = seed
         while (true) {
           const next = typedFlights.find(
-            f => !used.has(f._id as string) && (f.depStation as string) === (current.arrStation as string)
+            (f) => !used.has(f._id as string) && (f.depStation as string) === (current.arrStation as string),
           )
           if (!next) break
           chain.push(next._id as string)
@@ -120,7 +123,7 @@ export async function rotationRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string }
     await ScheduledFlight.updateMany(
       { rotationId: id },
-      { $set: { rotationId: null, rotationSequence: null, rotationLabel: null, updatedAt: new Date().toISOString() } }
+      { $set: { rotationId: null, rotationSequence: null, rotationLabel: null, updatedAt: new Date().toISOString() } },
     )
     return { success: true }
   })

@@ -8,7 +8,7 @@ export function parseLdmMessage(raw: string): ParsedLdm | null {
 
   const lines = raw
     .split(/\r?\n/)
-    .map(l => l.trim())
+    .map((l) => l.trim())
     .filter(Boolean)
 
   // Find LDM identifier line
@@ -22,7 +22,7 @@ export function parseLdmMessage(raw: string): ParsedLdm | null {
 
   if (bodyStart >= lines.length) return null
 
-  const bodyLines = lines.slice(bodyStart).filter(l => l !== '=')
+  const bodyLines = lines.slice(bodyStart).filter((l) => l !== '=')
 
   // Parse flight ID line
   const flightId = parseLdmFlightId(bodyLines[0])

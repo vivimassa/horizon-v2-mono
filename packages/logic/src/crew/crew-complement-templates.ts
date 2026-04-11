@@ -31,18 +31,18 @@ export const COMPLEMENT_TEMPLATES: ComplementTemplateDef[] = [
 ]
 
 export const POSITION_COLUMNS = [
-  { key: 'cp', code: 'CP', name: 'Captain',         category: 'cockpit' },
-  { key: 'fo', code: 'FO', name: 'First Officer',    category: 'cockpit' },
-  { key: 'so', code: 'SO', name: 'Second Officer',   category: 'cockpit' },
-  { key: 'fe', code: 'FE', name: 'Flight Engineer',  category: 'cockpit' },
-  { key: 'cc', code: 'CC', name: 'Cabin Chief',      category: 'cabin'   },
-  { key: 'sp', code: 'SP', name: 'Senior Purser',    category: 'cabin'   },
-  { key: 'ps', code: 'PS', name: 'Purser',           category: 'cabin'   },
-  { key: 'fa', code: 'FA', name: 'Flight Attendant', category: 'cabin'   },
-  { key: 'tf', code: 'TF', name: 'Trainee FA',       category: 'cabin'   },
+  { key: 'cp', code: 'CP', name: 'Captain', category: 'cockpit' },
+  { key: 'fo', code: 'FO', name: 'First Officer', category: 'cockpit' },
+  { key: 'so', code: 'SO', name: 'Second Officer', category: 'cockpit' },
+  { key: 'fe', code: 'FE', name: 'Flight Engineer', category: 'cockpit' },
+  { key: 'cc', code: 'CC', name: 'Cabin Chief', category: 'cabin' },
+  { key: 'sp', code: 'SP', name: 'Senior Purser', category: 'cabin' },
+  { key: 'ps', code: 'PS', name: 'Purser', category: 'cabin' },
+  { key: 'fa', code: 'FA', name: 'Flight Attendant', category: 'cabin' },
+  { key: 'tf', code: 'TF', name: 'Trainee FA', category: 'cabin' },
 ] as const
 
-export type PositionKey = typeof POSITION_COLUMNS[number]['key']
+export type PositionKey = (typeof POSITION_COLUMNS)[number]['key']
 
 export const POSITION_DEFAULT_COLORS: Record<string, string> = {
   CP: '#4338ca',

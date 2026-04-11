@@ -18,9 +18,7 @@ export function Drawer({
   return (
     <Ctx.Provider value={{ onClose }}>
       <RNModal visible={isOpen} transparent animationType="slide" onRequestClose={onClose}>
-        <View className={`flex-1 flex-row ${anchor === 'right' ? 'justify-end' : ''}`}>
-          {children}
-        </View>
+        <View className={`flex-1 flex-row ${anchor === 'right' ? 'justify-end' : ''}`}>{children}</View>
       </RNModal>
     </Ctx.Provider>
   )

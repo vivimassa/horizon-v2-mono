@@ -20,7 +20,7 @@ const crewPositionSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'crewPositions',
-  }
+  },
 )
 
 crewPositionSchema.index({ operatorId: 1, code: 1 }, { unique: true })

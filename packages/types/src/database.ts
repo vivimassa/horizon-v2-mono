@@ -1,12 +1,6 @@
 // Database types — aligned with actual Supabase schema
 
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export interface CabinEntry {
   class: string
@@ -14,7 +8,14 @@ export interface CabinEntry {
 }
 
 export type ModuleName = 'home' | 'network' | 'operations' | 'workforce' | 'reports' | 'admin'
-export type UserRole = 'super_admin' | 'admin' | 'ops_controller' | 'crew_controller' | 'roster_planner' | 'crew_member' | 'viewer'
+export type UserRole =
+  | 'super_admin'
+  | 'admin'
+  | 'ops_controller'
+  | 'crew_controller'
+  | 'roster_planner'
+  | 'crew_member'
+  | 'viewer'
 export type UserStatus = 'active' | 'inactive' | 'suspended'
 
 export interface Database {
@@ -1904,7 +1905,7 @@ export interface CrewBaseWithAirport extends CrewBase {
     latitude: number | null
     longitude: number | null
     timezone: string | null
-    utc_offset: string | null   // formatted e.g. "+07:00", computed from utc_offset_hours
+    utc_offset: string | null // formatted e.g. "+07:00", computed from utc_offset_hours
   }
 }
 
@@ -2049,7 +2050,7 @@ export interface CrewComplement {
   operator_id: string
   aircraft_type: string
   template_key: string
-  counts: Record<string, number>  // e.g. { CP: 1, FO: 1, CA: 3 } — keyed by position code from 4.5.1
+  counts: Record<string, number> // e.g. { CP: 1, FO: 1, CA: 3 } — keyed by position code from 4.5.1
   notes: string | null
   created_at: string
   updated_at: string
@@ -2169,7 +2170,7 @@ export interface CrewExpiryDate {
   id: string
   crew_id: string
   expiry_code_id: string
-  aircraft_type: string        // '' = not type-specific; populated for family/variant-scoped codes
+  aircraft_type: string // '' = not type-specific; populated for family/variant-scoped codes
   last_done: string | null
   base_month: string | null
   expiry_date: string | null
@@ -2251,7 +2252,7 @@ export interface CrewBlockHours {
 
 export interface FullCrewProfile {
   member: CrewMember
-  base_label: string | null          // airports.iata_code via crew_bases join
+  base_label: string | null // airports.iata_code via crew_bases join
   phones: CrewPhone[]
   passports: CrewPassport[]
   licenses: CrewLicense[]
@@ -2269,7 +2270,7 @@ export interface FullCrewProfile {
 export interface CrewMemberListItem extends CrewMember {
   ac_types: string[]
   expiry_alert_count: number
-  base_label: string | null          // airports.iata_code via crew_bases join
+  base_label: string | null // airports.iata_code via crew_bases join
 }
 
 // ─── 3.1.2 Crew Documents ─────────────────────────────────────────────────────
@@ -2322,5 +2323,5 @@ export interface CrewDocumentStatus {
   base_label: string | null
   has_photo: boolean
   has_passport_scan: boolean
-  coverage: number   // 0-100
+  coverage: number // 0-100
 }

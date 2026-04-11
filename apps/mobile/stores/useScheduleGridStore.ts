@@ -113,25 +113,33 @@ export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
 
   // ── New rows & deletes ──
   newRowIds: new Set(),
-  addNewRow: (row) => set(s => ({
-    rows: [...s.rows, row],
-    newRowIds: new Set(s.newRowIds).add(row._id),
-  })),
-  insertRowAt: (row, atIdx) => set(s => {
-    const next = [...s.rows]
-    next.splice(atIdx, 0, row)
-    return { rows: next, newRowIds: new Set(s.newRowIds).add(row._id) }
-  }),
-  removeNewRow: (id) => set(s => ({
-    rows: s.rows.filter(r => r._id !== id),
-    newRowIds: (() => { const n = new Set(s.newRowIds); n.delete(id); return n })(),
-  })),
-  clearNewRows: () => set(s => ({
-    rows: s.rows.filter(r => !s.newRowIds.has(r._id)),
-    newRowIds: new Set(),
-  })),
+  addNewRow: (row) =>
+    set((s) => ({
+      rows: [...s.rows, row],
+      newRowIds: new Set(s.newRowIds).add(row._id),
+    })),
+  insertRowAt: (row, atIdx) =>
+    set((s) => {
+      const next = [...s.rows]
+      next.splice(atIdx, 0, row)
+      return { rows: next, newRowIds: new Set(s.newRowIds).add(row._id) }
+    }),
+  removeNewRow: (id) =>
+    set((s) => ({
+      rows: s.rows.filter((r) => r._id !== id),
+      newRowIds: (() => {
+        const n = new Set(s.newRowIds)
+        n.delete(id)
+        return n
+      })(),
+    })),
+  clearNewRows: () =>
+    set((s) => ({
+      rows: s.rows.filter((r) => !s.newRowIds.has(r._id)),
+      newRowIds: new Set(),
+    })),
   deletedIds: new Set(),
-  markDeleted: (id) => set(s => ({ deletedIds: new Set(s.deletedIds).add(id) })),
+  markDeleted: (id) => set((s) => ({ deletedIds: new Set(s.deletedIds).add(id) })),
   clearDeleted: () => set({ deletedIds: new Set() }),
 
   // ── Selection ──
@@ -146,7 +154,7 @@ export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
     const maxCol = GRID_COLUMNS.length - 1
     const anchor = selectionRange
       ? { startRow: selectionRange.startRow, startCol: selectionRange.startCol }
-      : { startRow: selectedCell.rowIdx, startCol: GRID_COLUMNS.findIndex(c => c.key === selectedCell.colKey) }
+      : { startRow: selectedCell.rowIdx, startCol: GRID_COLUMNS.findIndex((c) => c.key === selectedCell.colKey) }
     const endRow = Math.max(0, Math.min(maxRow, (selectionRange?.endRow ?? anchor.startRow) + dRow))
     const endCol = Math.max(0, Math.min(maxCol, (selectionRange?.endCol ?? anchor.startCol) + dCol))
     set({ selectionRange: { ...anchor, endRow, endCol } })
@@ -154,13 +162,23 @@ export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
   selectEntireRow: () => {
     const { selectedCell } = get()
     if (!selectedCell) return
-    set({ selectionRange: { startRow: selectedCell.rowIdx, startCol: 0, endRow: selectedCell.rowIdx, endCol: GRID_COLUMNS.length - 1 } })
+    set({
+      selectionRange: {
+        startRow: selectedCell.rowIdx,
+        startCol: 0,
+        endRow: selectedCell.rowIdx,
+        endCol: GRID_COLUMNS.length - 1,
+      },
+    })
   },
   selectEntireColumn: () => {
     const { selectedCell, rows } = get()
     if (!selectedCell) return
-    const colIdx = GRID_COLUMNS.findIndex(c => c.key === selectedCell.colKey)
-    set({ selectionRange: { startRow: 0, startCol: colIdx, endRow: rows.length - 1, endCol: colIdx }, highlightedCol: colIdx })
+    const colIdx = GRID_COLUMNS.findIndex((c) => c.key === selectedCell.colKey)
+    set({
+      selectionRange: { startRow: 0, startCol: colIdx, endRow: rows.length - 1, endCol: colIdx },
+      highlightedCol: colIdx,
+    })
   },
   selectAll: () => {
     const { rows } = get()
@@ -179,7 +197,9 @@ export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
     const row = rows[cell.rowIdx]
     if (!row) return
     const dirty = dirtyMap.get(row._id)
-    const val = initialValue ?? (dirty && cell.colKey in dirty ? String((dirty as any)[cell.colKey]) : String((row as any)[cell.colKey] ?? ''))
+    const val =
+      initialValue ??
+      (dirty && cell.colKey in dirty ? String((dirty as any)[cell.colKey]) : String((row as any)[cell.colKey] ?? ''))
     set({ editingCell: cell, editValue: val, selectedCell: cell })
   },
   setEditValue: (value) => set({ editValue: value }),
@@ -187,7 +207,10 @@ export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
     const { editingCell, editValue, rows } = get()
     if (!editingCell) return
     const row = rows[editingCell.rowIdx]
-    if (!row) { set({ editingCell: null, editValue: '' }); return }
+    if (!row) {
+      set({ editingCell: null, editValue: '' })
+      return
+    }
     const currentVal = String((row as any)[editingCell.colKey] ?? '')
     if (editValue !== currentVal) {
       get().markDirty(row._id, { [editingCell.colKey]: editValue } as any)
@@ -198,13 +221,14 @@ export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
 
   // ── Cell formatting ──
   cellFormats: new Map(),
-  setCellFormat: (rowId, colKey, format) => set(s => {
-    const next = new Map(s.cellFormats)
-    const key = `${rowId}:${colKey}`
-    const existing = next.get(key) ?? {}
-    next.set(key, { ...existing, ...format })
-    return { cellFormats: next }
-  }),
+  setCellFormat: (rowId, colKey, format) =>
+    set((s) => {
+      const next = new Map(s.cellFormats)
+      const key = `${rowId}:${colKey}`
+      const existing = next.get(key) ?? {}
+      next.set(key, { ...existing, ...format })
+      return { cellFormats: next }
+    }),
   getCellFormat: (rowId, colKey) => get().cellFormats.get(`${rowId}:${colKey}`),
   clearCellFormats: () => set({ cellFormats: new Map() }),
 
@@ -257,18 +281,23 @@ export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
     const row = rows[selectedCell.rowIdx]
     if (!row) return
     const dirty = dirtyMap.get(row._id)
-    const val = dirty && selectedCell.colKey in dirty ? String((dirty as any)[selectedCell.colKey]) : String((row as any)[selectedCell.colKey] ?? '')
+    const val =
+      dirty && selectedCell.colKey in dirty
+        ? String((dirty as any)[selectedCell.colKey])
+        : String((row as any)[selectedCell.colKey] ?? '')
     set({
       clipboard: {
         cells: [{ colKey: selectedCell.colKey, value: val }],
-        rowId: row._id, rowIds: [row._id],
-        colKeys: [selectedCell.colKey], mode: 'copy',
+        rowId: row._id,
+        rowIds: [row._id],
+        colKeys: [selectedCell.colKey],
+        mode: 'copy',
       },
     })
   },
   cutCell: () => {
     get().copyCell()
-    set(s => s.clipboard ? { clipboard: { ...s.clipboard, mode: 'cut' } } : {})
+    set((s) => (s.clipboard ? { clipboard: { ...s.clipboard, mode: 'cut' } } : {}))
     // Clear source cell
     const { selectedCell, rows } = get()
     if (!selectedCell) return
@@ -289,17 +318,18 @@ export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
   // ── Undo/Redo ──
   undoStack: [],
   redoStack: [],
-  pushUndo: () => set(s => {
-    const snapshot: UndoSnapshot = { dirtyMap: new Map(s.dirtyMap) }
-    const stack = [...s.undoStack, snapshot]
-    if (stack.length > MAX_UNDO_DEPTH) stack.shift()
-    return { undoStack: stack }
-  }),
+  pushUndo: () =>
+    set((s) => {
+      const snapshot: UndoSnapshot = { dirtyMap: new Map(s.dirtyMap) }
+      const stack = [...s.undoStack, snapshot]
+      if (stack.length > MAX_UNDO_DEPTH) stack.shift()
+      return { undoStack: stack }
+    }),
   undo: () => {
     const { undoStack, dirtyMap } = get()
     if (undoStack.length === 0) return
     const snapshot = undoStack[undoStack.length - 1]
-    set(s => ({
+    set((s) => ({
       undoStack: s.undoStack.slice(0, -1),
       redoStack: [...s.redoStack, { dirtyMap: new Map(s.dirtyMap) }],
       dirtyMap: snapshot.dirtyMap as Map<string, Partial<ScheduledFlightRef>>,
@@ -309,7 +339,7 @@ export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
     const { redoStack } = get()
     if (redoStack.length === 0) return
     const snapshot = redoStack[redoStack.length - 1]
-    set(s => ({
+    set((s) => ({
       redoStack: s.redoStack.slice(0, -1),
       undoStack: [...s.undoStack, { dirtyMap: new Map(s.dirtyMap) }],
       dirtyMap: snapshot.dirtyMap as Map<string, Partial<ScheduledFlightRef>>,
@@ -320,8 +350,13 @@ export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
 
   // ── Separators ──
   separatorAfter: new Set(),
-  addSeparator: (rowId) => set(s => ({ separatorAfter: new Set(s.separatorAfter).add(rowId) })),
-  removeSeparator: (rowId) => set(s => { const n = new Set(s.separatorAfter); n.delete(rowId); return { separatorAfter: n } }),
+  addSeparator: (rowId) => set((s) => ({ separatorAfter: new Set(s.separatorAfter).add(rowId) })),
+  removeSeparator: (rowId) =>
+    set((s) => {
+      const n = new Set(s.separatorAfter)
+      n.delete(rowId)
+      return { separatorAfter: n }
+    }),
   clearSeparators: () => set({ separatorAfter: new Set() }),
 
   // ── Filter period ──

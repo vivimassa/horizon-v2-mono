@@ -1,7 +1,14 @@
 import type {
-  GanttFlight, GanttAircraft, GanttAircraftType,
-  BarLayout, RowLayout, LayoutResult,
-  ZoomLevel, ColorMode, BarLabelMode, FleetSortOrder,
+  GanttFlight,
+  GanttAircraft,
+  GanttAircraftType,
+  BarLayout,
+  RowLayout,
+  LayoutResult,
+  ZoomLevel,
+  ColorMode,
+  BarLabelMode,
+  FleetSortOrder,
 } from './types'
 import { ROW_HEIGHT_LEVELS } from './types'
 import { utcToX, computeTicks, dateToMs } from './time-axis'
@@ -45,11 +52,11 @@ interface AircraftSlot {
 
 /** A rotation block: one or more flights that must be assigned to the same aircraft */
 interface FlightBlock {
-  flights: GanttFlight[]   // sorted by stdUtc
-  depStation: string       // first flight's departure
-  arrStation: string       // last flight's arrival
-  startMs: number          // earliest STD
-  endMs: number            // latest STA
+  flights: GanttFlight[] // sorted by stdUtc
+  depStation: string // first flight's departure
+  arrStation: string // last flight's arrival
+  startMs: number // earliest STD
+  endMs: number // latest STA
 }
 
 /** Group flights into atomic blocks by rotationId, then sort blocks chronologically */
@@ -131,13 +138,16 @@ function computeVirtualPlacements(
     const blocks = buildBlocks(flights)
 
     // Init slots from already-assigned flights
-    const slots: AircraftSlot[] = acList.map(ac => {
+    const slots: AircraftSlot[] = acList.map((ac) => {
       const real = assignedByReg.get(ac.registration) ?? []
-      const windows = real.map(f => ({ start: f.stdUtc, end: f.staUtc }))
+      const windows = real.map((f) => ({ start: f.stdUtc, end: f.staUtc }))
       let lastArr: string | null = null
       let lastEnd = 0
       for (const f of real) {
-        if (f.staUtc > lastEnd) { lastEnd = f.staUtc; lastArr = f.arrStation }
+        if (f.staUtc > lastEnd) {
+          lastEnd = f.staUtc
+          lastArr = f.arrStation
+        }
       }
       return { registration: ac.registration, windows, lastArr, lastEnd }
     })
@@ -154,10 +164,11 @@ function computeVirtualPlacements(
         // ALL flights in the block must fit without overlap
         let blockFits = true
         for (const f of block.flights) {
-          const hasOverlap = s.windows.some(w =>
-            f.stdUtc < w.end + TAT_MS && w.start < f.staUtc + TAT_MS
-          )
-          if (hasOverlap) { blockFits = false; break }
+          const hasOverlap = s.windows.some((w) => f.stdUtc < w.end + TAT_MS && w.start < f.staUtc + TAT_MS)
+          if (hasOverlap) {
+            blockFits = false
+            break
+          }
         }
         if (!blockFits) continue
 
@@ -165,9 +176,7 @@ function computeVirtualPlacements(
 
         // Affinity: strongly prefer keeping flights on the same row as before
         if (previousPlacements) {
-          const affinityCount = block.flights.filter(
-            f => previousPlacements.get(f.id) === s.registration
-          ).length
+          const affinityCount = block.flights.filter((f) => previousPlacements.get(f.id) === s.registration).length
           if (affinityCount > 0) score += 2000 + affinityCount * 500
         }
 
@@ -209,8 +218,18 @@ function computeVirtualPlacements(
 
 export function computeLayout(input: LayoutInput): LayoutResult {
   const {
-    flights, aircraft, aircraftTypes, periodFrom, periodTo,
-    pph, zoom, rowHeightLevel, collapsedTypes, colorMode, barLabelMode, isDark,
+    flights,
+    aircraft,
+    aircraftTypes,
+    periodFrom,
+    periodTo,
+    pph,
+    zoom,
+    rowHeightLevel,
+    collapsedTypes,
+    colorMode,
+    barLabelMode,
+    isDark,
   } = input
 
   const config = ROW_HEIGHT_LEVELS[rowHeightLevel] ?? ROW_HEIGHT_LEVELS[1]
@@ -237,9 +256,7 @@ export function computeLayout(input: LayoutInput): LayoutResult {
   // Apply forced placements first (from drag-drop rearrange) — these skip the greedy algorithm
   const forced = input.forcedPlacements
   const forcedFlightIds = new Set(forced?.keys() ?? [])
-  const unassignedForGreedy = forced
-    ? unassignedFlights.filter(f => !forcedFlightIds.has(f.id))
-    : unassignedFlights
+  const unassignedForGreedy = forced ? unassignedFlights.filter((f) => !forcedFlightIds.has(f.id)) : unassignedFlights
 
   // Pre-place forced flights into assignedByReg so greedy sees them as occupied
   const assignedByRegWithForced = new Map(assignedByReg)
@@ -256,7 +273,10 @@ export function computeLayout(input: LayoutInput): LayoutResult {
 
   // Virtual placement: auto-distribute remaining unassigned flights to aircraft rows
   const virtualPlacements = computeVirtualPlacements(
-    unassignedForGreedy, aircraft, assignedByRegWithForced, input.previousVirtualPlacements
+    unassignedForGreedy,
+    aircraft,
+    assignedByRegWithForced,
+    input.previousVirtualPlacements,
   )
 
   // Merge forced placements into virtualPlacements map
@@ -276,7 +296,7 @@ export function computeLayout(input: LayoutInput): LayoutResult {
   }
 
   // Truly unassigned (couldn't fit on any aircraft)
-  const overflow = unassignedFlights.filter(f => !virtualPlacements.has(f.id))
+  const overflow = unassignedFlights.filter((f) => !virtualPlacements.has(f.id))
 
   // Group aircraft by type
   const typeGroups = new Map<string, GanttAircraft[]>()
@@ -313,7 +333,7 @@ export function computeLayout(input: LayoutInput): LayoutResult {
   const sortedTypes = [...typeGroups.entries()].sort((a, b) => a[0].localeCompare(b[0]))
 
   for (const [typeIcao, acList] of sortedTypes) {
-    const typeInfo = aircraftTypes.find(t => t.icaoType === typeIcao)
+    const typeInfo = aircraftTypes.find((t) => t.icaoType === typeIcao)
     const typeColor = acTypeColorMap.get(typeIcao) ?? '#6b7280'
 
     rows.push({
@@ -321,8 +341,10 @@ export function computeLayout(input: LayoutInput): LayoutResult {
       aircraftTypeIcao: typeIcao,
       aircraftTypeName: typeInfo?.name ?? typeIcao,
       label: `${typeIcao} (${acList.length} aircraft)`,
-      y, height: GROUP_HEADER_HEIGHT,
-      color: typeColor, aircraftCount: acList.length,
+      y,
+      height: GROUP_HEADER_HEIGHT,
+      color: typeColor,
+      aircraftCount: acList.length,
     })
     y += GROUP_HEADER_HEIGHT
 
@@ -330,10 +352,15 @@ export function computeLayout(input: LayoutInput): LayoutResult {
 
     for (const ac of acList) {
       rows.push({
-        type: 'aircraft', registration: ac.registration,
-        aircraftTypeIcao: typeIcao, aircraftTypeName: typeInfo?.name ?? typeIcao,
+        type: 'aircraft',
+        registration: ac.registration,
+        aircraftTypeIcao: typeIcao,
+        aircraftTypeName: typeInfo?.name ?? typeIcao,
         seatConfig: ac.seatConfig,
-        label: ac.registration, y, height: rowH, color: typeColor,
+        label: ac.registration,
+        y,
+        height: rowH,
+        color: typeColor,
       })
 
       const acFlights = flightsByReg.get(ac.registration) ?? []
@@ -342,14 +369,22 @@ export function computeLayout(input: LayoutInput): LayoutResult {
         const xEnd = utcToX(f.staUtc, startMs, pph)
         const width = Math.max(2, xEnd - x)
         const { bg, text } = getBarColor(f, colorMode, acTypeColorMap, isDark)
-        const label = barLabelMode === 'flightNo'
-          ? f.flightNumber.replace(AIRLINE_PREFIX_RE, '')
-          : `${f.depStation}-${f.arrStation}`
+        const label =
+          barLabelMode === 'flightNo'
+            ? f.flightNumber.replace(AIRLINE_PREFIX_RE, '')
+            : `${f.depStation}-${f.arrStation}`
 
         bars.push({
-          flightId: f.id, x, y: y + (rowH - barH) / 2,
-          width, height: barH, color: bg, textColor: text,
-          label, row: rows.length - 1, flight: f,
+          flightId: f.id,
+          x,
+          y: y + (rowH - barH) / 2,
+          width,
+          height: barH,
+          color: bg,
+          textColor: text,
+          label,
+          row: rows.length - 1,
+          flight: f,
         })
       }
       y += rowH
@@ -367,13 +402,19 @@ export function computeLayout(input: LayoutInput): LayoutResult {
       const xEnd = utcToX(f.staUtc, startMs, pph)
       const width = Math.max(2, xEnd - x)
       const { bg, text } = getBarColor(f, colorMode, acTypeColorMap, isDark)
-      const label = barLabelMode === 'flightNo'
-        ? f.flightNumber.replace(AIRLINE_PREFIX_RE, '')
-        : `${f.depStation}-${f.arrStation}`
+      const label =
+        barLabelMode === 'flightNo' ? f.flightNumber.replace(AIRLINE_PREFIX_RE, '') : `${f.depStation}-${f.arrStation}`
       bars.push({
-        flightId: f.id, x, y: y + (rowH - barH) / 2,
-        width, height: barH, color: bg, textColor: text,
-        label, row: rows.length - 1, flight: f,
+        flightId: f.id,
+        x,
+        y: y + (rowH - barH) / 2,
+        width,
+        height: barH,
+        color: bg,
+        textColor: text,
+        label,
+        row: rows.length - 1,
+        flight: f,
       })
       y += rowH
     }

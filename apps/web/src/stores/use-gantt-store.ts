@@ -1,9 +1,15 @@
-"use client"
+'use client'
 
 import { create } from 'zustand'
 import type {
-  GanttFlight, GanttAircraft, GanttAircraftType,
-  ZoomLevel, ColorMode, BarLabelMode, FleetSortOrder, LayoutResult,
+  GanttFlight,
+  GanttAircraft,
+  GanttAircraftType,
+  ZoomLevel,
+  ColorMode,
+  BarLabelMode,
+  FleetSortOrder,
+  LayoutResult,
 } from '@/lib/gantt/types'
 import { ROW_HEIGHT_LEVELS, ZOOM_CONFIG } from '@/lib/gantt/types'
 import { fetchGanttFlights, assignFlights, unassignFlights, swapFlights, cancelFlights } from '@/lib/gantt/api'
@@ -28,9 +34,9 @@ interface GanttState {
   periodCommitted: boolean
 
   // Filters
-  acTypeFilter: string[] | null   // null = all types
-  statusFilter: string[] | null   // null = server default
-  scenarioId: string | null        // null = production schedule
+  acTypeFilter: string[] | null // null = all types
+  statusFilter: string[] | null // null = server default
+  scenarioId: string | null // null = production schedule
 
   // View
   zoomLevel: ZoomLevel
@@ -81,11 +87,11 @@ interface GanttState {
   swapMode: {
     sourceFlightIds: string[]
     sourceReg: string | null
-    sourceDates: string[]           // operating dates covered by source selection
+    sourceDates: string[] // operating dates covered by source selection
   } | null
   swapDialog: {
     targetReg: string
-    targetFlightIds: string[]       // flights on target AC for the source dates
+    targetFlightIds: string[] // flights on target AC for the source dates
   } | null
 
   // Computed layout
@@ -141,7 +147,12 @@ interface GanttState {
   closeCancelDialog: () => void
   confirmCancel: () => Promise<void>
   /** Visual-only rearrange: swap virtual placements between two sets of flights without DB writes */
-  rearrangeVirtualPlacements: (sourceFlightIds: string[], sourceReg: string | null, targetFlightIds: string[], targetReg: string) => void
+  rearrangeVirtualPlacements: (
+    sourceFlightIds: string[],
+    sourceReg: string | null,
+    targetFlightIds: string[],
+    targetReg: string,
+  ) => void
   enterSwapMode: () => void
   exitSwapMode: () => void
   pickSwapTarget: (targetFlightId: string) => void
@@ -159,7 +170,10 @@ export const useGanttStore = create<GanttState>((set, get) => {
   /** Debounced recompute — coalesces rapid state changes into a single layout pass */
   function recomputeDebounced() {
     if (recomputeTimer) clearTimeout(recomputeTimer)
-    recomputeTimer = setTimeout(() => { recomputeTimer = null; recompute() }, 16)
+    recomputeTimer = setTimeout(() => {
+      recomputeTimer = null
+      recompute()
+    }, 16)
   }
 
   function recompute() {
@@ -169,9 +183,7 @@ export const useGanttStore = create<GanttState>((set, get) => {
       return
     }
     const pph = computePixelsPerHour(s.containerWidth || 1200, s.zoomLevel)
-    const isDark = typeof document !== 'undefined'
-      ? document.documentElement.classList.contains('dark')
-      : true
+    const isDark = typeof document !== 'undefined' ? document.documentElement.classList.contains('dark') : true
 
     // Use in-memory placements first, fall back to localStorage on fresh load
     let prevPlacements = s.layout?.virtualPlacements
@@ -179,7 +191,9 @@ export const useGanttStore = create<GanttState>((set, get) => {
       try {
         const raw = localStorage.getItem('gantt.virtualPlacements')
         if (raw) prevPlacements = new Map(JSON.parse(raw))
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
 
     const layout = computeLayout({
@@ -205,7 +219,9 @@ export const useGanttStore = create<GanttState>((set, get) => {
     // Persist virtual placements for page reload stability
     try {
       localStorage.setItem('gantt.virtualPlacements', JSON.stringify([...layout.virtualPlacements]))
-    } catch { /* quota exceeded — non-critical */ }
+    } catch {
+      /* quota exceeded — non-critical */
+    }
   }
 
   async function fetchFlights() {
@@ -213,9 +229,12 @@ export const useGanttStore = create<GanttState>((set, get) => {
     let operatorId = useOperatorStore.getState().operator?._id ?? ''
     if (!operatorId) {
       // Operator may not have loaded yet — wait and retry
-      await new Promise(r => setTimeout(r, 1000))
+      await new Promise((r) => setTimeout(r, 1000))
       operatorId = useOperatorStore.getState().operator?._id ?? ''
-      if (!operatorId) { set({ loading: false }); return }
+      if (!operatorId) {
+        set({ loading: false })
+        return
+      }
     }
     set({ loading: true, error: null })
     try {
@@ -342,7 +361,9 @@ export const useGanttStore = create<GanttState>((set, get) => {
       // Persist to localStorage
       try {
         localStorage.setItem('gantt.utilizationTargets', JSON.stringify([...targets]))
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     },
 
     setBarLabelMode: (mode) => {
@@ -384,28 +405,37 @@ export const useGanttStore = create<GanttState>((set, get) => {
 
     openContextMenu: (x, y, flightId) => set({ contextMenu: { x, y, flightId } }),
     closeContextMenu: () => set({ contextMenu: null }),
-    openAircraftContextMenu: (x, y, registration, aircraftTypeIcao) => set({ aircraftContextMenu: { x, y, registration, aircraftTypeIcao }, contextMenu: null }),
+    openAircraftContextMenu: (x, y, registration, aircraftTypeIcao) =>
+      set({ aircraftContextMenu: { x, y, registration, aircraftTypeIcao }, contextMenu: null }),
     closeAircraftContextMenu: () => set({ aircraftContextMenu: null }),
     openFlightInfo: (flightId) => set({ flightInfoDialogId: flightId, contextMenu: null }),
     closeFlightInfo: () => set({ flightInfoDialogId: null }),
-    openAircraftPopover: (x, y, registration, aircraftTypeIcao) => set({ aircraftPopover: { x, y, registration, aircraftTypeIcao }, contextMenu: null }),
+    openAircraftPopover: (x, y, registration, aircraftTypeIcao) =>
+      set({ aircraftPopover: { x, y, registration, aircraftTypeIcao }, contextMenu: null }),
     closeAircraftPopover: () => set({ aircraftPopover: null }),
-    openDayContextMenu: (x, y, date) => set({ dayContextMenu: { x, y, date }, contextMenu: null, aircraftContextMenu: null }),
+    openDayContextMenu: (x, y, date) =>
+      set({ dayContextMenu: { x, y, date }, contextMenu: null, aircraftContextMenu: null }),
     closeDayContextMenu: () => set({ dayContextMenu: null }),
     openDailySummary: (x, y, date) => set({ dailySummaryPopover: { x, y, date }, dayContextMenu: null }),
     closeDailySummary: () => set({ dailySummaryPopover: null }),
-    openRowContextMenu: (x, y, registration, aircraftTypeIcao, date) => set({ rowContextMenu: { x, y, registration, aircraftTypeIcao, date }, contextMenu: null, aircraftContextMenu: null, dayContextMenu: null }),
+    openRowContextMenu: (x, y, registration, aircraftTypeIcao, date) =>
+      set({
+        rowContextMenu: { x, y, registration, aircraftTypeIcao, date },
+        contextMenu: null,
+        aircraftContextMenu: null,
+        dayContextMenu: null,
+      }),
     closeRowContextMenu: () => set({ rowContextMenu: null }),
-    openRotationPopover: (x, y, registration, aircraftTypeIcao, date) => set({ rotationPopover: { x, y, registration, aircraftTypeIcao, date }, rowContextMenu: null }),
+    openRotationPopover: (x, y, registration, aircraftTypeIcao, date) =>
+      set({ rotationPopover: { x, y, registration, aircraftTypeIcao, date }, rowContextMenu: null }),
     closeRotationPopover: () => set({ rotationPopover: null }),
-    openAssignPopover: (x, y, flightIds, aircraftTypeIcao) => set({ assignPopover: { x, y, flightIds, aircraftTypeIcao }, contextMenu: null }),
+    openAssignPopover: (x, y, flightIds, aircraftTypeIcao) =>
+      set({ assignPopover: { x, y, flightIds, aircraftTypeIcao }, contextMenu: null }),
     closeAssignPopover: () => set({ assignPopover: null }),
 
     assignToAircraft: async (flightIds, registration) => {
       const operatorId = useOperatorStore.getState().operator?._id ?? ''
-      const flights = get().flights.map(f =>
-        flightIds.includes(f.id) ? { ...f, aircraftReg: registration } : f
-      )
+      const flights = get().flights.map((f) => (flightIds.includes(f.id) ? { ...f, aircraftReg: registration } : f))
       set({ flights, assignPopover: null })
       recompute()
       try {
@@ -418,9 +448,7 @@ export const useGanttStore = create<GanttState>((set, get) => {
 
     unassignFromAircraft: async (flightIds) => {
       const operatorId = useOperatorStore.getState().operator?._id ?? ''
-      const flights = get().flights.map(f =>
-        flightIds.includes(f.id) ? { ...f, aircraftReg: null } : f
-      )
+      const flights = get().flights.map((f) => (flightIds.includes(f.id) ? { ...f, aircraftReg: null } : f))
       set({ flights, assignPopover: null })
       recompute()
       try {
@@ -439,7 +467,7 @@ export const useGanttStore = create<GanttState>((set, get) => {
       const { flightIds } = s.cancelDialog
       const operatorId = useOperatorStore.getState().operator?._id ?? ''
       // Optimistic: remove flights from local state
-      const flights = s.flights.filter(f => !flightIds.includes(f.id))
+      const flights = s.flights.filter((f) => !flightIds.includes(f.id))
       set({ flights, selectedFlightIds: new Set(), cancelDialog: null })
       recompute()
       try {
@@ -466,18 +494,29 @@ export const useGanttStore = create<GanttState>((set, get) => {
       const pph = computePixelsPerHour(s.containerWidth || 1200, s.zoomLevel)
       const isDark = typeof document !== 'undefined' ? document.documentElement.classList.contains('dark') : true
       const layout = computeLayout({
-        flights: s.flights, aircraft: s.aircraft, aircraftTypes: s.aircraftTypes,
-        periodFrom: s.periodFrom, periodTo: s.periodTo, pph, zoom: s.zoomLevel,
-        rowHeightLevel: s.rowHeightLevel, collapsedTypes: s.collapsedTypes,
-        colorMode: s.colorMode, barLabelMode: s.barLabelMode, fleetSortOrder: s.fleetSortOrder,
-        isDark, containerWidth: s.containerWidth || 1200,
+        flights: s.flights,
+        aircraft: s.aircraft,
+        aircraftTypes: s.aircraftTypes,
+        periodFrom: s.periodFrom,
+        periodTo: s.periodTo,
+        pph,
+        zoom: s.zoomLevel,
+        rowHeightLevel: s.rowHeightLevel,
+        collapsedTypes: s.collapsedTypes,
+        colorMode: s.colorMode,
+        barLabelMode: s.barLabelMode,
+        fleetSortOrder: s.fleetSortOrder,
+        isDark,
+        containerWidth: s.containerWidth || 1200,
         previousVirtualPlacements: s.layout?.virtualPlacements,
         forcedPlacements: merged,
       })
       // Persist for refresh stability
       try {
         localStorage.setItem('gantt.virtualPlacements', JSON.stringify([...layout.virtualPlacements]))
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       set({ layout, selectedFlightIds: new Set(), _forcedPlacements: merged })
     },
 
@@ -489,9 +528,9 @@ export const useGanttStore = create<GanttState>((set, get) => {
       // Group selected flights by their aircraft row
       const regGroups = new Map<string, string[]>()
       for (const id of allIds) {
-        const bar = s.layout.bars.find(b => b.flightId === id)
+        const bar = s.layout.bars.find((b) => b.flightId === id)
         const row = bar ? s.layout.rows[bar.row] : null
-        const reg = row?.registration ?? s.flights.find(f => f.id === id)?.aircraftReg ?? '_unassigned'
+        const reg = row?.registration ?? s.flights.find((f) => f.id === id)?.aircraftReg ?? '_unassigned'
         const list = regGroups.get(reg) ?? []
         list.push(id)
         regGroups.set(reg, list)
@@ -504,20 +543,20 @@ export const useGanttStore = create<GanttState>((set, get) => {
         const [regA, regB] = regs
         const aFlightIds = regGroups.get(regA)!
         const bFlightIds = regGroups.get(regB)!
-        const aFlights = s.flights.filter(f => aFlightIds.includes(f.id))
-        const sourceDates = [...new Set(aFlights.map(f => f.operatingDate))]
+        const aFlights = s.flights.filter((f) => aFlightIds.includes(f.id))
+        const sourceDates = [...new Set(aFlights.map((f) => f.operatingDate))]
         const sourceReg = regA === '_unassigned' ? null : regA
         const targetReg = regB === '_unassigned' ? null : regB
 
         // Also include any other flights on the target row for the same dates (date-aware)
         const allTargetIds = s.flights
-          .filter(f => {
-            const fBar = s.layout!.bars.find(b => b.flightId === f.id)
+          .filter((f) => {
+            const fBar = s.layout!.bars.find((b) => b.flightId === f.id)
             const fRow = fBar ? s.layout!.rows[fBar.row] : null
             const fReg = fRow?.registration ?? f.aircraftReg
             return fReg === targetReg && sourceDates.includes(f.operatingDate) && !aFlightIds.includes(f.id)
           })
-          .map(f => f.id)
+          .map((f) => f.id)
         // Merge explicitly selected B flights + date-aware B flights
         const mergedTargetIds = [...new Set([...bFlightIds, ...allTargetIds])]
 
@@ -529,10 +568,10 @@ export const useGanttStore = create<GanttState>((set, get) => {
       } else if (regs.length === 1) {
         // Single row: enter swap mode, wait for target click
         const sourceFlightIds = allIds
-        const sourceFlights = s.flights.filter(f => sourceFlightIds.includes(f.id))
+        const sourceFlights = s.flights.filter((f) => sourceFlightIds.includes(f.id))
         const reg = regs[0]
         const sourceReg = reg === '_unassigned' ? null : reg
-        const sourceDates = [...new Set(sourceFlights.map(f => f.operatingDate))]
+        const sourceDates = [...new Set(sourceFlights.map((f) => f.operatingDate))]
         set({ swapMode: { sourceFlightIds, sourceReg, sourceDates }, contextMenu: null })
       }
       // 3+ rows: do nothing (too ambiguous)
@@ -543,22 +582,22 @@ export const useGanttStore = create<GanttState>((set, get) => {
     pickSwapTarget: (targetFlightId) => {
       const s = get()
       if (!s.swapMode) return
-      const targetFlight = s.flights.find(f => f.id === targetFlightId)
+      const targetFlight = s.flights.find((f) => f.id === targetFlightId)
       if (!targetFlight) return
       // Find target registration from the clicked flight's row
-      const targetBar = s.layout?.bars.find(b => b.flightId === targetFlightId)
+      const targetBar = s.layout?.bars.find((b) => b.flightId === targetFlightId)
       const targetRow = targetBar ? s.layout?.rows[targetBar.row] : null
       const targetReg = targetRow?.registration ?? targetFlight.aircraftReg ?? null
       if (!targetReg || targetReg === s.swapMode.sourceReg) return // same row = no-op
       // Find ALL flights on target aircraft for the source dates
       const targetFlightIds = s.flights
-        .filter(f => {
-          const fBar = s.layout?.bars.find(b => b.flightId === f.id)
+        .filter((f) => {
+          const fBar = s.layout?.bars.find((b) => b.flightId === f.id)
           const fRow = fBar ? s.layout?.rows[fBar.row] : null
           const fReg = fRow?.registration ?? f.aircraftReg
           return fReg === targetReg && s.swapMode!.sourceDates.includes(f.operatingDate)
         })
-        .map(f => f.id)
+        .map((f) => f.id)
       set({ swapDialog: { targetReg, targetFlightIds } })
     },
 
@@ -572,7 +611,7 @@ export const useGanttStore = create<GanttState>((set, get) => {
       const operatorId = useOperatorStore.getState().operator?._id ?? ''
 
       // Close dialog + optimistic update
-      const flights = s.flights.map(f => {
+      const flights = s.flights.map((f) => {
         if (sourceFlightIds.includes(f.id)) return { ...f, aircraftReg: targetReg }
         if (targetFlightIds.includes(f.id)) return { ...f, aircraftReg: sourceReg }
         return f
@@ -598,7 +637,9 @@ export const useGanttStore = create<GanttState>((set, get) => {
       try {
         const raw = localStorage.getItem('gantt.utilizationTargets')
         if (raw) set({ utilizationTargets: new Map(JSON.parse(raw)) })
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     },
   }
 })

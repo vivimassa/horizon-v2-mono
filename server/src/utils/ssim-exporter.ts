@@ -26,11 +26,16 @@ function formatDate(iso: string, fmt: string): string {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   const mon = months[parseInt(m, 10) - 1] ?? m
   switch (fmt) {
-    case 'DD-MMM-YY': return `${d}-${mon}-${y.slice(2)}`
-    case 'DD/MM/YYYY': return `${d}/${m}/${y}`
-    case 'MM/DD/YYYY': return `${m}/${d}/${y}`
-    case 'DD.MM.YYYY': return `${d}.${m}.${y}`
-    default: return iso.slice(0, 10)
+    case 'DD-MMM-YY':
+      return `${d}-${mon}-${y.slice(2)}`
+    case 'DD/MM/YYYY':
+      return `${d}/${m}/${y}`
+    case 'MM/DD/YYYY':
+      return `${m}/${d}/${y}`
+    case 'DD.MM.YYYY':
+      return `${d}.${m}.${y}`
+    default:
+      return iso.slice(0, 10)
   }
 }
 
@@ -58,7 +63,11 @@ function calcBlock(std: string, sta: string): number | null {
   return diff
 }
 
-export async function generateSsimExcel(flights: FlightRow[], seasonCode: string, dateFormat = 'YYYY-MM-DD'): Promise<Buffer> {
+export async function generateSsimExcel(
+  flights: FlightRow[],
+  seasonCode: string,
+  dateFormat = 'YYYY-MM-DD',
+): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook()
   workbook.creator = 'SkyHub'
   workbook.created = new Date()
@@ -66,7 +75,22 @@ export async function generateSsimExcel(flights: FlightRow[], seasonCode: string
   const sheet = workbook.addWorksheet(`Schedule ${seasonCode}`)
 
   // Header row
-  const headers = ['AC Type', 'From', 'To', 'DEP', 'ARR', 'Flight', 'STD', 'STA', 'Offset', 'SVC', 'Frequency', 'Block', 'TAT', 'Status']
+  const headers = [
+    'AC Type',
+    'From',
+    'To',
+    'DEP',
+    'ARR',
+    'Flight',
+    'STD',
+    'STA',
+    'Offset',
+    'SVC',
+    'Frequency',
+    'Block',
+    'TAT',
+    'Status',
+  ]
   const headerRow = sheet.addRow(headers)
   headerRow.font = { bold: true, size: 11 }
   headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F5' } }
@@ -75,7 +99,9 @@ export async function generateSsimExcel(flights: FlightRow[], seasonCode: string
 
   // Column widths
   const widths = [10, 14, 14, 6, 6, 10, 6, 6, 6, 5, 10, 6, 6, 8]
-  widths.forEach((w, i) => { sheet.getColumn(i + 1).width = w })
+  widths.forEach((w, i) => {
+    sheet.getColumn(i + 1).width = w
+  })
 
   // Data rows
   for (const f of flights) {

@@ -25,7 +25,7 @@ const codeshareMappingSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'codeshareMappings',
-  }
+  },
 )
 
 codeshareMappingSchema.index({ agreementId: 1, operatingFlightNumber: 1 })

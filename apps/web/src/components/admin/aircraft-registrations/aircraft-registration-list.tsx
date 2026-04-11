@@ -1,26 +1,26 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import type { AircraftRegistrationRef } from "@skyhub/api";
-import { Search, Plus, ChevronRight, Plane } from "lucide-react";
+import { useState } from 'react'
+import type { AircraftRegistrationRef } from '@skyhub/api'
+import { Search, Plus, ChevronRight, Plane } from 'lucide-react'
 
 const STATUS_DOT_COLOR: Record<string, string> = {
-  active: "#06C270",
-  maintenance: "#E67A00",
-  stored: "#9ca3af",
-  retired: "#E63535",
-};
+  active: '#06C270',
+  maintenance: '#E67A00',
+  stored: '#9ca3af',
+  retired: '#E63535',
+}
 
 interface AircraftRegistrationListProps {
-  groups: [string, AircraftRegistrationRef[]][];
-  totalCount: number;
-  filteredCount: number;
-  selected: AircraftRegistrationRef | null;
-  onSelect: (r: AircraftRegistrationRef) => void;
-  search: string;
-  onSearchChange: (value: string) => void;
-  loading: boolean;
-  onCreateClick: () => void;
+  groups: [string, AircraftRegistrationRef[]][]
+  totalCount: number
+  filteredCount: number
+  selected: AircraftRegistrationRef | null
+  onSelect: (r: AircraftRegistrationRef) => void
+  search: string
+  onSearchChange: (value: string) => void
+  loading: boolean
+  onCreateClick: () => void
 }
 
 export function AircraftRegistrationList({
@@ -34,16 +34,16 @@ export function AircraftRegistrationList({
   loading,
   onCreateClick,
 }: AircraftRegistrationListProps) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
   const toggleGroup = (name: string) => {
     setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
-  };
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -90,7 +90,7 @@ export function AircraftRegistrationList({
               >
                 <ChevronRight
                   className={`h-3 w-3 shrink-0 text-hz-text-secondary/50 transition-transform duration-200 ${
-                    !collapsed.has(icaoType) ? "rotate-90" : ""
+                    !collapsed.has(icaoType) ? 'rotate-90' : ''
                   }`}
                 />
                 <Plane className="h-3.5 w-3.5 text-hz-text-secondary/50" />
@@ -103,18 +103,21 @@ export function AircraftRegistrationList({
               {!collapsed.has(icaoType) && (
                 <div className="space-y-0.5">
                   {items.map((r) => {
-                    const isSelected = selected?._id === r._id;
+                    const isSelected = selected?._id === r._id
                     return (
                       <button
                         key={r._id}
                         onClick={() => onSelect(r)}
                         className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 ${
                           isSelected
-                            ? "border-l-[3px] border-l-module-accent bg-module-accent/[0.08]"
-                            : "border-l-[3px] border-l-transparent hover:bg-hz-border/30"
+                            ? 'border-l-[3px] border-l-module-accent bg-module-accent/[0.08]'
+                            : 'border-l-[3px] border-l-transparent hover:bg-hz-border/30'
                         }`}
                       >
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT_COLOR[r.status] || "#9ca3af" }} />
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: STATUS_DOT_COLOR[r.status] || '#9ca3af' }}
+                        />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span className="text-[14px] font-bold font-mono">{r.registration}</span>
@@ -123,11 +126,9 @@ export function AircraftRegistrationList({
                             )}
                           </div>
                         </div>
-                        <span className="text-[13px] text-hz-text-tertiary capitalize shrink-0">
-                          {r.status}
-                        </span>
+                        <span className="text-[13px] text-hz-text-tertiary capitalize shrink-0">{r.status}</span>
                       </button>
-                    );
+                    )
                   })}
                 </div>
               )}
@@ -136,5 +137,5 @@ export function AircraftRegistrationList({
         )}
       </div>
     </div>
-  );
+  )
 }

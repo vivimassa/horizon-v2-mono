@@ -1,25 +1,27 @@
-"use client";
+'use client'
 
-import { useTheme } from "@/components/theme-provider";
-import { colors, type Palette as PaletteType } from "@skyhub/ui/theme";
-import { FlightList } from "@/app/ground-ops/cargo/cargo-manifest/components/FlightList";
-import { AircraftView } from "@/app/ground-ops/cargo/cargo-manifest/components/AircraftView";
-import { useCargoState } from "@/app/ground-ops/cargo/cargo-manifest/hooks/useCargoState";
+import { useTheme } from '@/components/theme-provider'
+import { colors, type Palette as PaletteType } from '@skyhub/ui/theme'
+import { FlightList } from '@/app/ground-ops/cargo/cargo-manifest/components/FlightList'
+import { AircraftView } from '@/app/ground-ops/cargo/cargo-manifest/components/AircraftView'
+import { useCargoState } from '@/app/ground-ops/cargo/cargo-manifest/hooks/useCargoState'
 
 export default function EmbedCargoLoading() {
-  const { theme, moduleTheme } = useTheme();
-  const isDark = theme === "dark";
-  const palette: PaletteType = isDark ? colors.dark : colors.light;
-  const rawAccent = moduleTheme?.accent ?? "#059669";
-  const accent = isDark ? (() => {
-    const r = parseInt(rawAccent.slice(1, 3), 16);
-    const g = parseInt(rawAccent.slice(3, 5), 16);
-    const b = parseInt(rawAccent.slice(5, 7), 16);
-    const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    const mix = (v: number) => Math.round(v + (gray - v) * 0.2);
-    const hex = (v: number) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0");
-    return `#${hex(mix(r))}${hex(mix(g))}${hex(mix(b))}`;
-  })() : rawAccent;
+  const { theme, moduleTheme } = useTheme()
+  const isDark = theme === 'dark'
+  const palette: PaletteType = isDark ? colors.dark : colors.light
+  const rawAccent = moduleTheme?.accent ?? '#059669'
+  const accent = isDark
+    ? (() => {
+        const r = parseInt(rawAccent.slice(1, 3), 16)
+        const g = parseInt(rawAccent.slice(3, 5), 16)
+        const b = parseInt(rawAccent.slice(5, 7), 16)
+        const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        const mix = (v: number) => Math.round(v + (gray - v) * 0.2)
+        const hex = (v: number) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')
+        return `#${hex(mix(r))}${hex(mix(g))}${hex(mix(b))}`
+      })()
+    : rawAccent
 
   const {
     selectedFlight,
@@ -37,7 +39,7 @@ export default function EmbedCargoLoading() {
     totalCapacity,
     cgMac,
     dockCount,
-  } = useCargoState();
+  } = useCargoState()
 
   return (
     <div className="flex flex-col h-screen w-screen p-2">
@@ -50,7 +52,7 @@ export default function EmbedCargoLoading() {
           dockItems={dockItems}
           accent={accent}
           isDark={isDark}
-          hasSelection={selectedFlightId !== ""}
+          hasSelection={selectedFlightId !== ''}
         >
           <FlightList
             flights={filteredFlights}
@@ -88,5 +90,5 @@ export default function EmbedCargoLoading() {
         }
       `}</style>
     </div>
-  );
+  )
 }

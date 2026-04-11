@@ -20,7 +20,7 @@ const slotDateSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'slotDates',
-  }
+  },
 )
 
 slotDateSchema.index({ seriesId: 1, slotDate: 1 }, { unique: true })

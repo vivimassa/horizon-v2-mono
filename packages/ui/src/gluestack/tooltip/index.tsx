@@ -19,11 +19,7 @@ export function Tooltip({
 }
 
 export function TooltipContent({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <View className={`rounded-lg px-3 py-1.5 bg-gray-900 dark:bg-gray-100 ${className ?? ''}`}>
-      {children}
-    </View>
-  )
+  return <View className={`rounded-lg px-3 py-1.5 bg-gray-900 dark:bg-gray-100 ${className ?? ''}`}>{children}</View>
 }
 
 export function TooltipText({ children, className }: { children: React.ReactNode; className?: string }) {

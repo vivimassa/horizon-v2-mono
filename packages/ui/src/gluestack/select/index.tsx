@@ -103,21 +103,14 @@ export function SelectPortal({ children }: { children: React.ReactNode }) {
   const { isOpen, setIsOpen } = useContext(Ctx)
   return (
     <Modal visible={isOpen} transparent animationType="fade" onRequestClose={() => setIsOpen(false)}>
-      <View className="flex-1 justify-center items-center">
-        {children}
-      </View>
+      <View className="flex-1 justify-center items-center">{children}</View>
     </Modal>
   )
 }
 
 export function SelectBackdrop({ className }: { className?: string }) {
   const { setIsOpen } = useContext(Ctx)
-  return (
-    <Pressable
-      className={`absolute inset-0 bg-black/50 ${className ?? ''}`}
-      onPress={() => setIsOpen(false)}
-    />
-  )
+  return <Pressable className={`absolute inset-0 bg-black/50 ${className ?? ''}`} onPress={() => setIsOpen(false)} />
 }
 
 export function SelectContent({
@@ -136,15 +129,7 @@ export function SelectContent({
   )
 }
 
-export function SelectItem({
-  label,
-  value,
-  className,
-}: {
-  label: string
-  value: string
-  className?: string
-}) {
+export function SelectItem({ label, value, className }: { label: string; value: string; className?: string }) {
   const { value: selected, onValueChange, setIsOpen } = useContext(Ctx)
   const isSelected = selected === value
   return (
@@ -157,9 +142,7 @@ export function SelectItem({
       accessibilityRole="button"
       accessibilityState={{ selected: isSelected }}
     >
-      <Text className={`text-sm ${isSelected ? 'font-semibold' : ''} ${className ?? ''}`}>
-        {label}
-      </Text>
+      <Text className={`text-sm ${isSelected ? 'font-semibold' : ''} ${className ?? ''}`}>{label}</Text>
     </Pressable>
   )
 }

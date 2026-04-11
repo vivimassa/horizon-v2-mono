@@ -18,9 +18,9 @@ export interface SSIMCarrier {
   recordType: 2
   actionCode: string
   airlineCode: string
-  seasonStart: string   // ISO date YYYY-MM-DD
-  seasonEnd: string     // ISO date YYYY-MM-DD
-  creationDate: string  // ISO date YYYY-MM-DD
+  seasonStart: string // ISO date YYYY-MM-DD
+  seasonEnd: string // ISO date YYYY-MM-DD
+  creationDate: string // ISO date YYYY-MM-DD
   airlineName: string
   releaseCode: string
   creator: string
@@ -36,21 +36,21 @@ export interface SSIMFlightLeg {
   itineraryVariation: string
   legSequence: string
   serviceType: string
-  periodStart: string   // ISO date YYYY-MM-DD
-  periodEnd: string     // ISO date YYYY-MM-DD
-  daysOfOperation: string  // "1234567" format with spaces for non-operating days
+  periodStart: string // ISO date YYYY-MM-DD
+  periodEnd: string // ISO date YYYY-MM-DD
+  daysOfOperation: string // "1234567" format with spaces for non-operating days
   depStation: string
-  stdLocal: string    // HHMM — local time at departure station (col 39-42)
-  stdUtc: string      // HHMM — UTC time (col 43-46)
-  depUtcOffset: string  // +HHMM or -HHMM
+  stdLocal: string // HHMM — local time at departure station (col 39-42)
+  stdUtc: string // HHMM — UTC time (col 43-46)
+  depUtcOffset: string // +HHMM or -HHMM
   arrStation: string
-  staLocal: string    // HHMM — local time at arrival station (col 57-60)
-  staUtc: string      // HHMM — UTC time (col 61-64)
-  arrUtcOffset: string  // +HHMM or -HHMM
-  aircraftType: string  // IATA 3-letter code
-  nextAirlineCode: string | null   // 2-char IATA from SSIM onward flight field
-  nextFlightNumber: number | null  // numeric flight number of next leg
-  seatConfig: Record<string, number>  // e.g. { C: 12, Y: 365 }
+  staLocal: string // HHMM — local time at arrival station (col 57-60)
+  staUtc: string // HHMM — UTC time (col 61-64)
+  arrUtcOffset: string // +HHMM or -HHMM
+  aircraftType: string // IATA 3-letter code
+  nextAirlineCode: string | null // 2-char IATA from SSIM onward flight field
+  nextFlightNumber: number | null // numeric flight number of next leg
+  seatConfig: Record<string, number> // e.g. { C: 12, Y: 365 }
   totalCapacity: number
   blockMinutes: number
   recordNumber: number
@@ -90,9 +90,31 @@ const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', '
 
 /** Vietnam IATA airport codes — used for domestic/international classification */
 const VN_AIRPORTS = new Set([
-  'SGN', 'HAN', 'DAD', 'CXR', 'PQC', 'HPH', 'VII', 'HUI', 'VDO', 'VCA',
-  'UIH', 'TBB', 'BMV', 'DLI', 'VCL', 'VDH', 'THD', 'DIN', 'PXU', 'VCS',
-  'CAH', 'SQH', 'VKG', 'CON', 'PHA',
+  'SGN',
+  'HAN',
+  'DAD',
+  'CXR',
+  'PQC',
+  'HPH',
+  'VII',
+  'HUI',
+  'VDO',
+  'VCA',
+  'UIH',
+  'TBB',
+  'BMV',
+  'DLI',
+  'VCL',
+  'VDH',
+  'THD',
+  'DIN',
+  'PXU',
+  'VCS',
+  'CAH',
+  'SQH',
+  'VKG',
+  'CON',
+  'PHA',
 ])
 
 // ---- Date Parsing -----------------------------------------------------------
@@ -103,7 +125,7 @@ function parseSsimDate(s: string): string {
   const dd = s.slice(0, 2)
   const mmm = s.slice(2, 5).toUpperCase()
   const yy = s.slice(5, 7)
-  const monthIdx = MONTHS.indexOf(mmm as typeof MONTHS[number])
+  const monthIdx = MONTHS.indexOf(mmm as (typeof MONTHS)[number])
   if (monthIdx < 0) return ''
   const yyNum = parseInt(yy, 10)
   const year = yyNum < 70 ? 2000 + yyNum : 1900 + yyNum
@@ -135,10 +157,10 @@ function parseSeatConfig(raw: string): { config: Record<string, number>; total: 
  * The +HH:MM offset is metadata for display, not for conversion.
  */
 function calcBlockMinutes(
-  std: string,          // HHMM in UTC
-  _depOffset: string,   // unused — kept for signature compat
-  sta: string,          // HHMM in UTC
-  _arrOffset: string    // unused
+  std: string, // HHMM in UTC
+  _depOffset: string, // unused — kept for signature compat
+  sta: string, // HHMM in UTC
+  _arrOffset: string, // unused
 ): number {
   if (!std || !sta || std.length < 4 || sta.length < 4) return 0
 
@@ -322,13 +344,13 @@ function parseType3(line: string, lineNum: number, timeMode: SSIMTimeMode = 'sta
   const daysOfOperation = line.substring(28, 35)
 
   const depStation = line.substring(36, 39).trim()
-  const rawDep1 = line.substring(39, 43).trim()   // col 39-42
-  const rawDep2 = line.substring(43, 47).trim()   // col 43-46
+  const rawDep1 = line.substring(39, 43).trim() // col 39-42
+  const rawDep2 = line.substring(43, 47).trim() // col 43-46
   const depUtcOffset = line.substring(47, 52).trim()
 
   const arrStation = line.substring(54, 57).trim()
-  const rawArr1 = line.substring(57, 61).trim()   // col 57-60
-  const rawArr2 = line.substring(61, 65).trim()   // col 61-64
+  const rawArr1 = line.substring(57, 61).trim() // col 57-60
+  const rawArr2 = line.substring(61, 65).trim() // col 61-64
   const arrUtcOffset = line.substring(65, 70).trim()
 
   let stdLocal: string
@@ -339,14 +361,14 @@ function parseType3(line: string, lineNum: number, timeMode: SSIMTimeMode = 'sta
   if (timeMode === 'standard') {
     // Standard SSIM: col 39-42 = local, col 43-46 = UTC
     stdLocal = rawDep1
-    stdUtc   = rawDep2
+    stdUtc = rawDep2
     staLocal = rawArr1
-    staUtc   = rawArr2
+    staUtc = rawArr2
   } else {
     // UTC-only mode: col 39-42 = UTC; derive local from UTC + offset
-    stdUtc   = rawDep1
+    stdUtc = rawDep1
     stdLocal = utcToLocal(rawDep1, depUtcOffset) || rawDep1
-    staUtc   = rawArr1
+    staUtc = rawArr1
     staLocal = utcToLocal(rawArr1, arrUtcOffset) || rawArr1
   }
 
@@ -453,16 +475,22 @@ function computeStats(result: SSIMParseResult): void {
   result.stats.totalRecords = flights.length
 
   // Unique flight numbers
-  const flightNums = new Set(flights.map(f => `${f.airlineCode}${f.flightNumber}`))
+  const flightNums = new Set(flights.map((f) => `${f.airlineCode}${f.flightNumber}`))
   result.stats.uniqueFlightNumbers = flightNums.size
 
   // Unique routes
-  const routes = new Set(flights.map(f => `${f.depStation}-${f.arrStation}`))
+  const routes = new Set(flights.map((f) => `${f.depStation}-${f.arrStation}`))
   result.stats.uniqueRoutes = routes.size
 
   // Date range
-  const starts = flights.map(f => f.periodStart).filter(Boolean).sort()
-  const ends = flights.map(f => f.periodEnd).filter(Boolean).sort()
+  const starts = flights
+    .map((f) => f.periodStart)
+    .filter(Boolean)
+    .sort()
+  const ends = flights
+    .map((f) => f.periodEnd)
+    .filter(Boolean)
+    .sort()
   result.stats.dateRange = {
     start: starts[0] || '',
     end: ends[ends.length - 1] || '',
@@ -470,7 +498,7 @@ function computeStats(result: SSIMParseResult): void {
 
   // Aircraft types
   const acTypes = new Map<string, number>()
-  flights.forEach(f => {
+  flights.forEach((f) => {
     if (f.aircraftType) {
       acTypes.set(f.aircraftType, (acTypes.get(f.aircraftType) || 0) + 1)
     }
@@ -480,14 +508,14 @@ function computeStats(result: SSIMParseResult): void {
 
   // Service types
   const svcTypes: Record<string, number> = {}
-  flights.forEach(f => {
+  flights.forEach((f) => {
     svcTypes[f.serviceType] = (svcTypes[f.serviceType] || 0) + 1
   })
   result.stats.serviceTypes = svcTypes
 
   // Stations
   const stations = new Set<string>()
-  flights.forEach(f => {
+  flights.forEach((f) => {
     stations.add(f.depStation)
     stations.add(f.arrStation)
   })
@@ -496,7 +524,7 @@ function computeStats(result: SSIMParseResult): void {
   // Domestic vs international (based on VN airports)
   let domestic = 0
   let international = 0
-  routes.forEach(route => {
+  routes.forEach((route) => {
     const [dep, arr] = route.split('-')
     if (VN_AIRPORTS.has(dep) && VN_AIRPORTS.has(arr)) {
       domestic++
@@ -580,15 +608,15 @@ export const SERVICE_TYPE_LABELS: Record<string, string> = {
 
 /** Service types grouped by application category */
 export const SERVICE_TYPE_GROUPS: { label: string; codes: string[]; color: string }[] = [
-  { label: 'Scheduled — Passenger',    codes: ['J', 'S', 'U'],                         color: '#22c55e' },
-  { label: 'Charter — Passenger',      codes: ['C'],                                    color: '#3b82f6' },
-  { label: 'Additional — Passenger',   codes: ['B', 'G'],                               color: '#a855f7' },
-  { label: 'Scheduled — Cargo/Mail',   codes: ['F', 'M', 'V'],                          color: '#f97316' },
-  { label: 'Charter — Cargo/Mail',     codes: ['H'],                                    color: '#ea580c' },
-  { label: 'Additional — Cargo/Mail',  codes: ['A'],                                    color: '#c2410c' },
-  { label: 'Passenger/Cargo Mixed',    codes: ['Q', 'R'],                               color: '#0ea5e9' },
-  { label: 'Charter — Pax/Cargo/Mail', codes: ['L', 'O'],                               color: '#6366f1' },
-  { label: 'Others',                   codes: ['P', 'T', 'K', 'W', 'E', 'D', 'N', 'I', 'X'], color: '#6b7280' },
+  { label: 'Scheduled — Passenger', codes: ['J', 'S', 'U'], color: '#22c55e' },
+  { label: 'Charter — Passenger', codes: ['C'], color: '#3b82f6' },
+  { label: 'Additional — Passenger', codes: ['B', 'G'], color: '#a855f7' },
+  { label: 'Scheduled — Cargo/Mail', codes: ['F', 'M', 'V'], color: '#f97316' },
+  { label: 'Charter — Cargo/Mail', codes: ['H'], color: '#ea580c' },
+  { label: 'Additional — Cargo/Mail', codes: ['A'], color: '#c2410c' },
+  { label: 'Passenger/Cargo Mixed', codes: ['Q', 'R'], color: '#0ea5e9' },
+  { label: 'Charter — Pax/Cargo/Mail', codes: ['L', 'O'], color: '#6366f1' },
+  { label: 'Others', codes: ['P', 'T', 'K', 'W', 'E', 'D', 'N', 'I', 'X'], color: '#6b7280' },
 ]
 
 /** Color for a service type code */
@@ -633,9 +661,9 @@ export const IATA_TO_ICAO_AIRCRAFT: Record<string, string> = {
   '788': 'B788',
   '789': 'B789',
   '78J': 'B789',
-  'E90': 'E190',
-  'E95': 'E195',
-  'CR9': 'CRJ9',
-  'AT7': 'AT76',
-  'DH4': 'DH8D',
+  E90: 'E190',
+  E95: 'E195',
+  CR9: 'CRJ9',
+  AT7: 'AT76',
+  DH4: 'DH8D',
 }

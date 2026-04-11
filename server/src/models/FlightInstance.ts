@@ -125,7 +125,18 @@ const flightInstanceSchema = new Schema(
 
     status: {
       type: String,
-      enum: ['scheduled', 'assigned', 'crewed', 'departed', 'onTime', 'delayed', 'cancelled', 'diverted', 'arrived', 'completed'],
+      enum: [
+        'scheduled',
+        'assigned',
+        'crewed',
+        'departed',
+        'onTime',
+        'delayed',
+        'cancelled',
+        'diverted',
+        'arrived',
+        'completed',
+      ],
       default: 'scheduled',
       index: true,
     },
@@ -142,7 +153,7 @@ const flightInstanceSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'flightInstances',
-  }
+  },
 )
 
 flightInstanceSchema.index({ operatorId: 1, operatingDate: 1 })

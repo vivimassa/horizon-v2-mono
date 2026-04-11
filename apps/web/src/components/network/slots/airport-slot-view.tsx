@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { ArrowLeft } from 'lucide-react'
@@ -33,14 +33,26 @@ const FILTERS: { key: FilterStatus; label: string }[] = [
 ]
 
 export function AirportSlotView({
-  airport, seasonCode, refreshKey, onDataChanged, onBack, isDark,
+  airport,
+  seasonCode,
+  refreshKey,
+  onDataChanged,
+  onBack,
+  isDark,
 }: AirportSlotViewProps) {
   const palette = isDark ? colors.dark : colors.light
   const accent = MODULE_THEMES.network.accent
   const glassBorder = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'
 
   const [series, setSeries] = useState<SlotSeriesRef[]>([])
-  const [stats, setStats] = useState<SlotPortfolioStats>({ totalSeries: 0, confirmed: 0, offered: 0, waitlisted: 0, refused: 0, atRisk80: 0 })
+  const [stats, setStats] = useState<SlotPortfolioStats>({
+    totalSeries: 0,
+    confirmed: 0,
+    offered: 0,
+    waitlisted: 0,
+    refused: 0,
+    atRisk80: 0,
+  })
   const [utilization, setUtilization] = useState<SlotUtilizationSummary[]>([])
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState<FilterStatus>('all')
@@ -62,7 +74,9 @@ export function AirportSlotView({
     }
   }, [airport.iataCode, seasonCode])
 
-  useEffect(() => { loadData() }, [loadData, refreshKey])
+  useEffect(() => {
+    loadData()
+  }, [loadData, refreshKey])
 
   const handleChanged = useCallback(() => {
     loadData()
@@ -70,11 +84,11 @@ export function AirportSlotView({
   }, [loadData, onDataChanged])
 
   // Merge utilization into series
-  const utilMap = new Map(utilization.map(u => [u.seriesId, u]))
+  const utilMap = new Map(utilization.map((u) => [u.seriesId, u]))
 
   // Filter + sort: at-risk first
   const filtered = series
-    .filter(s => filter === 'all' || s.status === filter)
+    .filter((s) => filter === 'all' || s.status === filter)
     .sort((a, b) => {
       const ua = utilMap.get(a._id)?.utilizationPct ?? 100
       const ub = utilMap.get(b._id)?.utilizationPct ?? 100
@@ -88,9 +102,12 @@ export function AirportSlotView({
       {/* Header */}
       <div className="px-5 pt-4 pb-3 shrink-0" style={{ borderBottom: `1px solid ${glassBorder}` }}>
         <div className="flex items-center gap-3 mb-1">
-          <button type="button" onClick={onBack}
+          <button
+            type="button"
+            onClick={onBack}
             className="p-1.5 rounded-lg transition-colors hover:opacity-80"
-            style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}>
+            style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}
+          >
             <ArrowLeft size={16} style={{ color: palette.textSecondary }} />
           </button>
           <span className="text-[20px] font-bold" style={{ color: palette.text }}>
@@ -99,12 +116,16 @@ export function AirportSlotView({
           <span className="text-[14px] font-medium" style={{ color: palette.text }}>
             {airport.name}
           </span>
-          <span className="text-[13px] font-semibold px-2 py-0.5 rounded-lg"
-            style={{ background: `${levelColor}15`, color: levelColor, border: `1px solid ${levelColor}20` }}>
+          <span
+            className="text-[13px] font-semibold px-2 py-0.5 rounded-lg"
+            style={{ background: `${levelColor}15`, color: levelColor, border: `1px solid ${levelColor}20` }}
+          >
             Level {airport.coordinationLevel}
           </span>
-          <span className="text-[13px] font-medium px-2 py-0.5 rounded-lg"
-            style={{ background: accentTint(accent, isDark ? 0.12 : 0.08), color: accent }}>
+          <span
+            className="text-[13px] font-medium px-2 py-0.5 rounded-lg"
+            style={{ background: accentTint(accent, isDark ? 0.12 : 0.08), color: accent }}
+          >
             {seasonCode}
           </span>
 
@@ -125,17 +146,21 @@ export function AirportSlotView({
       <div className="flex items-center gap-2 px-5 py-2 shrink-0" style={{ borderBottom: `1px solid ${glassBorder}` }}>
         {/* Status filters */}
         <div className="flex gap-1">
-          {FILTERS.map(f => {
+          {FILTERS.map((f) => {
             const isActive = filter === f.key
             const chip = f.key !== 'all' ? STATUS_CHIP_CLASSES[f.key] : null
             return (
-              <button key={f.key} type="button" onClick={() => setFilter(f.key)}
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setFilter(f.key)}
                 className="h-7 px-2.5 rounded-lg text-[13px] font-medium transition-colors"
                 style={{
-                  background: isActive ? (chip?.bg || accentTint(accent, 0.12)) : 'transparent',
-                  color: isActive ? (chip?.text || accent) : palette.textSecondary,
+                  background: isActive ? chip?.bg || accentTint(accent, 0.12) : 'transparent',
+                  color: isActive ? chip?.text || accent : palette.textSecondary,
                   border: isActive ? `1px solid ${chip?.border || accentTint(accent, 0.2)}` : '1px solid transparent',
-                }}>
+                }}
+              >
                 {f.label}
               </button>
             )
@@ -145,7 +170,7 @@ export function AirportSlotView({
 
       {/* Unified series list */}
       <div className="flex-1 overflow-auto px-5 py-3">
-        {filtered.map(s => (
+        {filtered.map((s) => (
           <UnifiedSeriesRow
             key={s._id}
             series={s}
@@ -166,7 +191,6 @@ export function AirportSlotView({
           </div>
         )}
       </div>
-
     </div>
   )
 }

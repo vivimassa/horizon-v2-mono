@@ -42,10 +42,7 @@ export async function assignFlights(
   return res.json()
 }
 
-export async function unassignFlights(
-  operatorId: string,
-  flightIds: string[],
-): Promise<{ updated: number }> {
+export async function unassignFlights(operatorId: string, flightIds: string[]): Promise<{ updated: number }> {
   // Chunk large requests to avoid timeouts
   const CHUNK = 3000
   let totalUpdated = 0
@@ -76,10 +73,7 @@ export async function bulkAssignFlights(
   return res.json()
 }
 
-export async function cancelFlights(
-  operatorId: string,
-  flightIds: string[],
-): Promise<{ removed: number }> {
+export async function cancelFlights(operatorId: string, flightIds: string[]): Promise<{ removed: number }> {
   const res = await fetch(`${API_BASE}/gantt/remove-from-date`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -181,20 +175,14 @@ export async function listOptimizerRuns(
   return res.json()
 }
 
-export async function getOptimizerRun(
-  operatorId: string,
-  runId: string,
-): Promise<OptimizerRunFull> {
+export async function getOptimizerRun(operatorId: string, runId: string): Promise<OptimizerRunFull> {
   const qs = new URLSearchParams({ operatorId })
   const res = await fetch(`${API_BASE}/gantt/optimizer/runs/${runId}?${qs}`)
   if (!res.ok) throw new Error(`Get optimizer run API ${res.status}`)
   return res.json()
 }
 
-export async function deleteOptimizerRun(
-  operatorId: string,
-  runId: string,
-): Promise<{ removed: number }> {
+export async function deleteOptimizerRun(operatorId: string, runId: string): Promise<{ removed: number }> {
   const qs = new URLSearchParams({ operatorId })
   const res = await fetch(`${API_BASE}/gantt/optimizer/runs/${runId}?${qs}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`Delete optimizer run API ${res.status}`)

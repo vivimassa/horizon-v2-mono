@@ -52,23 +52,9 @@ export const ConnectorLine = memo(function ConnectorLine({
     >
       <Svg style={{ width: '100%', height: '100%' }}>
         {/* Glow */}
-        <Path
-          d={path}
-          fill="none"
-          stroke={accent}
-          strokeWidth={6}
-          strokeOpacity={0.08}
-          strokeLinecap="round"
-        />
+        <Path d={path} fill="none" stroke={accent} strokeWidth={6} strokeOpacity={0.08} strokeLinecap="round" />
         {/* Main line */}
-        <Path
-          d={path}
-          fill="none"
-          stroke={accent}
-          strokeWidth={2}
-          strokeOpacity={0.45}
-          strokeLinecap="round"
-        />
+        <Path d={path} fill="none" stroke={accent} strokeWidth={2} strokeOpacity={0.45} strokeLinecap="round" />
         {/* Endpoint dot */}
         <Circle cx={toX} cy={toY} r={3} fill={accent} fillOpacity={0.3} />
       </Svg>

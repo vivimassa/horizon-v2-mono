@@ -9,7 +9,7 @@ export function parseMvtMessage(raw: string): ParsedMvt | null {
 
   const lines = raw
     .split(/\r?\n/)
-    .map(l => l.trim())
+    .map((l) => l.trim())
     .filter(Boolean)
 
   // Detect message type — skip envelope lines until we find MVT or COR MVT
@@ -32,7 +32,7 @@ export function parseMvtMessage(raw: string): ParsedMvt | null {
 
   if (bodyStart >= lines.length) return null
 
-  const bodyLines = lines.slice(bodyStart).filter(l => l !== '=')
+  const bodyLines = lines.slice(bodyStart).filter((l) => l !== '=')
 
   // Parse flight identification line
   const flightId = parseFlightIdLine(bodyLines[0])
@@ -82,14 +82,10 @@ function parseFlightIdLine(line: string): MvtFlightId | null {
   if (!line) return null
 
   // Format: SB8113/12.ECENZ.IST
-  const match = line.match(
-    /^([A-Z]{2})(\d{1,4}[A-Z]?)\/(\d{2})\.([A-Z0-9]+)\.([A-Z]{3})$/i
-  )
+  const match = line.match(/^([A-Z]{2})(\d{1,4}[A-Z]?)\/(\d{2})\.([A-Z0-9]+)\.([A-Z]{3})$/i)
   if (!match) {
     // Try looser match — some systems add extra fields
-    const loose = line.match(
-      /^([A-Z]{2})(\d{1,4}[A-Z]?)\/(\d{2})\.([A-Z0-9]+)\.([A-Z]{3})/i
-    )
+    const loose = line.match(/^([A-Z]{2})(\d{1,4}[A-Z]?)\/(\d{2})\.([A-Z0-9]+)\.([A-Z]{3})/i)
     if (!loose) return null
     return {
       airline: loose[1].toUpperCase(),

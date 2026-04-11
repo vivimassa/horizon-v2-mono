@@ -23,9 +23,15 @@ function lookupFdpLimit(reportLocalMinOfDay: number, sectorCount: number): numbe
   let baseFdp = 660
   for (const [s, e, fdp] of CAAV_BASE) {
     if (s < e) {
-      if (reportLocalMinOfDay >= s && reportLocalMinOfDay < e) { baseFdp = fdp; break }
+      if (reportLocalMinOfDay >= s && reportLocalMinOfDay < e) {
+        baseFdp = fdp
+        break
+      }
     } else {
-      if (reportLocalMinOfDay >= s || reportLocalMinOfDay < e) { baseFdp = fdp; break }
+      if (reportLocalMinOfDay >= s || reportLocalMinOfDay < e) {
+        baseFdp = fdp
+        break
+      }
     }
   }
   return Math.max(baseFdp - Math.max(0, sectorCount - 2) * 30, 480)

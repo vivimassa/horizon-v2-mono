@@ -1,40 +1,90 @@
 import { useState, useCallback, useRef, memo } from 'react'
 import { View, Text, Pressable, Modal, FlatList } from 'react-native'
+import { resolveNavPath, buildBreadcrumbs, type BreadcrumbSegment } from '@skyhub/ui/navigation'
 import {
-  resolveNavPath,
-  buildBreadcrumbs,
-  type BreadcrumbSegment,
-} from '@skyhub/ui/navigation'
-import {
-  Home, Globe, Plane, Truck, Users, Settings,
-  Calendar, Clock, Handshake, Send,
-  Radar, Wrench, ShieldCheck,
-  CalendarDays, BarChart3, Database,
+  Home,
+  Globe,
+  Plane,
+  Truck,
+  Users,
+  Settings,
+  Calendar,
+  Clock,
+  Handshake,
+  Send,
+  Radar,
+  Wrench,
+  ShieldCheck,
+  CalendarDays,
+  BarChart3,
+  Database,
   UserCircle,
-  FileText, GanttChart, Repeat, CalendarRange,
-  Info, MessageSquare, Map, AlertTriangle,
-  DoorOpen, LayoutGrid,
-  PlaneTakeoff, Lock, Bell, Palette as PaletteIcon,
-  ArrowLeftRight, Building2,
+  FileText,
+  GanttChart,
+  Repeat,
+  CalendarRange,
+  Info,
+  MessageSquare,
+  Map,
+  AlertTriangle,
+  DoorOpen,
+  LayoutGrid,
+  PlaneTakeoff,
+  Lock,
+  Bell,
+  Palette as PaletteIcon,
+  ArrowLeftRight,
+  Building2,
   ChevronDown,
-  Armchair, Tag, Timer, UserRound, FileCheck,
+  Armchair,
+  Tag,
+  Timer,
+  UserRound,
+  FileCheck,
 } from 'lucide-react-native'
 import type { LucideIcon } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 
 // ── Icon map (string name → component) ──
 const ICON_MAP: Record<string, LucideIcon> = {
-  Home, Globe, Plane, Truck, Users, Settings,
-  Calendar, Clock, Handshake, Send,
-  Radar, Wrench, ShieldCheck,
-  CalendarDays, BarChart3, Database,
+  Home,
+  Globe,
+  Plane,
+  Truck,
+  Users,
+  Settings,
+  Calendar,
+  Clock,
+  Handshake,
+  Send,
+  Radar,
+  Wrench,
+  ShieldCheck,
+  CalendarDays,
+  BarChart3,
+  Database,
   UserCircle,
-  FileText, GanttChart, Repeat, CalendarRange,
-  Info, MessageSquare, Map, AlertTriangle,
-  DoorOpen, LayoutGrid,
-  PlaneTakeoff, Lock, Bell, Palette: PaletteIcon,
-  ArrowLeftRight, Building2,
-  Armchair, Tag, Timer, UserRound, FileCheck,
+  FileText,
+  GanttChart,
+  Repeat,
+  CalendarRange,
+  Info,
+  MessageSquare,
+  Map,
+  AlertTriangle,
+  DoorOpen,
+  LayoutGrid,
+  PlaneTakeoff,
+  Lock,
+  Bell,
+  Palette: PaletteIcon,
+  ArrowLeftRight,
+  Building2,
+  Armchair,
+  Tag,
+  Timer,
+  UserRound,
+  FileCheck,
 }
 
 interface TabletBreadcrumbProps {
@@ -57,18 +107,24 @@ export const TabletBreadcrumb = memo(function TabletBreadcrumb({
   const segments = navPath ? buildBreadcrumbs(navPath) : []
   const [openIndex, setOpenIndex] = useState<number | null>(null)
 
-  const handleSegmentPress = useCallback((idx: number, seg: BreadcrumbSegment) => {
-    if (seg.siblings.length <= 1) {
-      onNavigate?.(seg.route)
-      return
-    }
-    setOpenIndex(prev => prev === idx ? null : idx)
-  }, [onNavigate])
+  const handleSegmentPress = useCallback(
+    (idx: number, seg: BreadcrumbSegment) => {
+      if (seg.siblings.length <= 1) {
+        onNavigate?.(seg.route)
+        return
+      }
+      setOpenIndex((prev) => (prev === idx ? null : idx))
+    },
+    [onNavigate],
+  )
 
-  const handleItemPress = useCallback((route: string) => {
-    setOpenIndex(null)
-    onNavigate?.(route)
-  }, [onNavigate])
+  const handleItemPress = useCallback(
+    (route: string) => {
+      setOpenIndex(null)
+      onNavigate?.(route)
+    },
+    [onNavigate],
+  )
 
   if (segments.length === 0) return null
 
@@ -109,9 +165,7 @@ export const TabletBreadcrumb = memo(function TabletBreadcrumb({
                 style={{
                   paddingHorizontal: 8,
                   paddingVertical: 5,
-                  backgroundColor: isPage
-                    ? accentTint(accentColor, isDark ? 0.12 : 0.08)
-                    : 'transparent',
+                  backgroundColor: isPage ? accentTint(accentColor, isDark ? 0.12 : 0.08) : 'transparent',
                   gap: 4,
                 }}
               >
@@ -133,11 +187,13 @@ export const TabletBreadcrumb = memo(function TabletBreadcrumb({
                 )}
 
                 {/* Label */}
-                <Text style={{
-                  fontSize: 13,
-                  fontWeight: isPage ? '600' : '500',
-                  color: isPage ? accentColor : isDark ? '#c4c4cc' : palette.textSecondary,
-                }}>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: isPage ? '600' : '500',
+                    color: isPage ? accentColor : isDark ? '#c4c4cc' : palette.textSecondary,
+                  }}
+                >
                   {seg.label}
                 </Text>
 
@@ -173,32 +229,44 @@ export const TabletBreadcrumb = memo(function TabletBreadcrumb({
 
 // ── Dropdown as a Modal overlay ──
 function DropdownModal({
-  segment, palette, isDark, accent, onItemPress, onClose,
+  segment,
+  palette,
+  isDark,
+  accent,
+  onItemPress,
+  onClose,
 }: {
-  segment: BreadcrumbSegment; palette: Palette; isDark: boolean; accent: string;
-  onItemPress: (route: string) => void; onClose: () => void;
+  segment: BreadcrumbSegment
+  palette: Palette
+  isDark: boolean
+  accent: string
+  onItemPress: (route: string) => void
+  onClose: () => void
 }) {
   const isPageLevel = segment.level === 'page'
-  const hasGroups = segment.siblings.some(s => s.group)
+  const hasGroups = segment.siblings.some((s) => s.group)
 
   // Build grouped structure for horizontal column layout
   const groups: { name: string; iconName?: string; items: typeof segment.siblings }[] = []
   if (hasGroups) {
     for (const item of segment.siblings) {
       const gName = item.group || 'Other'
-      const existing = groups.find(g => g.name === gName)
+      const existing = groups.find((g) => g.name === gName)
       if (existing) existing.items.push(item)
       else groups.push({ name: gName, iconName: item.groupIconName, items: [item] })
     }
   }
 
-  const renderItem = (item: typeof segment.siblings[0]) => {
+  const renderItem = (item: (typeof segment.siblings)[0]) => {
     const isCurrent = item.num === segment.num
     const Icon = ICON_MAP[item.iconName]
     return (
       <Pressable
         key={item.key}
-        onPress={() => { onItemPress(item.route); onClose() }}
+        onPress={() => {
+          onItemPress(item.route)
+          onClose()
+        }}
         className="flex-row items-center rounded-xl active:opacity-70"
         style={{
           paddingHorizontal: 10,
@@ -210,29 +278,34 @@ function DropdownModal({
         <View
           className="items-center justify-center rounded-lg"
           style={{
-            width: 28, height: 28,
+            width: 28,
+            height: 28,
             backgroundColor: isCurrent
               ? accentTint(accent, isDark ? 0.18 : 0.1)
-              : isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+              : isDark
+                ? 'rgba(255,255,255,0.05)'
+                : 'rgba(0,0,0,0.04)',
           }}
         >
           {Icon && <Icon size={14} color={isCurrent ? accent : palette.textSecondary} strokeWidth={1.8} />}
         </View>
         <View className="flex-1">
-          <Text style={{
-            fontSize: 13,
-            fontWeight: isCurrent ? '600' : '400',
-            color: isCurrent ? accent : palette.text,
-          }}>
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: isCurrent ? '600' : '400',
+              color: isCurrent ? accent : palette.text,
+            }}
+          >
             {item.label}
           </Text>
           {isPageLevel && item.desc && (
-            <Text style={{ fontSize: 11, color: palette.textTertiary, marginTop: 1 }} numberOfLines={1}>{item.desc}</Text>
+            <Text style={{ fontSize: 11, color: palette.textTertiary, marginTop: 1 }} numberOfLines={1}>
+              {item.desc}
+            </Text>
           )}
         </View>
-        {isCurrent && (
-          <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: accent }} />
-        )}
+        {isCurrent && <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: accent }} />}
       </Pressable>
     )
   }
@@ -265,14 +338,22 @@ function DropdownModal({
           {hasGroups ? (
             /* Grouped: horizontal columns like web */
             <View className="flex-row" style={{ gap: 4 }}>
-              {groups.map(g => {
+              {groups.map((g) => {
                 const GIcon = g.iconName ? ICON_MAP[g.iconName] : null
                 return (
                   <View key={g.name} style={{ flex: 1 }}>
                     {/* Group header */}
                     <View className="flex-row items-center px-3 pt-2 pb-2 mb-1" style={{ gap: 6 }}>
                       {GIcon && <GIcon size={15} color={palette.textSecondary} strokeWidth={1.8} />}
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '700',
+                          color: palette.textSecondary,
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.5,
+                        }}
+                      >
                         {g.name}
                       </Text>
                     </View>
@@ -287,7 +368,15 @@ function DropdownModal({
               {segment.parentLabel && (
                 <View className="flex-row items-center px-3 pt-1 pb-2" style={{ gap: 6 }}>
                   <View style={{ width: 2, height: 14, borderRadius: 1, backgroundColor: accent }} />
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: palette.textTertiary, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '700',
+                      color: palette.textTertiary,
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.8,
+                    }}
+                  >
                     {segment.parentLabel}
                   </Text>
                 </View>

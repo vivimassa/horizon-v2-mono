@@ -61,15 +61,7 @@ export function useToast() {
   return ctx
 }
 
-export function Toast({
-  children,
-  className,
-  style,
-}: {
-  children: React.ReactNode
-  className?: string
-  style?: any
-}) {
+export function Toast({ children, className, style }: { children: React.ReactNode; className?: string; style?: any }) {
   return (
     <View
       className={`rounded-xl px-4 py-3 shadow-lg w-full ${className ?? ''}`}
@@ -107,6 +99,8 @@ export function ToastDescription({
   style?: any
 }) {
   return (
-    <Text className={`text-xs mt-0.5 ${className ?? ''}`} style={style}>{children}</Text>
+    <Text className={`text-xs mt-0.5 ${className ?? ''}`} style={style}>
+      {children}
+    </Text>
   )
 }

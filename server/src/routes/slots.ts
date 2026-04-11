@@ -150,12 +150,13 @@ function parseTimeToHHMM(timeStr: string | null): number | null {
 // ── Route Registration ──
 
 export async function slotRoutes(app: FastifyInstance): Promise<void> {
-
   // ─── GET /slots/airports ───
   app.get('/slots/airports', async () => {
     const airports = await Airport.find({
       isSlotControlled: true,
-    }).sort({ iataCode: 1 }).lean()
+    })
+      .sort({ iataCode: 1 })
+      .lean()
 
     return airports.map((a: Record<string, unknown>) => ({
       iataCode: a.iataCode ?? '',
@@ -171,42 +172,51 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
   // ─── GET /slots/fleet-stats ───
   // Returns per-airport aggregated stats for the fleet overview
   app.get('/slots/fleet-stats', async (req) => {
-    const { operatorId, seasonCode } = z.object({
-      operatorId: z.string().min(1),
-      seasonCode: z.string().regex(/^[SW]\d{2}$/),
-    }).parse(req.query)
+    const { operatorId, seasonCode } = z
+      .object({
+        operatorId: z.string().min(1),
+        seasonCode: z.string().regex(/^[SW]\d{2}$/),
+      })
+      .parse(req.query)
 
     // Get all series grouped by airport
     const seriesAgg = await SlotSeries.aggregate([
       { $match: { operatorId, seasonCode } },
-      { $group: {
-        _id: '$airportIata',
-        total: { $sum: 1 },
-        confirmed: { $sum: { $cond: [{ $eq: ['$status', 'confirmed'] }, 1, 0] } },
-        offered: { $sum: { $cond: [{ $eq: ['$status', 'offered'] }, 1, 0] } },
-        waitlisted: { $sum: { $cond: [{ $eq: ['$status', 'waitlisted'] }, 1, 0] } },
-        refused: { $sum: { $cond: [{ $eq: ['$status', 'refused'] }, 1, 0] } },
-        draft: { $sum: { $cond: [{ $eq: ['$status', 'draft'] }, 1, 0] } },
-        submitted: { $sum: { $cond: [{ $eq: ['$status', 'submitted'] }, 1, 0] } },
-        seriesIds: { $push: '$_id' },
-      }},
+      {
+        $group: {
+          _id: '$airportIata',
+          total: { $sum: 1 },
+          confirmed: { $sum: { $cond: [{ $eq: ['$status', 'confirmed'] }, 1, 0] } },
+          offered: { $sum: { $cond: [{ $eq: ['$status', 'offered'] }, 1, 0] } },
+          waitlisted: { $sum: { $cond: [{ $eq: ['$status', 'waitlisted'] }, 1, 0] } },
+          refused: { $sum: { $cond: [{ $eq: ['$status', 'refused'] }, 1, 0] } },
+          draft: { $sum: { $cond: [{ $eq: ['$status', 'draft'] }, 1, 0] } },
+          submitted: { $sum: { $cond: [{ $eq: ['$status', 'submitted'] }, 1, 0] } },
+          seriesIds: { $push: '$_id' },
+        },
+      },
     ])
 
     // Get utilization for all series at once (past dates only)
     const today = new Date().toISOString().split('T')[0]
     const allSeriesIds = seriesAgg.flatMap((a: Record<string, unknown>) => (a.seriesIds as string[]) || [])
-    const dateAgg = allSeriesIds.length > 0 ? await SlotDate.aggregate([
-      { $match: { seriesId: { $in: allSeriesIds }, slotDate: { $lte: today } } },
-      { $lookup: { from: 'slotSeries', localField: 'seriesId', foreignField: '_id', as: 'series' } },
-      { $unwind: '$series' },
-      { $group: {
-        _id: '$series.airportIata',
-        totalDates: { $sum: 1 },
-        operated: { $sum: { $cond: [{ $eq: ['$operationStatus', 'operated'] }, 1, 0] } },
-        jnus: { $sum: { $cond: [{ $eq: ['$operationStatus', 'jnus'] }, 1, 0] } },
-        cancelled: { $sum: { $cond: [{ $eq: ['$operationStatus', 'cancelled'] }, 1, 0] } },
-      }},
-    ]) : []
+    const dateAgg =
+      allSeriesIds.length > 0
+        ? await SlotDate.aggregate([
+            { $match: { seriesId: { $in: allSeriesIds }, slotDate: { $lte: today } } },
+            { $lookup: { from: 'slotSeries', localField: 'seriesId', foreignField: '_id', as: 'series' } },
+            { $unwind: '$series' },
+            {
+              $group: {
+                _id: '$series.airportIata',
+                totalDates: { $sum: 1 },
+                operated: { $sum: { $cond: [{ $eq: ['$operationStatus', 'operated'] }, 1, 0] } },
+                jnus: { $sum: { $cond: [{ $eq: ['$operationStatus', 'jnus'] }, 1, 0] } },
+                cancelled: { $sum: { $cond: [{ $eq: ['$operationStatus', 'cancelled'] }, 1, 0] } },
+              },
+            },
+          ])
+        : []
 
     const dateMap = new Map(dateAgg.map((d: Record<string, unknown>) => [d._id as string, d]))
 
@@ -239,9 +249,7 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
   // ─── GET /slots/series ───
   app.get('/slots/series', async (req) => {
     const { operatorId, airportIata, seasonCode } = seriesQuery.parse(req.query)
-    return SlotSeries.find({ operatorId, airportIata, seasonCode })
-      .sort({ arrivalFlightNumber: 1 })
-      .lean()
+    return SlotSeries.find({ operatorId, airportIata, seasonCode }).sort({ arrivalFlightNumber: 1 }).lean()
   })
 
   // ─── GET /slots/series/:id ───
@@ -278,12 +286,15 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
   // ─── GET /slots/stats ───
   app.get('/slots/stats', async (req) => {
     const { operatorId, airportIata, seasonCode } = seriesQuery.parse(req.query)
-    const seriesList = await SlotSeries.find({ operatorId, airportIata, seasonCode })
-      .select('_id status').lean()
+    const seriesList = await SlotSeries.find({ operatorId, airportIata, seasonCode }).select('_id status').lean()
 
     const stats = {
       totalSeries: seriesList.length,
-      confirmed: 0, offered: 0, waitlisted: 0, refused: 0, atRisk80: 0,
+      confirmed: 0,
+      offered: 0,
+      waitlisted: 0,
+      refused: 0,
+      atRisk80: 0,
     }
     for (const s of seriesList) {
       if (s.status === 'confirmed') stats.confirmed++
@@ -295,15 +306,17 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
     // Compute at-risk from utilization (past dates only)
     if (seriesList.length > 0) {
       const today = new Date().toISOString().split('T')[0]
-      const seriesIds = seriesList.map(s => s._id)
+      const seriesIds = seriesList.map((s) => s._id)
       const pipeline = [
         { $match: { seriesId: { $in: seriesIds }, slotDate: { $lte: today } } },
-        { $group: {
-          _id: '$seriesId',
-          total: { $sum: 1 },
-          operated: { $sum: { $cond: [{ $eq: ['$operationStatus', 'operated'] }, 1, 0] } },
-          jnus: { $sum: { $cond: [{ $eq: ['$operationStatus', 'jnus'] }, 1, 0] } },
-        }},
+        {
+          $group: {
+            _id: '$seriesId',
+            total: { $sum: 1 },
+            operated: { $sum: { $cond: [{ $eq: ['$operationStatus', 'operated'] }, 1, 0] } },
+            jnus: { $sum: { $cond: [{ $eq: ['$operationStatus', 'jnus'] }, 1, 0] } },
+          },
+        },
       ]
       const agg = await SlotDate.aggregate(pipeline)
       for (const row of agg) {
@@ -321,24 +334,25 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
   // Only past dates count toward utilization — future dates haven't happened yet
   app.get('/slots/utilization', async (req) => {
     const { operatorId, airportIata, seasonCode } = seriesQuery.parse(req.query)
-    const seriesList = await SlotSeries.find({ operatorId, airportIata, seasonCode })
-      .select('_id').lean()
+    const seriesList = await SlotSeries.find({ operatorId, airportIata, seasonCode }).select('_id').lean()
 
     if (!seriesList.length) return []
 
     const today = new Date().toISOString().split('T')[0]
-    const seriesIds = seriesList.map(s => s._id)
+    const seriesIds = seriesList.map((s) => s._id)
     const pipeline = [
       { $match: { seriesId: { $in: seriesIds }, slotDate: { $lte: today } } },
-      { $group: {
-        _id: '$seriesId',
-        total: { $sum: 1 },
-        operated: { $sum: { $cond: [{ $eq: ['$operationStatus', 'operated'] }, 1, 0] } },
-        cancelled: { $sum: { $cond: [{ $eq: ['$operationStatus', 'cancelled'] }, 1, 0] } },
-        jnus: { $sum: { $cond: [{ $eq: ['$operationStatus', 'jnus'] }, 1, 0] } },
-        noShow: { $sum: { $cond: [{ $eq: ['$operationStatus', 'no_show'] }, 1, 0] } },
-        scheduled: { $sum: { $cond: [{ $eq: ['$operationStatus', 'scheduled'] }, 1, 0] } },
-      }},
+      {
+        $group: {
+          _id: '$seriesId',
+          total: { $sum: 1 },
+          operated: { $sum: { $cond: [{ $eq: ['$operationStatus', 'operated'] }, 1, 0] } },
+          cancelled: { $sum: { $cond: [{ $eq: ['$operationStatus', 'cancelled'] }, 1, 0] } },
+          jnus: { $sum: { $cond: [{ $eq: ['$operationStatus', 'jnus'] }, 1, 0] } },
+          noShow: { $sum: { $cond: [{ $eq: ['$operationStatus', 'no_show'] }, 1, 0] } },
+          scheduled: { $sum: { $cond: [{ $eq: ['$operationStatus', 'scheduled'] }, 1, 0] } },
+        },
+      },
     ]
     const agg = await SlotDate.aggregate(pipeline)
 
@@ -365,20 +379,27 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
   // ─── GET /slots/calendar ───
   app.get('/slots/calendar', async (req) => {
     const { operatorId, airportIata, seasonCode } = seriesQuery.parse(req.query)
-    const seriesList = await SlotSeries.find({ operatorId, airportIata, seasonCode })
-      .select('_id').lean()
+    const seriesList = await SlotSeries.find({ operatorId, airportIata, seasonCode }).select('_id').lean()
 
     if (!seriesList.length) return {}
 
-    const seriesIds = seriesList.map(s => s._id)
+    const seriesIds = seriesList.map((s) => s._id)
     const allDates = await SlotDate.find({ seriesId: { $in: seriesIds } })
-      .select('seriesId slotDate operationStatus').sort({ slotDate: 1 }).lean()
+      .select('seriesId slotDate operationStatus')
+      .sort({ slotDate: 1 })
+      .lean()
 
-    const result: Record<string, Array<{ weekNumber: number; operated: number; cancelled: number; jnus: number; total: number }>> = {}
+    const result: Record<
+      string,
+      Array<{ weekNumber: number; operated: number; cancelled: number; jnus: number; total: number }>
+    > = {}
 
     for (const seriesId of seriesIds) {
-      const dates = allDates.filter(d => d.seriesId === seriesId)
-      const weekMap = new Map<number, { weekNumber: number; operated: number; cancelled: number; jnus: number; total: number }>()
+      const dates = allDates.filter((d) => d.seriesId === seriesId)
+      const weekMap = new Map<
+        number,
+        { weekNumber: number; operated: number; cancelled: number; jnus: number; total: number }
+      >()
 
       for (const d of dates) {
         const wk = getISOWeek(new Date(d.slotDate))
@@ -405,12 +426,16 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
         operatorId: q.operatorId,
         arrStation: q.airportIata,
         status: { $in: ['draft', 'active'] },
-      }).sort({ flightNumber: 1 }).lean(),
+      })
+        .sort({ flightNumber: 1 })
+        .lean(),
       ScheduledFlight.find({
         operatorId: q.operatorId,
         depStation: q.airportIata,
         status: { $in: ['draft', 'active'] },
-      }).sort({ flightNumber: 1 }).lean(),
+      })
+        .sort({ flightNumber: 1 })
+        .lean(),
     ])
 
     const result = []
@@ -485,12 +510,14 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string }
     const data = seriesCreateSchema.partial().parse(req.body)
 
-    const needsReExpand = data.periodStart || data.periodEnd ||
-      data.daysOfOperation || data.frequencyRate
+    const needsReExpand = data.periodStart || data.periodEnd || data.daysOfOperation || data.frequencyRate
 
-    await SlotSeries.updateOne({ _id: id }, {
-      $set: { ...data, updatedAt: new Date().toISOString() },
-    })
+    await SlotSeries.updateOne(
+      { _id: id },
+      {
+        $set: { ...data, updatedAt: new Date().toISOString() },
+      },
+    )
 
     if (needsReExpand) {
       const updated = await SlotSeries.findById(id).lean()
@@ -583,9 +610,8 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
     })
 
     // Update last action code on the series
-    const updateField = data.actionSource === 'airline'
-      ? { lastActionCode: data.actionCode }
-      : { lastCoordinatorCode: data.actionCode }
+    const updateField =
+      data.actionSource === 'airline' ? { lastActionCode: data.actionCode } : { lastCoordinatorCode: data.actionCode }
     await SlotSeries.updateOne(
       { _id: data.seriesId },
       { $set: { ...updateField, updatedAt: new Date().toISOString() } },
@@ -601,11 +627,13 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
     // Get flights at this airport
     const [arrivals, departures] = await Promise.all([
       ScheduledFlight.find({
-        operatorId, arrStation: airportIata,
+        operatorId,
+        arrStation: airportIata,
         status: { $in: ['draft', 'active'] },
       }).lean(),
       ScheduledFlight.find({
-        operatorId, depStation: airportIata,
+        operatorId,
+        depStation: airportIata,
         status: { $in: ['draft', 'active'] },
       }).lean(),
     ])
@@ -614,13 +642,14 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
 
     // Check existing
     const existing = await SlotSeries.find({ operatorId, airportIata, seasonCode })
-      .select('arrivalFlightNumber departureFlightNumber').lean()
+      .select('arrivalFlightNumber departureFlightNumber')
+      .lean()
     const existingFlights = new Set(
-      existing.flatMap(s => [s.arrivalFlightNumber, s.departureFlightNumber].filter(Boolean))
+      existing.flatMap((s) => [s.arrivalFlightNumber, s.departureFlightNumber].filter(Boolean)),
     )
 
     // Build departure lookup
-    const depByNumber = new Map<string, typeof departures[0]>()
+    const depByNumber = new Map<string, (typeof departures)[0]>()
     for (const d of departures) depByNumber.set(d.flightNumber, d)
 
     let created = 0
@@ -629,20 +658,24 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
 
     for (const arr of arrivals) {
       const flightKey = `${arr.airlineCode}${arr.flightNumber}`
-      if (existingFlights.has(flightKey)) { skipped++; continue }
+      if (existingFlights.has(flightKey)) {
+        skipped++
+        continue
+      }
 
       // Try to pair: same airline code, flight number ±1
       const fNum = parseInt(arr.flightNumber, 10)
-      const dep = !isNaN(fNum)
-        ? (depByNumber.get(String(fNum + 1)) || depByNumber.get(String(fNum - 1)))
-        : null
+      const dep = !isNaN(fNum) ? depByNumber.get(String(fNum + 1)) || depByNumber.get(String(fNum - 1)) : null
 
       const arrTime = parseTimeToHHMM(arr.staUtc)
       const depTime = dep ? parseTimeToHHMM(dep.stdUtc) : null
 
       const id = crypto.randomUUID()
       await SlotSeries.create({
-        _id: id, operatorId, airportIata, seasonCode,
+        _id: id,
+        operatorId,
+        airportIata,
+        seasonCode,
         arrivalFlightNumber: flightKey,
         departureFlightNumber: dep ? `${dep.airlineCode}${dep.flightNumber}` : null,
         arrivalOriginIata: arr.depStation,
@@ -655,13 +688,22 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
         daysOfOperation: arr.daysOfWeek || '1234567',
         frequencyRate: 1,
         aircraftTypeIcao: arr.aircraftTypeIcao,
-        arrivalServiceType: 'J', departureServiceType: 'J',
-        status: 'draft', priorityCategory: 'new',
+        arrivalServiceType: 'J',
+        departureServiceType: 'J',
+        status: 'draft',
+        priorityCategory: 'new',
         linkedScheduledFlightId: arr._id,
-        createdAt: now, updatedAt: now,
+        createdAt: now,
+        updatedAt: now,
       })
 
-      const dates = expandSeriesToDates(id, new Date(arr.effectiveFrom), new Date(arr.effectiveUntil), arr.daysOfWeek || '1234567', 1)
+      const dates = expandSeriesToDates(
+        id,
+        new Date(arr.effectiveFrom),
+        new Date(arr.effectiveUntil),
+        arr.daysOfWeek || '1234567',
+        1,
+      )
       if (dates.length) await SlotDate.insertMany(dates)
 
       created++
@@ -671,11 +713,17 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
     // Handle remaining unpaired departures
     for (const [, dep] of depByNumber) {
       const flightKey = `${dep.airlineCode}${dep.flightNumber}`
-      if (existingFlights.has(flightKey)) { skipped++; continue }
+      if (existingFlights.has(flightKey)) {
+        skipped++
+        continue
+      }
 
       const id = crypto.randomUUID()
       await SlotSeries.create({
-        _id: id, operatorId, airportIata, seasonCode,
+        _id: id,
+        operatorId,
+        airportIata,
+        seasonCode,
         departureFlightNumber: flightKey,
         departureDestIata: dep.arrStation,
         requestedDepartureTime: parseTimeToHHMM(dep.stdUtc),
@@ -685,13 +733,22 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
         daysOfOperation: dep.daysOfWeek || '1234567',
         frequencyRate: 1,
         aircraftTypeIcao: dep.aircraftTypeIcao,
-        arrivalServiceType: 'J', departureServiceType: 'J',
-        status: 'draft', priorityCategory: 'new',
+        arrivalServiceType: 'J',
+        departureServiceType: 'J',
+        status: 'draft',
+        priorityCategory: 'new',
         linkedScheduledFlightId: dep._id,
-        createdAt: now, updatedAt: now,
+        createdAt: now,
+        updatedAt: now,
       })
 
-      const dates = expandSeriesToDates(id, new Date(dep.effectiveFrom), new Date(dep.effectiveUntil), dep.daysOfWeek || '1234567', 1)
+      const dates = expandSeriesToDates(
+        id,
+        new Date(dep.effectiveFrom),
+        new Date(dep.effectiveUntil),
+        dep.daysOfWeek || '1234567',
+        1,
+      )
       if (dates.length) await SlotDate.insertMany(dates)
 
       created++
@@ -705,7 +762,8 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
     const { operatorId, airportIata, seasonCode } = seriesQuery.parse(req.body)
 
     const seriesList = await SlotSeries.find({ operatorId, airportIata, seasonCode })
-      .select('_id arrivalFlightNumber departureFlightNumber').lean()
+      .select('_id arrivalFlightNumber departureFlightNumber')
+      .lean()
 
     if (!seriesList.length) return { synced: 0, errors: 0 }
 
@@ -723,7 +781,9 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
       const instances = await FlightInstance.find({
         operatorId,
         flightNumber: { $in: flightNumbers },
-      }).select('flightNumber operatingDate status').lean()
+      })
+        .select('flightNumber operatingDate status')
+        .lean()
 
       if (!instances.length) continue
 
@@ -731,8 +791,12 @@ export async function slotRoutes(app: FastifyInstance): Promise<void> {
       for (const inst of instances) {
         const dateKey = inst.operatingDate
         const current = statusByDate.get(dateKey)
-        if (!current || inst.status === 'completed' || inst.status === 'arrived' ||
-            (inst.status === 'cancelled' && current === 'scheduled')) {
+        if (
+          !current ||
+          inst.status === 'completed' ||
+          inst.status === 'arrived' ||
+          (inst.status === 'cancelled' && current === 'scheduled')
+        ) {
           statusByDate.set(dateKey, inst.status)
         }
       }

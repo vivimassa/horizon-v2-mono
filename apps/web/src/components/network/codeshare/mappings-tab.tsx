@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useMemo } from 'react'
 import { Plus, Upload, Download, Trash2, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle } from 'lucide-react'
@@ -30,7 +30,7 @@ const DOW_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 function formatDateShort(d: string) {
   if (!d) return ''
   const dt = new Date(d + 'T00:00:00')
-  const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
+  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
   return `${String(dt.getDate()).padStart(2, '0')}${months[dt.getMonth()]}`
 }
 
@@ -39,8 +39,17 @@ function statusLabel(s: string) {
 }
 
 export function MappingsTab({
-  agreement, operatorCode, mappings, stats, healthMap, isDark,
-  onAddMapping, onEditMapping, onBulkImport, onSwitchTab, onMappingChanged,
+  agreement,
+  operatorCode,
+  mappings,
+  stats,
+  healthMap,
+  isDark,
+  onAddMapping,
+  onEditMapping,
+  onBulkImport,
+  onSwitchTab,
+  onMappingChanged,
 }: MappingsTabProps) {
   const palette = isDark ? colors.dark : colors.light
   const accent = MODULE_THEMES.network.accent
@@ -54,11 +63,21 @@ export function MappingsTab({
     arr.sort((a, b) => {
       let cmp = 0
       switch (sortCol) {
-        case 'operating': cmp = a.operatingFlightNumber.localeCompare(b.operatingFlightNumber, undefined, { numeric: true }); break
-        case 'marketing': cmp = a.marketingFlightNumber.localeCompare(b.marketingFlightNumber, undefined, { numeric: true }); break
-        case 'route': cmp = `${a.departureIata}${a.arrivalIata}`.localeCompare(`${b.departureIata}${b.arrivalIata}`); break
-        case 'effective': cmp = a.effectiveFrom.localeCompare(b.effectiveFrom); break
-        case 'status': cmp = a.status.localeCompare(b.status); break
+        case 'operating':
+          cmp = a.operatingFlightNumber.localeCompare(b.operatingFlightNumber, undefined, { numeric: true })
+          break
+        case 'marketing':
+          cmp = a.marketingFlightNumber.localeCompare(b.marketingFlightNumber, undefined, { numeric: true })
+          break
+        case 'route':
+          cmp = `${a.departureIata}${a.arrivalIata}`.localeCompare(`${b.departureIata}${b.arrivalIata}`)
+          break
+        case 'effective':
+          cmp = a.effectiveFrom.localeCompare(b.effectiveFrom)
+          break
+        case 'status':
+          cmp = a.status.localeCompare(b.status)
+          break
       }
       return sortAsc ? cmp : -cmp
     })
@@ -67,7 +86,10 @@ export function MappingsTab({
 
   function toggleSort(col: SortCol) {
     if (sortCol === col) setSortAsc(!sortAsc)
-    else { setSortCol(col); setSortAsc(true) }
+    else {
+      setSortCol(col)
+      setSortAsc(true)
+    }
   }
 
   async function handleDelete(id: string) {
@@ -77,8 +99,16 @@ export function MappingsTab({
 
   const typeChipStyle = (type: string) =>
     type === 'block_space' || type === 'hard_block'
-      ? { background: 'rgba(139,92,246,0.10)', color: isDark ? '#c4b5fd' : '#7c3aed', border: '1px solid rgba(139,92,246,0.15)' }
-      : { background: 'rgba(59,130,246,0.10)', color: isDark ? '#93c5fd' : '#2563eb', border: '1px solid rgba(59,130,246,0.15)' }
+      ? {
+          background: 'rgba(139,92,246,0.10)',
+          color: isDark ? '#c4b5fd' : '#7c3aed',
+          border: '1px solid rgba(139,92,246,0.15)',
+        }
+      : {
+          background: 'rgba(59,130,246,0.10)',
+          color: isDark ? '#93c5fd' : '#2563eb',
+          border: '1px solid rgba(59,130,246,0.15)',
+        }
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
@@ -92,7 +122,13 @@ export function MappingsTab({
           isDark={isDark}
           palette={palette}
         />
-        <KpiCard value={AGREEMENT_TYPE_LABELS[agreement.agreementType]} label="Agreement Type" textValue isDark={isDark} palette={palette} />
+        <KpiCard
+          value={AGREEMENT_TYPE_LABELS[agreement.agreementType]}
+          label="Agreement Type"
+          textValue
+          isDark={isDark}
+          palette={palette}
+        />
       </div>
 
       {/* Toolbar */}
@@ -115,8 +151,12 @@ export function MappingsTab({
             border: `1px solid ${glassBorder}`,
             color: palette.textSecondary,
           }}
-          onMouseEnter={e => { e.currentTarget.style.color = palette.text }}
-          onMouseLeave={e => { e.currentTarget.style.color = palette.textSecondary }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = palette.text
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = palette.textSecondary
+          }}
         >
           <Upload size={14} />
           Bulk import
@@ -144,20 +184,68 @@ export function MappingsTab({
       <div className="flex-1 overflow-y-auto">
         <table className="w-full">
           <thead>
-            <tr className="sticky top-0 z-10" style={{ background: isDark ? 'rgba(25,25,33,0.95)' : 'rgba(255,255,255,0.95)' }}>
+            <tr
+              className="sticky top-0 z-10"
+              style={{ background: isDark ? 'rgba(25,25,33,0.95)' : 'rgba(255,255,255,0.95)' }}
+            >
               <th className="w-9 px-3 py-2" />
-              <SortTh col="operating" label="Operating flt" sortCol={sortCol} sortAsc={sortAsc} onClick={toggleSort} palette={palette} />
-              <SortTh col="marketing" label="Marketing flt" sortCol={sortCol} sortAsc={sortAsc} onClick={toggleSort} palette={palette} />
-              <SortTh col="route" label="Route" sortCol={sortCol} sortAsc={sortAsc} onClick={toggleSort} palette={palette} />
-              <th className="text-[13px] font-semibold uppercase tracking-wider text-left px-2.5 py-2" style={{ color: palette.textTertiary }}>DOW</th>
-              <th className="text-[13px] font-semibold uppercase tracking-wider text-left px-2.5 py-2" style={{ color: palette.textTertiary }}>Type</th>
-              <SortTh col="effective" label="Effective" sortCol={sortCol} sortAsc={sortAsc} onClick={toggleSort} palette={palette} />
-              <SortTh col="status" label="Status" sortCol={sortCol} sortAsc={sortAsc} onClick={toggleSort} palette={palette} />
+              <SortTh
+                col="operating"
+                label="Operating flt"
+                sortCol={sortCol}
+                sortAsc={sortAsc}
+                onClick={toggleSort}
+                palette={palette}
+              />
+              <SortTh
+                col="marketing"
+                label="Marketing flt"
+                sortCol={sortCol}
+                sortAsc={sortAsc}
+                onClick={toggleSort}
+                palette={palette}
+              />
+              <SortTh
+                col="route"
+                label="Route"
+                sortCol={sortCol}
+                sortAsc={sortAsc}
+                onClick={toggleSort}
+                palette={palette}
+              />
+              <th
+                className="text-[13px] font-semibold uppercase tracking-wider text-left px-2.5 py-2"
+                style={{ color: palette.textTertiary }}
+              >
+                DOW
+              </th>
+              <th
+                className="text-[13px] font-semibold uppercase tracking-wider text-left px-2.5 py-2"
+                style={{ color: palette.textTertiary }}
+              >
+                Type
+              </th>
+              <SortTh
+                col="effective"
+                label="Effective"
+                sortCol={sortCol}
+                sortAsc={sortAsc}
+                onClick={toggleSort}
+                palette={palette}
+              />
+              <SortTh
+                col="status"
+                label="Status"
+                sortCol={sortCol}
+                sortAsc={sortAsc}
+                onClick={toggleSort}
+                palette={palette}
+              />
               <th className="w-10 px-2 py-2" />
             </tr>
           </thead>
           <tbody>
-            {sorted.map(m => {
+            {sorted.map((m) => {
               const health = (healthMap[m._id] || 'valid') as MappingHealth
               const hi = HEALTH_INDICATORS[health]
               const sc = STATUS_COLORS[m.status] || STATUS_COLORS.pending
@@ -168,8 +256,12 @@ export function MappingsTab({
                   onClick={() => onEditMapping(m)}
                   className="h-10 cursor-pointer transition-colors duration-150"
                   style={{ borderBottom: `1px solid ${glassBorder}` }}
-                  onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent'
+                  }}
                 >
                   {/* Health dot */}
                   <td className="px-3">
@@ -179,7 +271,12 @@ export function MappingsTab({
                       title={hi.title}
                     />
                     {health !== 'valid' && (
-                      <AlertTriangle size={13} className="inline-block ml-1 -mt-0.5" style={{ color: hi.color }} title={hi.title} />
+                      <AlertTriangle
+                        size={13}
+                        className="inline-block ml-1 -mt-0.5"
+                        style={{ color: hi.color }}
+                        title={hi.title}
+                      />
                     )}
                   </td>
 
@@ -243,11 +340,20 @@ export function MappingsTab({
                   <td className="px-2">
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); handleDelete(m._id) }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDelete(m._id)
+                      }}
                       className="h-7 w-7 rounded-lg flex items-center justify-center transition-colors duration-150"
                       style={{ color: palette.textTertiary }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,59,59,0.1)'; e.currentTarget.style.color = '#FF3B3B' }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = palette.textTertiary }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(255,59,59,0.1)'
+                        e.currentTarget.style.color = '#FF3B3B'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent'
+                        e.currentTarget.style.color = palette.textTertiary
+                      }}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -272,8 +378,18 @@ export function MappingsTab({
 
 // ── Sub-components ──
 
-function KpiCard({ value, label, textValue, isDark, palette }: {
-  value: string; label: string; textValue?: boolean; isDark: boolean; palette: ReturnType<typeof colors.dark & typeof colors.light>
+function KpiCard({
+  value,
+  label,
+  textValue,
+  isDark,
+  palette,
+}: {
+  value: string
+  label: string
+  textValue?: boolean
+  isDark: boolean
+  palette: ReturnType<typeof colors.dark & typeof colors.light>
 }) {
   const glassBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)'
   const glassBorder = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'
@@ -285,14 +401,27 @@ function KpiCard({ value, label, textValue, isDark, palette }: {
       >
         {value}
       </div>
-      <div className="text-[13px] mt-1" style={{ color: palette.textSecondary }}>{label}</div>
+      <div className="text-[13px] mt-1" style={{ color: palette.textSecondary }}>
+        {label}
+      </div>
     </div>
   )
 }
 
-function SortTh({ col, label, sortCol, sortAsc, onClick, palette }: {
-  col: SortCol; label: string; sortCol: SortCol; sortAsc: boolean
-  onClick: (col: SortCol) => void; palette: any
+function SortTh({
+  col,
+  label,
+  sortCol,
+  sortAsc,
+  onClick,
+  palette,
+}: {
+  col: SortCol
+  label: string
+  sortCol: SortCol
+  sortAsc: boolean
+  onClick: (col: SortCol) => void
+  palette: any
 }) {
   const Icon = sortCol !== col ? ArrowUpDown : sortAsc ? ArrowUp : ArrowDown
   return (
@@ -302,8 +431,12 @@ function SortTh({ col, label, sortCol, sortAsc, onClick, palette }: {
         onClick={() => onClick(col)}
         className="flex items-center gap-1 text-[13px] font-semibold uppercase tracking-wider transition-colors duration-150"
         style={{ color: palette.textTertiary }}
-        onMouseEnter={e => { e.currentTarget.style.color = palette.text }}
-        onMouseLeave={e => { e.currentTarget.style.color = palette.textTertiary }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = palette.text
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = palette.textTertiary
+        }}
       >
         {label}
         <Icon size={13} style={{ opacity: sortCol === col ? 1 : 0.3 }} />
@@ -324,7 +457,7 @@ function DowPillsReadonly({ value, isDark, accent }: { value: string; isDark: bo
             className="w-5 h-5 rounded text-[13px] font-medium flex items-center justify-center"
             style={{
               background: active ? accentTint(accent, isDark ? 0.2 : 0.12) : 'transparent',
-              color: active ? accent : (isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'),
+              color: active ? accent : isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)',
             }}
           >
             {lbl}

@@ -16,7 +16,16 @@ export interface BreadcrumbSegment {
   label: string
   route: string
   iconName: string
-  siblings: Array<{ key: string; label: string; num: string; route: string; iconName: string; desc?: string; group?: string; groupIconName?: string }>
+  siblings: Array<{
+    key: string
+    label: string
+    num: string
+    route: string
+    iconName: string
+    desc?: string
+    group?: string
+    groupIconName?: string
+  }>
   parentLabel?: string
   hideNum?: boolean
   /** When true, show descriptions in the dropdown (used when section shows its pages) */
@@ -79,7 +88,7 @@ export function resolveNavPath(pathname: string): NavPath | null {
   // e.g. /admin resolves to the master-database section (pages are /admin/airports, etc.)
   for (const mod of NAV_TREE) {
     for (const section of mod.sections) {
-      if (section.pages.some(p => p.route.startsWith(pathname + '/'))) {
+      if (section.pages.some((p) => p.route.startsWith(pathname + '/'))) {
         return { module: mod, section }
       }
     }
@@ -136,7 +145,11 @@ export function buildBreadcrumbs(path: NavPath): BreadcrumbSegment[] {
     iconName: path.module.iconName,
     hideNum,
     siblings: NAV_TREE.map((m) => ({
-      key: m.key, label: m.label, num: m.num, route: firstRoute(m), iconName: m.iconName,
+      key: m.key,
+      label: m.label,
+      num: m.num,
+      route: firstRoute(m),
+      iconName: m.iconName,
     })),
   })
 
@@ -148,10 +161,21 @@ export function buildBreadcrumbs(path: NavPath): BreadcrumbSegment[] {
     const usePageSiblings = sectionSiblings.length <= 1
     const siblings = usePageSiblings
       ? path.section.pages.map((p) => ({
-          key: p.key, label: p.label, num: p.num, route: p.route, iconName: p.iconName, desc: p.desc, group: p.group, groupIconName: p.groupIconName,
+          key: p.key,
+          label: p.label,
+          num: p.num,
+          route: p.route,
+          iconName: p.iconName,
+          desc: p.desc,
+          group: p.group,
+          groupIconName: p.groupIconName,
         }))
       : sectionSiblings.map((s) => ({
-          key: s.key, label: s.label, num: s.num, route: firstSectionRoute(s), iconName: s.iconName,
+          key: s.key,
+          label: s.label,
+          num: s.num,
+          route: firstSectionRoute(s),
+          iconName: s.iconName,
         }))
 
     segs.push({
@@ -182,7 +206,14 @@ export function buildBreadcrumbs(path: NavPath): BreadcrumbSegment[] {
       hideNum,
       parentLabel: skipSection ? path.module.label : path.section.label,
       siblings: allPages.map((p) => ({
-        key: p.key, label: p.label, num: p.num, route: p.route, iconName: p.iconName, desc: p.desc, group: p.group, groupIconName: p.groupIconName,
+        key: p.key,
+        label: p.label,
+        num: p.num,
+        route: p.route,
+        iconName: p.iconName,
+        desc: p.desc,
+        group: p.group,
+        groupIconName: p.groupIconName,
       })),
     })
   }
@@ -195,15 +226,27 @@ export function getSiblings(
 ): Array<{ key: string; label: string; num: string; route: string; iconName: string }> {
   if (path.page && path.section) {
     return path.section.pages.map((p) => ({
-      key: p.key, label: p.label, num: p.num, route: p.route, iconName: p.iconName,
+      key: p.key,
+      label: p.label,
+      num: p.num,
+      route: p.route,
+      iconName: p.iconName,
     }))
   }
   if (path.section) {
     return path.module.sections.map((s) => ({
-      key: s.key, label: s.label, num: s.num, route: firstSectionRoute(s), iconName: s.iconName,
+      key: s.key,
+      label: s.label,
+      num: s.num,
+      route: firstSectionRoute(s),
+      iconName: s.iconName,
     }))
   }
   return NAV_TREE.map((m) => ({
-    key: m.key, label: m.label, num: m.num, route: firstRoute(m), iconName: m.iconName,
+    key: m.key,
+    label: m.label,
+    num: m.num,
+    route: firstRoute(m),
+    iconName: m.iconName,
   }))
 }

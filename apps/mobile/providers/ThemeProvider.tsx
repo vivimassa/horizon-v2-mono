@@ -91,7 +91,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [isDark])
 
   return (
-    <ThemeCtx.Provider value={{ isDark, palette, accent: resolvedAccent, rawAccent: accent, isTablet, fonts, fs, toggleDark, setAccent }}>
+    <ThemeCtx.Provider
+      value={{ isDark, palette, accent: resolvedAccent, rawAccent: accent, isTablet, fonts, fs, toggleDark, setAccent }}
+    >
       {children}
     </ThemeCtx.Provider>
   )

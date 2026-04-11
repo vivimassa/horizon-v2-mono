@@ -9,11 +9,13 @@ Full-featured Gantt chart for tablet and phone, built with React Native + Skia. 
 ## Interaction Model
 
 ### Single Tap on Flight Bar
+
 - Opens a **bottom sheet** with flight summary
 - Bottom sheet has swipeable tabs: **Flight** | **Cycle** (if rotationId) | **Aircraft** | **Day**
 - Dismissible via swipe-down or tap on backdrop
 
 ### Long Press on Flight Bar
+
 - All flights in the **same rotation** begin **jiggling** (iOS delete-mode animation)
 - A **top action bar** slides in with a **"Select All"** button
 - Tapping **Select All** reveals two scope buttons: **"Selected Day"** | **"Entire Period"**
@@ -22,17 +24,21 @@ Full-featured Gantt chart for tablet and phone, built with React Native + Skia. 
 - Tap backdrop or "Done" in action bar to exit selection mode
 
 ### Single Tap on Aircraft Registration (row label)
+
 - Opens bottom sheet on **Aircraft** tab
 
 ### Single Tap on Day/Date Header
+
 - Opens bottom sheet on **Day** tab
 
 ### Pan / Scroll
+
 - **One finger horizontal** = scroll timeline
 - **One finger vertical** = scroll aircraft rows
 - **Two finger pinch** = zoom in/out time axis
 
 ### Selection Mode (entered via long press)
+
 - Individual flight taps add/remove from selection
 - "Select All" → "Selected Day" / "Entire Period" for rotation-wide selection
 - "Done" button exits selection mode
@@ -52,29 +58,29 @@ apps/mobile/package.json:
 
 ### Shared (already exists, reuse as-is)
 
-| Asset | Location | Notes |
-|---|---|---|
-| API types | `apps/web/src/lib/gantt/types.ts` | Move to `packages/shared/src/types/gantt.ts` |
-| Virtual placement | `packages/logic/src/utils/virtual-placement.ts` | Rotation-aware block solver |
-| Layout engine logic | `apps/web/src/lib/gantt/layout-engine.ts` | Extract core to `packages/logic/` |
-| Gantt settings | `packages/constants/src/gantt-settings.ts` | TAT, colors, zoom configs |
-| Color helpers | `packages/logic/src/utils/color-helpers.ts` | Bar coloring |
-| Server API | `server/src/routes/gantt.ts` | GET /gantt/flights, PATCH assign/unassign |
-| Theme tokens | `packages/ui/src/theme/` | Colors, typography, shadows |
+| Asset               | Location                                        | Notes                                        |
+| ------------------- | ----------------------------------------------- | -------------------------------------------- |
+| API types           | `apps/web/src/lib/gantt/types.ts`               | Move to `packages/shared/src/types/gantt.ts` |
+| Virtual placement   | `packages/logic/src/utils/virtual-placement.ts` | Rotation-aware block solver                  |
+| Layout engine logic | `apps/web/src/lib/gantt/layout-engine.ts`       | Extract core to `packages/logic/`            |
+| Gantt settings      | `packages/constants/src/gantt-settings.ts`      | TAT, colors, zoom configs                    |
+| Color helpers       | `packages/logic/src/utils/color-helpers.ts`     | Bar coloring                                 |
+| Server API          | `server/src/routes/gantt.ts`                    | GET /gantt/flights, PATCH assign/unassign    |
+| Theme tokens        | `packages/ui/src/theme/`                        | Colors, typography, shadows                  |
 
 ### Mobile-Specific (new)
 
-| Component | Location | Purpose |
-|---|---|---|
-| Gantt screen | `apps/mobile/app/(tabs)/network/gantt.tsx` | Entry point, navigation |
-| Gantt store | `apps/mobile/src/stores/use-mobile-gantt-store.ts` | Zustand store (mobile-specific view state) |
-| Skia canvas | `apps/mobile/src/components/gantt/gantt-canvas.tsx` | Skia-based flight bar + grid renderer |
-| Time header | `apps/mobile/src/components/gantt/time-header.tsx` | Sticky date/hour header |
-| Row labels | `apps/mobile/src/components/gantt/row-labels.tsx` | Aircraft registration column |
-| Bottom sheet | `apps/mobile/src/components/gantt/gantt-detail-sheet.tsx` | Tabbed detail sheet (Flight/Cycle/Aircraft/Day) |
-| Selection bar | `apps/mobile/src/components/gantt/selection-action-bar.tsx` | Top bar during selection mode |
-| Filter sheet | `apps/mobile/src/components/gantt/gantt-filter-sheet.tsx` | Period picker + filters (bottom sheet) |
-| Hit testing | `apps/mobile/src/lib/gantt/hit-testing.ts` | Touch coordinate → flight/row/header mapping |
+| Component     | Location                                                    | Purpose                                         |
+| ------------- | ----------------------------------------------------------- | ----------------------------------------------- |
+| Gantt screen  | `apps/mobile/app/(tabs)/network/gantt.tsx`                  | Entry point, navigation                         |
+| Gantt store   | `apps/mobile/src/stores/use-mobile-gantt-store.ts`          | Zustand store (mobile-specific view state)      |
+| Skia canvas   | `apps/mobile/src/components/gantt/gantt-canvas.tsx`         | Skia-based flight bar + grid renderer           |
+| Time header   | `apps/mobile/src/components/gantt/time-header.tsx`          | Sticky date/hour header                         |
+| Row labels    | `apps/mobile/src/components/gantt/row-labels.tsx`           | Aircraft registration column                    |
+| Bottom sheet  | `apps/mobile/src/components/gantt/gantt-detail-sheet.tsx`   | Tabbed detail sheet (Flight/Cycle/Aircraft/Day) |
+| Selection bar | `apps/mobile/src/components/gantt/selection-action-bar.tsx` | Top bar during selection mode                   |
+| Filter sheet  | `apps/mobile/src/components/gantt/gantt-filter-sheet.tsx`   | Period picker + filters (bottom sheet)          |
+| Hit testing   | `apps/mobile/src/lib/gantt/hit-testing.ts`                  | Touch coordinate → flight/row/header mapping    |
 
 ---
 
@@ -85,6 +91,7 @@ apps/mobile/package.json:
 **Goal:** Render flights on a scrollable Skia canvas. No interaction beyond scroll/zoom.
 
 **Tasks:**
+
 1. Add `@shopify/react-native-skia` and `@gorhom/bottom-sheet` to `apps/mobile`
 2. Move shared Gantt types from `apps/web/src/lib/gantt/types.ts` to `packages/shared/src/types/gantt.ts`. Update web imports.
 3. Extract core layout computation from `apps/web/src/lib/gantt/layout-engine.ts` into `packages/logic/src/utils/gantt-layout.ts` (pure function, no DOM/web dependencies). Keep web's `layout-engine.ts` as a thin wrapper.
@@ -109,6 +116,7 @@ apps/mobile/package.json:
 12. Create gantt screen at `apps/mobile/app/(tabs)/network/gantt.tsx`
 
 **Acceptance criteria:**
+
 - Flights render as colored bars on correct aircraft rows
 - Smooth 60fps scroll and pinch-zoom
 - Aircraft type groups collapsible via tap on group header
@@ -123,6 +131,7 @@ apps/mobile/package.json:
 **Goal:** Single tap on flight bar, aircraft reg, or day header opens a tabbed detail bottom sheet.
 
 **Tasks:**
+
 1. Implement hit testing for Skia canvas:
    - Touch coordinate → flight bar (using bar layout positions)
    - Touch on row label area → aircraft registration
@@ -158,6 +167,7 @@ apps/mobile/package.json:
 8. Highlight the tapped flight/aircraft/day on canvas while sheet is open
 
 **Acceptance criteria:**
+
 - Single tap opens bottom sheet instantly (<100ms to first frame)
 - Sheet is swipeable between snap points
 - Tabs switch without re-rendering the entire sheet
@@ -171,6 +181,7 @@ apps/mobile/package.json:
 **Goal:** Long press enters selection mode for rotation-based multi-select.
 
 **Tasks:**
+
 1. Implement long-press gesture detection (500ms threshold) on flight bars
 2. On long press trigger:
    - Enter selection mode (`selectionMode: true` in store)
@@ -193,6 +204,7 @@ apps/mobile/package.json:
 7. "Done" button or swipe-dismiss on bottom sheet exits selection mode, clears selection, stops all animations
 
 **Acceptance criteria:**
+
 - Long press feedback: haptic vibration (Expo Haptics) + jiggle starts
 - Jiggle animation is smooth 60fps (Skia render loop, not React state)
 - Action bar appears/disappears with spring animation
@@ -207,6 +219,7 @@ apps/mobile/package.json:
 **Goal:** Production-quality rendering and interaction refinements.
 
 **Tasks:**
+
 1. Bar label rendering:
    - Auto-hide label when bar width < text width + padding
    - Two modes: flight number or sector (DEP-ARR), togglable from filter sheet
@@ -226,6 +239,7 @@ apps/mobile/package.json:
 10. Dark mode: all canvas drawing respects `useTheme()` palette, no hardcoded colors
 
 **Acceptance criteria:**
+
 - 60fps scroll/zoom with 500+ flights loaded
 - Smooth orientation transitions
 - All color modes working
@@ -239,6 +253,7 @@ apps/mobile/package.json:
 **Goal:** Drag a flight bar to a different aircraft row to assign/reassign.
 
 **Tasks:**
+
 1. Implement drag gesture on flight bars (long press + move, distinct from selection long press by movement threshold > 10px)
 2. During drag:
    - Ghost bar follows finger (semi-transparent, Skia overlay)
@@ -257,6 +272,7 @@ apps/mobile/package.json:
    - Visual feedback: green drop zone = valid, red = invalid
 
 **Acceptance criteria:**
+
 - Drag initiates only after 10px movement (prevents conflict with long-press selection)
 - Ghost bar is visually distinct (50% opacity, slight scale up)
 - Drop validation prevents invalid assignments
@@ -270,6 +286,7 @@ apps/mobile/package.json:
 **Goal:** Gantt works offline using WatermelonDB, syncs when reconnected.
 
 **Tasks:**
+
 1. Create WatermelonDB models mirroring Gantt data:
    - `GanttFlightInstance` (expanded per-date flights)
    - `AircraftRegistration` (already exists in WatermelonDB)
@@ -281,6 +298,7 @@ apps/mobile/package.json:
 6. Sync indicator: subtle badge in toolbar showing "Synced" / "Pending changes" / "Offline"
 
 **Acceptance criteria:**
+
 - Gantt loads from local cache instantly on revisit
 - Assignments persist offline and sync on reconnect
 - Conflict resolution doesn't lose data

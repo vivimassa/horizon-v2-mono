@@ -1,153 +1,124 @@
-"use client";
+'use client'
 
-import { useEffect, useState, useMemo, useCallback } from "react";
-import {
-  api,
-  setApiBaseUrl,
-  type AircraftTypeRef,
-  type CrewComplementRef,
-  type CrewPositionRef,
-} from "@skyhub/api";
-import { MasterDetailLayout } from "@/components/layout";
-import { CrewComplementTypeList } from "./crew-complement-type-list";
-import { CrewComplementTable } from "./crew-complement-table";
-import { accentTint } from "@skyhub/ui/theme";
-import { getOperatorId } from "@/stores/use-operator-store";
-import { Users, Sparkles, Plus } from "lucide-react";
+import { useEffect, useState, useMemo, useCallback } from 'react'
+import { api, setApiBaseUrl, type AircraftTypeRef, type CrewComplementRef, type CrewPositionRef } from '@skyhub/api'
+import { MasterDetailLayout } from '@/components/layout'
+import { CrewComplementTypeList } from './crew-complement-type-list'
+import { CrewComplementTable } from './crew-complement-table'
+import { accentTint } from '@skyhub/ui/theme'
+import { getOperatorId } from '@/stores/use-operator-store'
+import { Users, Sparkles, Plus } from 'lucide-react'
 
-setApiBaseUrl("http://localhost:3002");
+setApiBaseUrl('http://localhost:3002')
 
-export const ACCENT = "#7c3aed"; // Crew Ops purple
+export const ACCENT = '#7c3aed' // Crew Ops purple
 
 export function CrewComplementsShell() {
-  const [aircraftTypes, setAircraftTypes] = useState<AircraftTypeRef[]>([]);
-  const [complements, setComplements] = useState<CrewComplementRef[]>([]);
-  const [positions, setPositions] = useState<CrewPositionRef[]>([]);
-  const [selectedType, setSelectedType] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [aircraftTypes, setAircraftTypes] = useState<AircraftTypeRef[]>([])
+  const [complements, setComplements] = useState<CrewComplementRef[]>([])
+  const [positions, setPositions] = useState<CrewPositionRef[]>([])
+  const [selectedType, setSelectedType] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    setLoading(true)
     try {
       const [types, comps, pos] = await Promise.all([
         api.getAircraftTypes(getOperatorId()),
         api.getCrewComplements(getOperatorId()),
         api.getCrewPositions(getOperatorId()),
-      ]);
-      setAircraftTypes(types.filter((t) => t.isActive));
-      setComplements(comps);
-      setPositions(pos);
+      ])
+      setAircraftTypes(types.filter((t) => t.isActive))
+      setComplements(comps)
+      setPositions(pos)
       setSelectedType((prev) => {
-        if (prev && types.some((t) => t.icaoType === prev)) return prev;
-        return types.length > 0 ? types[0].icaoType : null;
-      });
+        if (prev && types.some((t) => t.icaoType === prev)) return prev
+        return types.length > 0 ? types[0].icaoType : null
+      })
     } catch (err) {
-      console.error("Failed to load crew complement data:", err);
+      console.error('Failed to load crew complement data:', err)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchData()
+  }, [fetchData])
 
   // Group complements by aircraft type ICAO
   const byType = useMemo(() => {
-    const map = new Map<string, CrewComplementRef[]>();
+    const map = new Map<string, CrewComplementRef[]>()
     for (const c of complements) {
-      const arr = map.get(c.aircraftTypeIcao);
-      if (arr) arr.push(c);
-      else map.set(c.aircraftTypeIcao, [c]);
+      const arr = map.get(c.aircraftTypeIcao)
+      if (arr) arr.push(c)
+      else map.set(c.aircraftTypeIcao, [c])
     }
-    return map;
-  }, [complements]);
+    return map
+  }, [complements])
 
   const selectedTypeInfo = useMemo(
     () => aircraftTypes.find((t) => t.icaoType === selectedType) ?? null,
-    [aircraftTypes, selectedType]
-  );
+    [aircraftTypes, selectedType],
+  )
 
   const selectedComplements = useMemo(
-    () => (selectedType ? byType.get(selectedType) ?? [] : []),
-    [selectedType, byType]
-  );
+    () => (selectedType ? (byType.get(selectedType) ?? []) : []),
+    [selectedType, byType],
+  )
 
-  const cockpitPositions = useMemo(
-    () => positions.filter((p) => p.category === "cockpit"),
-    [positions]
-  );
-  const cabinPositions = useMemo(
-    () => positions.filter((p) => p.category === "cabin"),
-    [positions]
-  );
+  const cockpitPositions = useMemo(() => positions.filter((p) => p.category === 'cockpit'), [positions])
+  const cabinPositions = useMemo(() => positions.filter((p) => p.category === 'cabin'), [positions])
 
   // ── Handlers ──
 
-  const handleCountChange = useCallback(
-    async (complementId: string, counts: Record<string, number>) => {
-      try {
-        await api.updateCrewComplement(complementId, { counts });
-        setComplements((prev) =>
-          prev.map((c) => (c._id === complementId ? { ...c, counts } : c))
-        );
-      } catch (err) {
-        console.error("Failed to update counts:", err);
-      }
-    },
-    []
-  );
+  const handleCountChange = useCallback(async (complementId: string, counts: Record<string, number>) => {
+    try {
+      await api.updateCrewComplement(complementId, { counts })
+      setComplements((prev) => prev.map((c) => (c._id === complementId ? { ...c, counts } : c)))
+    } catch (err) {
+      console.error('Failed to update counts:', err)
+    }
+  }, [])
 
-  const handleNotesChange = useCallback(
-    async (complementId: string, notes: string | null) => {
-      try {
-        await api.updateCrewComplement(complementId, { notes });
-        setComplements((prev) =>
-          prev.map((c) => (c._id === complementId ? { ...c, notes } : c))
-        );
-      } catch (err) {
-        console.error("Failed to update notes:", err);
-      }
-    },
-    []
-  );
+  const handleNotesChange = useCallback(async (complementId: string, notes: string | null) => {
+    try {
+      await api.updateCrewComplement(complementId, { notes })
+      setComplements((prev) => prev.map((c) => (c._id === complementId ? { ...c, notes } : c)))
+    } catch (err) {
+      console.error('Failed to update notes:', err)
+    }
+  }, [])
 
-  const handleLabelChange = useCallback(
-    async (complementId: string, templateKey: string) => {
-      try {
-        await api.updateCrewComplement(complementId, { templateKey });
-        setComplements((prev) =>
-          prev.map((c) =>
-            c._id === complementId ? { ...c, templateKey } : c
-          )
-        );
-      } catch (err) {
-        console.error("Failed to update label:", err);
-      }
-    },
-    []
-  );
+  const handleLabelChange = useCallback(async (complementId: string, templateKey: string) => {
+    try {
+      await api.updateCrewComplement(complementId, { templateKey })
+      setComplements((prev) => prev.map((c) => (c._id === complementId ? { ...c, templateKey } : c)))
+    } catch (err) {
+      console.error('Failed to update label:', err)
+    }
+  }, [])
 
   const handleSeedForType = useCallback(
     async (icaoType: string) => {
       try {
-        await api.seedCrewComplementDefaults(getOperatorId(), icaoType);
-        fetchData();
+        await api.seedCrewComplementDefaults(getOperatorId(), icaoType)
+        fetchData()
       } catch (err) {
-        console.error("Failed to seed:", err);
+        console.error('Failed to seed:', err)
       }
     },
-    [fetchData]
-  );
+    [fetchData],
+  )
 
   const handleSeedAll = useCallback(async () => {
     try {
-      await api.seedCrewComplementDefaults(getOperatorId());
-      fetchData();
+      await api.seedCrewComplementDefaults(getOperatorId())
+      fetchData()
     } catch (err) {
-      console.error("Failed to seed all:", err);
+      console.error('Failed to seed all:', err)
     }
-  }, [fetchData]);
+  }, [fetchData])
 
   const handleAddRow = useCallback(
     async (icaoType: string, templateKey: string) => {
@@ -157,29 +128,26 @@ export function CrewComplementsShell() {
           aircraftTypeIcao: icaoType,
           templateKey,
           counts: {},
-        });
-        fetchData();
+        })
+        fetchData()
       } catch (err) {
-        console.error("Failed to add row:", err);
+        console.error('Failed to add row:', err)
       }
     },
-    [fetchData]
-  );
+    [fetchData],
+  )
 
-  const handleDeleteRow = useCallback(
-    async (id: string) => {
-      try {
-        await api.deleteCrewComplement(id);
-        setComplements((prev) => prev.filter((c) => c._id !== id));
-      } catch (err: any) {
-        const msg = err.message || "";
-        const match = msg.match(/API \d+: (.+)/);
-        const parsed = match ? JSON.parse(match[1]) : null;
-        alert(parsed?.error || "Failed to delete row");
-      }
-    },
-    []
-  );
+  const handleDeleteRow = useCallback(async (id: string) => {
+    try {
+      await api.deleteCrewComplement(id)
+      setComplements((prev) => prev.filter((c) => c._id !== id))
+    } catch (err: any) {
+      const msg = err.message || ''
+      const match = msg.match(/API \d+: (.+)/)
+      const parsed = match ? JSON.parse(match[1]) : null
+      alert(parsed?.error || 'Failed to delete row')
+    }
+  }, [])
 
   // ── Render ──
 
@@ -193,24 +161,17 @@ export function CrewComplementsShell() {
           <Users size={24} color={ACCENT} strokeWidth={1.8} />
         </div>
         <div className="text-center">
-          <h2 className="text-[17px] font-semibold text-hz-text mb-1">
-            No Crew Positions Configured
-          </h2>
+          <h2 className="text-[17px] font-semibold text-hz-text mb-1">No Crew Positions Configured</h2>
           <p className="text-[13px] text-hz-text-secondary max-w-sm">
-            Crew complements require crew positions to define the column
-            structure. Go to{" "}
-            <a
-              href="/admin/crew-positions"
-              className="font-semibold underline"
-              style={{ color: ACCENT }}
-            >
+            Crew complements require crew positions to define the column structure. Go to{' '}
+            <a href="/admin/crew-positions" className="font-semibold underline" style={{ color: ACCENT }}>
               5.4.2 Crew Positions
-            </a>{" "}
+            </a>{' '}
             first.
           </p>
         </div>
       </div>
-    );
+    )
   }
 
   if (!loading && aircraftTypes.length === 0) {
@@ -223,23 +184,17 @@ export function CrewComplementsShell() {
           <Users size={24} color={ACCENT} strokeWidth={1.8} />
         </div>
         <div className="text-center">
-          <h2 className="text-[17px] font-semibold text-hz-text mb-1">
-            No Aircraft Types Configured
-          </h2>
+          <h2 className="text-[17px] font-semibold text-hz-text mb-1">No Aircraft Types Configured</h2>
           <p className="text-[13px] text-hz-text-secondary max-w-sm">
-            Crew complements are defined per aircraft type. Go to{" "}
-            <a
-              href="/admin/aircraft-types"
-              className="font-semibold underline"
-              style={{ color: ACCENT }}
-            >
+            Crew complements are defined per aircraft type. Go to{' '}
+            <a href="/admin/aircraft-types" className="font-semibold underline" style={{ color: ACCENT }}>
               5.2.1 Aircraft Types
-            </a>{" "}
+            </a>{' '}
             first.
           </p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -272,22 +227,22 @@ export function CrewComplementsShell() {
         ) : null
       }
     />
-  );
+  )
 }
 
 // ── Empty State ──
 
 function EmptyState({ onSeedAll }: { onSeedAll: () => void }) {
-  const [seeding, setSeeding] = useState(false);
+  const [seeding, setSeeding] = useState(false)
 
   const handleSeed = async () => {
-    setSeeding(true);
+    setSeeding(true)
     try {
-      await onSeedAll();
+      await onSeedAll()
     } finally {
-      setSeeding(false);
+      setSeeding(false)
     }
-  };
+  }
 
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 px-6">
@@ -298,12 +253,10 @@ function EmptyState({ onSeedAll }: { onSeedAll: () => void }) {
         <Users size={24} color={ACCENT} strokeWidth={1.8} />
       </div>
       <div className="text-center">
-        <h2 className="text-[17px] font-semibold text-hz-text mb-1">
-          No Crew Complements Configured
-        </h2>
+        <h2 className="text-[17px] font-semibold text-hz-text mb-1">No Crew Complements Configured</h2>
         <p className="text-[13px] text-hz-text-secondary max-w-sm">
-          Seed default complements (Standard, Aug 1, Aug 2) for all aircraft
-          types, or click an aircraft type to configure individually.
+          Seed default complements (Standard, Aug 1, Aug 2) for all aircraft types, or click an aircraft type to
+          configure individually.
         </p>
       </div>
       <button
@@ -313,8 +266,8 @@ function EmptyState({ onSeedAll }: { onSeedAll: () => void }) {
         style={{ backgroundColor: ACCENT }}
       >
         <Sparkles className="h-4 w-4" />
-        {seeding ? "Seeding..." : "Seed All Defaults"}
+        {seeding ? 'Seeding...' : 'Seed All Defaults'}
       </button>
     </div>
-  );
+  )
 }

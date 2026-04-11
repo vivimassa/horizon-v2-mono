@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { History } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
@@ -13,7 +13,6 @@ function fmtTimestamp(iso: string | null): string {
   const mm = String(d.getUTCMinutes()).padStart(2, '0')
   return `${dd} ${mon} ${d.getUTCFullYear()} ${hh}:${mm}z`
 }
-
 
 export function AuditTab({ data }: { data: FlightDetail }) {
   const { theme } = useTheme()
@@ -64,7 +63,9 @@ export function AuditTab({ data }: { data: FlightDetail }) {
       {entries.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 opacity-50">
           <History size={28} style={{ color: muted }} className="mb-3" />
-          <span className="text-[13px] font-medium" style={{ color: muted }}>No audit records</span>
+          <span className="text-[13px] font-medium" style={{ color: muted }}>
+            No audit records
+          </span>
         </div>
       ) : (
         <div className="relative pl-4">
@@ -75,17 +76,30 @@ export function AuditTab({ data }: { data: FlightDetail }) {
             {entries.map((entry, i) => (
               <div key={i} className="flex items-start gap-3 relative">
                 {/* Dot */}
-                <div className="absolute left-[-12px] top-[6px] w-[10px] h-[10px] rounded-full z-10"
-                  style={{ background: entry.color, boxShadow: `0 0 6px ${entry.color}40` }} />
+                <div
+                  className="absolute left-[-12px] top-[6px] w-[10px] h-[10px] rounded-full z-10"
+                  style={{ background: entry.color, boxShadow: `0 0 6px ${entry.color}40` }}
+                />
                 {/* Card */}
-                <div className="flex-1 flex items-start gap-3 rounded-xl px-4 py-2.5 ml-2"
-                  style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', border: `1px solid ${cardBorder}` }}>
-                  <span className="text-[11px] font-bold px-2 py-1 rounded-md text-center shrink-0"
-                    style={{ background: `${entry.color}15`, color: entry.color, minWidth: 72 }}>
+                <div
+                  className="flex-1 flex items-start gap-3 rounded-xl px-4 py-2.5 ml-2"
+                  style={{
+                    background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                    border: `1px solid ${cardBorder}`,
+                  }}
+                >
+                  <span
+                    className="text-[11px] font-bold px-2 py-1 rounded-md text-center shrink-0"
+                    style={{ background: `${entry.color}15`, color: entry.color, minWidth: 72 }}
+                  >
                     {entry.type}
                   </span>
-                  <span className="text-[13px] flex-1" style={{ color: textPrimary }}>{entry.description}</span>
-                  <span className="text-[11px] font-mono shrink-0" style={{ color: `${muted}80` }}>{entry.timestamp}</span>
+                  <span className="text-[13px] flex-1" style={{ color: textPrimary }}>
+                    {entry.description}
+                  </span>
+                  <span className="text-[11px] font-mono shrink-0" style={{ color: `${muted}80` }}>
+                    {entry.timestamp}
+                  </span>
                 </div>
               </div>
             ))}

@@ -14,21 +14,30 @@
  */
 
 import {
-  evaluateRules, evaluateBonus,
-  type FlightForEval, type AircraftForEval,
-  type RuleViolation, type RejectionReason,
+  evaluateRules,
+  evaluateBonus,
+  type FlightForEval,
+  type AircraftForEval,
+  type RuleViolation,
+  type RejectionReason,
   type ScheduleRule,
 } from './schedule-rule-evaluator'
 
 // Re-export types from tail-assignment for shared use
 export type {
-  AssignableFlight, AssignableAircraft, ChainBreak,
-  TailAssignmentResult, AircraftTypeTAT,
+  AssignableFlight,
+  AssignableAircraft,
+  ChainBreak,
+  TailAssignmentResult,
+  AircraftTypeTAT,
 } from './tail-assignment'
 
 import type {
-  AssignableFlight, AssignableAircraft, ChainBreak,
-  TailAssignmentResult, AircraftTypeTAT,
+  AssignableFlight,
+  AssignableAircraft,
+  ChainBreak,
+  TailAssignmentResult,
+  AircraftTypeTAT,
 } from './tail-assignment'
 import { isFlightDomestic, resolveTatMs } from './tail-assignment'
 
@@ -97,20 +106,20 @@ function canFitBlock(
   blockDepRouteType: string | null,
   blockArrRouteType: string | null,
   tatData: AircraftTypeTAT,
-  useMinimum: boolean
+  useMinimum: boolean,
 ): boolean {
   for (const w of state.windows) {
     const tatAfterExisting = resolveTatMs(
       tatData,
       isFlightDomestic(w.arrRouteType),
       isFlightDomestic(blockDepRouteType),
-      useMinimum
+      useMinimum,
     )
     const tatAfterBlock = resolveTatMs(
       tatData,
       isFlightDomestic(blockArrRouteType),
       isFlightDomestic(w.depRouteType),
-      useMinimum
+      useMinimum,
     )
 
     if (blockStartMs < w.endMs + tatAfterExisting && w.startMs < blockEndMs + tatAfterBlock) {
@@ -120,10 +129,7 @@ function canFitBlock(
   return true
 }
 
-function checkStationChain(
-  state: AircraftState,
-  block: AssignmentBlock,
-): boolean {
+function checkStationChain(state: AircraftState, block: AssignmentBlock): boolean {
   const blockDepStation = block.flights[0].depStation
   const blockArrStation = block.flights[block.flights.length - 1].arrStation
 
@@ -164,7 +170,7 @@ function validateBlockInternal(block: AssignmentBlock): boolean {
     const nextStartMs = toAbsoluteMs(next.date, next.stdMinutes)
     if (nextStartMs < currEndMs) {
       console.warn(
-        `Route ${block.id}: internal leg overlap — leg ends at ${curr.staMinutes}min but next starts at ${next.stdMinutes}min`
+        `Route ${block.id}: internal leg overlap — leg ends at ${curr.staMinutes}min but next starts at ${next.stdMinutes}min`,
       )
       return false
     }
@@ -283,9 +289,8 @@ export function autoAssignFlights(
         depRouteType: firstFl.routeType,
         arrRouteType: lastFlight.routeType,
       })
-      const currentLastEndMs = st.lastSTA !== null && st.lastSTADate !== null
-        ? st.lastSTADate + st.lastSTA * 60000
-        : -Infinity
+      const currentLastEndMs =
+        st.lastSTA !== null && st.lastSTADate !== null ? st.lastSTADate + st.lastSTA * 60000 : -Infinity
       if (block.endMs > currentLastEndMs) {
         st.lastSTA = lastFlight.staMinutes
         st.lastSTADate = lastFlight.date.getTime()
@@ -302,7 +307,17 @@ export function autoAssignFlights(
       return
     }
 
-    const tatData = tatByType.get(icaoType) ?? { sched_dd: null, sched_di: null, sched_id: null, sched_ii: null, min_dd: null, min_di: null, min_id: null, min_ii: null, default: 30 }
+    const tatData = tatByType.get(icaoType) ?? {
+      sched_dd: null,
+      sched_di: null,
+      sched_id: null,
+      sched_ii: null,
+      min_dd: null,
+      min_di: null,
+      min_id: null,
+      min_ii: null,
+      default: 30,
+    }
 
     const states = globalStates
 
@@ -357,8 +372,8 @@ export function autoAssignFlights(
           if (result.violations.length > 0) {
             const existing = ruleViolations.get(f.id) || []
             ruleViolations.set(f.id, [...existing, ...result.violations])
-            stats.softRulesBent += result.violations.filter(v => v.enforcement === 'soft').length
-            stats.hardRulesEnforced += result.violations.filter(v => v.enforcement === 'hard').length
+            stats.softRulesBent += result.violations.filter((v) => v.enforcement === 'soft').length
+            stats.hardRulesEnforced += result.violations.filter((v) => v.enforcement === 'hard').length
             stats.totalPenaltyCost += result.totalPenalty
           }
         }
@@ -381,14 +396,33 @@ export function autoAssignFlights(
 
       if (method === 'balance') {
         bestReg = findBalancedAircraft(
-          firstFlight, block, states, regs, tatData, useMinimumTat, chainBreaks,
-          rules, aircraftFamilies, ruleViolations, rejections, stats
+          firstFlight,
+          block,
+          states,
+          regs,
+          tatData,
+          useMinimumTat,
+          chainBreaks,
+          rules,
+          aircraftFamilies,
+          ruleViolations,
+          rejections,
+          stats,
         )
       } else {
         bestReg = findBestAircraft(
-          firstFlight, block,
-          states, regs, tatData, useMinimumTat, chainBreaks,
-          rules, aircraftFamilies, ruleViolations, rejections, stats
+          firstFlight,
+          block,
+          states,
+          regs,
+          tatData,
+          useMinimumTat,
+          chainBreaks,
+          rules,
+          aircraftFamilies,
+          ruleViolations,
+          rejections,
+          stats,
         )
       }
 
@@ -420,8 +454,7 @@ export function autoAssignFlights(
         continue
       }
 
-      const siblingTypes = (familyToTypes.get(blockFamily) || [])
-        .filter(t => t !== block.icaoType)
+      const siblingTypes = (familyToTypes.get(blockFamily) || []).filter((t) => t !== block.icaoType)
 
       if (siblingTypes.length === 0) {
         overflow.push(...block.flights)
@@ -439,10 +472,23 @@ export function autoAssignFlights(
         continue
       }
 
-      let sibTatData: AircraftTypeTAT = { sched_dd: null, sched_di: null, sched_id: null, sched_ii: null, min_dd: null, min_di: null, min_id: null, min_ii: null, default: 30 }
+      let sibTatData: AircraftTypeTAT = {
+        sched_dd: null,
+        sched_di: null,
+        sched_id: null,
+        sched_ii: null,
+        min_dd: null,
+        min_di: null,
+        min_id: null,
+        min_ii: null,
+        default: 30,
+      }
       for (const sibType of siblingTypes) {
         const td = tatByType.get(sibType)
-        if (td) { sibTatData = td; break }
+        if (td) {
+          sibTatData = td
+          break
+        }
       }
 
       const firstFlight = block.flights[0]
@@ -450,13 +496,33 @@ export function autoAssignFlights(
 
       if (method === 'balance') {
         bestReg = findBalancedAircraft(
-          firstFlight, block, globalStates, siblingRegs, sibTatData, useMinimumTat, chainBreaks,
-          rules, aircraftFamilies, ruleViolations, rejections, stats
+          firstFlight,
+          block,
+          globalStates,
+          siblingRegs,
+          sibTatData,
+          useMinimumTat,
+          chainBreaks,
+          rules,
+          aircraftFamilies,
+          ruleViolations,
+          rejections,
+          stats,
         )
       } else {
         bestReg = findBestAircraft(
-          firstFlight, block, globalStates, siblingRegs, sibTatData, useMinimumTat, chainBreaks,
-          rules, aircraftFamilies, ruleViolations, rejections, stats
+          firstFlight,
+          block,
+          globalStates,
+          siblingRegs,
+          sibTatData,
+          useMinimumTat,
+          chainBreaks,
+          rules,
+          aircraftFamilies,
+          ruleViolations,
+          rejections,
+          stats,
         )
       }
 
@@ -469,7 +535,11 @@ export function autoAssignFlights(
   }
 
   return {
-    assignments, overflow, chainBreaks, ruleViolations, rejections,
+    assignments,
+    overflow,
+    chainBreaks,
+    ruleViolations,
+    rejections,
     summary: {
       totalFlights: flights.length,
       assigned: assignments.size,
@@ -495,7 +565,7 @@ function findBestAircraft(
   aircraftFamilies: Map<string, string>,
   ruleViolations: Map<string, RuleViolation[]>,
   rejections: Map<string, RejectionReason[]>,
-  stats: RuleStats
+  stats: RuleStats,
 ): string | null {
   interface Candidate {
     reg: string
@@ -633,7 +703,7 @@ function findBestAircraft(
       const existing = ruleViolations.get(f.id) || []
       ruleViolations.set(f.id, [...existing, ...best.violations])
     }
-    stats.softRulesBent += best.violations.filter(v => v.enforcement === 'soft').length
+    stats.softRulesBent += best.violations.filter((v) => v.enforcement === 'soft').length
     stats.totalPenaltyCost += best.softPenalty
   }
 
@@ -643,7 +713,7 @@ function findBestAircraft(
       const flightRejections = rejections.get(f.id) || []
       flightRejections.push({
         registration: c.reg,
-        icaoType: regs.find(r => r.registration === c.reg)?.icaoType || '',
+        icaoType: regs.find((r) => r.registration === c.reg)?.icaoType || '',
         reason: 'score',
         totalCost: c.softPenalty - c.bonus,
       })
@@ -668,7 +738,7 @@ function findBalancedAircraft(
   aircraftFamilies: Map<string, string>,
   ruleViolations: Map<string, RuleViolation[]>,
   rejections: Map<string, RejectionReason[]>,
-  stats: RuleStats
+  stats: RuleStats,
 ): string | null {
   interface Candidate {
     reg: string
@@ -790,7 +860,7 @@ function findBalancedAircraft(
       const existing = ruleViolations.get(f.id) || []
       ruleViolations.set(f.id, [...existing, ...best.violations])
     }
-    stats.softRulesBent += best.violations.filter(v => v.enforcement === 'soft').length
+    stats.softRulesBent += best.violations.filter((v) => v.enforcement === 'soft').length
     stats.totalPenaltyCost += best.softPenalty
   }
 
@@ -800,7 +870,7 @@ function findBalancedAircraft(
       const flightRejections = rejections.get(f.id) || []
       flightRejections.push({
         registration: c.reg,
-        icaoType: regs.find(r => r.registration === c.reg)?.icaoType || '',
+        icaoType: regs.find((r) => r.registration === c.reg)?.icaoType || '',
         reason: 'score',
         totalCost: c.softPenalty,
       })
@@ -812,11 +882,7 @@ function findBalancedAircraft(
 }
 
 /** Compute gap minutes between aircraft's latest STA and the flight's STD. */
-function computeGapFn(
-  state: AircraftState,
-  flight: AssignableFlight,
-  flightDateMs: number
-): number {
+function computeGapFn(state: AircraftState, flight: AssignableFlight, flightDateMs: number): number {
   if (state.lastSTA === null || state.lastSTADate === null) return Infinity
 
   if (flightDateMs === state.lastSTADate) {
@@ -825,5 +891,5 @@ function computeGapFn(
 
   const dayDiffMs = flightDateMs - state.lastSTADate
   const dayDiff = Math.round(dayDiffMs / 86400000)
-  return (1440 - state.lastSTA) + (dayDiff - 1) * 1440 + flight.stdMinutes
+  return 1440 - state.lastSTA + (dayDiff - 1) * 1440 + flight.stdMinutes
 }

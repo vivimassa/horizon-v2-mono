@@ -10,13 +10,13 @@
 // ---- Types ------------------------------------------------------------------
 
 export interface SSIMExportOptions {
-  airlineCode: string        // 2-3 char IATA airline code (e.g. "HZ")
-  airlineName: string        // Full airline name (up to 35 chars)
-  seasonStart: string        // ISO date YYYY-MM-DD
-  seasonEnd: string          // ISO date YYYY-MM-DD
-  actionCode?: string        // H=new, R=replace, etc. Default "H"
-  releaseCode?: string       // Numeric release version
-  creator?: string           // Creator identifier (up to 8 chars)
+  airlineCode: string // 2-3 char IATA airline code (e.g. "HZ")
+  airlineName: string // Full airline name (up to 35 chars)
+  seasonStart: string // ISO date YYYY-MM-DD
+  seasonEnd: string // ISO date YYYY-MM-DD
+  actionCode?: string // H=new, R=replace, etc. Default "H"
+  releaseCode?: string // Numeric release version
+  creator?: string // Creator identifier (up to 8 chars)
 }
 
 export interface SSIMFlightRecord {
@@ -26,17 +26,17 @@ export interface SSIMFlightRecord {
   itineraryVariation: string
   legSequence: string
   serviceType: string
-  periodStart: string        // ISO date YYYY-MM-DD
-  periodEnd: string          // ISO date YYYY-MM-DD
-  daysOfOperation: string    // "1234567" format, 7 chars
-  depStation: string         // 3-char IATA
-  stdUtc: string           // HH:MM or HHMM
-  depUtcOffset: string       // +HHMM or -HHMM (5 chars)
-  arrStation: string         // 3-char IATA
-  staUtc: string           // HH:MM or HHMM
-  arrUtcOffset: string       // +HHMM or -HHMM (5 chars)
-  aircraftTypeIata: string   // 3-char IATA aircraft type
-  seatConfig?: Record<string, number>  // e.g. { C: 12, Y: 365 }
+  periodStart: string // ISO date YYYY-MM-DD
+  periodEnd: string // ISO date YYYY-MM-DD
+  daysOfOperation: string // "1234567" format, 7 chars
+  depStation: string // 3-char IATA
+  stdUtc: string // HH:MM or HHMM
+  depUtcOffset: string // +HHMM or -HHMM (5 chars)
+  arrStation: string // 3-char IATA
+  staUtc: string // HH:MM or HHMM
+  arrUtcOffset: string // +HHMM or -HHMM (5 chars)
+  aircraftTypeIata: string // 3-char IATA aircraft type
+  seatConfig?: Record<string, number> // e.g. { C: 12, Y: 365 }
   /** Next leg in the rotation cycle — IATA carrier of the onward flight */
   onwardAirlineCode?: string
   /** Next leg flight number (numeric) */
@@ -262,10 +262,7 @@ function generateType5(airlineCode: string, lastFlightSerial: number, totalRecor
  * @param options - Export options (airline info, season dates)
  * @returns Complete SSIM file content as a string
  */
-export function generateSSIM(
-  flights: SSIMFlightRecord[],
-  options: SSIMExportOptions
-): string {
+export function generateSSIM(flights: SSIMFlightRecord[], options: SSIMExportOptions): string {
   const lines: string[] = []
 
   // Type 1: Header

@@ -26,15 +26,15 @@ function oklchToHex(L: number, C: number, H: number): string {
   // OKLab → linear sRGB
   const l_ = L + 0.3963377774 * a + 0.2158037573 * b
   const m_ = L - 0.1055613458 * a - 0.0638541728 * b
-  const s_ = L - 0.0894841775 * a - 1.2914855480 * b
+  const s_ = L - 0.0894841775 * a - 1.291485548 * b
 
   const l3 = l_ * l_ * l_
   const m3 = m_ * m_ * m_
   const s3 = s_ * s_ * s_
 
-  let r = +4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3
-  let g = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3
-  let bl = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.7076147010 * s3
+  const r = +4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3
+  const g = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3
+  const bl = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3
 
   // Gamma correction
   const gamma = (x: number) => {
@@ -64,26 +64,30 @@ interface PresetConfig {
 }
 
 const PRESET_CONFIGS: Record<Exclude<BackgroundPreset, 'none'>, PresetConfig> = {
-  aurora:  { hue1Start: 200, hue1End: 260, hue2Start: 260, hue2End: 320, duration: 5000, pingPong: true },
-  ember:   { hue1Start: 10,  hue1End: 40,  hue2Start: 40,  hue2End: 65,  duration: 6000, pingPong: true },
-  lagoon:  { hue1Start: 170, hue1End: 210, hue2Start: 210, hue2End: 245, duration: 7000, pingPong: true },
-  prism:   { hue1Start: 0,   hue1End: 360, hue2Start: 180, hue2End: 540, duration: 6000, pingPong: false },
+  aurora: { hue1Start: 200, hue1End: 260, hue2Start: 260, hue2End: 320, duration: 5000, pingPong: true },
+  ember: { hue1Start: 10, hue1End: 40, hue2Start: 40, hue2End: 65, duration: 6000, pingPong: true },
+  lagoon: { hue1Start: 170, hue1End: 210, hue2Start: 210, hue2End: 245, duration: 7000, pingPong: true },
+  prism: { hue1Start: 0, hue1End: 360, hue2Start: 180, hue2End: 540, duration: 6000, pingPong: false },
 }
 
 interface ColorTable {
   light: { c1: string[]; c2: string[] }
-  dark:  { c1: string[]; c2: string[] }
+  dark: { c1: string[]; c2: string[] }
 }
 
 function buildColorTable(config: PresetConfig): ColorTable {
-  const lightL1 = 0.970, lightC1 = 0.025
-  const lightL2 = 0.960, lightC2 = 0.035
-  const darkL1 = 0.180, darkC1 = 0.045
-  const darkL2 = 0.140, darkC2 = 0.055
+  const lightL1 = 0.97,
+    lightC1 = 0.025
+  const lightL2 = 0.96,
+    lightC2 = 0.035
+  const darkL1 = 0.18,
+    darkC1 = 0.045
+  const darkL2 = 0.14,
+    darkC2 = 0.055
 
   const table: ColorTable = {
     light: { c1: [], c2: [] },
-    dark:  { c1: [], c2: [] },
+    dark: { c1: [], c2: [] },
   }
 
   for (let i = 0; i <= STEPS; i++) {
@@ -101,9 +105,9 @@ function buildColorTable(config: PresetConfig): ColorTable {
 
 const COLOR_TABLES: Record<Exclude<BackgroundPreset, 'none'>, ColorTable> = {
   aurora: buildColorTable(PRESET_CONFIGS.aurora),
-  ember:  buildColorTable(PRESET_CONFIGS.ember),
+  ember: buildColorTable(PRESET_CONFIGS.ember),
   lagoon: buildColorTable(PRESET_CONFIGS.lagoon),
-  prism:  buildColorTable(PRESET_CONFIGS.prism),
+  prism: buildColorTable(PRESET_CONFIGS.prism),
 }
 
 // ── Interpolate between two hex colors ────────────────────────
@@ -116,19 +120,13 @@ function lerpColor(a: string, b: string, t: number): string {
   return `#${toHex(r)}${toHex(g)}${toHex(bl)}`
 }
 
-function getInterpolatedColors(
-  table: { c1: string[]; c2: string[] },
-  progress: number,
-): [string, string] {
+function getInterpolatedColors(table: { c1: string[]; c2: string[] }, progress: number): [string, string] {
   const pos = progress * STEPS
   const idx = Math.floor(pos)
   const frac = pos - idx
   const i0 = Math.min(idx, STEPS)
   const i1 = Math.min(idx + 1, STEPS)
-  return [
-    lerpColor(table.c1[i0], table.c1[i1], frac),
-    lerpColor(table.c2[i0], table.c2[i1], frac),
-  ]
+  return [lerpColor(table.c1[i0], table.c1[i1], frac), lerpColor(table.c2[i0], table.c2[i1], frac)]
 }
 
 // ── Component ─────────────────────────────────────────────────
@@ -138,11 +136,7 @@ interface AnimatedBackgroundProps {
   children: React.ReactNode
 }
 
-export function AnimatedBackground({
-  preset,
-  isDark,
-  children,
-}: AnimatedBackgroundProps) {
+export function AnimatedBackground({ preset, isDark, children }: AnimatedBackgroundProps) {
   const config = PRESET_CONFIGS[preset]
   const table = COLOR_TABLES[preset]
   const modeTable = isDark ? table.dark : table.light
@@ -159,11 +153,7 @@ export function AnimatedBackground({
       )
     } else {
       progress.value = 0
-      progress.value = withRepeat(
-        withTiming(1, { duration: config.duration, easing: Easing.linear }),
-        -1,
-        false,
-      )
+      progress.value = withRepeat(withTiming(1, { duration: config.duration, easing: Easing.linear }), -1, false)
     }
   }, [preset, config.duration, config.pingPong])
 
@@ -190,12 +180,7 @@ export function AnimatedBackground({
   }, [modeTable, preset])
 
   return (
-    <LinearGradient
-      colors={gradientColors}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={StyleSheet.absoluteFill}
-    >
+    <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill}>
       {children}
     </LinearGradient>
   )

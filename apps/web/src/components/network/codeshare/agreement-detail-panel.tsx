@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plane, AlertTriangle } from 'lucide-react'
@@ -6,8 +6,10 @@ import { colors, accentTint } from '@skyhub/ui/theme'
 import { MODULE_THEMES } from '@skyhub/constants'
 import { api } from '@skyhub/api'
 import type {
-  CodeshareAgreementRef, CodeshareMappingRef,
-  CodeshareSeatAllocationRef, CodeshareAgreementStats,
+  CodeshareAgreementRef,
+  CodeshareMappingRef,
+  CodeshareSeatAllocationRef,
+  CodeshareAgreementStats,
 } from '@skyhub/api'
 import { getOperatorId } from '@/stores/use-operator-store'
 import type { TabKey, MappingHealth } from './codeshare-types'
@@ -28,9 +30,7 @@ interface AgreementDetailPanelProps {
   onDataChanged: () => void
 }
 
-export function AgreementDetailPanel({
-  agreement, operatorCode, isDark, onDataChanged,
-}: AgreementDetailPanelProps) {
+export function AgreementDetailPanel({ agreement, operatorCode, isDark, onDataChanged }: AgreementDetailPanelProps) {
   const palette = isDark ? colors.dark : colors.light
   const accent = MODULE_THEMES.network.accent
   const glassBorder = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
@@ -77,10 +77,12 @@ export function AgreementDetailPanel({
     setCabinConfigs(configs)
   }, [agreement._id])
 
-  useEffect(() => { loadData() }, [loadData, refreshKey])
+  useEffect(() => {
+    loadData()
+  }, [loadData, refreshKey])
 
   function handleMappingChanged() {
-    setRefreshKey(k => k + 1)
+    setRefreshKey((k) => k + 1)
     onDataChanged()
   }
 
@@ -89,9 +91,10 @@ export function AgreementDetailPanel({
     onDataChanged()
   }
 
-  const seasonLabel = new Date(agreement.effectiveFrom).getFullYear() >= 2025
-    ? `S${String(new Date(agreement.effectiveFrom).getFullYear()).slice(2)}`
-    : ''
+  const seasonLabel =
+    new Date(agreement.effectiveFrom).getFullYear() >= 2025
+      ? `S${String(new Date(agreement.effectiveFrom).getFullYear()).slice(2)}`
+      : ''
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-w-0">
@@ -108,7 +111,12 @@ export function AgreementDetailPanel({
             </div>
             <div className="text-[13px]" style={{ color: palette.textSecondary }}>
               {AGREEMENT_TYPE_LABELS[agreement.agreementType]} agreement
-              {seasonLabel && <> &middot; <span className="font-mono">{seasonLabel}</span></>}
+              {seasonLabel && (
+                <>
+                  {' '}
+                  &middot; <span className="font-mono">{seasonLabel}</span>
+                </>
+              )}
               {' \u00b7 Since '}
               <span className="font-mono">{agreement.effectiveFrom}</span>
             </div>
@@ -124,8 +132,12 @@ export function AgreementDetailPanel({
               border: `1px solid ${glassBorder}`,
               color: palette.text,
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'
+            }}
           >
             Edit agreement
           </button>
@@ -149,7 +161,7 @@ export function AgreementDetailPanel({
 
       {/* Tabs */}
       <div className="flex px-5 shrink-0" style={{ borderBottom: `1px solid ${glassBorder}` }}>
-        {TABS.map(t => (
+        {TABS.map((t) => (
           <button
             key={t.key}
             type="button"
@@ -176,19 +188,16 @@ export function AgreementDetailPanel({
           healthMap={healthMap}
           isDark={isDark}
           onAddMapping={() => setMappingDialogOpen(true)}
-          onEditMapping={(m) => { setEditingMapping(m); setMappingDialogOpen(true) }}
+          onEditMapping={(m) => {
+            setEditingMapping(m)
+            setMappingDialogOpen(true)
+          }}
           onBulkImport={() => setBulkImportOpen(true)}
           onSwitchTab={setTab}
           onMappingChanged={handleMappingChanged}
         />
       )}
-      {tab === 'details' && (
-        <DetailsTab
-          agreement={agreement}
-          isDark={isDark}
-          onUpdated={onDataChanged}
-        />
-      )}
+      {tab === 'details' && <DetailsTab agreement={agreement} isDark={isDark} onUpdated={onDataChanged} />}
       {tab === 'capacity' && (
         <CapacityTab
           agreement={agreement}
@@ -201,19 +210,17 @@ export function AgreementDetailPanel({
         />
       )}
       {tab === 'ssim' && (
-        <SsimTab
-          agreement={agreement}
-          mappings={mappings}
-          operatorCode={operatorCode}
-          isDark={isDark}
-        />
+        <SsimTab agreement={agreement} mappings={mappings} operatorCode={operatorCode} isDark={isDark} />
       )}
 
       {/* Dialogs */}
       {mappingDialogOpen && (
         <MappingDialog
           open
-          onOpenChange={(open) => { setMappingDialogOpen(open); if (!open) setEditingMapping(null) }}
+          onOpenChange={(open) => {
+            setMappingDialogOpen(open)
+            if (!open) setEditingMapping(null)
+          }}
           agreement={agreement}
           mapping={editingMapping}
           isDark={isDark}

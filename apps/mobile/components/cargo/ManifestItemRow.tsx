@@ -34,9 +34,7 @@ export const ManifestItemRow = memo(function ManifestItemRow({ item, accent, isD
       </View>
       <View className="flex-1">
         <View className="flex-row items-center gap-1.5">
-          <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#f5f5f5' : '#1f2937' }}>
-            {item.id}
-          </Text>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#f5f5f5' : '#1f2937' }}>{item.id}</Text>
           {p && (
             <View className="px-1.5 py-0.5 rounded-full" style={{ backgroundColor: p.bg }}>
               <Text style={{ fontSize: 9, fontWeight: '700', color: p.text, textTransform: 'uppercase' }}>

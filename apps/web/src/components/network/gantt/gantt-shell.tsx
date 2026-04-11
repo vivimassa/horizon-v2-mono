@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useEffect, useCallback, useState, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
@@ -20,12 +20,12 @@ export function GanttShell() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
-  const error = useGanttStore(s => s.error)
-  const layout = useGanttStore(s => s.layout)
-  const flights = useGanttStore(s => s.flights)
-  const aircraft = useGanttStore(s => s.aircraft)
-  const loading = useGanttStore(s => s.loading)
-  const periodCommitted = useGanttStore(s => s.periodCommitted)
+  const error = useGanttStore((s) => s.error)
+  const layout = useGanttStore((s) => s.layout)
+  const flights = useGanttStore((s) => s.flights)
+  const aircraft = useGanttStore((s) => s.aircraft)
+  const loading = useGanttStore((s) => s.loading)
+  const periodCommitted = useGanttStore((s) => s.periodCommitted)
   const runway = useRunwayLoading()
   const [searchOpen, setSearchOpen] = useState(false)
   const [addFlightOpen, setAddFlightOpen] = useState(false)
@@ -51,7 +51,7 @@ export function GanttShell() {
 
   // Register Ctrl+F toggle
   useEffect(() => {
-    registerSearchToggle(() => setSearchOpen(v => !v))
+    registerSearchToggle(() => setSearchOpen((v) => !v))
     return () => unregisterSearchToggle()
   }, [])
 
@@ -63,15 +63,15 @@ export function GanttShell() {
   }, [])
 
   const handleGo = useCallback(async () => {
-    await runway.run(
-      () => useGanttStore.getState().commitPeriod(),
-      'Loading flights…',
-      'Flights loaded',
-    )
+    await runway.run(() => useGanttStore.getState().commitPeriod(), 'Loading flights…', 'Flights loaded')
   }, [runway])
 
   return (
-    <div ref={shellRef} className="h-full flex gap-3 p-3" style={{ background: isFullscreen ? (isDark ? '#0E0E14' : '#FAFAFC') : undefined }}>
+    <div
+      ref={shellRef}
+      className="h-full flex gap-3 p-3"
+      style={{ background: isFullscreen ? (isDark ? '#0E0E14' : '#FAFAFC') : undefined }}
+    >
       <div className="shrink-0 h-full">
         <GanttFilterPanel forceCollapsed={!!layout} onGo={handleGo} />
       </div>
@@ -87,7 +87,12 @@ export function GanttShell() {
               backdropFilter: 'blur(24px)',
             }}
           >
-            <GanttToolbar onSearch={() => setSearchOpen(v => !v)} onFullscreen={toggleFullscreen} isFullscreen={isFullscreen} onAddFlight={() => setAddFlightOpen(v => !v)} />
+            <GanttToolbar
+              onSearch={() => setSearchOpen((v) => !v)}
+              onFullscreen={toggleFullscreen}
+              isFullscreen={isFullscreen}
+              onAddFlight={() => setAddFlightOpen((v) => !v)}
+            />
           </div>
         )}
 
@@ -100,48 +105,47 @@ export function GanttShell() {
             backdropFilter: 'blur(24px)',
           }}
         >
+          {/* Runway animation */}
+          {runway.active && <RunwayLoadingPanel percent={runway.percent} label={runway.label} />}
 
-        {/* Runway animation */}
-        {runway.active && (
-          <RunwayLoadingPanel percent={runway.percent} label={runway.label} />
-        )}
+          {/* Empty state */}
+          {!runway.active && !periodCommitted && !loading && <EmptyPanel />}
 
-        {/* Empty state */}
-        {!runway.active && !periodCommitted && !loading && (
-          <EmptyPanel />
-        )}
+          {/* Canvas */}
+          {!runway.active && layout && (
+            <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
+              <GanttCanvas />
+              <GanttSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
+              {loading && (
+                <div
+                  className="absolute inset-0 flex items-center justify-center z-10"
+                  style={{ background: isDark ? 'rgba(14,14,20,0.5)' : 'rgba(255,255,255,0.5)' }}
+                >
+                  <Loader2 size={28} className="animate-spin text-module-accent" />
+                </div>
+              )}
+            </div>
+          )}
 
-        {/* Canvas */}
-        {!runway.active && layout && (
-          <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
-            <GanttCanvas />
-            <GanttSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
-            {loading && (
-              <div className="absolute inset-0 flex items-center justify-center z-10"
-                style={{ background: isDark ? 'rgba(14,14,20,0.5)' : 'rgba(255,255,255,0.5)' }}>
-                <Loader2 size={28} className="animate-spin text-module-accent" />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Fallback states */}
-        {!runway.active && !layout && (periodCommitted || loading) && (
-          <EmptyPanel message={
-            loading ? 'Loading flights…'
-              : error ? `Failed to load: ${error}`
-              : flights.length === 0 && aircraft.length === 0 ? 'No flights found for this period'
-              : ''
-          } />
-        )}
+          {/* Fallback states */}
+          {!runway.active && !layout && (periodCommitted || loading) && (
+            <EmptyPanel
+              message={
+                loading
+                  ? 'Loading flights…'
+                  : error
+                    ? `Failed to load: ${error}`
+                    : flights.length === 0 && aircraft.length === 0
+                      ? 'No flights found for this period'
+                      : ''
+              }
+            />
+          )}
         </div>
-
       </div>
 
       {/* Add Flight dialog — portal */}
-      {addFlightOpen && (
-        <AddFlightPanel onClose={() => setAddFlightOpen(false)} />
-      )}
+      {addFlightOpen && <AddFlightPanel onClose={() => setAddFlightOpen(false)} />}
 
       {/* Flight Information dialog — portaled to body */}
       <FlightInformationDialog />

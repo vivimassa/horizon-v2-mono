@@ -5,7 +5,7 @@ const cabinEntrySchema = new Schema(
     classCode: { type: String, required: true },
     seats: { type: Number, required: true },
   },
-  { _id: false }
+  { _id: false },
 )
 
 const lopaConfigSchema = new Schema(
@@ -26,7 +26,7 @@ const lopaConfigSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'lopaConfigs',
-  }
+  },
 )
 
 lopaConfigSchema.index({ operatorId: 1, aircraftType: 1, configName: 1 }, { unique: true })

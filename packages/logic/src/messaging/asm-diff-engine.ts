@@ -25,10 +25,7 @@ import type {
  * Compare two snapshots and generate ASM diff results.
  * Returns only NET changes (reverted changes are excluded).
  */
-export function computeAsmDiff(
-  before: InstanceSnapshot[],
-  after: InstanceSnapshot[],
-): AsmDiffResult[] {
+export function computeAsmDiff(before: InstanceSnapshot[], after: InstanceSnapshot[]): AsmDiffResult[] {
   const results: AsmDiffResult[] = []
 
   // Build lookup maps by flightNumber + instanceDate
@@ -99,10 +96,14 @@ export function computeAsmDiff(
 
     if (Object.keys(timeChanges).length > 0) {
       const parts: string[] = []
-      if (timeChanges['std']) parts.push(`STD ${fmtTime(timeChanges['std'].from!)}\u2192${fmtTime(timeChanges['std'].to)}`)
-      if (timeChanges['sta']) parts.push(`STA ${fmtTime(timeChanges['sta'].from!)}\u2192${fmtTime(timeChanges['sta'].to)}`)
-      if (timeChanges['dep_station']) parts.push(`DEP ${timeChanges['dep_station'].from}\u2192${timeChanges['dep_station'].to}`)
-      if (timeChanges['arr_station']) parts.push(`ARR ${timeChanges['arr_station'].from}\u2192${timeChanges['arr_station'].to}`)
+      if (timeChanges['std'])
+        parts.push(`STD ${fmtTime(timeChanges['std'].from!)}\u2192${fmtTime(timeChanges['std'].to)}`)
+      if (timeChanges['sta'])
+        parts.push(`STA ${fmtTime(timeChanges['sta'].from!)}\u2192${fmtTime(timeChanges['sta'].to)}`)
+      if (timeChanges['dep_station'])
+        parts.push(`DEP ${timeChanges['dep_station'].from}\u2192${timeChanges['dep_station'].to}`)
+      if (timeChanges['arr_station'])
+        parts.push(`ARR ${timeChanges['arr_station'].from}\u2192${timeChanges['arr_station'].to}`)
 
       results.push({
         actionCode: timeChanges['dep_station'] || timeChanges['arr_station'] ? 'RRT' : 'TIM',
@@ -159,8 +160,8 @@ export function findNeutralizablePairs(held: HeldMessageRef[]): string[] {
 
   const toNeutralize: string[] = []
   for (const [, msgs] of byKey) {
-    const newMsgs = msgs.filter(m => m.actionCode === 'NEW')
-    const cnlMsgs = msgs.filter(m => m.actionCode === 'CNL')
+    const newMsgs = msgs.filter((m) => m.actionCode === 'NEW')
+    const cnlMsgs = msgs.filter((m) => m.actionCode === 'CNL')
     if (newMsgs.length > 0 && cnlMsgs.length > 0) {
       const pairs = Math.min(newMsgs.length, cnlMsgs.length)
       for (let i = 0; i < pairs; i++) {
@@ -208,7 +209,7 @@ export function groupHeldMessages(messages: ScheduleMessageLogRef[]): GroupedMes
       dateTo: last.flightDate || '',
       instanceCount: msgs.length,
       summary: changePart,
-      messageIds: msgs.map(m => m._id),
+      messageIds: msgs.map((m) => m._id),
       messages: msgs,
     })
   }

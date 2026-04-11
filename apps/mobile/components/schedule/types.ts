@@ -32,23 +32,58 @@ export interface UndoSnapshot {
 
 /** Text color palette (15 colors) */
 export const TEXT_COLORS = [
-  '#1C1C28', '#E63535', '#0063F7', '#06C270', '#FF8800',
-  '#6600CC', '#0f766e', '#991b1b', '#5B8DEF', '#15803d',
-  '#b45309', '#7c3aed', '#1e40af', '#0891b2', '#8F90A6',
+  '#1C1C28',
+  '#E63535',
+  '#0063F7',
+  '#06C270',
+  '#FF8800',
+  '#6600CC',
+  '#0f766e',
+  '#991b1b',
+  '#5B8DEF',
+  '#15803d',
+  '#b45309',
+  '#7c3aed',
+  '#1e40af',
+  '#0891b2',
+  '#8F90A6',
 ]
 
 /** Background color palette (20 colors) */
 export const BG_COLORS = [
-  '#FFCC00', '#06C270', '#00CFDE', '#be185d', '#0063F7',
-  '#1e40af', '#0f766e', '#b45309', '#6600CC', '#FF8800',
-  '#39D98A', '#FDAC42', '#5B8DEF', '#AC5DD9', '#FDDD48',
-  '#73DFE7', '#f472b6', '#8F90A6', '#E4E4EB', '#C7C9D9',
+  '#FFCC00',
+  '#06C270',
+  '#00CFDE',
+  '#be185d',
+  '#0063F7',
+  '#1e40af',
+  '#0f766e',
+  '#b45309',
+  '#6600CC',
+  '#FF8800',
+  '#39D98A',
+  '#FDAC42',
+  '#5B8DEF',
+  '#AC5DD9',
+  '#FDDD48',
+  '#73DFE7',
+  '#f472b6',
+  '#8F90A6',
+  '#E4E4EB',
+  '#C7C9D9',
 ]
 
 /** Default font families */
 export const DEFAULT_FONTS = [
-  'System', 'Mono', 'Arial', 'Helvetica', 'Times New Roman',
-  'Georgia', 'Verdana', 'Tahoma', 'Courier New',
+  'System',
+  'Mono',
+  'Arial',
+  'Helvetica',
+  'Times New Roman',
+  'Georgia',
+  'Verdana',
+  'Tahoma',
+  'Courier New',
 ]
 
 /** Font size options */

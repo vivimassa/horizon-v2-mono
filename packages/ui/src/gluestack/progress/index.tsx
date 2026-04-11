@@ -22,13 +22,7 @@ export function Progress({
   )
 }
 
-export function ProgressFilledTrack({
-  value = 0,
-  className,
-}: {
-  value?: number
-  className?: string
-}) {
+export function ProgressFilledTrack({ value = 0, className }: { value?: number; className?: string }) {
   return (
     <View
       className={`h-full rounded-full bg-blue-600 ${className ?? ''}`}

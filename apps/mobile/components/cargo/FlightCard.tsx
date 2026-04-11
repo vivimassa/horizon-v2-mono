@@ -29,8 +29,12 @@ export function FlightCard({ flight, accent }: FlightCardProps) {
         <Text style={{ fontSize: 16, fontWeight: '600', color: '#fff' }}>{flight.arr}</Text>
       </View>
       <View className="flex-row items-center justify-between">
-        <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{flight.std} — {flight.sta}</Text>
-        <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{flight.aircraftType} · {flight.tailNumber}</Text>
+        <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
+          {flight.std} — {flight.sta}
+        </Text>
+        <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
+          {flight.aircraftType} · {flight.tailNumber}
+        </Text>
       </View>
     </View>
   )

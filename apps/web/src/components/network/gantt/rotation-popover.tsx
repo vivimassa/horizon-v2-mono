@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
@@ -27,38 +27,50 @@ function fmtGap(ms: number): string {
 
 function statusColor(s: string): string {
   switch (s) {
-    case 'active': return '#06C270'
-    case 'draft': return '#3B82F6'
-    case 'suspended': return '#FF8800'
-    case 'cancelled': return '#FF3B3B'
-    default: return '#6B7280'
+    case 'active':
+      return '#06C270'
+    case 'draft':
+      return '#3B82F6'
+    case 'suspended':
+      return '#FF8800'
+    case 'cancelled':
+      return '#FF3B3B'
+    default:
+      return '#6B7280'
   }
 }
 
 function statusLabel(s: string): string {
   switch (s) {
-    case 'active': return 'Active'
-    case 'draft': return 'Draft'
-    case 'suspended': return 'Suspended'
-    case 'cancelled': return 'Cancelled'
-    default: return s
+    case 'active':
+      return 'Active'
+    case 'draft':
+      return 'Draft'
+    case 'suspended':
+      return 'Suspended'
+    case 'cancelled':
+      return 'Cancelled'
+    default:
+      return s
   }
 }
 
 export function RotationPopover() {
-  const pop = useGanttStore(s => s.rotationPopover)
-  const close = useGanttStore(s => s.closeRotationPopover)
-  const flights = useGanttStore(s => s.flights)
-  const aircraftTypes = useGanttStore(s => s.aircraftTypes)
-  const utilizationTargets = useGanttStore(s => s.utilizationTargets)
-  const operatorCountry = useGanttStore(s => s.operatorCountry)
-  const stationCountryMap = useGanttStore(s => s.stationCountryMap)
+  const pop = useGanttStore((s) => s.rotationPopover)
+  const close = useGanttStore((s) => s.closeRotationPopover)
+  const flights = useGanttStore((s) => s.flights)
+  const aircraftTypes = useGanttStore((s) => s.aircraftTypes)
+  const utilizationTargets = useGanttStore((s) => s.utilizationTargets)
+  const operatorCountry = useGanttStore((s) => s.operatorCountry)
+  const stationCountryMap = useGanttStore((s) => s.stationCountryMap)
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const ref = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (!pop) return
@@ -66,7 +78,10 @@ export function RotationPopover() {
       if (ref.current && !ref.current.contains(e.target as Node)) close()
     }
     const id = setTimeout(() => document.addEventListener('mousedown', handler), 100)
-    return () => { clearTimeout(id); document.removeEventListener('mousedown', handler) }
+    return () => {
+      clearTimeout(id)
+      document.removeEventListener('mousedown', handler)
+    }
   }, [pop, close])
 
   const data = useMemo(() => {
@@ -74,7 +89,7 @@ export function RotationPopover() {
 
     // Get flights for this aircraft on this date
     const dayFlights = flights
-      .filter(f => f.aircraftReg === pop.registration && f.operatingDate === pop.date)
+      .filter((f) => f.aircraftReg === pop.registration && f.operatingDate === pop.date)
       .sort((a, b) => a.stdUtc - b.stdUtc)
 
     const totalBlockMin = dayFlights.reduce((s, f) => s + f.blockMinutes, 0)
@@ -83,15 +98,14 @@ export function RotationPopover() {
     const utilPct = (totalBlockHrs / targetHrs) * 100
 
     // Route-type-aware TAT lookup using operator's base country
-    const isDom = (station: string) =>
-      operatorCountry ? stationCountryMap[station] === operatorCountry : true
+    const isDom = (station: string) => (operatorCountry ? stationCountryMap[station] === operatorCountry : true)
 
-    function flightIsDom(f: typeof dayFlights[0]): boolean {
+    function flightIsDom(f: (typeof dayFlights)[0]): boolean {
       return isDom(f.depStation) && isDom(f.arrStation)
     }
 
-    function getRouteTat(curr: typeof dayFlights[0], next: typeof dayFlights[0]): number {
-      const t = aircraftTypes.find(a => a.icaoType === (curr.aircraftTypeIcao ?? pop!.aircraftTypeIcao))
+    function getRouteTat(curr: (typeof dayFlights)[0], next: (typeof dayFlights)[0]): number {
+      const t = aircraftTypes.find((a) => a.icaoType === (curr.aircraftTypeIcao ?? pop!.aircraftTypeIcao))
       if (!t) return 30
       const cDom = flightIsDom(curr)
       const nDom = flightIsDom(next)
@@ -102,7 +116,15 @@ export function RotationPopover() {
     }
 
     // Compute TAT gaps + conflicts
-    const gaps: { gapMs: number; gapMin: number; stationMatch: boolean; tatOk: boolean; overlap: boolean; minTatMin: number; routeType: string }[] = []
+    const gaps: {
+      gapMs: number
+      gapMin: number
+      stationMatch: boolean
+      tatOk: boolean
+      overlap: boolean
+      minTatMin: number
+      routeType: string
+    }[] = []
     for (let i = 0; i < dayFlights.length - 1; i++) {
       const curr = dayFlights[i]
       const next = dayFlights[i + 1]
@@ -118,7 +140,7 @@ export function RotationPopover() {
       gaps.push({ gapMs, gapMin, stationMatch, tatOk, overlap, minTatMin, routeType })
     }
 
-    const conflicts = gaps.filter(g => g.overlap || !g.stationMatch || !g.tatOk).length
+    const conflicts = gaps.filter((g) => g.overlap || !g.stationMatch || !g.tatOk).length
 
     return { dayFlights, totalBlockHrs, utilPct, gaps, conflicts }
   }, [pop, flights, aircraftTypes, utilizationTargets, operatorCountry, stationCountryMap])
@@ -148,8 +170,12 @@ export function RotationPopover() {
       ref={ref}
       className="fixed z-[9998] rounded-xl flex flex-col"
       style={{
-        left, top: Math.min(top, window.innerHeight - 562), width: w, maxHeight: 550,
-        background: bg, border: `1px solid ${border}`,
+        left,
+        top: Math.min(top, window.innerHeight - 562),
+        width: w,
+        maxHeight: 550,
+        background: bg,
+        border: `1px solid ${border}`,
         backdropFilter: 'blur(20px) saturate(180%)',
         WebkitBackdropFilter: 'blur(20px) saturate(180%)',
         boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)',
@@ -158,64 +184,105 @@ export function RotationPopover() {
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-3 pb-1">
         <div>
-          <span className="text-[16px] font-mono font-bold" style={{ color: text }}>{pop.registration}</span>
-          <span className="text-[13px] ml-2" style={{ color: textSec }}>{pop.aircraftTypeIcao}</span>
+          <span className="text-[16px] font-mono font-bold" style={{ color: text }}>
+            {pop.registration}
+          </span>
+          <span className="text-[13px] ml-2" style={{ color: textSec }}>
+            {pop.aircraftTypeIcao}
+          </span>
         </div>
-        <button onClick={close} className="w-6 h-6 rounded-md flex items-center justify-center opacity-60 hover:opacity-100 transition-opacity"
-          style={{ background: cardBg }}>
+        <button
+          onClick={close}
+          className="w-6 h-6 rounded-md flex items-center justify-center opacity-60 hover:opacity-100 transition-opacity"
+          style={{ background: cardBg }}
+        >
           <X size={14} style={{ color: text }} />
         </button>
       </div>
-      <div className="px-4 pb-3 text-[13px]" style={{ color: textSec }}>{fmtDate(pop.date)}</div>
+      <div className="px-4 pb-3 text-[13px]" style={{ color: textSec }}>
+        {fmtDate(pop.date)}
+      </div>
 
       {/* Daily utilization */}
       <div className="mx-4 mb-3 rounded-lg p-3" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
-        <div className="text-[13px] font-bold uppercase tracking-wider mb-2" style={{ color: textMuted }}>Daily Utilization</div>
+        <div className="text-[13px] font-bold uppercase tracking-wider mb-2" style={{ color: textMuted }}>
+          Daily Utilization
+        </div>
         <div className="grid grid-cols-3 gap-2 mb-2">
           <div className="text-center">
-            <div className="text-[18px] font-mono font-bold" style={{ color: text }}>{data?.dayFlights.length ?? 0}</div>
-            <div className="text-[13px]" style={{ color: textMuted }}>Flights</div>
+            <div className="text-[18px] font-mono font-bold" style={{ color: text }}>
+              {data?.dayFlights.length ?? 0}
+            </div>
+            <div className="text-[13px]" style={{ color: textMuted }}>
+              Flights
+            </div>
           </div>
           <div className="text-center">
-            <div className="text-[18px] font-mono font-bold" style={{ color: text }}>{(data?.totalBlockHrs ?? 0).toFixed(1)}h</div>
-            <div className="text-[13px]" style={{ color: textMuted }}>Block</div>
+            <div className="text-[18px] font-mono font-bold" style={{ color: text }}>
+              {(data?.totalBlockHrs ?? 0).toFixed(1)}h
+            </div>
+            <div className="text-[13px]" style={{ color: textMuted }}>
+              Block
+            </div>
           </div>
           <div className="text-center">
-            <div className="text-[18px] font-mono font-bold" style={{ color: utilColor }}>{(data?.utilPct ?? 0).toFixed(0)}%</div>
-            <div className="text-[13px]" style={{ color: textMuted }}>Util</div>
+            <div className="text-[18px] font-mono font-bold" style={{ color: utilColor }}>
+              {(data?.utilPct ?? 0).toFixed(0)}%
+            </div>
+            <div className="text-[13px]" style={{ color: textMuted }}>
+              Util
+            </div>
           </div>
         </div>
         <div className="relative h-[6px] rounded-full" style={{ background: cardBorder }}>
-          <div className="absolute inset-y-0 left-0 rounded-full transition-all" style={{ width: `${Math.min(100, data?.utilPct ?? 0)}%`, background: utilColor }} />
+          <div
+            className="absolute inset-y-0 left-0 rounded-full transition-all"
+            style={{ width: `${Math.min(100, data?.utilPct ?? 0)}%`, background: utilColor }}
+          />
           {(() => {
             const targetHrs = utilizationTargets.get(pop.aircraftTypeIcao)
             if (!targetHrs) return null
             const targetPct = (targetHrs / 24) * 100
             return (
-              <div className="absolute" style={{
-                left: `${Math.min(100, targetPct)}%`,
-                top: -3, bottom: -3, width: 2,
-                background: '#06C270',
-                borderRadius: 1,
-              }} />
+              <div
+                className="absolute"
+                style={{
+                  left: `${Math.min(100, targetPct)}%`,
+                  top: -3,
+                  bottom: -3,
+                  width: 2,
+                  background: '#06C270',
+                  borderRadius: 1,
+                }}
+              />
             )
           })()}
         </div>
       </div>
 
       {/* Flight sequence — scrollable */}
-      <div className="mx-4 mb-4 rounded-lg p-3 flex-1 min-h-0 overflow-y-auto" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+      <div
+        className="mx-4 mb-4 rounded-lg p-3 flex-1 min-h-0 overflow-y-auto"
+        style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
+      >
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[13px] font-bold uppercase tracking-wider" style={{ color: textMuted }}>Flight Sequence</span>
+          <span className="text-[13px] font-bold uppercase tracking-wider" style={{ color: textMuted }}>
+            Flight Sequence
+          </span>
           {data && data.conflicts > 0 && (
-            <span className="text-[13px] font-bold px-2 py-0.5 rounded" style={{ background: 'rgba(230,53,53,0.15)', color: '#E63535' }}>
+            <span
+              className="text-[13px] font-bold px-2 py-0.5 rounded"
+              style={{ background: 'rgba(230,53,53,0.15)', color: '#E63535' }}
+            >
               {data.conflicts} issue{data.conflicts > 1 ? 's' : ''}
             </span>
           )}
         </div>
 
-        {(!data || data.dayFlights.length === 0) ? (
-          <div className="py-4 text-center text-[13px]" style={{ color: textMuted }}>No flights on this date</div>
+        {!data || data.dayFlights.length === 0 ? (
+          <div className="py-4 text-center text-[13px]" style={{ color: textMuted }}>
+            No flights on this date
+          </div>
         ) : (
           <div>
             {data.dayFlights.map((f, i) => {
@@ -235,19 +302,26 @@ export function RotationPopover() {
                     <span className="text-[13px] font-mono flex-1 text-right" style={{ color: textSec }}>
                       {fmtUtc(f.stdUtc)}—{fmtUtc(f.staUtc)}
                     </span>
-                    <span className="text-[13px] font-semibold px-1.5 py-0.5 rounded shrink-0"
-                      style={{ background: `${sColor}15`, color: sColor, fontSize: 11 }}>
+                    <span
+                      className="text-[13px] font-semibold px-1.5 py-0.5 rounded shrink-0"
+                      style={{ background: `${sColor}15`, color: sColor, fontSize: 11 }}
+                    >
                       {statusLabel(f.status)}
                     </span>
                   </div>
 
                   {/* TAT indicator between flights */}
                   {gap && (
-                    <div className="flex items-center gap-2 py-1.5 pl-8" style={{ borderTop: `1px dashed ${cardBorder}`, borderBottom: `1px dashed ${cardBorder}` }}>
+                    <div
+                      className="flex items-center gap-2 py-1.5 pl-8"
+                      style={{ borderTop: `1px dashed ${cardBorder}`, borderBottom: `1px dashed ${cardBorder}` }}
+                    >
                       {gap.overlap ? (
                         <>
                           <XCircle size={14} style={{ color: '#E63535' }} />
-                          <span className="text-[13px] font-mono font-bold" style={{ color: '#E63535' }}>OVERLAP {fmtGap(Math.abs(gap.gapMs))}</span>
+                          <span className="text-[13px] font-mono font-bold" style={{ color: '#E63535' }}>
+                            OVERLAP {fmtGap(Math.abs(gap.gapMs))}
+                          </span>
                         </>
                       ) : !gap.stationMatch ? (
                         <>
@@ -266,7 +340,9 @@ export function RotationPopover() {
                       ) : (
                         <>
                           <CheckCircle size={14} style={{ color: '#06C270' }} />
-                          <span className="text-[13px] font-mono" style={{ color: textSec }}>TAT: {fmtGap(gap.gapMs)} ({gap.routeType})</span>
+                          <span className="text-[13px] font-mono" style={{ color: textSec }}>
+                            TAT: {fmtGap(gap.gapMs)} ({gap.routeType})
+                          </span>
                         </>
                       )}
                     </div>
@@ -278,6 +354,6 @@ export function RotationPopover() {
         )}
       </div>
     </div>,
-    document.body
+    document.body,
   )
 }

@@ -1,90 +1,86 @@
-"use client";
+'use client'
 
-import { createContext, useContext, useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
-import { resolveModule, MODULE_THEMES } from "@skyhub/constants";
-import { darkAccent } from "@skyhub/ui/theme";
+import { createContext, useContext, useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
+import { resolveModule, MODULE_THEMES } from '@skyhub/constants'
+import { darkAccent } from '@skyhub/ui/theme'
 
-type Theme = "light" | "dark";
-type ModuleKey = "network" | "operations" | "ground" | "workforce" | "integration" | "admin" | null;
+type Theme = 'light' | 'dark'
+type ModuleKey = 'network' | 'operations' | 'ground' | 'workforce' | 'integration' | 'admin' | null
 
 interface ThemeContextValue {
-  theme: Theme;
-  toggle: () => void;
-  moduleKey: ModuleKey;
-  moduleTheme: { accent: string; bg: string; bgSubtle: string } | null;
+  theme: Theme
+  toggle: () => void
+  moduleKey: ModuleKey
+  moduleTheme: { accent: string; bg: string; bgSubtle: string } | null
 }
 
 const ThemeCtx = createContext<ThemeContextValue>({
-  theme: "light",
+  theme: 'light',
   toggle: () => {},
   moduleKey: null,
   moduleTheme: null,
-});
+})
 
 export function useTheme() {
-  return useContext(ThemeCtx);
+  return useContext(ThemeCtx)
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("light");
-  const pathname = usePathname();
+  const [theme, setTheme] = useState<Theme>('light')
+  const pathname = usePathname()
 
   // Resolve current module
-  const currentModule = resolveModule(pathname);
-  const moduleKey = (currentModule?.module ?? null) as ModuleKey;
-  const moduleTheme = moduleKey ? MODULE_THEMES[moduleKey] ?? null : null;
+  const currentModule = resolveModule(pathname)
+  const moduleKey = (currentModule?.module ?? null) as ModuleKey
+  const moduleTheme = moduleKey ? (MODULE_THEMES[moduleKey] ?? null) : null
 
   // Resolve accent for dark mode — same hue, 80% saturation, 70% lightness
   function resolveAccent(hex: string, isDark: boolean): string {
-    if (!isDark) return hex;
-    return darkAccent(hex);
+    if (!isDark) return hex
+    return darkAccent(hex)
   }
 
   // Apply module theme CSS custom properties
   useEffect(() => {
-    const root = document.documentElement;
-    const isDark = theme === "dark";
+    const root = document.documentElement
+    const isDark = theme === 'dark'
     if (moduleTheme) {
-      const accent = resolveAccent(moduleTheme.accent, isDark);
-      root.style.setProperty("--module-accent", accent);
-      root.style.setProperty("--module-bg", isDark ? hexToRgba(accent, 0.12) : moduleTheme.bg);
-      root.style.setProperty("--module-bg-subtle", isDark ? hexToRgba(accent, 0.06) : moduleTheme.bgSubtle);
+      const accent = resolveAccent(moduleTheme.accent, isDark)
+      root.style.setProperty('--module-accent', accent)
+      root.style.setProperty('--module-bg', isDark ? hexToRgba(accent, 0.12) : moduleTheme.bg)
+      root.style.setProperty('--module-bg-subtle', isDark ? hexToRgba(accent, 0.06) : moduleTheme.bgSubtle)
     } else {
-      const accent = resolveAccent("#1e40af", isDark);
-      root.style.setProperty("--module-accent", accent);
-      root.style.setProperty("--module-bg", isDark ? hexToRgba(accent, 0.12) : "#dbeafe");
-      root.style.setProperty("--module-bg-subtle", isDark ? hexToRgba(accent, 0.06) : "#eff6ff");
+      const accent = resolveAccent('#1e40af', isDark)
+      root.style.setProperty('--module-accent', accent)
+      root.style.setProperty('--module-bg', isDark ? hexToRgba(accent, 0.12) : '#dbeafe')
+      root.style.setProperty('--module-bg-subtle', isDark ? hexToRgba(accent, 0.06) : '#eff6ff')
     }
-  }, [moduleKey, moduleTheme, theme]);
+  }, [moduleKey, moduleTheme, theme])
 
   // Init theme from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem("hz-theme") as Theme | null;
+    const stored = localStorage.getItem('hz-theme') as Theme | null
     if (stored) {
-      setTheme(stored);
-      document.documentElement.classList.toggle("dark", stored === "dark");
+      setTheme(stored)
+      document.documentElement.classList.toggle('dark', stored === 'dark')
     }
-  }, []);
+  }, [])
 
   const toggle = () => {
-    const next = theme === "light" ? "dark" : "light";
-    setTheme(next);
-    localStorage.setItem("hz-theme", next);
-    document.documentElement.classList.toggle("dark", next === "dark");
-  };
+    const next = theme === 'light' ? 'dark' : 'light'
+    setTheme(next)
+    localStorage.setItem('hz-theme', next)
+    document.documentElement.classList.toggle('dark', next === 'dark')
+  }
 
-  return (
-    <ThemeCtx.Provider value={{ theme, toggle, moduleKey, moduleTheme }}>
-      {children}
-    </ThemeCtx.Provider>
-  );
+  return <ThemeCtx.Provider value={{ theme, toggle, moduleKey, moduleTheme }}>{children}</ThemeCtx.Provider>
 }
 
 /** Convert hex color to rgba string */
 function hexToRgba(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }

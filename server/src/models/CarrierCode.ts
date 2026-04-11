@@ -5,7 +5,7 @@ const reportDebriefSchema = new Schema(
     reportMinutes: { type: Number, default: null },
     debriefMinutes: { type: Number, default: null },
   },
-  { _id: false }
+  { _id: false },
 )
 
 const carrierCodeSchema = new Schema(
@@ -34,7 +34,7 @@ const carrierCodeSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'carrierCodes',
-  }
+  },
 )
 
 carrierCodeSchema.index({ operatorId: 1, iataCode: 1 }, { unique: true })

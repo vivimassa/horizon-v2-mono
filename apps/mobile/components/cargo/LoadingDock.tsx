@@ -22,7 +22,16 @@ export function LoadingDock({ items, accent, palette, isDark }: LoadingDockProps
     >
       <View className="flex-row items-center mb-2.5">
         <Package size={14} color={accent} strokeWidth={2} />
-        <Text style={{ fontSize: 12, fontWeight: '700', color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginLeft: 6 }}>
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: '700',
+            color: palette.textSecondary,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+            marginLeft: 6,
+          }}
+        >
           Loading Dock
         </Text>
         <View className="ml-auto px-2 py-0.5 rounded-full" style={{ backgroundColor: accentTint(accent, 0.15) }}>

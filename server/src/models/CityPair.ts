@@ -13,7 +13,7 @@ const blockHourSchema = new Schema(
     dir2FuelKg: { type: Number, default: null },
     notes: { type: String, default: null },
   },
-  { _id: false, timestamps: false }
+  { _id: false, timestamps: false },
 )
 
 const cityPairSchema = new Schema(
@@ -63,7 +63,7 @@ const cityPairSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'city_pairs',
-  }
+  },
 )
 
 cityPairSchema.index({ operatorId: 1, station1Icao: 1, station2Icao: 1 }, { unique: true })

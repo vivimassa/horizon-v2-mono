@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 // ─── FlightTooltip ────────────────────────────────────────────────────────
 // Ported from V1 pairing-gantt-v2. DOM-based positioning — zero React
@@ -54,8 +54,8 @@ function getStatusStyle(status: string, isDark: boolean) {
       return { bg: 'rgba(6,194,112,0.15)', color: '#06C270', text: 'Active' }
     case 'draft':
       return isDark
-        ? { bg: 'rgba(30,40,80,0.20)', color: '#1e3a5f', text: 'Draft' }      // dark text on light tooltip
-        : { bg: 'rgba(255,136,0,0.15)', color: '#FF8800', text: 'Draft' }      // orange on dark tooltip
+        ? { bg: 'rgba(30,40,80,0.20)', color: '#1e3a5f', text: 'Draft' } // dark text on light tooltip
+        : { bg: 'rgba(255,136,0,0.15)', color: '#FF8800', text: 'Draft' } // orange on dark tooltip
     case 'suspended':
       return { bg: 'rgba(255,136,0,0.15)', color: '#FF8800', text: 'Suspended' }
     case 'cancelled':
@@ -75,13 +75,13 @@ export interface FlightTooltipProps {
 
 // ─── Component ────────────────────────────────────────────────────────────
 
-export const FlightTooltip = memo(function FlightTooltip({
-  flight, mousePosRef, isDark,
-}: FlightTooltipProps) {
+export const FlightTooltip = memo(function FlightTooltip({ flight, mousePosRef, isDark }: FlightTooltipProps) {
   const tooltipRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // DOM-based positioning — no React state, no re-renders on mouse move
   useEffect(() => {
@@ -119,8 +119,8 @@ export const FlightTooltip = memo(function FlightTooltip({
 
   // Hide tooltip when any modal/dialog/popover overlay is open
   const hasOverlay = typeof document !== 'undefined' && document.querySelector('[data-gantt-overlay]') !== null
-  const swapMode = useGanttStore(s => s.swapMode)
-  const stationUtcOffsetMap = useGanttStore(s => s.stationUtcOffsetMap)
+  const swapMode = useGanttStore((s) => s.swapMode)
+  const stationUtcOffsetMap = useGanttStore((s) => s.stationUtcOffsetMap)
   if (!mounted || !flight || swapMode || hasOverlay) return null
 
   const status = getStatusStyle(flight.status, isDark)
@@ -166,10 +166,7 @@ export const FlightTooltip = memo(function FlightTooltip({
           >
             {flight.airlineCode ? `${flight.airlineCode} ${flight.flightNumber}` : flight.flightNumber}
           </span>
-          <span
-            className="text-[10px] font-medium tracking-wider uppercase"
-            style={{ color: status.color }}
-          >
+          <span className="text-[10px] font-medium tracking-wider uppercase" style={{ color: status.color }}>
             {status.text}
           </span>
         </div>
@@ -195,36 +192,52 @@ export const FlightTooltip = memo(function FlightTooltip({
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12px]">
           <div className="flex justify-between">
             <span style={{ color: muted }}>STD (UTC)</span>
-            <span className="tabular-nums font-normal text-[13px]" style={{ color: heading }}>{fmtUtc(flight.stdUtc)}z</span>
+            <span className="tabular-nums font-normal text-[13px]" style={{ color: heading }}>
+              {fmtUtc(flight.stdUtc)}z
+            </span>
           </div>
           <div className="flex justify-between">
             <span style={{ color: muted }}>STA (UTC)</span>
-            <span className="tabular-nums font-normal text-[13px]" style={{ color: heading }}>{fmtUtc(flight.staUtc)}z</span>
+            <span className="tabular-nums font-normal text-[13px]" style={{ color: heading }}>
+              {fmtUtc(flight.staUtc)}z
+            </span>
           </div>
           {depOffset !== null && (
             <div className="flex justify-between">
               <span style={{ color: muted }}>STD (Local)</span>
-              <span className="tabular-nums text-[13px]" style={{ color: body }}>{fmtLocal(flight.stdUtc, depOffset)} <span style={{ color: muted, fontSize: 10 }}>UTC{fmtOffset(depOffset)}</span></span>
+              <span className="tabular-nums text-[13px]" style={{ color: body }}>
+                {fmtLocal(flight.stdUtc, depOffset)}{' '}
+                <span style={{ color: muted, fontSize: 10 }}>UTC{fmtOffset(depOffset)}</span>
+              </span>
             </div>
           )}
           {arrOffset !== null && (
             <div className="flex justify-between">
               <span style={{ color: muted }}>STA (Local)</span>
-              <span className="tabular-nums text-[13px]" style={{ color: body }}>{fmtLocal(flight.staUtc, arrOffset)} <span style={{ color: muted, fontSize: 10 }}>UTC{fmtOffset(arrOffset)}</span></span>
+              <span className="tabular-nums text-[13px]" style={{ color: body }}>
+                {fmtLocal(flight.staUtc, arrOffset)}{' '}
+                <span style={{ color: muted, fontSize: 10 }}>UTC{fmtOffset(arrOffset)}</span>
+              </span>
             </div>
           )}
           <div className="flex justify-between">
             <span style={{ color: muted }}>Date</span>
-            <span className="tabular-nums" style={{ color: body }}>{fmtDate(flight.stdUtc)}</span>
+            <span className="tabular-nums" style={{ color: body }}>
+              {fmtDate(flight.stdUtc)}
+            </span>
           </div>
           <div className="flex justify-between">
             <span style={{ color: muted }}>AC Type</span>
-            <span className="tabular-nums" style={{ color: body }}>{flight.aircraftTypeIcao || '—'}</span>
+            <span className="tabular-nums" style={{ color: body }}>
+              {flight.aircraftTypeIcao || '—'}
+            </span>
           </div>
           {flight.aircraftReg && (
             <div className="flex justify-between">
               <span style={{ color: muted }}>Aircraft</span>
-              <span className="font-mono font-medium" style={{ color: heading }}>{flight.aircraftReg}</span>
+              <span className="font-mono font-medium" style={{ color: heading }}>
+                {flight.aircraftReg}
+              </span>
             </div>
           )}
           {flight.serviceType && (
@@ -252,11 +265,15 @@ export const FlightTooltip = memo(function FlightTooltip({
           {flight.slotRiskLevel && flight.slotRiskLevel !== 'safe' && (
             <div className="flex justify-between">
               <span style={{ color: muted }}>Risk</span>
-              <span className="font-medium" style={{
-                padding: '1px 6px', borderRadius: 4,
-                background: flight.slotRiskLevel === 'at_risk' ? 'rgba(255,59,59,0.15)' : 'rgba(255,136,0,0.15)',
-                color: SLOT_RISK_COLORS[flight.slotRiskLevel],
-              }}>
+              <span
+                className="font-medium"
+                style={{
+                  padding: '1px 6px',
+                  borderRadius: 4,
+                  background: flight.slotRiskLevel === 'at_risk' ? 'rgba(255,59,59,0.15)' : 'rgba(255,136,0,0.15)',
+                  color: SLOT_RISK_COLORS[flight.slotRiskLevel],
+                }}
+              >
                 {flight.slotRiskLevel === 'at_risk' ? 'AT RISK' : 'CLOSE'}
               </span>
             </div>

@@ -13,12 +13,7 @@ function toRad(deg: number): number {
  * Calculate the great circle distance between two points using the Haversine formula.
  * @returns Distance in nautical miles
  */
-export function calculateGreatCircleDistance(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
+export function calculateGreatCircleDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const dLat = toRad(lat2 - lat1)
   const dLon = toRad(lon2 - lon1)
   const a =
@@ -39,7 +34,7 @@ export function calculateGreatCirclePoints(
   lon1: number,
   lat2: number,
   lon2: number,
-  numPoints?: number
+  numPoints?: number,
 ): [number, number][] {
   // Auto-scale point count based on distance if not specified
   if (numPoints == null) {
@@ -56,8 +51,8 @@ export function calculateGreatCirclePoints(
     Math.asin(
       Math.sqrt(
         Math.sin((lat1Rad - lat2Rad) / 2) ** 2 +
-          Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin((lon1Rad - lon2Rad) / 2) ** 2
-      )
+          Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin((lon1Rad - lon2Rad) / 2) ** 2,
+      ),
     )
 
   if (d === 0) return [[lat1, lon1]]
@@ -88,7 +83,7 @@ export function determineRouteType(
   region1?: string | null,
   region2?: string | null,
   _iata1?: string | null,
-  _iata2?: string | null
+  _iata2?: string | null,
 ): 'domestic' | 'regional' | 'international' | 'unknown' {
   // Primary: compare country UUIDs
   if (country1Id && country2Id) {

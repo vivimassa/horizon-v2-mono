@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useEffect, useState } from 'react'
 import { Plane, Clock, Radio } from 'lucide-react'
@@ -27,12 +27,12 @@ export function GanttStatusBar() {
   const isDark = theme === 'dark'
   const palette = isDark ? colors.dark : colors.light
 
-  const zoomLevel = useGanttStore(s => s.zoomLevel)
-  const periodFrom = useGanttStore(s => s.periodFrom)
-  const periodTo = useGanttStore(s => s.periodTo)
-  const flights = useGanttStore(s => s.flights)
-  const aircraft = useGanttStore(s => s.aircraft)
-  const swapMode = useGanttStore(s => s.swapMode)
+  const zoomLevel = useGanttStore((s) => s.zoomLevel)
+  const periodFrom = useGanttStore((s) => s.periodFrom)
+  const periodTo = useGanttStore((s) => s.periodTo)
+  const flights = useGanttStore((s) => s.flights)
+  const aircraft = useGanttStore((s) => s.aircraft)
+  const swapMode = useGanttStore((s) => s.swapMode)
 
   const [utcTime, setUtcTime] = useState(formatUtcClock)
 
@@ -42,7 +42,8 @@ export function GanttStatusBar() {
   }, [])
 
   return (
-    <div className="h-6 shrink-0 flex items-center justify-between px-3 select-none"
+    <div
+      className="h-6 shrink-0 flex items-center justify-between px-3 select-none"
       style={{ background: palette.backgroundSecondary, color: palette.textTertiary, fontSize: 11 }}
     >
       <div className="flex items-center gap-3 font-mono">
@@ -66,11 +67,15 @@ export function GanttStatusBar() {
       </div>
 
       <div className="flex items-center gap-3 font-mono">
-        <span className="flex items-center gap-1"><Clock size={11} /> UTC {utcTime}</span>
+        <span className="flex items-center gap-1">
+          <Clock size={11} /> UTC {utcTime}
+        </span>
         <span style={{ opacity: 0.3 }}>·</span>
         <span>Period: {formatPeriodShort(periodFrom, periodTo)}</span>
         <span style={{ opacity: 0.3 }}>·</span>
-        <span className="flex items-center gap-1"><Radio size={9} color="#06C270" /> Sync Active</span>
+        <span className="flex items-center gap-1">
+          <Radio size={9} color="#06C270" /> Sync Active
+        </span>
       </div>
     </div>
   )

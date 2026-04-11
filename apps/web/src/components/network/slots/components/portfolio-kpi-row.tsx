@@ -19,7 +19,7 @@ export function PortfolioKpiRow({ stats, isDark }: PortfolioKpiRowProps) {
 
   return (
     <div className="flex gap-2.5 px-5 py-3.5 shrink-0">
-      {KPI_DEFS.map(k => {
+      {KPI_DEFS.map((k) => {
         const value = stats[k.key as keyof SlotPortfolioStats]
         return (
           <div
@@ -30,16 +30,17 @@ export function PortfolioKpiRow({ stats, isDark }: PortfolioKpiRowProps) {
               border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'}`,
             }}
           >
-            <div className="text-[20px] font-bold leading-tight"
-              style={{ color: k.color || palette.text }}>
+            <div className="text-[20px] font-bold leading-tight" style={{ color: k.color || palette.text }}>
               {value}
             </div>
             <div className="text-[13px] mt-1" style={{ color: palette.textSecondary }}>
               {k.label}
             </div>
             {stats.totalSeries > 0 && (
-              <div className="h-[3px] rounded-full mt-2 overflow-hidden"
-                style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}>
+              <div
+                className="h-[3px] rounded-full mt-2 overflow-hidden"
+                style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}
+              >
                 <div
                   className="h-full rounded-full"
                   style={{

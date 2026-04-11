@@ -3,8 +3,18 @@ import { Text, View, ScrollView, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import {
-  Globe, Calendar, LayoutGrid, GanttChart, Clock, Repeat, CalendarRange,
-  Handshake, PlaneTakeoff, Send, MessageSquare, PackageOpen,
+  Globe,
+  Calendar,
+  LayoutGrid,
+  GanttChart,
+  Clock,
+  Repeat,
+  CalendarRange,
+  Handshake,
+  PlaneTakeoff,
+  Send,
+  MessageSquare,
+  PackageOpen,
   ChevronRight,
 } from 'lucide-react-native'
 import type { LucideIcon } from 'lucide-react-native'
@@ -33,7 +43,13 @@ const SECTIONS: SectionDef[] = [
     icon: Calendar,
     color: '#0f766e',
     cards: [
-      { code: '1.1.1', label: 'Scheduling XL', desc: 'Excel-style flight schedule editor', icon: LayoutGrid, route: '/(tabs)/network/schedule-grid' },
+      {
+        code: '1.1.1',
+        label: 'Scheduling XL',
+        desc: 'Excel-style flight schedule editor',
+        icon: LayoutGrid,
+        route: '/(tabs)/network/schedule-grid',
+      },
       { code: '1.1.2', label: 'Gantt Chart', desc: 'Visual timeline', icon: GanttChart, route: '' },
       { code: '1.1.3', label: 'Slot Manager', desc: 'Airport slot allocations & IATA 80/20', icon: Clock, route: '' },
       { code: '1.1.4', label: 'Flight Patterns', desc: 'Build & edit patterns', icon: Repeat, route: '' },
@@ -67,48 +83,57 @@ export default function NetworkHub() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
-    <BreadcrumbHeader moduleCode="1" />
-    <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
-      {/* Header */}
-      <View className="flex-row items-center px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <BreadcrumbHeader moduleCode="1" />
+      <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
+        {/* Header */}
         <View
-          className="items-center justify-center rounded-lg mr-3"
-          style={{ width: 36, height: 36, backgroundColor: accentTint(accent, isDark ? 0.15 : 0.1) }}
+          className="flex-row items-center px-4 pt-2 pb-3"
+          style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}
         >
-          <Globe size={18} color={accent} strokeWidth={1.8} />
+          <View
+            className="items-center justify-center rounded-lg mr-3"
+            style={{ width: 36, height: 36, backgroundColor: accentTint(accent, isDark ? 0.15 : 0.1) }}
+          >
+            <Globe size={18} color={accent} strokeWidth={1.8} />
+          </View>
+          <View>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>Network</Text>
+            <Text style={{ fontSize: 15, color: palette.textSecondary }}>Schedule, commercial & distribution</Text>
+          </View>
         </View>
-        <View>
-          <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>Network</Text>
-          <Text style={{ fontSize: 15, color: palette.textSecondary }}>Schedule, commercial & distribution</Text>
-        </View>
-      </View>
 
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {SECTIONS.map((section) => (
-          <DomainSection
-            key={section.label}
-            section={section}
-            palette={palette}
-            isDark={isDark}
-            onNavigate={(route) => {
-              if (route) router.push(route as any)
-            }}
-          />
-        ))}
-      </ScrollView>
-    </SafeAreaView>
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {SECTIONS.map((section) => (
+            <DomainSection
+              key={section.label}
+              section={section}
+              palette={palette}
+              isDark={isDark}
+              onNavigate={(route) => {
+                if (route) router.push(route as any)
+              }}
+            />
+          ))}
+        </ScrollView>
+      </SafeAreaView>
     </View>
   )
 }
 
 const DomainSection = memo(function DomainSection({
-  section, palette, isDark, onNavigate,
+  section,
+  palette,
+  isDark,
+  onNavigate,
 }: {
-  section: SectionDef; palette: Palette; isDark: boolean; onNavigate: (route: string) => void
+  section: SectionDef
+  palette: Palette
+  isDark: boolean
+  onNavigate: (route: string) => void
 }) {
   const SectionIcon = section.icon
 
@@ -144,9 +169,17 @@ const DomainSection = memo(function DomainSection({
 })
 
 const EntityCard = memo(function EntityCard({
-  card, sectionColor, palette, isDark, onPress,
+  card,
+  sectionColor,
+  palette,
+  isDark,
+  onPress,
 }: {
-  card: CardDef; sectionColor: string; palette: Palette; isDark: boolean; onPress: () => void
+  card: CardDef
+  sectionColor: string
+  palette: Palette
+  isDark: boolean
+  onPress: () => void
 }) {
   const Icon = card.icon
   const disabled = !card.route
@@ -176,7 +209,9 @@ const EntityCard = memo(function EntityCard({
         <Text style={{ fontSize: 15, color: palette.textTertiary, marginTop: 2 }}>{card.desc}</Text>
       </View>
       <View className="flex-row items-center" style={{ gap: 6 }}>
-        <Text style={{ fontSize: 13, fontWeight: '600', fontFamily: 'monospace', color: palette.textTertiary }}>{card.code}</Text>
+        <Text style={{ fontSize: 13, fontWeight: '600', fontFamily: 'monospace', color: palette.textTertiary }}>
+          {card.code}
+        </Text>
         <ChevronRight size={16} color={palette.textTertiary} strokeWidth={1.8} />
       </View>
     </Pressable>

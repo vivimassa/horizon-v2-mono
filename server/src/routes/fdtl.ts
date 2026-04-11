@@ -161,12 +161,10 @@ export async function fdtlRoutes(app: FastifyInstance): Promise<void> {
   app.post('/fdtl/schemes', async (req, reply) => {
     const parsed = schemeCreateSchema.safeParse(req.body)
     if (!parsed.success) {
-      return reply
-        .code(400)
-        .send({
-          error: 'Validation failed',
-          details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
-        })
+      return reply.code(400).send({
+        error: 'Validation failed',
+        details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+      })
     }
     const body = parsed.data
     const existing = await FdtlScheme.findOne({ operatorId: body.operatorId }).lean()
@@ -200,12 +198,10 @@ export async function fdtlRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string }
     const parsed = schemeUpdateSchema.safeParse(req.body)
     if (!parsed.success) {
-      return reply
-        .code(400)
-        .send({
-          error: 'Validation failed',
-          details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
-        })
+      return reply.code(400).send({
+        error: 'Validation failed',
+        details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+      })
     }
     const body = { ...parsed.data, updatedAt: new Date().toISOString() }
     const doc = await FdtlScheme.findByIdAndUpdate(id, { $set: body }, { new: true }).lean()

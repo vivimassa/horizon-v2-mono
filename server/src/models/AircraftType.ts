@@ -98,7 +98,7 @@ const aircraftTypeSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'aircraftTypes',
-  }
+  },
 )
 
 aircraftTypeSchema.index({ operatorId: 1, icaoType: 1 }, { unique: true })

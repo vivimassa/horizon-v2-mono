@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
@@ -29,7 +29,14 @@ interface DropdownProps {
 // ── Component ──
 
 export function Dropdown({
-  options, value, onChange, placeholder = 'Select...', size = 'md', className = '', disabled, maxVisible,
+  options,
+  value,
+  onChange,
+  placeholder = 'Select...',
+  size = 'md',
+  className = '',
+  disabled,
+  maxVisible,
 }: DropdownProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -39,7 +46,9 @@ export function Dropdown({
   const [panelPos, setPanelPos] = useState({ top: 0, left: 0, width: 0 })
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Position panel when opening — flip above if overflowing viewport
   useEffect(() => {
@@ -47,9 +56,7 @@ export function Dropdown({
     const rect = triggerRef.current.getBoundingClientRect()
     const panelHeight = Math.min(options.length * 36 + 8, 280)
     const spaceBelow = window.innerHeight - rect.bottom
-    const top = spaceBelow < panelHeight + 8
-      ? rect.top - panelHeight - 4
-      : rect.bottom + 4
+    const top = spaceBelow < panelHeight + 8 ? rect.top - panelHeight - 4 : rect.bottom + 4
     setPanelPos({ top, left: rect.left, width: rect.width })
   }, [open, options.length])
 
@@ -58,10 +65,8 @@ export function Dropdown({
     if (!open) return
     const handler = (e: MouseEvent) => {
       const t = e.target as Node
-      if (
-        triggerRef.current && !triggerRef.current.contains(t) &&
-        panelRef.current && !panelRef.current.contains(t)
-      ) setOpen(false)
+      if (triggerRef.current && !triggerRef.current.contains(t) && panelRef.current && !panelRef.current.contains(t))
+        setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -70,12 +75,14 @@ export function Dropdown({
   // Close on Escape
   useEffect(() => {
     if (!open) return
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [open])
 
-  const selected = options.find(o => o.value === value)
+  const selected = options.find((o) => o.value === value)
   const h = size === 'sm' ? 'h-8' : 'h-9'
   const textSize = 'text-[13px]'
 
@@ -96,7 +103,9 @@ export function Dropdown({
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => { if (!disabled) setOpen(o => !o) }}
+        onClick={() => {
+          if (!disabled) setOpen((o) => !o)
+        }}
         disabled={disabled}
         className={`w-full ${h} flex items-center justify-between gap-2 px-3 rounded-lg ${textSize} font-medium transition-colors disabled:opacity-40`}
         style={{ background: triggerBg, border: `1px solid ${triggerBorder}` }}
@@ -105,10 +114,14 @@ export function Dropdown({
           {selected ? (
             <span className="flex items-center gap-2">
               {selected.icon}
-              {selected.color && <span className="w-2 h-2 rounded-full shrink-0" style={{ background: selected.color }} />}
+              {selected.color && (
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: selected.color }} />
+              )}
               {selected.label}
             </span>
-          ) : placeholder}
+          ) : (
+            placeholder
+          )}
         </span>
         <ChevronDown
           size={14}
@@ -118,48 +131,63 @@ export function Dropdown({
       </button>
 
       {/* Panel — portaled to body to escape overflow:hidden containers */}
-      {open && mounted && createPortal(
-        <div
-          ref={panelRef}
-          className="fixed z-[9999] rounded-xl py-1"
-          style={{
-            top: panelPos.top,
-            left: panelPos.left,
-            minWidth: panelPos.width,
-            background: panelBg,
-            border: `1px solid ${panelBorder}`,
-            boxShadow: panelShadow,
-            backdropFilter: 'blur(20px)',
-            maxHeight: maxVisible ? maxVisible * (size === 'sm' ? 32 : 36) + 8 : undefined,
-            overflowY: maxVisible ? 'auto' : undefined,
-          }}
-        >
-          {options.map(opt => {
-            const isActive = opt.value === value
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => { onChange(opt.value); setOpen(false) }}
-                className={`w-full flex items-center gap-2.5 ${h} px-3 ${textSize} font-medium transition-colors`}
-                style={{ color: isActive ? accent : textPrimary }}
-                onMouseEnter={e => { e.currentTarget.style.background = hoverBg }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-              >
-                {opt.icon}
-                {opt.color && <span className="w-2 h-2 rounded-full shrink-0" style={{ background: opt.color }} />}
-                <span className="flex-1 text-left truncate">{opt.label}</span>
-                {isActive && (
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
-                    <path d="M3 7l3 3 5-5.5" stroke={accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
-              </button>
-            )
-          })}
-        </div>,
-        document.body
-      )}
+      {open &&
+        mounted &&
+        createPortal(
+          <div
+            ref={panelRef}
+            className="fixed z-[9999] rounded-xl py-1"
+            style={{
+              top: panelPos.top,
+              left: panelPos.left,
+              minWidth: panelPos.width,
+              background: panelBg,
+              border: `1px solid ${panelBorder}`,
+              boxShadow: panelShadow,
+              backdropFilter: 'blur(20px)',
+              maxHeight: maxVisible ? maxVisible * (size === 'sm' ? 32 : 36) + 8 : undefined,
+              overflowY: maxVisible ? 'auto' : undefined,
+            }}
+          >
+            {options.map((opt) => {
+              const isActive = opt.value === value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value)
+                    setOpen(false)
+                  }}
+                  className={`w-full flex items-center gap-2.5 ${h} px-3 ${textSize} font-medium transition-colors`}
+                  style={{ color: isActive ? accent : textPrimary }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = hoverBg
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent'
+                  }}
+                >
+                  {opt.icon}
+                  {opt.color && <span className="w-2 h-2 rounded-full shrink-0" style={{ background: opt.color }} />}
+                  <span className="flex-1 text-left truncate">{opt.label}</span>
+                  {isActive && (
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
+                      <path
+                        d="M3 7l3 3 5-5.5"
+                        stroke={accent}
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                </button>
+              )
+            })}
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

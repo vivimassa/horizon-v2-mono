@@ -40,9 +40,10 @@ export function Card({
   }
 
   // Glass variant on web gets backdrop-filter
-  const webGlassStyle: ViewStyle = isGlass && Platform.OS === 'web'
-    ? { backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any
-    : {}
+  const webGlassStyle: ViewStyle =
+    isGlass && Platform.OS === 'web'
+      ? ({ backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any)
+      : {}
 
   if (pressable || onPress) {
     return (

@@ -22,12 +22,12 @@ export function computeAlertTier(
   windGustKts: number | null,
   visibilityMeters: number | null,
   ceilingFeet: number | null,
-  weatherPhenomena: string[]
+  weatherPhenomena: string[],
 ): WeatherAlertTier {
   // ── WARN tier ──
   if (flightCategory === 'IFR' || flightCategory === 'LIFR') return 'warn'
   const warnWx = ['TS', 'TSRA', '+TSRA', 'FC', 'VA', 'FZRA', 'FZFG', 'SS']
-  if (weatherPhenomena.some(w => warnWx.includes(w))) return 'warn'
+  if (weatherPhenomena.some((w) => warnWx.includes(w))) return 'warn'
   if (visibilityMeters != null && visibilityMeters < 1600) return 'warn'
   if (ceilingFeet != null && ceilingFeet < 500) return 'warn'
   if (windGustKts != null && windGustKts >= 35) return 'warn'
@@ -38,7 +38,7 @@ export function computeAlertTier(
   if (ceilingFeet != null && ceilingFeet < 1500) return 'caution'
   if (windSpeedKts != null && windSpeedKts >= 20) return 'caution'
   const cautionWx = ['-RA', 'BR', 'HZ', '-SN', 'BCFG']
-  if (weatherPhenomena.some(w => cautionWx.includes(w))) return 'caution'
+  if (weatherPhenomena.some((w) => cautionWx.includes(w))) return 'caution'
 
   return 'none'
 }
@@ -73,13 +73,48 @@ export const ALERT_TIER_CONFIG = {
 
 // ─── Flight category colors (standard aviation) ───
 export const FLIGHT_CATEGORY_CONFIG = {
-  VFR:  { label: 'VFR',  dot: '#22c55e', bg: 'bg-green-500/15',  border: 'border-green-500/25',  text: 'text-green-600 dark:text-green-400'  },
-  MVFR: { label: 'MVFR', dot: '#3b82f6', bg: 'bg-blue-500/15',   border: 'border-blue-500/25',   text: 'text-blue-600 dark:text-blue-400'    },
-  IFR:  { label: 'IFR',  dot: '#ef4444', bg: 'bg-red-500/15',    border: 'border-red-500/25',    text: 'text-red-600 dark:text-red-400'      },
-  LIFR: { label: 'LIFR', dot: '#a855f7', bg: 'bg-purple-500/15', border: 'border-purple-500/25', text: 'text-purple-600 dark:text-purple-400' },
+  VFR: {
+    label: 'VFR',
+    dot: '#22c55e',
+    bg: 'bg-green-500/15',
+    border: 'border-green-500/25',
+    text: 'text-green-600 dark:text-green-400',
+  },
+  MVFR: {
+    label: 'MVFR',
+    dot: '#3b82f6',
+    bg: 'bg-blue-500/15',
+    border: 'border-blue-500/25',
+    text: 'text-blue-600 dark:text-blue-400',
+  },
+  IFR: {
+    label: 'IFR',
+    dot: '#ef4444',
+    bg: 'bg-red-500/15',
+    border: 'border-red-500/25',
+    text: 'text-red-600 dark:text-red-400',
+  },
+  LIFR: {
+    label: 'LIFR',
+    dot: '#a855f7',
+    bg: 'bg-purple-500/15',
+    border: 'border-purple-500/25',
+    text: 'text-purple-600 dark:text-purple-400',
+  },
 } as const
 
 // ─── Weather phenomena significance ───
 export const SIGNIFICANT_WEATHER = new Set([
-  'TS', '+RA', 'TSRA', '+TSRA', 'FG', 'FZRA', 'FZFG', '+SN', 'SQ', 'FC', 'VA', 'SS',
+  'TS',
+  '+RA',
+  'TSRA',
+  '+TSRA',
+  'FG',
+  'FZRA',
+  'FZFG',
+  '+SN',
+  'SQ',
+  'FC',
+  'VA',
+  'SS',
 ])

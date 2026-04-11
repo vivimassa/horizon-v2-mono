@@ -37,7 +37,7 @@ export interface SerializedRuleSet {
   augmentedLimits: Array<{
     crewCount: number
     facilityClass: string
-    facilityLabel: string      // e.g. "Class 1 — Bunk"
+    facilityLabel: string // e.g. "Class 1 — Bunk"
     maxFdpMinutes: number
     legalReference: string | null
   }>

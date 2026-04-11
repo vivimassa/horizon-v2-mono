@@ -21,8 +21,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
   accentColor: colors.defaultAccent,
   backgroundPreset: 'aurora',
   palette: colors.light,
-  setColorMode: (mode) =>
-    set({ colorMode: mode, palette: colors[mode] }),
+  setColorMode: (mode) => set({ colorMode: mode, palette: colors[mode] }),
   toggleColorMode: () =>
     set((s) => {
       const next = s.colorMode === 'light' ? 'dark' : 'light'

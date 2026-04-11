@@ -13,7 +13,7 @@ const codeshareSeatAllocationSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'codeshareSeatAllocations',
-  }
+  },
 )
 
 codeshareSeatAllocationSchema.index({ mappingId: 1, cabinCode: 1 }, { unique: true })

@@ -1,43 +1,34 @@
-"use client";
+'use client'
 
-import { useState, useRef, useEffect } from "react";
-import { ChevronDown, Check, X } from "lucide-react";
-import type { SelectOption } from "./select";
+import { useState, useRef, useEffect } from 'react'
+import { ChevronDown, Check, X } from 'lucide-react'
+import type { SelectOption } from './select'
 
 interface MultiSelectProps {
-  selected: string[];
-  onChange: (values: string[]) => void;
-  options: SelectOption[];
-  placeholder?: string;
+  selected: string[]
+  onChange: (values: string[]) => void
+  options: SelectOption[]
+  placeholder?: string
 }
 
 /** Multi-value dropdown select with chips */
-export function MultiSelect({
-  selected,
-  onChange,
-  options,
-  placeholder = "Select…",
-}: MultiSelectProps) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+export function MultiSelect({ selected, onChange, options, placeholder = 'Select…' }: MultiSelectProps) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   const toggle = (value: string) => {
-    onChange(
-      selected.includes(value)
-        ? selected.filter((v) => v !== value)
-        : [...selected, value]
-    );
-  };
+    onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value])
+  }
 
-  const selectedLabels = options.filter((o) => selected.includes(o.value));
+  const selectedLabels = options.filter((o) => selected.includes(o.value))
 
   return (
     <div ref={ref} className="relative">
@@ -58,16 +49,14 @@ export function MultiSelect({
                   <X
                     className="h-3 w-3 cursor-pointer hover:text-hz-cancelled"
                     onClick={(e) => {
-                      e.stopPropagation();
-                      toggle(o.value);
+                      e.stopPropagation()
+                      toggle(o.value)
                     }}
                   />
                 </span>
               ))}
               {selectedLabels.length > 2 && (
-                <span className="text-[11px] text-hz-text-secondary">
-                  +{selectedLabels.length - 2}
-                </span>
+                <span className="text-[11px] text-hz-text-secondary">+{selectedLabels.length - 2}</span>
               )}
             </span>
           ) : (
@@ -75,14 +64,14 @@ export function MultiSelect({
           )}
         </span>
         <ChevronDown
-          className={`h-3.5 w-3.5 text-hz-text-secondary shrink-0 ml-1 transition-transform duration-150 ${open ? "rotate-180" : ""}`}
+          className={`h-3.5 w-3.5 text-hz-text-secondary shrink-0 ml-1 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
         />
       </button>
 
       {open && (
         <div className="absolute z-50 top-full left-0 right-0 mt-1 rounded-xl border border-hz-border bg-white dark:bg-hz-card shadow-lg max-h-[240px] overflow-y-auto py-1">
           {options.map((opt) => {
-            const checked = selected.includes(opt.value);
+            const checked = selected.includes(opt.value)
             return (
               <button
                 key={opt.value}
@@ -92,19 +81,17 @@ export function MultiSelect({
               >
                 <div
                   className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                    checked
-                      ? "bg-module-accent border-module-accent"
-                      : "border-black/20 dark:border-white/20"
+                    checked ? 'bg-module-accent border-module-accent' : 'border-black/20 dark:border-white/20'
                   }`}
                 >
                   {checked && <Check className="h-3 w-3 text-white" />}
                 </div>
                 <span>{opt.label}</span>
               </button>
-            );
+            )
           })}
         </div>
       )}
     </div>
-  );
+  )
 }

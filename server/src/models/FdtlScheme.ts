@@ -7,7 +7,7 @@ const reportingTimeSchema = new Schema(
     columnKey: { type: String, required: true }, // aircraft type ICAO or 'pax_air'/'pax_ground'
     minutes: { type: Number, required: true },
   },
-  { _id: false }
+  { _id: false },
 )
 
 const fdtlSchemeSchema = new Schema(
@@ -35,7 +35,7 @@ const fdtlSchemeSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'fdtlSchemes',
-  }
+  },
 )
 
 fdtlSchemeSchema.index({ operatorId: 1 }, { unique: true })

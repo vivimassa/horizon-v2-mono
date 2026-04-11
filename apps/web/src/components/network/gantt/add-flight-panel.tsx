@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useEffect, useCallback, useRef, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -21,7 +21,12 @@ export function AddFlightPanel({ onClose }: AddFlightPanelProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const palette = isDark ? colors.dark : colors.light
-  const snapshotRef = useRef<{ rows: ScheduledFlightRef[]; dirtyMap: Map<string, Partial<ScheduledFlightRef>>; newRowIds: Set<string>; deletedIds: Set<string> } | null>(null)
+  const snapshotRef = useRef<{
+    rows: ScheduledFlightRef[]
+    dirtyMap: Map<string, Partial<ScheduledFlightRef>>
+    newRowIds: Set<string>
+    deletedIds: Set<string>
+  } | null>(null)
 
   // Save store snapshot on mount, restore on unmount
   useEffect(() => {
@@ -99,17 +104,20 @@ export function AddFlightPanel({ onClose }: AddFlightPanelProps) {
 
     // Collect non-deleted rows with merged dirty data
     const rows = s.rows
-      .filter(r => !s.deletedIds.has(r._id))
-      .map(r => {
+      .filter((r) => !s.deletedIds.has(r._id))
+      .map((r) => {
         const dirty = s.dirtyMap.get(r._id)
         return { ...r, ...dirty }
       })
-      .filter(r => r.depStation && r.arrStation && r.flightNumber && r.stdUtc && r.staUtc)
+      .filter((r) => r.depStation && r.arrStation && r.flightNumber && r.stdUtc && r.staUtc)
 
-    if (rows.length === 0) { onClose(); return }
+    if (rows.length === 0) {
+      onClose()
+      return
+    }
 
     // Set metadata
-    const payload = rows.map(r => ({
+    const payload = rows.map((r) => ({
       ...r,
       operatorId,
       scenarioId: scenarioId ?? null,
@@ -139,27 +147,35 @@ export function AddFlightPanel({ onClose }: AddFlightPanelProps) {
     // Focus first editable column of the new row
     requestAnimationFrame(() => {
       const s = useScheduleGridStore.getState()
-      const lastIdx = s.rows.filter(r => !s.deletedIds.has(r._id)).length - 1
+      const lastIdx = s.rows.filter((r) => !s.deletedIds.has(r._id)).length - 1
       useScheduleGridStore.getState().startEditing({ rowIdx: lastIdx, colKey: 'aircraftTypeIcao' })
     })
   }, [handleAddFlight])
 
   // Visible rows (non-deleted)
-  const allRows = useScheduleGridStore(s => s.rows)
-  const deletedIds = useScheduleGridStore(s => s.deletedIds)
-  const rows = useMemo(() => allRows.filter(r => !deletedIds.has(r._id)), [allRows, deletedIds])
+  const allRows = useScheduleGridStore((s) => s.rows)
+  const deletedIds = useScheduleGridStore((s) => s.deletedIds)
+  const rows = useMemo(() => allRows.filter((r) => !deletedIds.has(r._id)), [allRows, deletedIds])
 
   const [mounted, setMounted] = useState(false)
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   if (!mounted) return null
 
   return createPortal(
-    <div data-gantt-overlay className="fixed inset-0 z-[9998] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.4)' }}>
+    <div
+      data-gantt-overlay
+      className="fixed inset-0 z-[9998] flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.4)' }}
+    >
       <div
         className="rounded-2xl flex flex-col overflow-hidden"
         style={{
-          width: '90vw', maxWidth: 1400, height: 340,
+          width: '90vw',
+          maxWidth: 1400,
+          height: 340,
           background: isDark ? palette.card : '#fff',
           border: `1px solid ${palette.border}`,
           boxShadow: isDark ? '0 24px 64px rgba(0,0,0,0.6)' : '0 24px 64px rgba(96,97,112,0.18)',
@@ -167,8 +183,13 @@ export function AddFlightPanel({ onClose }: AddFlightPanelProps) {
         }}
       >
         {/* Header bar */}
-        <div className="shrink-0 flex items-center justify-between px-5 py-3" style={{ borderBottom: `1px solid ${palette.border}` }}>
-          <span className="text-[15px] font-semibold" style={{ color: palette.text }}>Add Flights</span>
+        <div
+          className="shrink-0 flex items-center justify-between px-5 py-3"
+          style={{ borderBottom: `1px solid ${palette.border}` }}
+        >
+          <span className="text-[15px] font-semibold" style={{ color: palette.text }}>
+            Add Flights
+          </span>
           <div className="flex items-center gap-2">
             <button
               onClick={handleSave}
@@ -194,7 +215,10 @@ export function AddFlightPanel({ onClose }: AddFlightPanelProps) {
         </div>
 
         {/* Grid */}
-        <div className="flex-1 min-h-0 overflow-hidden" style={{ background: isDark ? palette.backgroundSecondary : '#F8F9FA' }}>
+        <div
+          className="flex-1 min-h-0 overflow-hidden"
+          style={{ background: isDark ? palette.backgroundSecondary : '#F8F9FA' }}
+        >
           <ScheduleGrid
             rows={rows}
             columns={MINI_GRID_COLUMNS}
@@ -207,6 +231,6 @@ export function AddFlightPanel({ onClose }: AddFlightPanelProps) {
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   )
 }

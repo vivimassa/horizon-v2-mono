@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { Search, X } from 'lucide-react'
@@ -65,7 +65,9 @@ export function SlotSearch({ open, onClose, onQueryChange }: SlotSearchProps) {
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2.5" style={{ borderBottom: `1px solid ${glassBorder}` }}>
         <Search size={14} style={{ color: palette.textTertiary }} />
-        <span className="text-[13px] font-semibold flex-1" style={{ color: palette.text }}>Search Slot Series</span>
+        <span className="text-[13px] font-semibold flex-1" style={{ color: palette.text }}>
+          Search Slot Series
+        </span>
         <button onClick={onClose} className="p-1 rounded-md transition-colors hover:bg-black/5 dark:hover:bg-white/5">
           <X size={14} style={{ color: palette.textTertiary }} />
         </button>
@@ -78,7 +80,7 @@ export function SlotSearch({ open, onClose, onQueryChange }: SlotSearchProps) {
             ref={inputRef}
             type="text"
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Flight number, airport, or name..."
             className="w-full h-10 pl-3 pr-10 rounded-lg text-[14px] outline-none transition-colors"
             style={{
@@ -89,8 +91,10 @@ export function SlotSearch({ open, onClose, onQueryChange }: SlotSearchProps) {
             }}
           />
           {query && (
-            <button onClick={() => setQuery('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md transition-colors hover:bg-black/5 dark:hover:bg-white/5">
+            <button
+              onClick={() => setQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+            >
               <X size={12} style={{ color: palette.textTertiary }} />
             </button>
           )}
@@ -100,8 +104,7 @@ export function SlotSearch({ open, onClose, onQueryChange }: SlotSearchProps) {
         <div className="text-[13px]" style={{ color: palette.textTertiary }}>
           {query
             ? 'Filtering airports and series in real-time'
-            : 'Type to filter by flight number, airport code, or airport name'
-          }
+            : 'Type to filter by flight number, airport code, or airport name'}
         </div>
       </div>
     </div>

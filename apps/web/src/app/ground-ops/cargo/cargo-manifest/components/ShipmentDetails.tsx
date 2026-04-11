@@ -1,24 +1,24 @@
-"use client";
+'use client'
 
-import { Plane, CheckCircle } from "lucide-react";
-import type { CargoFlight, CargoHold } from "@/types/cargo";
-import type { Palette as PaletteType } from "@skyhub/ui/theme";
-import { ManifestItem } from "./ManifestItem";
+import { Plane, CheckCircle } from 'lucide-react'
+import type { CargoFlight, CargoHold } from '@/types/cargo'
+import type { Palette as PaletteType } from '@skyhub/ui/theme'
+import { ManifestItem } from './ManifestItem'
 
 interface ShipmentDetailsProps {
-  flight: CargoFlight;
-  hold: CargoHold;
-  allHolds: Record<string, CargoHold>;
-  accent: string;
-  palette: PaletteType;
-  isDark: boolean;
+  flight: CargoFlight
+  hold: CargoHold
+  allHolds: Record<string, CargoHold>
+  accent: string
+  palette: PaletteType
+  isDark: boolean
 }
 
 export function ShipmentDetails({ flight, hold, allHolds, accent, palette, isDark }: ShipmentDetailsProps) {
-  const allItems = Object.values(allHolds).flatMap((h) => h.items);
-  const totalPieces = allItems.length;
-  const totalWeight = Object.values(allHolds).reduce((sum, h) => sum + h.weight, 0);
-  const cgMac = 28.4;
+  const allItems = Object.values(allHolds).flatMap((h) => h.items)
+  const totalPieces = allItems.length
+  const totalWeight = Object.values(allHolds).reduce((sum, h) => sum + h.weight, 0)
+  const cgMac = 28.4
 
   return (
     <div
@@ -26,20 +26,15 @@ export function ShipmentDetails({ flight, hold, allHolds, accent, palette, isDar
       style={{
         width: 320,
         minWidth: 320,
-        background: isDark ? "rgba(30,30,34,0.9)" : "#ffffff",
-        border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
+        background: isDark ? 'rgba(30,30,34,0.9)' : '#ffffff',
+        border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
         borderRadius: 14,
-        boxShadow: isDark
-          ? "0 2px 8px rgba(0,0,0,0.3)"
-          : "0 2px 8px rgba(0,0,0,0.04)",
+        boxShadow: isDark ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.04)',
       }}
     >
       <div className="flex-1 overflow-y-auto p-3.5">
         {/* Title */}
-        <h2
-          className="text-[15px] font-bold mb-3"
-          style={{ color: palette.text }}
-        >
+        <h2 className="text-[15px] font-bold mb-3" style={{ color: palette.text }}>
           Cargo Details
         </h2>
 
@@ -47,9 +42,9 @@ export function ShipmentDetails({ flight, hold, allHolds, accent, palette, isDar
         <div
           className="rounded-xl mb-3"
           style={{
-            padding: "10px 12px",
-            background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.015)",
-            border: `1px solid ${isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)"}`,
+            padding: '10px 12px',
+            background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)',
+            border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'}`,
           }}
         >
           <div className="flex items-center justify-between mb-2">
@@ -68,14 +63,14 @@ export function ShipmentDetails({ flight, hold, allHolds, accent, palette, isDar
               <div
                 className="flex-1 h-px"
                 style={{
-                  backgroundImage: `repeating-linear-gradient(90deg, ${isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.12)"} 0, ${isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.12)"} 4px, transparent 4px, transparent 8px)`,
+                  backgroundImage: `repeating-linear-gradient(90deg, ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'} 0, ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'} 4px, transparent 4px, transparent 8px)`,
                 }}
               />
               <Plane size={14} strokeWidth={1.8} style={{ color: accent }} />
               <div
                 className="flex-1 h-px"
                 style={{
-                  backgroundImage: `repeating-linear-gradient(90deg, ${isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.12)"} 0, ${isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.12)"} 4px, transparent 4px, transparent 8px)`,
+                  backgroundImage: `repeating-linear-gradient(90deg, ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'} 0, ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'} 4px, transparent 4px, transparent 8px)`,
                 }}
               />
             </div>
@@ -94,12 +89,12 @@ export function ShipmentDetails({ flight, hold, allHolds, accent, palette, isDar
         <div
           className="rounded-xl mb-3"
           style={{
-            padding: "10px 12px",
+            padding: '10px 12px',
             background: isDark ? accent : accent,
-            color: "#ffffff",
+            color: '#ffffff',
           }}
         >
-          <div className="text-[11px] font-semibold uppercase mb-1" style={{ opacity: 0.7, letterSpacing: "0.5px" }}>
+          <div className="text-[11px] font-semibold uppercase mb-1" style={{ opacity: 0.7, letterSpacing: '0.5px' }}>
             Active Hold
           </div>
           <div className="text-[14px] font-bold">{hold.name}</div>
@@ -110,11 +105,8 @@ export function ShipmentDetails({ flight, hold, allHolds, accent, palette, isDar
             <span className="text-[13px] font-bold">{hold.percent}%</span>
           </div>
           {/* Progress bar */}
-          <div className="mt-1.5 h-[3px] rounded-full" style={{ background: "rgba(255,255,255,0.2)" }}>
-            <div
-              className="h-full rounded-full"
-              style={{ width: `${hold.percent}%`, background: "#a7f3d0" }}
-            />
+          <div className="mt-1.5 h-[3px] rounded-full" style={{ background: 'rgba(255,255,255,0.2)' }}>
+            <div className="h-full rounded-full" style={{ width: `${hold.percent}%`, background: '#a7f3d0' }} />
           </div>
         </div>
 
@@ -122,21 +114,21 @@ export function ShipmentDetails({ flight, hold, allHolds, accent, palette, isDar
         <div
           className="rounded-xl mb-3"
           style={{
-            padding: "10px 12px",
-            background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.015)",
-            border: `1px solid ${isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)"}`,
+            padding: '10px 12px',
+            background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)',
+            border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'}`,
           }}
         >
           <div className="flex items-center justify-between mb-2">
             <span
               className="text-[11px] font-semibold uppercase"
-              style={{ color: palette.textSecondary, letterSpacing: "0.5px" }}
+              style={{ color: palette.textSecondary, letterSpacing: '0.5px' }}
             >
               Center of Gravity
             </span>
             <span
               className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-              style={{ background: isDark ? "rgba(22,163,74,0.15)" : "#dcfce7", color: isDark ? "#4ade80" : "#166534" }}
+              style={{ background: isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7', color: isDark ? '#4ade80' : '#166534' }}
             >
               <CheckCircle size={10} strokeWidth={2} />
               Within Limits
@@ -154,15 +146,15 @@ export function ShipmentDetails({ flight, hold, allHolds, accent, palette, isDar
           <div className="relative">
             <div
               className="h-[6px] rounded-full"
-              style={{ background: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)" }}
+              style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}
             >
               {/* Safe range */}
               <div
                 className="absolute h-[6px] rounded-full"
                 style={{
-                  left: "15%",
-                  width: "50%",
-                  background: isDark ? "rgba(22,163,74,0.2)" : "rgba(22,163,74,0.15)",
+                  left: '15%',
+                  width: '50%',
+                  background: isDark ? 'rgba(22,163,74,0.2)' : 'rgba(22,163,74,0.15)',
                 }}
               />
               {/* CG dot */}
@@ -171,14 +163,18 @@ export function ShipmentDetails({ flight, hold, allHolds, accent, palette, isDar
                 style={{
                   left: `${cgMac}%`,
                   background: accent,
-                  border: "2px solid white",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                  border: '2px solid white',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
                 }}
               />
             </div>
             <div className="flex justify-between mt-1.5">
-              <span className="text-[8px]" style={{ color: palette.textTertiary }}>FWD 15%</span>
-              <span className="text-[8px]" style={{ color: palette.textTertiary }}>AFT 65%</span>
+              <span className="text-[8px]" style={{ color: palette.textTertiary }}>
+                FWD 15%
+              </span>
+              <span className="text-[8px]" style={{ color: palette.textTertiary }}>
+                AFT 65%
+              </span>
             </div>
           </div>
         </div>
@@ -187,7 +183,7 @@ export function ShipmentDetails({ flight, hold, allHolds, accent, palette, isDar
         <div className="mb-3">
           <div
             className="text-[11px] font-semibold uppercase mb-2"
-            style={{ color: palette.textSecondary, letterSpacing: "0.5px" }}
+            style={{ color: palette.textSecondary, letterSpacing: '0.5px' }}
           >
             Manifest &middot; {hold.name}
           </div>
@@ -209,9 +205,9 @@ export function ShipmentDetails({ flight, hold, allHolds, accent, palette, isDar
         <div
           className="rounded-xl mb-3"
           style={{
-            padding: "8px 12px",
-            background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.015)",
-            border: `1px solid ${isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)"}`,
+            padding: '8px 12px',
+            background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)',
+            border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'}`,
           }}
         >
           <div className="flex items-center justify-between">
@@ -236,14 +232,14 @@ export function ShipmentDetails({ flight, hold, allHolds, accent, palette, isDar
       {/* Action buttons */}
       <div
         className="p-3 flex gap-2"
-        style={{ borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)"}` }}
+        style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}` }}
       >
         <button
           className="flex-1 text-[12px] font-semibold py-2 rounded-lg transition-colors"
           style={{
-            border: `1.5px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)"}`,
+            border: `1.5px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'}`,
             color: palette.textSecondary,
-            background: "transparent",
+            background: 'transparent',
           }}
         >
           Cancel Load
@@ -252,7 +248,7 @@ export function ShipmentDetails({ flight, hold, allHolds, accent, palette, isDar
           className="flex-1 text-[12px] font-semibold py-2 rounded-lg transition-colors"
           style={{
             background: accent,
-            color: "#ffffff",
+            color: '#ffffff',
             border: `1.5px solid ${accent}`,
           }}
         >
@@ -260,5 +256,5 @@ export function ShipmentDetails({ flight, hold, allHolds, accent, palette, isDar
         </button>
       </div>
     </div>
-  );
+  )
 }

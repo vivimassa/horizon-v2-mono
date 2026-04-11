@@ -87,17 +87,21 @@ export const SLOT_RISK_COLORS: Record<string, string> = {
 
 /** Default palette when AircraftType.color is null. */
 export const AC_TYPE_COLOR_PALETTE = [
-  '#0d9488', '#2563eb', '#d97706', '#7c3aed',
-  '#059669', '#e11d48', '#0284c7', '#ca8a04',
+  '#0d9488',
+  '#2563eb',
+  '#d97706',
+  '#7c3aed',
+  '#059669',
+  '#e11d48',
+  '#0284c7',
+  '#ca8a04',
 ] as const
 
 /**
  * Build the AC type → color map from aircraft types.
  * Uses stored color if present, otherwise cycles through the palette.
  */
-export function buildAcTypeColorMap(
-  types: Array<{ icaoType: string; color: string | null }>,
-): Map<string, string> {
+export function buildAcTypeColorMap(types: Array<{ icaoType: string; color: string | null }>): Map<string, string> {
   const map = new Map<string, string>()
   types.forEach((t, i) => {
     map.set(t.icaoType, t.color ?? AC_TYPE_COLOR_PALETTE[i % AC_TYPE_COLOR_PALETTE.length])

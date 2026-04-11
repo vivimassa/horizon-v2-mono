@@ -50,15 +50,23 @@ export function NotesTab({ contract, onUpdated, isDark }: NotesTabProps) {
       {/* Toggle button */}
       <div className="flex justify-end">
         {editing ? (
-          <button onClick={handleSave} disabled={saving}
-            className="h-8 px-3 flex items-center gap-2 rounded-lg text-[13px] font-semibold text-white bg-module-accent hover:opacity-90 transition-opacity disabled:opacity-50">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="h-8 px-3 flex items-center gap-2 rounded-lg text-[13px] font-semibold text-white bg-module-accent hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
             {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
             Save
           </button>
         ) : (
-          <button onClick={handleEdit}
+          <button
+            onClick={handleEdit}
             className="h-8 px-3 flex items-center gap-2 rounded-lg text-[13px] font-semibold transition-colors"
-            style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', border: `1px solid ${cardBorder}` }}>
+            style={{
+              background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+              border: `1px solid ${cardBorder}`,
+            }}
+          >
             <Pencil size={13} />
             Edit
           </button>
@@ -67,18 +75,23 @@ export function NotesTab({ contract, onUpdated, isDark }: NotesTabProps) {
 
       {/* Client notes */}
       <div className="rounded-xl p-4" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
-        <div className="text-[13px] font-semibold uppercase tracking-wider mb-3" style={{ color: labelColor }}>Client Notes</div>
+        <div className="text-[13px] font-semibold uppercase tracking-wider mb-3" style={{ color: labelColor }}>
+          Client Notes
+        </div>
         {editing ? (
           <textarea
             value={clientNotes}
-            onChange={e => setClientNotes(e.target.value)}
+            onChange={(e) => setClientNotes(e.target.value)}
             rows={5}
             placeholder="Notes visible to the client..."
             className="w-full rounded-lg px-3 py-2 text-[13px] outline-none resize-none"
             style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
           />
         ) : (
-          <div className="text-[13px] whitespace-pre-wrap min-h-[80px]" style={{ color: contract.notes ? undefined : labelColor }}>
+          <div
+            className="text-[13px] whitespace-pre-wrap min-h-[80px]"
+            style={{ color: contract.notes ? undefined : labelColor }}
+          >
             {contract.notes || 'No client notes'}
           </div>
         )}
@@ -86,21 +99,26 @@ export function NotesTab({ contract, onUpdated, isDark }: NotesTabProps) {
 
       {/* Internal notes */}
       <div className="rounded-xl p-4" style={{ background: warningBg, border: `1px solid ${warningBorder}` }}>
-        <div className="text-[13px] font-semibold uppercase tracking-wider mb-3"
-          style={{ color: isDark ? '#FDAC42' : '#E67A00' }}>
+        <div
+          className="text-[13px] font-semibold uppercase tracking-wider mb-3"
+          style={{ color: isDark ? '#FDAC42' : '#E67A00' }}
+        >
           Internal Notes (not shared)
         </div>
         {editing ? (
           <textarea
             value={internalNotes}
-            onChange={e => setInternalNotes(e.target.value)}
+            onChange={(e) => setInternalNotes(e.target.value)}
             rows={5}
             placeholder="Internal notes only..."
             className="w-full rounded-lg px-3 py-2 text-[13px] outline-none resize-none"
             style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
           />
         ) : (
-          <div className="text-[13px] whitespace-pre-wrap min-h-[80px]" style={{ color: contract.internalNotes ? undefined : labelColor }}>
+          <div
+            className="text-[13px] whitespace-pre-wrap min-h-[80px]"
+            style={{ color: contract.internalNotes ? undefined : labelColor }}
+          >
             {contract.internalNotes || 'No internal notes'}
           </div>
         )}

@@ -1,20 +1,20 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import type { AircraftTypeRef } from "@skyhub/api";
-import { Search, Plus, ChevronRight, Plane } from "lucide-react";
+import { useState } from 'react'
+import type { AircraftTypeRef } from '@skyhub/api'
+import { Search, Plus, ChevronRight, Plane } from 'lucide-react'
 
 interface AircraftTypeListProps {
-  groups: [string, AircraftTypeRef[]][];
-  categoryLabels: Record<string, string>;
-  totalCount: number;
-  filteredCount: number;
-  selected: AircraftTypeRef | null;
-  onSelect: (t: AircraftTypeRef) => void;
-  search: string;
-  onSearchChange: (value: string) => void;
-  loading: boolean;
-  onCreateClick: () => void;
+  groups: [string, AircraftTypeRef[]][]
+  categoryLabels: Record<string, string>
+  totalCount: number
+  filteredCount: number
+  selected: AircraftTypeRef | null
+  onSelect: (t: AircraftTypeRef) => void
+  search: string
+  onSearchChange: (value: string) => void
+  loading: boolean
+  onCreateClick: () => void
 }
 
 export function AircraftTypeList({
@@ -29,16 +29,16 @@ export function AircraftTypeList({
   loading,
   onCreateClick,
 }: AircraftTypeListProps) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
   const toggleGroup = (name: string) => {
     setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
-  };
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -85,7 +85,7 @@ export function AircraftTypeList({
               >
                 <ChevronRight
                   className={`h-3 w-3 shrink-0 text-hz-text-secondary/50 transition-transform duration-200 ${
-                    !collapsed.has(category) ? "rotate-90" : ""
+                    !collapsed.has(category) ? 'rotate-90' : ''
                   }`}
                 />
                 <Plane className="h-3.5 w-3.5 text-hz-text-secondary/50" />
@@ -98,15 +98,15 @@ export function AircraftTypeList({
               {!collapsed.has(category) && (
                 <div className="space-y-0.5">
                   {items.map((t) => {
-                    const isSelected = selected?._id === t._id;
+                    const isSelected = selected?._id === t._id
                     return (
                       <button
                         key={t._id}
                         onClick={() => onSelect(t)}
                         className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 ${
                           isSelected
-                            ? "border-l-[3px] border-l-module-accent bg-module-accent/[0.08]"
-                            : "border-l-[3px] border-l-transparent hover:bg-hz-border/30"
+                            ? 'border-l-[3px] border-l-module-accent bg-module-accent/[0.08]'
+                            : 'border-l-[3px] border-l-transparent hover:bg-hz-border/30'
                         }`}
                       >
                         <div className="min-w-0 flex-1">
@@ -116,7 +116,7 @@ export function AircraftTypeList({
                           </div>
                         </div>
                       </button>
-                    );
+                    )
                   })}
                 </div>
               )}
@@ -125,5 +125,5 @@ export function AircraftTypeList({
         )}
       </div>
     </div>
-  );
+  )
 }

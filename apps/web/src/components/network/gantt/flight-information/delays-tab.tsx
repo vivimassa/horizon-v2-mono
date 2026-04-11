@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useEffect, useMemo } from 'react'
 import { CheckCircle, Plus, Trash2, Search, Check, X } from 'lucide-react'
@@ -10,11 +10,21 @@ import { useOperatorStore } from '@/stores/use-operator-store'
 import type { FlightDetail } from '@/lib/gantt/flight-detail-types'
 
 const CATEGORY_COLORS: Record<string, string> = {
-  airline_internal: '#6B7280', passenger_and_baggage: '#8B5CF6', cargo_and_mail: '#14B8A6',
-  mail_only: '#14B8A6', aircraft_and_ramp: '#F97316', technical: '#EF4444',
-  damage_to_aircraft: '#EF4444', egd: '#EF4444', atfm: '#3B82F6', airport: '#0EA5E9',
-  government: '#6B7280', weather: '#0EA5E9', reactionary: '#F59E0B',
-  miscellaneous: '#6B7280', default: '#6B7280',
+  airline_internal: '#6B7280',
+  passenger_and_baggage: '#8B5CF6',
+  cargo_and_mail: '#14B8A6',
+  mail_only: '#14B8A6',
+  aircraft_and_ramp: '#F97316',
+  technical: '#EF4444',
+  damage_to_aircraft: '#EF4444',
+  egd: '#EF4444',
+  atfm: '#3B82F6',
+  airport: '#0EA5E9',
+  government: '#6B7280',
+  weather: '#0EA5E9',
+  reactionary: '#F59E0B',
+  miscellaneous: '#6B7280',
+  default: '#6B7280',
 }
 
 function getCategoryColor(cat: string): string {
@@ -45,48 +55,65 @@ export function DelaysTab({ data, onUpdate }: DelaysTabProps) {
 
   useEffect(() => {
     const operatorId = useOperatorStore.getState().operator?._id ?? ''
-    api.getDelayCodes(operatorId).then(setDelayCodes).catch(() => {})
+    api
+      .getDelayCodes(operatorId)
+      .then(setDelayCodes)
+      .catch(() => {})
   }, [])
 
   // Split codes by AHM type
-  const codes730 = useMemo(() => delayCodes.filter(c => !c.ahm732Process && !c.ahm732Reason && !c.ahm732Stakeholder), [delayCodes])
-  const codes732 = useMemo(() => delayCodes.filter(c => c.ahm732Process || c.ahm732Reason || c.ahm732Stakeholder), [delayCodes])
+  const codes730 = useMemo(
+    () => delayCodes.filter((c) => !c.ahm732Process && !c.ahm732Reason && !c.ahm732Stakeholder),
+    [delayCodes],
+  )
+  const codes732 = useMemo(
+    () => delayCodes.filter((c) => c.ahm732Process || c.ahm732Reason || c.ahm732Stakeholder),
+    [delayCodes],
+  )
   const activeCodes = ahmMode === '732' ? codes732 : codes730
 
   function addDelay730(code: DelayCodeRef) {
-    onUpdate(d => {
+    onUpdate((d) => {
       d.delays.push({ code: code.code, minutes: 0, reason: code.name, category: code.category })
     })
   }
 
   function addDelay732(process: string, reason: string, stakeholder: string, minutes: number) {
     const code = [process, reason, stakeholder].filter(Boolean).join('')
-    onUpdate(d => {
+    onUpdate((d) => {
       d.delays.push({ code, minutes, reason: `${process}/${reason}/${stakeholder}`, category: 'ahm732' })
     })
   }
 
   function removeDelay(index: number) {
-    onUpdate(d => { d.delays.splice(index, 1) })
+    onUpdate((d) => {
+      d.delays.splice(index, 1)
+    })
   }
 
   function updateDelayMinutes(index: number, minutes: number) {
-    onUpdate(d => { d.delays[index].minutes = minutes })
+    onUpdate((d) => {
+      d.delays[index].minutes = minutes
+    })
   }
 
   function updateDelayReason(index: number, reason: string) {
-    onUpdate(d => { d.delays[index].reason = reason })
+    onUpdate((d) => {
+      d.delays[index].reason = reason
+    })
   }
 
   return (
     <div>
       {/* AHM scheme selector */}
       <div className="flex items-center gap-3 mb-4">
-        <span className="text-[13px] font-medium shrink-0" style={{ color: muted }}>Delay code scheme <span style={{ color: '#E63535' }}>*</span></span>
+        <span className="text-[13px] font-medium shrink-0" style={{ color: muted }}>
+          Delay code scheme <span style={{ color: '#E63535' }}>*</span>
+        </span>
         <Dropdown
           size="sm"
           value={ahmMode}
-          onChange={v => setAhmMode(v as AhmMode)}
+          onChange={(v) => setAhmMode(v as AhmMode)}
           placeholder="Select scheme..."
           options={[
             { value: '730', label: 'AHM 730/731' },
@@ -107,9 +134,14 @@ export function DelaysTab({ data, onUpdate }: DelaysTabProps) {
           onRemove={removeDelay}
           onUpdateMinutes={updateDelayMinutes}
           onUpdateReason={updateDelayReason}
-          isDark={isDark} muted={muted} textPrimary={textPrimary}
-          cardBg={cardBg} cardBorder={cardBorder} accent={accent}
-          inputBg={inputBg} inputBorder={inputBorder}
+          isDark={isDark}
+          muted={muted}
+          textPrimary={textPrimary}
+          cardBg={cardBg}
+          cardBorder={cardBorder}
+          accent={accent}
+          inputBg={inputBg}
+          inputBorder={inputBorder}
         />
         <DelaySection
           title="Arrival Delays"
@@ -121,17 +153,38 @@ export function DelaysTab({ data, onUpdate }: DelaysTabProps) {
           onRemove={removeDelay}
           onUpdateMinutes={updateDelayMinutes}
           onUpdateReason={updateDelayReason}
-          isDark={isDark} muted={muted} textPrimary={textPrimary}
-          cardBg={cardBg} cardBorder={cardBorder} accent={accent}
-          inputBg={inputBg} inputBorder={inputBorder}
+          isDark={isDark}
+          muted={muted}
+          textPrimary={textPrimary}
+          cardBg={cardBg}
+          cardBorder={cardBorder}
+          accent={accent}
+          inputBg={inputBg}
+          inputBorder={inputBorder}
         />
       </div>
     </div>
   )
 }
 
-function DelaySection({ title, delays, activeCodes, ahmMode, onAdd730, onAdd732, onRemove, onUpdateMinutes, onUpdateReason,
-  isDark, muted, textPrimary, cardBg, cardBorder, accent, inputBg, inputBorder,
+function DelaySection({
+  title,
+  delays,
+  activeCodes,
+  ahmMode,
+  onAdd730,
+  onAdd732,
+  onRemove,
+  onUpdateMinutes,
+  onUpdateReason,
+  isDark,
+  muted,
+  textPrimary,
+  cardBg,
+  cardBorder,
+  accent,
+  inputBg,
+  inputBorder,
 }: {
   title: string
   delays: FlightDetail['delays']
@@ -142,8 +195,14 @@ function DelaySection({ title, delays, activeCodes, ahmMode, onAdd730, onAdd732,
   onRemove: (index: number) => void
   onUpdateMinutes: (index: number, min: number) => void
   onUpdateReason: (index: number, reason: string) => void
-  isDark: boolean; muted: string; textPrimary: string; cardBg: string; cardBorder: string; accent: string
-  inputBg: string; inputBorder: string
+  isDark: boolean
+  muted: string
+  textPrimary: string
+  cardBg: string
+  cardBorder: string
+  accent: string
+  inputBg: string
+  inputBorder: string
 }) {
   const [showAdd, setShowAdd] = useState(false)
   const [search, setSearch] = useState('')
@@ -155,14 +214,15 @@ function DelaySection({ title, delays, activeCodes, ahmMode, onAdd730, onAdd732,
   const [f732Time, setF732Time] = useState('')
 
   const filtered = useMemo(() => {
-    let list = activeCodes.filter(c => c.isActive !== false)
+    let list = activeCodes.filter((c) => c.isActive !== false)
     if (search) {
       const q = search.toLowerCase()
-      list = list.filter(c =>
-        c.code.toLowerCase().includes(q) ||
-        c.name.toLowerCase().includes(q) ||
-        (c.alphaCode && c.alphaCode.toLowerCase().includes(q)) ||
-        (c.category && c.category.toLowerCase().includes(q))
+      list = list.filter(
+        (c) =>
+          c.code.toLowerCase().includes(q) ||
+          c.name.toLowerCase().includes(q) ||
+          (c.alphaCode && c.alphaCode.toLowerCase().includes(q)) ||
+          (c.category && c.category.toLowerCase().includes(q)),
       )
     }
     return list
@@ -173,7 +233,10 @@ function DelaySection({ title, delays, activeCodes, ahmMode, onAdd730, onAdd732,
     const [h, m] = f732Time.split(':').map(Number)
     const mins = (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m)
     onAdd732(f732Process, f732Reason, f732Stakeholder, mins)
-    setF732Process(''); setF732Reason(''); setF732Stakeholder(''); setF732Time('')
+    setF732Process('')
+    setF732Reason('')
+    setF732Stakeholder('')
+    setF732Time('')
     setShowAdd(false)
   }
 
@@ -184,7 +247,9 @@ function DelaySection({ title, delays, activeCodes, ahmMode, onAdd730, onAdd732,
           {title}
         </h3>
         <button
-          onClick={() => { if (ahmMode) setShowAdd(!showAdd) }}
+          onClick={() => {
+            if (ahmMode) setShowAdd(!showAdd)
+          }}
           disabled={!ahmMode}
           className="flex items-center gap-1.5 rounded-xl text-[13px] font-medium h-8 px-3 disabled:opacity-30"
           style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: accent }}
@@ -202,40 +267,57 @@ function DelaySection({ title, delays, activeCodes, ahmMode, onAdd730, onAdd732,
               type="text"
               placeholder="Search AHM 730/731 code..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               autoFocus
               className="flex-1 text-[13px] bg-transparent outline-none"
               style={{ color: textPrimary }}
             />
-            <span className="text-[13px] font-mono" style={{ color: muted }}>{filtered.length} codes</span>
+            <span className="text-[13px] font-mono" style={{ color: muted }}>
+              {filtered.length} codes
+            </span>
           </div>
           <div className="max-h-[280px] overflow-y-auto space-y-0.5">
-            {filtered.map(code => {
+            {filtered.map((code) => {
               const color = getCategoryColor(code.category)
               return (
                 <button
                   key={code._id}
-                  onClick={() => { onAdd730(code); setShowAdd(false); setSearch('') }}
+                  onClick={() => {
+                    onAdd730(code)
+                    setShowAdd(false)
+                    setSearch('')
+                  }}
                   className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left transition-colors"
                   style={{ color: textPrimary }}
-                  onMouseEnter={e => (e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)')
+                  }
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <span className="text-[14px] font-mono font-bold w-[40px] shrink-0" style={{ color }}>{code.code}</span>
+                  <span className="text-[14px] font-mono font-bold w-[40px] shrink-0" style={{ color }}>
+                    {code.code}
+                  </span>
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-medium truncate">{code.name}</div>
                     {code.alphaCode && (
-                      <div className="text-[13px] font-mono" style={{ color: muted }}>{code.alphaCode}</div>
+                      <div className="text-[13px] font-mono" style={{ color: muted }}>
+                        {code.alphaCode}
+                      </div>
                     )}
                   </div>
-                  <span className="text-[13px] px-1.5 py-0.5 rounded shrink-0 whitespace-nowrap" style={{ background: `${color}15`, color }}>
+                  <span
+                    className="text-[13px] px-1.5 py-0.5 rounded shrink-0 whitespace-nowrap"
+                    style={{ background: `${color}15`, color }}
+                  >
                     {code.category.replace(/_/g, ' ')}
                   </span>
                 </button>
               )
             })}
             {filtered.length === 0 && (
-              <div className="text-center py-4 text-[13px]" style={{ color: muted }}>No matching delay codes</div>
+              <div className="text-center py-4 text-[13px]" style={{ color: muted }}>
+                No matching delay codes
+              </div>
             )}
           </div>
         </div>
@@ -243,50 +325,77 @@ function DelaySection({ title, delays, activeCodes, ahmMode, onAdd730, onAdd732,
 
       {/* AHM 732 — Triple-A free-form input, single row */}
       {showAdd && ahmMode === '732' && (
-        <div className="mb-4 rounded-xl px-3 py-2.5 flex items-end gap-2" style={{ background: inputBg, border: `1px solid ${inputBorder}` }}>
+        <div
+          className="mb-4 rounded-xl px-3 py-2.5 flex items-end gap-2"
+          style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
+        >
           <div className="text-center flex-1">
-            <label className="text-[13px] font-medium mb-1 block" style={{ color: muted }}>Process</label>
+            <label className="text-[13px] font-medium mb-1 block" style={{ color: muted }}>
+              Process
+            </label>
             <input
               type="text"
               maxLength={2}
               value={f732Process}
-              onChange={e => setF732Process(e.target.value.toUpperCase())}
+              onChange={(e) => setF732Process(e.target.value.toUpperCase())}
               autoFocus
               className="w-full h-[36px] text-center rounded-lg text-[15px] font-mono font-bold uppercase outline-none"
-              style={{ background: isDark ? 'rgba(255,255,255,0.06)' : '#fff', border: `1px solid ${inputBorder}`, color: textPrimary }}
+              style={{
+                background: isDark ? 'rgba(255,255,255,0.06)' : '#fff',
+                border: `1px solid ${inputBorder}`,
+                color: textPrimary,
+              }}
             />
           </div>
           <div className="text-center flex-1">
-            <label className="text-[13px] font-medium mb-1 block" style={{ color: muted }}>Reason</label>
+            <label className="text-[13px] font-medium mb-1 block" style={{ color: muted }}>
+              Reason
+            </label>
             <input
               type="text"
               maxLength={2}
               value={f732Reason}
-              onChange={e => setF732Reason(e.target.value.toUpperCase())}
+              onChange={(e) => setF732Reason(e.target.value.toUpperCase())}
               className="w-full h-[36px] text-center rounded-lg text-[15px] font-mono font-bold uppercase outline-none"
-              style={{ background: isDark ? 'rgba(255,255,255,0.06)' : '#fff', border: `1px solid ${inputBorder}`, color: textPrimary }}
+              style={{
+                background: isDark ? 'rgba(255,255,255,0.06)' : '#fff',
+                border: `1px solid ${inputBorder}`,
+                color: textPrimary,
+              }}
             />
           </div>
           <div className="text-center flex-1">
-            <label className="text-[13px] font-medium mb-1 block" style={{ color: muted }}>Stakeholder</label>
+            <label className="text-[13px] font-medium mb-1 block" style={{ color: muted }}>
+              Stakeholder
+            </label>
             <input
               type="text"
               maxLength={2}
               value={f732Stakeholder}
-              onChange={e => setF732Stakeholder(e.target.value.toUpperCase())}
+              onChange={(e) => setF732Stakeholder(e.target.value.toUpperCase())}
               className="w-full h-[36px] text-center rounded-lg text-[15px] font-mono font-bold uppercase outline-none"
-              style={{ background: isDark ? 'rgba(255,255,255,0.06)' : '#fff', border: `1px solid ${inputBorder}`, color: textPrimary }}
+              style={{
+                background: isDark ? 'rgba(255,255,255,0.06)' : '#fff',
+                border: `1px solid ${inputBorder}`,
+                color: textPrimary,
+              }}
             />
           </div>
           <div className="text-center flex-1">
-            <label className="text-[13px] font-medium mb-1 block" style={{ color: muted }}>Time</label>
+            <label className="text-[13px] font-medium mb-1 block" style={{ color: muted }}>
+              Time
+            </label>
             <input
               type="text"
               placeholder="HH:MM"
               value={f732Time}
-              onChange={e => setF732Time(e.target.value)}
+              onChange={(e) => setF732Time(e.target.value)}
               className="w-full h-[36px] text-center rounded-lg text-[15px] font-mono font-bold outline-none"
-              style={{ background: isDark ? 'rgba(255,255,255,0.06)' : '#fff', border: `1px solid ${inputBorder}`, color: '#E63535' }}
+              style={{
+                background: isDark ? 'rgba(255,255,255,0.06)' : '#fff',
+                border: `1px solid ${inputBorder}`,
+                color: '#E63535',
+              }}
             />
           </div>
           <div className="flex gap-1 shrink-0">
@@ -313,7 +422,9 @@ function DelaySection({ title, delays, activeCodes, ahmMode, onAdd730, onAdd732,
       {delays.length === 0 && !showAdd ? (
         <div className="flex items-center gap-2 py-3">
           <CheckCircle size={16} style={{ color: '#06C270' }} />
-          <span className="text-[14px] font-medium" style={{ color: '#06C270' }}>On time</span>
+          <span className="text-[14px] font-medium" style={{ color: '#06C270' }}>
+            On time
+          </span>
         </div>
       ) : (
         <div className="space-y-2">
@@ -323,27 +434,36 @@ function DelaySection({ title, delays, activeCodes, ahmMode, onAdd730, onAdd732,
               <div
                 key={i}
                 className="rounded-xl p-3 flex items-start gap-3 group"
-                style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', borderLeft: `3px solid ${color}`, border: `1px solid ${cardBorder}` }}
+                style={{
+                  background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                  borderLeft: `3px solid ${color}`,
+                  border: `1px solid ${cardBorder}`,
+                }}
               >
                 <input
                   type="number"
                   min={0}
                   value={d.minutes || ''}
-                  onChange={e => onUpdateMinutes(i, parseInt(e.target.value) || 0)}
+                  onChange={(e) => onUpdateMinutes(i, parseInt(e.target.value) || 0)}
                   className="w-[56px] h-[36px] text-center rounded-lg text-[18px] font-mono font-bold outline-none"
                   style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: '#E63535' }}
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-mono font-bold text-[14px]" style={{ color: textPrimary }}>{d.code}</span>
-                    <span className="text-[13px] font-medium px-1.5 py-0.5 rounded" style={{ background: `${color}15`, color }}>
+                    <span className="font-mono font-bold text-[14px]" style={{ color: textPrimary }}>
+                      {d.code}
+                    </span>
+                    <span
+                      className="text-[13px] font-medium px-1.5 py-0.5 rounded"
+                      style={{ background: `${color}15`, color }}
+                    >
                       {d.category.replace(/_/g, ' ')}
                     </span>
                   </div>
                   <input
                     type="text"
                     value={d.reason}
-                    onChange={e => onUpdateReason(i, e.target.value)}
+                    onChange={(e) => onUpdateReason(i, e.target.value)}
                     placeholder="Reason..."
                     className="w-full text-[13px] bg-transparent outline-none"
                     style={{ color: muted }}

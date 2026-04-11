@@ -25,23 +25,26 @@ export function drawGrid(
   ctx: CanvasRenderingContext2D,
   ticks: TickMark[],
   rows: RowLayout[],
-  sx: number, sy: number,
-  vw: number, vh: number,
+  sx: number,
+  sy: number,
+  vw: number,
+  vh: number,
   isDark: boolean,
   accentColor?: string,
 ) {
   // Weekend shading — faint accent-tinted columns for Saturday & Sunday
-  const majorTicks = ticks.filter(t => t.isMajor && t.date)
+  const majorTicks = ticks.filter((t) => t.isMajor && t.date)
   for (let i = 0; i < majorTicks.length; i++) {
     const tick = majorTicks[i]
     const jsDay = new Date(tick.date! + 'T12:00:00Z').getUTCDay()
     if (jsDay !== 0 && jsDay !== 6) continue // only Sat (6) and Sun (0)
-    const nextX = i + 1 < majorTicks.length ? majorTicks[i + 1].x : tick.x + (majorTicks[1]?.x ?? tick.x + 200) - (majorTicks[0]?.x ?? 0)
+    const nextX =
+      i + 1 < majorTicks.length
+        ? majorTicks[i + 1].x
+        : tick.x + (majorTicks[1]?.x ?? tick.x + 200) - (majorTicks[0]?.x ?? 0)
     const dayW = nextX - tick.x
     if (tick.x + dayW < sx || tick.x > sx + vw) continue
-    ctx.fillStyle = accentColor
-      ? hexToRgba(accentColor, 0.15)
-      : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)')
+    ctx.fillStyle = accentColor ? hexToRgba(accentColor, 0.15) : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
     ctx.fillRect(tick.x, sy, dayW, vh)
   }
 
@@ -61,8 +64,12 @@ export function drawGrid(
   for (const tick of ticks) {
     if (tick.x < sx - 1 || tick.x > sx + vw + 1) continue
     ctx.strokeStyle = tick.isMajor
-      ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')
-      : (isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)')
+      ? isDark
+        ? 'rgba(255,255,255,0.08)'
+        : 'rgba(0,0,0,0.08)'
+      : isDark
+        ? 'rgba(255,255,255,0.03)'
+        : 'rgba(0,0,0,0.03)'
     ctx.lineWidth = tick.isMajor ? 0.8 : 0.5
     ctx.beginPath()
     ctx.moveTo(tick.x, sy)
@@ -76,8 +83,10 @@ export function drawGrid(
 export function drawGroupHeaders(
   ctx: CanvasRenderingContext2D,
   rows: RowLayout[],
-  sx: number, sy: number,
-  vw: number, vh: number,
+  sx: number,
+  sy: number,
+  vw: number,
+  vh: number,
   isDark: boolean,
 ) {
   ctx.textBaseline = 'middle'
@@ -87,7 +96,9 @@ export function drawGroupHeaders(
 
     ctx.fillStyle = row.color
       ? hexToRgba(row.color, isDark ? 0.05 : 0.04)
-      : (isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)')
+      : isDark
+        ? 'rgba(255,255,255,0.02)'
+        : 'rgba(0,0,0,0.02)'
     ctx.fillRect(sx, row.y, vw, row.height)
 
     // Pinned label in canvas area
@@ -104,8 +115,10 @@ export function drawBars(
   bars: BarLayout[],
   selectedIds: Set<string>,
   hoveredId: string | null,
-  sx: number, sy: number,
-  vw: number, vh: number,
+  sx: number,
+  sy: number,
+  vw: number,
+  vh: number,
   swapSourceIds?: Set<string>,
 ) {
   const visR = sx + vw
@@ -207,8 +220,10 @@ export function buildBarsByRow(bars: BarLayout[]): Map<number, BarLayout[]> {
 export function drawTatLabels(
   ctx: CanvasRenderingContext2D,
   barsByRow: Map<number, BarLayout[]>,
-  sx: number, sy: number,
-  vw: number, vh: number,
+  sx: number,
+  sy: number,
+  vw: number,
+  vh: number,
   isDark: boolean,
 ) {
   ctx.fillStyle = isDark ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.30)'
@@ -266,8 +281,10 @@ function cachedMeasure(ctx: CanvasRenderingContext2D, text: string, font: string
 export function drawNightstopLabels(
   ctx: CanvasRenderingContext2D,
   barsByRow: Map<number, BarLayout[]>,
-  sx: number, sy: number,
-  vw: number, vh: number,
+  sx: number,
+  sy: number,
+  vw: number,
+  vh: number,
   isDark: boolean,
 ) {
   const textColor = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)'
@@ -301,9 +318,7 @@ export function drawNightstopLabels(
       const station = curr.flight.arrStation
       const gapH = Math.floor(gapMin / 60)
       const gapM = gapMin % 60
-      const timeLabel = gapMin >= 60
-        ? `${gapH}:${String(gapM).padStart(2, '0')}`
-        : `${gapMin}m`
+      const timeLabel = gapMin >= 60 ? `${gapH}:${String(gapM).padStart(2, '0')}` : `${gapMin}m`
 
       // Cached text measurements
       const stationW = cachedMeasure(ctx, station, stationFont)
@@ -349,11 +364,7 @@ export function drawNightstopLabels(
 
 // ── Now-line ──
 
-export function drawNowLine(
-  ctx: CanvasRenderingContext2D,
-  nowX: number,
-  totalHeight: number,
-) {
+export function drawNowLine(ctx: CanvasRenderingContext2D, nowX: number, totalHeight: number) {
   ctx.strokeStyle = '#0061FF'
   ctx.lineWidth = 2
   ctx.beginPath()
@@ -374,7 +385,10 @@ export function drawDragGhosts(
   ctx: CanvasRenderingContext2D,
   bars: BarLayout[],
   dragFlightIds: Set<string>,
-  sx: number, sy: number, vw: number, vh: number,
+  sx: number,
+  sy: number,
+  vw: number,
+  vh: number,
 ) {
   ctx.save()
   ctx.strokeStyle = 'rgba(100,100,100,0.35)'
@@ -397,7 +411,10 @@ export function drawDraggedBars(
   bars: BarLayout[],
   dragFlightIds: Set<string>,
   deltaY: number,
-  sx: number, sy: number, vw: number, vh: number,
+  sx: number,
+  sy: number,
+  vw: number,
+  vh: number,
 ) {
   ctx.save()
   ctx.globalAlpha = 0.65
@@ -441,7 +458,8 @@ export function drawDropTarget(
   rows: RowLayout[],
   targetRowIdx: number,
   validity: 'valid' | 'cross-type' | 'invalid',
-  sx: number, vw: number,
+  sx: number,
+  vw: number,
 ) {
   if (targetRowIdx < 0 || targetRowIdx >= rows.length) return
   const row = rows[targetRowIdx]
@@ -485,7 +503,7 @@ export function drawSlotIndicators(
   vh: number,
 ) {
   const BAR_RADIUS = 4
-  const FLAG_SIZE = 12  // triangle leg length
+  const FLAG_SIZE = 12 // triangle leg length
 
   for (const bar of bars) {
     const status = bar.flight.slotStatus

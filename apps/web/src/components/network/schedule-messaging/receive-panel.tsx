@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useCallback } from 'react'
 import { Inbox, FileText, CheckCircle, XCircle, AlertTriangle, ArrowRight, Loader2 } from 'lucide-react'
@@ -67,7 +67,10 @@ export function ReceivePanel({ operatorIataCode, onApplied }: ReceivePanelProps)
         changes: parsed.changes,
       })
 
-      setResult({ ok: true, message: `Applied ${ACTION_LABELS[parsed.actionCode] || parsed.actionCode} to ${parsed.flightNumber} on ${parsed.flightDate}` })
+      setResult({
+        ok: true,
+        message: `Applied ${ACTION_LABELS[parsed.actionCode] || parsed.actionCode} to ${parsed.flightNumber} on ${parsed.flightDate}`,
+      })
       setStep('done')
       onApplied()
     } catch (err: any) {
@@ -117,7 +120,10 @@ export function ReceivePanel({ operatorIataCode, onApplied }: ReceivePanelProps)
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 flex items-center gap-2 px-5" style={{ height: 44, borderBottom: `1px solid ${sectionBorder}` }}>
+      <div
+        className="shrink-0 flex items-center gap-2 px-5"
+        style={{ height: 44, borderBottom: `1px solid ${sectionBorder}` }}
+      >
         <Inbox size={14} className="text-module-accent" />
         <span className="text-[14px] font-bold">Receive Inbound ASM / SSM</span>
       </div>
@@ -131,7 +137,7 @@ export function ReceivePanel({ operatorIataCode, onApplied }: ReceivePanelProps)
             </p>
             <textarea
               value={rawText}
-              onChange={e => setRawText(e.target.value)}
+              onChange={(e) => setRawText(e.target.value)}
               placeholder={'ASM\nUTC\nTIM\nVJ301/22MAR\nJ 320\nSGN0615 ICN1430'}
               rows={10}
               className="w-full rounded-xl px-4 py-3 text-[13px] font-mono outline-none resize-none"
@@ -153,12 +159,17 @@ export function ReceivePanel({ operatorIataCode, onApplied }: ReceivePanelProps)
           <div className="space-y-5 max-w-2xl">
             {/* Parse errors */}
             {parsed.errors.length > 0 && (
-              <div className="rounded-xl p-4 flex items-start gap-3" style={{ background: 'rgba(255,59,59,0.08)', border: '1px solid rgba(255,59,59,0.2)' }}>
+              <div
+                className="rounded-xl p-4 flex items-start gap-3"
+                style={{ background: 'rgba(255,59,59,0.08)', border: '1px solid rgba(255,59,59,0.2)' }}
+              >
                 <AlertTriangle size={16} className="text-[#FF3B3B] shrink-0 mt-0.5" />
                 <div>
                   <p className="text-[13px] font-semibold text-[#FF3B3B] mb-1">Parse Errors</p>
                   {parsed.errors.map((e, i) => (
-                    <p key={i} className="text-[13px] text-hz-text-secondary">{e}</p>
+                    <p key={i} className="text-[13px] text-hz-text-secondary">
+                      {e}
+                    </p>
                   ))}
                 </div>
               </div>
@@ -168,7 +179,10 @@ export function ReceivePanel({ operatorIataCode, onApplied }: ReceivePanelProps)
             <div className="rounded-xl p-4" style={{ background: inputBg, border: `1px solid ${inputBorder}` }}>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Message Type" value={parsed.messageType} />
-                <Field label="Action Code" value={`${parsed.actionCode} — ${ACTION_LABELS[parsed.actionCode] || 'Unknown'}`} />
+                <Field
+                  label="Action Code"
+                  value={`${parsed.actionCode} — ${ACTION_LABELS[parsed.actionCode] || 'Unknown'}`}
+                />
                 <Field label="Flight" value={parsed.flightNumber || '—'} />
                 <Field label="Date" value={parsed.flightDate || '—'} />
                 <Field label="Airline" value={parsed.airline || '—'} />
@@ -183,10 +197,16 @@ export function ReceivePanel({ operatorIataCode, onApplied }: ReceivePanelProps)
                   <table className="w-full">
                     <thead>
                       <tr style={{ borderBottom: `1px solid ${sectionBorder}` }}>
-                        <th className="text-left px-4 py-2 text-[13px] font-medium text-hz-text-tertiary uppercase">Field</th>
-                        <th className="text-left px-4 py-2 text-[13px] font-medium text-hz-text-tertiary uppercase">From</th>
+                        <th className="text-left px-4 py-2 text-[13px] font-medium text-hz-text-tertiary uppercase">
+                          Field
+                        </th>
+                        <th className="text-left px-4 py-2 text-[13px] font-medium text-hz-text-tertiary uppercase">
+                          From
+                        </th>
                         <th className="text-center px-2 py-2 w-8" />
-                        <th className="text-left px-4 py-2 text-[13px] font-medium text-hz-text-tertiary uppercase">To</th>
+                        <th className="text-left px-4 py-2 text-[13px] font-medium text-hz-text-tertiary uppercase">
+                          To
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -194,7 +214,9 @@ export function ReceivePanel({ operatorIataCode, onApplied }: ReceivePanelProps)
                         <tr key={field} style={{ borderBottom: `1px solid ${sectionBorder}` }}>
                           <td className="px-4 py-2 text-[13px] font-medium">{FIELD_LABELS[field] || field}</td>
                           <td className="px-4 py-2 text-[13px] font-mono text-hz-text-secondary">{ch.from || '—'}</td>
-                          <td className="px-2 py-2 text-center"><ArrowRight size={13} className="text-hz-text-tertiary" /></td>
+                          <td className="px-2 py-2 text-center">
+                            <ArrowRight size={13} className="text-hz-text-tertiary" />
+                          </td>
                           <td className="px-4 py-2 text-[13px] font-mono font-semibold">{ch.to}</td>
                         </tr>
                       ))}
@@ -257,9 +279,11 @@ export function ReceivePanel({ operatorIataCode, onApplied }: ReceivePanelProps)
                 border: `1px solid ${result.ok ? 'rgba(6,194,112,0.2)' : 'rgba(255,59,59,0.2)'}`,
               }}
             >
-              {result.ok
-                ? <CheckCircle size={16} className="text-[#06C270] shrink-0 mt-0.5" />
-                : <XCircle size={16} className="text-[#FF3B3B] shrink-0 mt-0.5" />}
+              {result.ok ? (
+                <CheckCircle size={16} className="text-[#06C270] shrink-0 mt-0.5" />
+              ) : (
+                <XCircle size={16} className="text-[#FF3B3B] shrink-0 mt-0.5" />
+              )}
               <p className="text-[13px] font-medium">{result.message}</p>
             </div>
             <button

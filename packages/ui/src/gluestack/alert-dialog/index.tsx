@@ -37,7 +37,11 @@ export function AlertDialogHeader({ children, className }: { children: React.Rea
 
 export function AlertDialogCloseButton({ children, className }: { children?: React.ReactNode; className?: string }) {
   const { onClose } = useContext(Ctx)
-  return <Pressable className={className} onPress={onClose} hitSlop={8}>{children ?? <Text>X</Text>}</Pressable>
+  return (
+    <Pressable className={className} onPress={onClose} hitSlop={8}>
+      {children ?? <Text>X</Text>}
+    </Pressable>
+  )
 }
 
 export function AlertDialogBody({ children, className }: { children: React.ReactNode; className?: string }) {

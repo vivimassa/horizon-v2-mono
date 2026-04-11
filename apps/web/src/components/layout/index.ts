@@ -1,1 +1,1 @@
-export { MasterDetailLayout } from "./master-detail-layout";
+export { MasterDetailLayout } from './master-detail-layout'

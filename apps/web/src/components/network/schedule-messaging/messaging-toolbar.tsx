@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { RefreshCw, Inbox, Send, FileText, BarChart3 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
@@ -21,10 +21,10 @@ export function MessagingToolbar({ onRefresh }: MessagingToolbarProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
-  const activeSection = useScheduleMessagingStore(s => s.activeSection)
-  const setActiveSection = useScheduleMessagingStore(s => s.setActiveSection)
-  const stats = useScheduleMessagingStore(s => s.stats)
-  const statsLoading = useScheduleMessagingStore(s => s.statsLoading)
+  const activeSection = useScheduleMessagingStore((s) => s.activeSection)
+  const setActiveSection = useScheduleMessagingStore((s) => s.setActiveSection)
+  const stats = useScheduleMessagingStore((s) => s.stats)
+  const statsLoading = useScheduleMessagingStore((s) => s.statsLoading)
 
   const hoverBg = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'
   const activeBg = isDark ? 'rgba(62,123,250,0.20)' : 'rgba(30,64,175,0.12)'
@@ -35,7 +35,7 @@ export function MessagingToolbar({ onRefresh }: MessagingToolbarProps) {
     <div className="flex items-center gap-0 px-2" style={{ height: 48 }}>
       {/* Section tabs */}
       <div className="flex items-center gap-1">
-        {SECTIONS.map(s => {
+        {SECTIONS.map((s) => {
           const active = activeSection === s.key
           const Icon = s.icon
           return (
@@ -47,8 +47,12 @@ export function MessagingToolbar({ onRefresh }: MessagingToolbarProps) {
                 background: active ? activeBg : undefined,
                 color: active ? activeColor : undefined,
               }}
-              onMouseEnter={e => { if (!active) e.currentTarget.style.background = hoverBg }}
-              onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? activeBg : 'transparent' }}
+              onMouseEnter={(e) => {
+                if (!active) e.currentTarget.style.background = hoverBg
+              }}
+              onMouseLeave={(e) => {
+                if (!active) e.currentTarget.style.background = active ? activeBg : 'transparent'
+              }}
             >
               <Icon size={15} strokeWidth={active ? 2 : 1.6} />
               {s.label}
@@ -79,8 +83,12 @@ export function MessagingToolbar({ onRefresh }: MessagingToolbarProps) {
         <button
           onClick={onRefresh}
           className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
-          onMouseEnter={e => { e.currentTarget.style.background = hoverBg }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = hoverBg
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent'
+          }}
         >
           <RefreshCw size={15} strokeWidth={1.6} className="text-hz-text-secondary" />
         </button>
@@ -94,7 +102,9 @@ function StatPill({ label, value, color }: { label: string; value: number; color
   return (
     <div className="flex items-center gap-1.5">
       <span className="text-[13px] text-hz-text-tertiary font-medium">{label}</span>
-      <span className="text-[13px] font-bold" style={{ color }}>{value}</span>
+      <span className="text-[13px] font-bold" style={{ color }}>
+        {value}
+      </span>
     </div>
   )
 }

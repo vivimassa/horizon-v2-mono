@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { Send, MessageSquare } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
@@ -32,8 +32,12 @@ export function MessagesTab({ data }: { data: FlightDetail }) {
       {/* Empty state */}
       <div className="flex flex-col items-center justify-center py-12 opacity-50">
         <MessageSquare size={28} style={{ color: muted }} className="mb-3" />
-        <span className="text-[13px] font-medium" style={{ color: muted }}>No messages</span>
-        <span className="text-[11px] mt-1" style={{ color: `${muted}80` }}>MVT, LDM, and ACARS messages will appear here</span>
+        <span className="text-[13px] font-medium" style={{ color: muted }}>
+          No messages
+        </span>
+        <span className="text-[11px] mt-1" style={{ color: `${muted}80` }}>
+          MVT, LDM, and ACARS messages will appear here
+        </span>
       </div>
     </div>
   )

@@ -1,30 +1,30 @@
-"use client";
+'use client'
 
-import { Camera, Mail } from "lucide-react";
-import { accentTint, type Palette as PaletteType } from "@skyhub/ui/theme";
-import { useDisplay } from "@/components/display-provider";
+import { Camera, Mail } from 'lucide-react'
+import { accentTint, type Palette as PaletteType } from '@skyhub/ui/theme'
+import { useDisplay } from '@/components/display-provider'
 
 interface ProfileHeroProps {
-  palette: PaletteType;
-  isDark: boolean;
-  accent: string;
+  palette: PaletteType
+  isDark: boolean
+  accent: string
   user: {
-    name: string;
-    initials: string;
-    email: string;
-    isActive: boolean;
-    isAdmin: boolean;
-    department: string;
-    office: string;
-  };
+    name: string
+    initials: string
+    email: string
+    isActive: boolean
+    isAdmin: boolean
+    department: string
+    office: string
+  }
 }
 
 export function ProfileHero({ palette, isDark, accent, user }: ProfileHeroProps) {
-  const { fonts: F } = useDisplay();
+  const { fonts: F } = useDisplay()
   const heroGradient = isDark
-    ? "linear-gradient(135deg, rgba(30,64,175,0.12), rgba(124,58,237,0.08))"
-    : "linear-gradient(135deg, rgba(30,64,175,0.07), rgba(124,58,237,0.05))";
-  const heroBorder = isDark ? "rgba(255,255,255,0.06)" : "rgba(30,64,175,0.08)";
+    ? 'linear-gradient(135deg, rgba(30,64,175,0.12), rgba(124,58,237,0.08))'
+    : 'linear-gradient(135deg, rgba(30,64,175,0.07), rgba(124,58,237,0.05))'
+  const heroBorder = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(30,64,175,0.08)'
 
   return (
     <div
@@ -35,9 +35,12 @@ export function ProfileHero({ palette, isDark, accent, user }: ProfileHeroProps)
       <div
         className="absolute pointer-events-none"
         style={{
-          top: -30, right: -30, width: 120, height: 120,
+          top: -30,
+          right: -30,
+          width: 120,
+          height: 120,
           background: `radial-gradient(circle, ${accentTint(accent, 0.06)}, transparent 70%)`,
-          borderRadius: "50%",
+          borderRadius: '50%',
         }}
       />
 
@@ -49,15 +52,13 @@ export function ProfileHero({ palette, isDark, accent, user }: ProfileHeroProps)
               className="w-14 h-14 md:w-16 md:h-16 rounded-2xl md:rounded-[18px] flex items-center justify-center"
               style={{ backgroundColor: accent }}
             >
-              <span style={{ fontSize: F.xxl, fontWeight: 700, color: "#fff" }}>
-                {user.initials}
-              </span>
+              <span style={{ fontSize: F.xxl, fontWeight: 700, color: '#fff' }}>{user.initials}</span>
             </div>
             <button
               className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center cursor-pointer"
               style={{
                 backgroundColor: palette.card,
-                border: `2px solid ${isDark ? "#1a1a1a" : "#f5f5f5"}`,
+                border: `2px solid ${isDark ? '#1a1a1a' : '#f5f5f5'}`,
               }}
             >
               <Camera size={10} style={{ color: accent }} strokeWidth={2.5} />
@@ -66,9 +67,7 @@ export function ProfileHero({ palette, isDark, accent, user }: ProfileHeroProps)
 
           {/* Name + email + badges */}
           <div className="min-w-0">
-            <div style={{ fontSize: F.xxl, fontWeight: 600, color: palette.text }}>
-              {user.name}
-            </div>
+            <div style={{ fontSize: F.xxl, fontWeight: 600, color: palette.text }}>{user.name}</div>
             <div className="flex items-center gap-1.5 mt-1">
               <Mail size={14} style={{ color: palette.textSecondary }} strokeWidth={1.8} />
               <span className="truncate" style={{ fontSize: F.sm, color: palette.textSecondary }}>
@@ -81,8 +80,8 @@ export function ProfileHero({ palette, isDark, accent, user }: ProfileHeroProps)
                   className="font-semibold px-2.5 py-0.5 rounded-full"
                   style={{
                     fontSize: F.min,
-                    backgroundColor: isDark ? "rgba(22,163,74,0.15)" : "#dcfce7",
-                    color: isDark ? "#4ade80" : "#166534",
+                    backgroundColor: isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7',
+                    color: isDark ? '#4ade80' : '#166534',
                   }}
                 >
                   Active
@@ -94,7 +93,7 @@ export function ProfileHero({ palette, isDark, accent, user }: ProfileHeroProps)
                   style={{
                     fontSize: F.min,
                     backgroundColor: accentTint(accent, isDark ? 0.15 : 0.08),
-                    color: isDark ? "#60a5fa" : accent,
+                    color: isDark ? '#60a5fa' : accent,
                   }}
                 >
                   Administrator
@@ -112,15 +111,25 @@ export function ProfileHero({ palette, isDark, accent, user }: ProfileHeroProps)
         </div>
       </div>
     </div>
-  );
+  )
 }
 
-function StatItem({ label, value, accent, palette }: { label: string; value: string; accent: string; palette: PaletteType }) {
-  const { fonts: F } = useDisplay();
+function StatItem({
+  label,
+  value,
+  accent,
+  palette,
+}: {
+  label: string
+  value: string
+  accent: string
+  palette: PaletteType
+}) {
+  const { fonts: F } = useDisplay()
   return (
     <div className="text-center">
       <div style={{ fontSize: F.xl, fontWeight: 700, color: accent }}>{value}</div>
       <div style={{ fontSize: F.min, fontWeight: 500, color: palette.textSecondary }}>{label}</div>
     </div>
-  );
+  )
 }

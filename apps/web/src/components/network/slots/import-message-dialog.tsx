@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState } from 'react'
 import { X, AlertCircle, CheckCircle } from 'lucide-react'
@@ -20,7 +20,12 @@ interface ImportMessageDialogProps {
 }
 
 export function ImportMessageDialog({
-  open, onOpenChange, airportIata, seasonCode, onImported, isDark,
+  open,
+  onOpenChange,
+  airportIata,
+  seasonCode,
+  onImported,
+  isDark,
 }: ImportMessageDialogProps) {
   const palette = isDark ? colors.dark : colors.light
   const [rawText, setRawText] = useState('')
@@ -71,7 +76,9 @@ export function ImportMessageDialog({
 
         // Log the action
         if (line.actionCode) {
-          const isAirline = ['N', 'Y', 'B', 'V', 'F', 'C', 'M', 'R', 'L', 'I', 'D', 'A', 'P', 'Z'].includes(line.actionCode)
+          const isAirline = ['N', 'Y', 'B', 'V', 'F', 'C', 'M', 'R', 'L', 'I', 'D', 'A', 'P', 'Z'].includes(
+            line.actionCode,
+          )
           await api.logSlotAction({
             seriesId: '', // Will be set after creation in a future iteration
             actionCode: line.actionCode,
@@ -95,11 +102,15 @@ export function ImportMessageDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
-      <div className="w-[680px] max-h-[85vh] rounded-2xl overflow-hidden flex flex-col"
-        style={{ background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: 'blur(24px)' }}>
+      <div
+        className="w-[680px] max-h-[85vh] rounded-2xl overflow-hidden flex flex-col"
+        style={{ background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: 'blur(24px)' }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 shrink-0"
-          style={{ borderBottom: `1px solid ${glassBorder}` }}>
+        <div
+          className="flex items-center justify-between px-5 py-4 shrink-0"
+          style={{ borderBottom: `1px solid ${glassBorder}` }}
+        >
           <h2 className="text-[16px] font-semibold" style={{ color: palette.text }}>
             Import Slot Message
           </h2>
@@ -117,7 +128,7 @@ export function ImportMessageDialog({
               </label>
               <textarea
                 value={rawText}
-                onChange={e => setRawText(e.target.value)}
+                onChange={(e) => setRawText(e.target.value)}
                 placeholder={`SCR\n/CREATOR-REF\nS26\n22MAR\nSGN\nNVJ301 VJ302 29MAR24OCT 1234567 284320 ICN0615 0730ICN JJ`}
                 rows={12}
                 className="w-full rounded-xl p-4 text-[13px] font-mono resize-none outline-none"
@@ -132,7 +143,7 @@ export function ImportMessageDialog({
             <div className="space-y-4">
               {/* Parse summary */}
               <div className="flex items-center gap-3 text-[13px]">
-                {parsed.errors.filter(e => e.severity === 'error').length === 0 ? (
+                {parsed.errors.filter((e) => e.severity === 'error').length === 0 ? (
                   <CheckCircle size={16} style={{ color: '#06C270' }} />
                 ) : (
                   <AlertCircle size={16} style={{ color: '#FF8800' }} />
@@ -141,30 +152,55 @@ export function ImportMessageDialog({
                   {parsed.dataLines.length} series parsed from {parsed.messageType || 'message'}
                 </span>
                 {parsed.errors.length > 0 && (
-                  <span style={{ color: '#FF8800' }}>({parsed.errors.length} warning{parsed.errors.length !== 1 ? 's' : ''})</span>
+                  <span style={{ color: '#FF8800' }}>
+                    ({parsed.errors.length} warning{parsed.errors.length !== 1 ? 's' : ''})
+                  </span>
                 )}
               </div>
 
               {/* Header info */}
               <div className="grid grid-cols-3 gap-3 text-[13px]">
-                <div><span style={{ color: palette.textSecondary }}>Type: </span><span className="font-mono" style={{ color: palette.text }}>{parsed.messageType}</span></div>
-                <div><span style={{ color: palette.textSecondary }}>Season: </span><span className="font-mono" style={{ color: palette.text }}>{parsed.seasonCode}</span></div>
-                <div><span style={{ color: palette.textSecondary }}>Airport: </span><span className="font-mono" style={{ color: palette.text }}>{parsed.airportIata}</span></div>
+                <div>
+                  <span style={{ color: palette.textSecondary }}>Type: </span>
+                  <span className="font-mono" style={{ color: palette.text }}>
+                    {parsed.messageType}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ color: palette.textSecondary }}>Season: </span>
+                  <span className="font-mono" style={{ color: palette.text }}>
+                    {parsed.seasonCode}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ color: palette.textSecondary }}>Airport: </span>
+                  <span className="font-mono" style={{ color: palette.text }}>
+                    {parsed.airportIata}
+                  </span>
+                </div>
               </div>
 
               {/* Parsed lines preview */}
               <div className="space-y-1">
                 {parsed.dataLines.map((line, i) => (
-                  <div key={i} className="flex items-center gap-3 text-[13px] px-3 py-2 rounded-lg"
-                    style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }}>
-                    <span className="font-mono font-bold w-4" style={{ color: MODULE_THEMES.network.accent }}>{line.actionCode}</span>
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 text-[13px] px-3 py-2 rounded-lg"
+                    style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }}
+                  >
+                    <span className="font-mono font-bold w-4" style={{ color: MODULE_THEMES.network.accent }}>
+                      {line.actionCode}
+                    </span>
                     <span className="font-mono" style={{ color: palette.text }}>
-                      {line.arrivalFlight || ''}{line.departureFlight ? ` / ${line.departureFlight}` : ''}
+                      {line.arrivalFlight || ''}
+                      {line.departureFlight ? ` / ${line.departureFlight}` : ''}
                     </span>
                     <span style={{ color: palette.textSecondary }}>
                       {line.periodStart}\u2013{line.periodEnd}
                     </span>
-                    <span className="font-mono" style={{ color: palette.textSecondary }}>{line.daysOfOperation}</span>
+                    <span className="font-mono" style={{ color: palette.textSecondary }}>
+                      {line.daysOfOperation}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -174,8 +210,14 @@ export function ImportMessageDialog({
                 <div className="space-y-1">
                   {parsed.errors.map((e, i) => (
                     <div key={i} className="flex items-start gap-2 text-[13px]">
-                      <AlertCircle size={14} className="shrink-0 mt-0.5" style={{ color: e.severity === 'error' ? '#FF3B3B' : '#FF8800' }} />
-                      <span style={{ color: palette.textSecondary }}>Line {e.line}: {e.message}</span>
+                      <AlertCircle
+                        size={14}
+                        className="shrink-0 mt-0.5"
+                        style={{ color: e.severity === 'error' ? '#FF3B3B' : '#FF8800' }}
+                      />
+                      <span style={{ color: palette.textSecondary }}>
+                        Line {e.line}: {e.message}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -187,29 +229,53 @@ export function ImportMessageDialog({
         {/* Footer */}
         <div className="flex justify-between px-5 py-4 shrink-0" style={{ borderTop: `1px solid ${glassBorder}` }}>
           {step === 'preview' ? (
-            <button type="button" onClick={() => setStep('input')}
+            <button
+              type="button"
+              onClick={() => setStep('input')}
               className="h-9 px-4 rounded-xl text-[13px] font-medium"
-              style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', color: palette.text, border: `1px solid ${glassBorder}` }}>
+              style={{
+                background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                color: palette.text,
+                border: `1px solid ${glassBorder}`,
+              }}
+            >
               Back
             </button>
-          ) : <div />}
+          ) : (
+            <div />
+          )}
 
           <div className="flex gap-2">
-            <button type="button" onClick={() => onOpenChange(false)}
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
               className="h-9 px-4 rounded-xl text-[13px] font-medium"
-              style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', color: palette.text, border: `1px solid ${glassBorder}` }}>
+              style={{
+                background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                color: palette.text,
+                border: `1px solid ${glassBorder}`,
+              }}
+            >
               Cancel
             </button>
             {step === 'input' ? (
-              <button type="button" onClick={handleParse} disabled={!rawText.trim()}
+              <button
+                type="button"
+                onClick={handleParse}
+                disabled={!rawText.trim()}
                 className="h-9 px-4 rounded-xl text-[13px] font-medium disabled:opacity-50"
-                style={{ background: MODULE_THEMES.network.accent, color: '#fff' }}>
+                style={{ background: MODULE_THEMES.network.accent, color: '#fff' }}
+              >
                 Parse Message
               </button>
             ) : (
-              <button type="button" onClick={handleImport} disabled={importing || !parsed?.dataLines.length}
+              <button
+                type="button"
+                onClick={handleImport}
+                disabled={importing || !parsed?.dataLines.length}
                 className="h-9 px-4 rounded-xl text-[13px] font-medium disabled:opacity-50"
-                style={{ background: '#06C270', color: '#fff' }}>
+                style={{ background: '#06C270', color: '#fff' }}
+              >
                 {importing ? 'Importing...' : `Import ${parsed?.dataLines.length || 0} Series`}
               </button>
             )}

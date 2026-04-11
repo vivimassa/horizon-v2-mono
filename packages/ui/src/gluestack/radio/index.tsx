@@ -78,7 +78,11 @@ export function RadioLabel({
   className?: string
   style?: any
 }) {
-  return <Text className={`text-sm ${className ?? ''}`} style={style}>{children}</Text>
+  return (
+    <Text className={`text-sm ${className ?? ''}`} style={style}>
+      {children}
+    </Text>
+  )
 }
 
 export function RadioIcon() {

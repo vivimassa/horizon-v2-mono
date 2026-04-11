@@ -393,7 +393,7 @@ export function getCountryForIata(iata: string): string | undefined {
 export function classifyRoute(
   depIata: string,
   arrIata: string,
-  extraCountryMap?: Map<string, string>
+  extraCountryMap?: Map<string, string>,
 ): 'domestic' | 'international' | 'unknown' {
   const depCountry = AIRPORT_COUNTRY[depIata] ?? extraCountryMap?.get(depIata) ?? null
   const arrCountry = AIRPORT_COUNTRY[arrIata] ?? extraCountryMap?.get(arrIata) ?? null

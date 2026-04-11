@@ -1,15 +1,23 @@
 import React, { useState, useCallback } from 'react'
-import {
-  View, Text, ScrollView, Pressable, TextInput, Image,
-  useWindowDimensions, Alert,
-} from 'react-native'
+import { View, Text, ScrollView, Pressable, TextInput, Image, useWindowDimensions, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import {
-  ArrowLeft, Camera, Mail, Phone, MapPin,
-  Hash, Briefcase, Shield, Edit3, Save, X, Check,
-  Users, Globe,
+  ArrowLeft,
+  Camera,
+  Mail,
+  Phone,
+  MapPin,
+  Hash,
+  Briefcase,
+  Shield,
+  Edit3,
+  Save,
+  X,
+  Check,
+  Users,
+  Globe,
 } from 'lucide-react-native'
 import type { LucideIcon } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
@@ -57,17 +65,26 @@ const INITIAL: ProfileData = {
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', {
-    day: '2-digit', month: 'short', year: 'numeric',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
   })
 }
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso)
-  return d.toLocaleDateString('en-GB', {
-    day: '2-digit', month: 'short', year: 'numeric',
-  }) + ' ' + d.toLocaleTimeString('en-GB', {
-    hour: '2-digit', minute: '2-digit',
-  })
+  return (
+    d.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }) +
+    ' ' +
+    d.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  )
 }
 
 export default function ProfileScreen() {
@@ -203,7 +220,9 @@ export default function ProfileScreen() {
           }}
         >
           <ArrowLeft size={15} color={palette.text} strokeWidth={2} />
-          <Text className="text-[13px] font-semibold" style={{ color: palette.text }}>Settings</Text>
+          <Text className="text-[13px] font-semibold" style={{ color: palette.text }}>
+            Settings
+          </Text>
         </Pressable>
 
         {editing ? (
@@ -214,7 +233,9 @@ export default function ProfileScreen() {
               style={{ borderWidth: 1, borderColor: palette.border }}
             >
               <X size={14} color={palette.text} strokeWidth={2} />
-              <Text className="text-[12px] font-semibold" style={{ color: palette.text }}>Cancel</Text>
+              <Text className="text-[12px] font-semibold" style={{ color: palette.text }}>
+                Cancel
+              </Text>
             </Pressable>
             <Pressable
               onPress={saveEdit}
@@ -222,7 +243,9 @@ export default function ProfileScreen() {
               style={{ backgroundColor: ACCENT }}
             >
               <Save size={14} color="#fff" strokeWidth={2} />
-              <Text className="text-[12px] font-semibold" style={{ color: '#fff' }}>Save</Text>
+              <Text className="text-[12px] font-semibold" style={{ color: '#fff' }}>
+                Save
+              </Text>
             </Pressable>
           </View>
         ) : (
@@ -232,29 +255,61 @@ export default function ProfileScreen() {
             style={{ backgroundColor: ACCENT }}
           >
             <Edit3 size={14} color="#fff" strokeWidth={2} />
-            <Text className="text-[12px] font-semibold" style={{ color: '#fff' }}>Edit</Text>
+            <Text className="text-[12px] font-semibold" style={{ color: '#fff' }}>
+              Edit
+            </Text>
           </Pressable>
         )}
       </View>
 
-      <ScrollView
-        className="flex-1"
-        contentContainerClassName="pb-24"
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView className="flex-1" contentContainerClassName="pb-24" showsVerticalScrollIndicator={false}>
         {isTablet ? (
           <View className="flex-row px-4 gap-4">
             <View style={{ width: 320 }}>
-              <AvatarPanel current={current} palette={palette} isDark={isDark} isTablet fonts={fonts} fs={fs} pickAvatar={pickAvatar} avatarUri={avatarUri} />
+              <AvatarPanel
+                current={current}
+                palette={palette}
+                isDark={isDark}
+                isTablet
+                fonts={fonts}
+                fs={fs}
+                pickAvatar={pickAvatar}
+                avatarUri={avatarUri}
+              />
             </View>
             <View className="flex-1">
-              <FieldSections current={current} editing={editing} palette={palette} isDark={isDark} update={update} isTablet fonts={fonts} fs={fs} />
+              <FieldSections
+                current={current}
+                editing={editing}
+                palette={palette}
+                isDark={isDark}
+                update={update}
+                isTablet
+                fonts={fonts}
+                fs={fs}
+              />
             </View>
           </View>
         ) : (
           <View className="px-4">
-            <AvatarPanel current={current} palette={palette} isDark={isDark} fonts={fonts} fs={fs} pickAvatar={pickAvatar} avatarUri={avatarUri} />
-            <FieldSections current={current} editing={editing} palette={palette} isDark={isDark} update={update} fonts={fonts} fs={fs} />
+            <AvatarPanel
+              current={current}
+              palette={palette}
+              isDark={isDark}
+              fonts={fonts}
+              fs={fs}
+              pickAvatar={pickAvatar}
+              avatarUri={avatarUri}
+            />
+            <FieldSections
+              current={current}
+              editing={editing}
+              palette={palette}
+              isDark={isDark}
+              update={update}
+              fonts={fonts}
+              fs={fs}
+            />
           </View>
         )}
       </ScrollView>
@@ -263,12 +318,35 @@ export default function ProfileScreen() {
 }
 
 // ── Avatar panel ──
-function AvatarPanel({ current, palette, isDark, isTablet, fonts, fs, pickAvatar, avatarUri }: { current: ProfileData; palette: Palette; isDark: boolean; isTablet?: boolean; fonts: any; fs: (n: number) => number; pickAvatar: () => void; avatarUri: string | null }) {
+function AvatarPanel({
+  current,
+  palette,
+  isDark,
+  isTablet,
+  fonts,
+  fs,
+  pickAvatar,
+  avatarUri,
+}: {
+  current: ProfileData
+  palette: Palette
+  isDark: boolean
+  isTablet?: boolean
+  fonts: any
+  fs: (n: number) => number
+  pickAvatar: () => void
+  avatarUri: string | null
+}) {
   const t = isTablet
   return (
     <View
       className="rounded-2xl border items-center mb-4"
-      style={{ backgroundColor: palette.card, borderColor: palette.cardBorder, paddingVertical: t ? 32 : 24, paddingHorizontal: t ? 20 : 16 }}
+      style={{
+        backgroundColor: palette.card,
+        borderColor: palette.cardBorder,
+        paddingVertical: t ? 32 : 24,
+        paddingHorizontal: t ? 20 : 16,
+      }}
     >
       <Pressable className="relative active:opacity-70" style={{ marginBottom: t ? 16 : 12 }} onPress={pickAvatar}>
         <View
@@ -283,7 +361,8 @@ function AvatarPanel({ current, palette, isDark, isTablet, fonts, fs, pickAvatar
             <Image source={{ uri: avatarUri }} style={{ width: '100%', height: '100%' }} />
           ) : (
             <Text style={{ fontSize: fonts.xxl, fontWeight: '700', color: ACCENT }}>
-              {current.firstName[0]}{current.lastName[0]}
+              {current.firstName[0]}
+              {current.lastName[0]}
             </Text>
           )}
         </View>
@@ -297,14 +376,15 @@ function AvatarPanel({ current, palette, isDark, isTablet, fonts, fs, pickAvatar
       <Text style={{ fontSize: fonts.xl, fontWeight: '700', color: palette.text }}>
         {current.firstName} {current.lastName}
       </Text>
-      <Text style={{ fontSize: fonts.sm, color: palette.textSecondary, marginTop: 2 }}>
-        {current.role}
-      </Text>
+      <Text style={{ fontSize: fonts.sm, color: palette.textSecondary, marginTop: 2 }}>{current.role}</Text>
       <View className="mt-2 px-3 py-1 rounded-full" style={{ backgroundColor: '#dcfce7' }}>
         <Text style={{ fontSize: fonts.xs, fontWeight: '600', color: '#166534' }}>{current.status}</Text>
       </View>
 
-      <View className="w-full" style={{ marginTop: t ? 20 : 16, paddingTop: t ? 20 : 16, borderTopWidth: 0.5, borderTopColor: palette.border }}>
+      <View
+        className="w-full"
+        style={{ marginTop: t ? 20 : 16, paddingTop: t ? 20 : 16, borderTopWidth: 0.5, borderTopColor: palette.border }}
+      >
         <QuickRow icon={Briefcase} label="Department" value={current.department} palette={palette} fonts={fonts} />
         <QuickRow icon={Shield} label="Role" value={current.role} palette={palette} fonts={fonts} />
         <QuickRow icon={Hash} label="Employee ID" value={current.employeeId} palette={palette} fonts={fonts} />
@@ -313,7 +393,10 @@ function AvatarPanel({ current, palette, isDark, isTablet, fonts, fs, pickAvatar
         <QuickRow icon={MapPin} label="Location" value={current.location} palette={palette} fonts={fonts} />
       </View>
 
-      <View className="w-full" style={{ marginTop: t ? 16 : 12, paddingTop: t ? 16 : 12, borderTopWidth: 0.5, borderTopColor: palette.border }}>
+      <View
+        className="w-full"
+        style={{ marginTop: t ? 16 : 12, paddingTop: t ? 16 : 12, borderTopWidth: 0.5, borderTopColor: palette.border }}
+      >
         <Text style={{ fontSize: fonts.xs, color: palette.textSecondary }}>
           Last login: {formatDateTime(current.lastLogin)}
         </Text>
@@ -322,13 +405,29 @@ function AvatarPanel({ current, palette, isDark, isTablet, fonts, fs, pickAvatar
   )
 }
 
-function QuickRow({ icon: Icon, label, value, palette, fonts }: { icon: LucideIcon; label: string; value: string; palette: Palette; fonts: any }) {
+function QuickRow({
+  icon: Icon,
+  label,
+  value,
+  palette,
+  fonts,
+}: {
+  icon: LucideIcon
+  label: string
+  value: string
+  palette: Palette
+  fonts: any
+}) {
   return (
     <View className="flex-row items-center" style={{ gap: 10, marginBottom: 14 }}>
       <Icon size={fonts.sm} color={palette.textTertiary} strokeWidth={1.6} />
       <View className="flex-1">
-        <Text className="uppercase" style={{ fontSize: fonts.xs, color: palette.textTertiary, letterSpacing: 0.5 }}>{label}</Text>
-        <Text className="font-medium" style={{ fontSize: fonts.sm, color: palette.text }} numberOfLines={1}>{value}</Text>
+        <Text className="uppercase" style={{ fontSize: fonts.xs, color: palette.textTertiary, letterSpacing: 0.5 }}>
+          {label}
+        </Text>
+        <Text className="font-medium" style={{ fontSize: fonts.sm, color: palette.text }} numberOfLines={1}>
+          {value}
+        </Text>
       </View>
     </View>
   )
@@ -336,38 +435,182 @@ function QuickRow({ icon: Icon, label, value, palette, fonts }: { icon: LucideIc
 
 // ── Field sections ──
 function FieldSections({
-  current, editing, palette, isDark, update, isTablet, fonts, fs,
+  current,
+  editing,
+  palette,
+  isDark,
+  update,
+  isTablet,
+  fonts,
+  fs,
 }: {
-  current: ProfileData; editing: boolean; palette: Palette; isDark: boolean;
-  update: (key: keyof ProfileData, val: string) => void; isTablet?: boolean; fonts: any; fs: (n: number) => number;
+  current: ProfileData
+  editing: boolean
+  palette: Palette
+  isDark: boolean
+  update: (key: keyof ProfileData, val: string) => void
+  isTablet?: boolean
+  fonts: any
+  fs: (n: number) => number
 }) {
   const cols = isTablet ? 2 : 1
 
   return (
     <>
-      <SectionCard title="Personal Information" icon={Users} palette={palette} isDark={isDark} isTablet={isTablet} fonts={fonts}>
+      <SectionCard
+        title="Personal Information"
+        icon={Users}
+        palette={palette}
+        isDark={isDark}
+        isTablet={isTablet}
+        fonts={fonts}
+      >
         <FieldGrid cols={cols}>
-          <EditField label="First Name" field="firstName" value={current.firstName} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} fonts={fonts} />
-          <EditField label="Last Name" field="lastName" value={current.lastName} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} fonts={fonts} />
-          <EditField label="Date of Birth" field="dateOfBirth" value={formatDate(current.dateOfBirth)} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} fonts={fonts} />
-          <EditField label="Gender" field="gender" value={current.gender} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} fonts={fonts} />
-          <EditField label="Department" field="department" value={current.department} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} fonts={fonts} />
-          <EditField label="Employee ID" field="employeeId" value={current.employeeId} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} fonts={fonts} />
+          <EditField
+            label="First Name"
+            field="firstName"
+            value={current.firstName}
+            editing={editing}
+            palette={palette}
+            isDark={isDark}
+            onChange={update}
+            isTablet={isTablet}
+            fonts={fonts}
+          />
+          <EditField
+            label="Last Name"
+            field="lastName"
+            value={current.lastName}
+            editing={editing}
+            palette={palette}
+            isDark={isDark}
+            onChange={update}
+            isTablet={isTablet}
+            fonts={fonts}
+          />
+          <EditField
+            label="Date of Birth"
+            field="dateOfBirth"
+            value={formatDate(current.dateOfBirth)}
+            editing={editing}
+            palette={palette}
+            isDark={isDark}
+            onChange={update}
+            isTablet={isTablet}
+            fonts={fonts}
+          />
+          <EditField
+            label="Gender"
+            field="gender"
+            value={current.gender}
+            editing={editing}
+            palette={palette}
+            isDark={isDark}
+            onChange={update}
+            isTablet={isTablet}
+            fonts={fonts}
+          />
+          <EditField
+            label="Department"
+            field="department"
+            value={current.department}
+            editing={editing}
+            palette={palette}
+            isDark={isDark}
+            onChange={update}
+            isTablet={isTablet}
+            fonts={fonts}
+          />
+          <EditField
+            label="Employee ID"
+            field="employeeId"
+            value={current.employeeId}
+            editing={editing}
+            palette={palette}
+            isDark={isDark}
+            onChange={update}
+            isTablet={isTablet}
+            fonts={fonts}
+          />
         </FieldGrid>
       </SectionCard>
 
-      <SectionCard title="Contact Information" icon={Mail} palette={palette} isDark={isDark} isTablet={isTablet} fonts={fonts}>
+      <SectionCard
+        title="Contact Information"
+        icon={Mail}
+        palette={palette}
+        isDark={isDark}
+        isTablet={isTablet}
+        fonts={fonts}
+      >
         <FieldGrid cols={cols}>
-          <EditField label="Email Address" field="email" value={current.email} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} fonts={fonts} />
-          <EditField label="Mobile Phone" field="phone" value={current.phone} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} fonts={fonts} />
-          <EditField label="Office Phone" field="officePhone" value={current.officePhone} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} fonts={fonts} />
+          <EditField
+            label="Email Address"
+            field="email"
+            value={current.email}
+            editing={editing}
+            palette={palette}
+            isDark={isDark}
+            onChange={update}
+            isTablet={isTablet}
+            fonts={fonts}
+          />
+          <EditField
+            label="Mobile Phone"
+            field="phone"
+            value={current.phone}
+            editing={editing}
+            palette={palette}
+            isDark={isDark}
+            onChange={update}
+            isTablet={isTablet}
+            fonts={fonts}
+          />
+          <EditField
+            label="Office Phone"
+            field="officePhone"
+            value={current.officePhone}
+            editing={editing}
+            palette={palette}
+            isDark={isDark}
+            onChange={update}
+            isTablet={isTablet}
+            fonts={fonts}
+          />
         </FieldGrid>
       </SectionCard>
 
-      <SectionCard title="System & Preferences" icon={Globe} palette={palette} isDark={isDark} isTablet={isTablet} fonts={fonts}>
+      <SectionCard
+        title="System & Preferences"
+        icon={Globe}
+        palette={palette}
+        isDark={isDark}
+        isTablet={isTablet}
+        fonts={fonts}
+      >
         <FieldGrid cols={cols}>
-          <EditField label="System Role" field="role" value={current.role} editing={editing} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} fonts={fonts} />
-          <EditField label="Last Login" field="lastLogin" value={formatDateTime(current.lastLogin)} editing={false} palette={palette} isDark={isDark} onChange={update} isTablet={isTablet} fonts={fonts} />
+          <EditField
+            label="System Role"
+            field="role"
+            value={current.role}
+            editing={editing}
+            palette={palette}
+            isDark={isDark}
+            onChange={update}
+            isTablet={isTablet}
+            fonts={fonts}
+          />
+          <EditField
+            label="Last Login"
+            field="lastLogin"
+            value={formatDateTime(current.lastLogin)}
+            editing={false}
+            palette={palette}
+            isDark={isDark}
+            onChange={update}
+            isTablet={isTablet}
+            fonts={fonts}
+          />
         </FieldGrid>
       </SectionCard>
     </>
@@ -375,9 +618,21 @@ function FieldSections({
 }
 
 function SectionCard({
-  title, icon: Icon, palette, isDark, children, isTablet, fonts,
+  title,
+  icon: Icon,
+  palette,
+  isDark,
+  children,
+  isTablet,
+  fonts,
 }: {
-  title: string; icon: LucideIcon; palette: Palette; isDark: boolean; children: React.ReactNode; isTablet?: boolean; fonts: any;
+  title: string
+  icon: LucideIcon
+  palette: Palette
+  isDark: boolean
+  children: React.ReactNode
+  isTablet?: boolean
+  fonts: any
 }) {
   return (
     <View
@@ -386,7 +641,13 @@ function SectionCard({
     >
       <View
         className="flex-row items-center"
-        style={{ gap: 10, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: palette.border }}
+        style={{
+          gap: 10,
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          borderBottomWidth: 1,
+          borderBottomColor: palette.border,
+        }}
       >
         <View
           className="rounded-lg items-center justify-center"
@@ -394,9 +655,7 @@ function SectionCard({
         >
           <Icon size={fonts.md} color={ACCENT} strokeWidth={1.8} />
         </View>
-        <Text style={{ fontSize: fonts.lg, fontWeight: '700', color: palette.text, letterSpacing: -0.2 }}>
-          {title}
-        </Text>
+        <Text style={{ fontSize: fonts.lg, fontWeight: '700', color: palette.text, letterSpacing: -0.2 }}>{title}</Text>
       </View>
       <View style={{ paddingHorizontal: 16, paddingVertical: 14 }}>{children}</View>
     </View>
@@ -416,7 +675,9 @@ function FieldGrid({ cols, children }: { cols: number; children: React.ReactNode
       {rows.map((row, i) => (
         <View key={i} className="flex-row gap-4">
           {row.map((child, j) => (
-            <View key={j} className="flex-1">{child}</View>
+            <View key={j} className="flex-1">
+              {child}
+            </View>
           ))}
           {row.length < cols && <View className="flex-1" />}
         </View>
@@ -426,10 +687,25 @@ function FieldGrid({ cols, children }: { cols: number; children: React.ReactNode
 }
 
 function EditField({
-  label, field, value, editing, palette, isDark, onChange, isTablet, fonts,
+  label,
+  field,
+  value,
+  editing,
+  palette,
+  isDark,
+  onChange,
+  isTablet,
+  fonts,
 }: {
-  label: string; field: keyof ProfileData; value: string; editing: boolean;
-  palette: Palette; isDark: boolean; onChange: (key: keyof ProfileData, val: string) => void; isTablet?: boolean; fonts: any;
+  label: string
+  field: keyof ProfileData
+  value: string
+  editing: boolean
+  palette: Palette
+  isDark: boolean
+  onChange: (key: keyof ProfileData, val: string) => void
+  isTablet?: boolean
+  fonts: any
 }) {
   return (
     <View style={{ paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: palette.border }}>
@@ -451,7 +727,9 @@ function EditField({
           placeholderTextColor={palette.textTertiary}
         />
       ) : (
-        <Text className="font-medium" style={{ fontSize: fonts.md, color: palette.text }}>{value}</Text>
+        <Text className="font-medium" style={{ fontSize: fonts.md, color: palette.text }}>
+          {value}
+        </Text>
       )}
     </View>
   )

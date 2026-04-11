@@ -16,17 +16,17 @@ export interface MvtEncodeInput {
   }
   actionCode: MvtActionCode
   // AD fields
-  offBlocks?: string          // HHMM or DDHHMM
-  airborne?: string           // HHMM or DDHHMM
+  offBlocks?: string // HHMM or DDHHMM
+  airborne?: string // HHMM or DDHHMM
   // AA fields
-  touchdown?: string          // HHMM or DDHHMM
-  onBlocks?: string           // HHMM or DDHHMM
+  touchdown?: string // HHMM or DDHHMM
+  onBlocks?: string // HHMM or DDHHMM
   // ED fields
   estimatedDeparture?: string // DDHHMM
   // NI fields
-  nextInfoTime?: string       // DDHHMM
+  nextInfoTime?: string // DDHHMM
   // RR fields
-  returnTime?: string         // HHMM or DDHHMM
+  returnTime?: string // HHMM or DDHHMM
   // EA entries
   etas?: MvtEta[]
   // DL
@@ -55,9 +55,7 @@ export function encodeMvtMessage(input: MvtEncodeInput): string {
 
   // ─── Flight identification line ────────────────────────────────
   const fid = input.flightId
-  lines.push(
-    `${fid.airline}${fid.flightNumber}/${fid.dayOfMonth}.${fid.registration}.${fid.station}`
-  )
+  lines.push(`${fid.airline}${fid.flightNumber}/${fid.dayOfMonth}.${fid.registration}.${fid.station}`)
 
   // ─── Action code line ──────────────────────────────────────────
   let actionLine = ''
@@ -182,16 +180,16 @@ function formatCurrentTimestamp(): string {
 
 export function buildEnvelope(opts: {
   priority?: 'QU' | 'QK' | 'QD' | 'QX'
-  toStations: string[]      // 3-letter IATA codes
-  toFunction: string        // 2-letter function (AP, KP, OW)
-  toAirline: string         // 2-letter airline designator
+  toStations: string[] // 3-letter IATA codes
+  toFunction: string // 2-letter function (AP, KP, OW)
+  toAirline: string // 2-letter airline designator
   fromStation: string
   fromFunction: string
   fromAirline: string
 }): TypeBEnvelope {
   return {
     priority: opts.priority || 'QU',
-    addresses: opts.toStations.map(s => `${s}${opts.toFunction}${opts.toAirline}`),
+    addresses: opts.toStations.map((s) => `${s}${opts.toFunction}${opts.toAirline}`),
     originator: `${opts.fromStation}${opts.fromFunction}${opts.fromAirline}`,
     timestamp: formatCurrentTimestamp(),
   }

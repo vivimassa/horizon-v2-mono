@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useMemo } from 'react'
 import { Plus, CalendarSync, Loader2, ArrowUpDown } from 'lucide-react'
@@ -52,7 +52,14 @@ const COLUMNS = [
 ]
 
 export function PortfolioTab({
-  series, stats, airport, seasonCode, loading, onNewRequest, onDataChanged, isDark,
+  series,
+  stats,
+  airport,
+  seasonCode,
+  loading,
+  onNewRequest,
+  onDataChanged,
+  isDark,
 }: PortfolioTabProps) {
   const palette = isDark ? colors.dark : colors.light
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
@@ -74,7 +81,7 @@ export function PortfolioTab({
   const filtered = useMemo(() => {
     let result = series
     if (filterStatus !== 'all') {
-      result = result.filter(s => s.status === filterStatus)
+      result = result.filter((s) => s.status === filterStatus)
     }
     return [...result].sort((a, b) => {
       const aVal = (a as Record<string, unknown>)[sortCol]
@@ -86,7 +93,10 @@ export function PortfolioTab({
 
   function handleSort(col: string) {
     if (sortCol === col) setSortAsc(!sortAsc)
-    else { setSortCol(col); setSortAsc(true) }
+    else {
+      setSortCol(col)
+      setSortAsc(true)
+    }
   }
 
   const glassBorder = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'
@@ -96,16 +106,29 @@ export function PortfolioTab({
       <PortfolioKpiRow stats={stats} isDark={isDark} />
 
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-5 py-2.5 shrink-0"
-        style={{ borderBottom: `1px solid ${glassBorder}` }}>
-        <button type="button" onClick={onNewRequest}
+      <div
+        className="flex items-center gap-2 px-5 py-2.5 shrink-0"
+        style={{ borderBottom: `1px solid ${glassBorder}` }}
+      >
+        <button
+          type="button"
+          onClick={onNewRequest}
           className="h-8 px-3.5 rounded-xl text-[13px] font-medium flex items-center gap-1.5 transition-colors"
-          style={{ background: MODULE_THEMES.network.accent, color: '#fff' }}>
+          style={{ background: MODULE_THEMES.network.accent, color: '#fff' }}
+        >
           <Plus size={14} /> New slot request
         </button>
-        <button type="button" onClick={handleImportFromSchedule} disabled={importing}
+        <button
+          type="button"
+          onClick={handleImportFromSchedule}
+          disabled={importing}
           className="h-8 px-3.5 rounded-xl text-[13px] font-medium flex items-center gap-1.5 transition-colors disabled:opacity-50"
-          style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', border: `1px solid ${glassBorder}`, color: palette.text }}>
+          style={{
+            background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+            border: `1px solid ${glassBorder}`,
+            color: palette.text,
+          }}
+        >
           {importing ? <Loader2 size={14} className="animate-spin" /> : <CalendarSync size={14} />}
           Import from schedule
         </button>
@@ -114,17 +137,23 @@ export function PortfolioTab({
 
         {/* Status filter pills */}
         <div className="flex gap-1">
-          {FILTER_OPTIONS.map(f => {
+          {FILTER_OPTIONS.map((f) => {
             const isActive = filterStatus === f.key
             const chip = f.key !== 'all' ? STATUS_CHIP_CLASSES[f.key] : null
             return (
-              <button key={f.key} type="button" onClick={() => setFilterStatus(f.key)}
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setFilterStatus(f.key)}
                 className="h-7 px-2.5 rounded-lg text-[13px] font-medium transition-colors"
                 style={{
-                  background: isActive ? (chip?.bg || accentTint(MODULE_THEMES.network.accent, 0.12)) : 'transparent',
-                  color: isActive ? (chip?.text || MODULE_THEMES.network.accent) : palette.textSecondary,
-                  border: isActive ? `1px solid ${chip?.border || accentTint(MODULE_THEMES.network.accent, 0.2)}` : '1px solid transparent',
-                }}>
+                  background: isActive ? chip?.bg || accentTint(MODULE_THEMES.network.accent, 0.12) : 'transparent',
+                  color: isActive ? chip?.text || MODULE_THEMES.network.accent : palette.textSecondary,
+                  border: isActive
+                    ? `1px solid ${chip?.border || accentTint(MODULE_THEMES.network.accent, 0.2)}`
+                    : '1px solid transparent',
+                }}
+              >
                 {f.label}
               </button>
             )
@@ -137,11 +166,13 @@ export function PortfolioTab({
         <table className="w-full">
           <thead>
             <tr style={{ borderBottom: `1px solid ${glassBorder}` }}>
-              {COLUMNS.map(col => (
-                <th key={col.key}
+              {COLUMNS.map((col) => (
+                <th
+                  key={col.key}
                   className="px-3 py-2 text-left text-[13px] font-medium uppercase tracking-wide whitespace-nowrap"
                   style={{ color: palette.textTertiary, cursor: col.sortable ? 'pointer' : 'default' }}
-                  onClick={() => col.sortable && handleSort(col.key)}>
+                  onClick={() => col.sortable && handleSort(col.key)}
+                >
                   <span className="flex items-center gap-1">
                     {col.label}
                     {col.sortable && sortCol === col.key && <ArrowUpDown size={10} />}
@@ -151,7 +182,7 @@ export function PortfolioTab({
             </tr>
           </thead>
           <tbody>
-            {filtered.map(s => (
+            {filtered.map((s) => (
               <SeriesTableRow key={s._id} series={s} onViewDetail={setDetailId} isDark={isDark} />
             ))}
           </tbody>
@@ -166,8 +197,11 @@ export function PortfolioTab({
 
       {detailId && (
         <SlotDetailDialog
-          open={!!detailId} onOpenChange={() => setDetailId(null)}
-          seriesId={detailId} onDataChanged={onDataChanged} isDark={isDark}
+          open={!!detailId}
+          onOpenChange={() => setDetailId(null)}
+          seriesId={detailId}
+          onDataChanged={onDataChanged}
+          isDark={isDark}
         />
       )}
     </div>

@@ -34,11 +34,13 @@ export default function CrewComplementDetailScreen() {
     setError(null)
     Promise.all([api.getCrewComplements(operatorId), api.getCrewPositions(operatorId)])
       .then(([comps, pos]) => {
-        setComp(comps.find(c => c._id === id) ?? null)
-        setPositions(pos.sort((a, b) => {
-          if (a.category !== b.category) return a.category === 'cockpit' ? -1 : 1
-          return a.rankOrder - b.rankOrder
-        }))
+        setComp(comps.find((c) => c._id === id) ?? null)
+        setPositions(
+          pos.sort((a, b) => {
+            if (a.category !== b.category) return a.category === 'cockpit' ? -1 : 1
+            return a.rankOrder - b.rankOrder
+          }),
+        )
       })
       .catch((err: any) => setError(err.message || 'Failed to load'))
       .finally(() => setLoading(false))
@@ -56,7 +58,10 @@ export default function CrewComplementDetailScreen() {
       const payload: Partial<CrewComplementRef> = {}
       if (Object.keys(counts).length > 0) payload.counts = { ...comp.counts, ...counts }
       if (draftNotes !== null) payload.notes = draftNotes || null
-      if (Object.keys(payload).length === 0) { setEditing(false); return }
+      if (Object.keys(payload).length === 0) {
+        setEditing(false)
+        return
+      }
       const updated = await api.updateCrewComplement(comp._id, payload)
       setComp(updated)
       setDraftCounts({})
@@ -64,30 +69,43 @@ export default function CrewComplementDetailScreen() {
       setEditing(false)
     } catch (err: any) {
       Alert.alert('Save Failed', err.message || 'Could not save')
-    } finally { setSaving(false) }
+    } finally {
+      setSaving(false)
+    }
   }, [comp, draftCounts, draftNotes])
 
   const handleDelete = useCallback(() => {
     if (!comp) return
     if (PROTECTED.has(comp.templateKey)) {
-      Alert.alert('Cannot Delete', 'Standard, Augmented 1 and Augmented 2 templates are protected and cannot be deleted.')
+      Alert.alert(
+        'Cannot Delete',
+        'Standard, Augmented 1 and Augmented 2 templates are protected and cannot be deleted.',
+      )
       return
     }
     Alert.alert('Delete Template', `Delete "${comp.templateKey}" for ${comp.aircraftTypeIcao}?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        try { await api.deleteCrewComplement(comp._id); router.back() }
-        catch (err: any) { Alert.alert('Cannot Delete', err.message || 'Failed') }
-      }},
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.deleteCrewComplement(comp._id)
+            router.back()
+          } catch (err: any) {
+            Alert.alert('Cannot Delete', err.message || 'Failed')
+          }
+        },
+      },
     ])
   }, [comp, router])
 
-  const tplDef = useMemo(() => COMPLEMENT_TEMPLATES.find(t => t.key === comp?.templateKey), [comp])
+  const tplDef = useMemo(() => COMPLEMENT_TEMPLATES.find((t) => t.key === comp?.templateKey), [comp])
   const badgeColor = comp ? (TEMPLATE_COLORS[comp.templateKey] ?? accent) : accent
   const isProtected = comp ? PROTECTED.has(comp.templateKey) : false
 
-  const cockpitPositions = useMemo(() => positions.filter(p => p.category === 'cockpit'), [positions])
-  const cabinPositions = useMemo(() => positions.filter(p => p.category === 'cabin'), [positions])
+  const cockpitPositions = useMemo(() => positions.filter((p) => p.category === 'cockpit'), [positions])
+  const cabinPositions = useMemo(() => positions.filter((p) => p.category === 'cabin'), [positions])
 
   const getCount = (posCode: string): string => {
     if (posCode in draftCounts) return draftCounts[posCode]
@@ -121,7 +139,9 @@ export default function CrewComplementDetailScreen() {
           </Pressable>
         </View>
         <View className="flex-1 justify-center items-center px-8">
-          <Text style={{ fontSize: 15, color: palette.textSecondary, textAlign: 'center' }}>{error ?? 'Not found'}</Text>
+          <Text style={{ fontSize: 15, color: palette.textSecondary, textAlign: 'center' }}>
+            {error ?? 'Not found'}
+          </Text>
         </View>
       </SafeAreaView>
     )
@@ -148,12 +168,25 @@ export default function CrewComplementDetailScreen() {
           <View className="flex-row items-center" style={{ gap: 8 }}>
             {editing ? (
               <>
-                <Pressable onPress={() => { setEditing(false); setDraftCounts({}); setDraftNotes(null) }} className="active:opacity-60">
+                <Pressable
+                  onPress={() => {
+                    setEditing(false)
+                    setDraftCounts({})
+                    setDraftNotes(null)
+                  }}
+                  className="active:opacity-60"
+                >
                   <X size={20} color={palette.textSecondary} strokeWidth={1.8} />
                 </Pressable>
-                <Pressable onPress={handleSave} disabled={saving}
-                  className="px-4 py-2.5 rounded-lg active:opacity-60" style={{ backgroundColor: accent }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving...' : 'Save'}</Text>
+                <Pressable
+                  onPress={handleSave}
+                  disabled={saving}
+                  className="px-4 py-2.5 rounded-lg active:opacity-60"
+                  style={{ backgroundColor: accent }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>
+                    {saving ? 'Saving...' : 'Save'}
+                  </Text>
                 </Pressable>
               </>
             ) : (
@@ -163,9 +196,15 @@ export default function CrewComplementDetailScreen() {
                     <Trash2 size={18} color={palette.textTertiary} strokeWidth={1.8} />
                   </Pressable>
                 )}
-                <Pressable onPress={() => { setDraftCounts({}); setDraftNotes(null); setEditing(true) }}
+                <Pressable
+                  onPress={() => {
+                    setDraftCounts({})
+                    setDraftNotes(null)
+                    setEditing(true)
+                  }}
                   className="flex-row items-center px-3 py-1.5 rounded-lg active:opacity-60"
-                  style={{ backgroundColor: accentTint(accent, isDark ? 0.15 : 0.08) }}>
+                  style={{ backgroundColor: accentTint(accent, isDark ? 0.15 : 0.08) }}
+                >
                   <Pencil size={15} color={accent} strokeWidth={1.8} />
                   <Text style={{ fontSize: 14, fontWeight: '600', color: accent, marginLeft: 6 }}>Edit</Text>
                 </Pressable>
@@ -179,7 +218,11 @@ export default function CrewComplementDetailScreen() {
         </View>
       </View>
 
-      <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Total */}
         <View className="flex-row items-center justify-between mb-4 px-1">
           <Text style={{ fontSize: 14, fontWeight: '600', color: palette.textSecondary }}>Total Crew</Text>
@@ -194,7 +237,7 @@ export default function CrewComplementDetailScreen() {
             positions={cockpitPositions}
             getCount={getCount}
             editing={editing}
-            onCountChange={(code, v) => setDraftCounts(prev => ({ ...prev, [code]: v }))}
+            onCountChange={(code, v) => setDraftCounts((prev) => ({ ...prev, [code]: v }))}
             palette={palette}
             isDark={isDark}
             accent={accent}
@@ -209,7 +252,7 @@ export default function CrewComplementDetailScreen() {
             positions={cabinPositions}
             getCount={getCount}
             editing={editing}
-            onCountChange={(code, v) => setDraftCounts(prev => ({ ...prev, [code]: v }))}
+            onCountChange={(code, v) => setDraftCounts((prev) => ({ ...prev, [code]: v }))}
             palette={palette}
             isDark={isDark}
             accent={accent}
@@ -228,9 +271,18 @@ export default function CrewComplementDetailScreen() {
             placeholder="Optional notes..."
             placeholderTextColor={palette.textTertiary}
             multiline
-            style={{ fontSize: 15, color: palette.text, minHeight: 60, textAlignVertical: 'top',
-              borderWidth: 1, borderColor: palette.cardBorder, borderRadius: 10,
-              paddingHorizontal: 12, paddingVertical: 10, backgroundColor: palette.card }}
+            style={{
+              fontSize: 15,
+              color: palette.text,
+              minHeight: 60,
+              textAlignVertical: 'top',
+              borderWidth: 1,
+              borderColor: palette.cardBorder,
+              borderRadius: 10,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              backgroundColor: palette.card,
+            }}
           />
         ) : (
           <Text style={{ fontSize: 15, color: comp.notes ? palette.text : palette.textTertiary, paddingVertical: 8 }}>
@@ -240,7 +292,14 @@ export default function CrewComplementDetailScreen() {
 
         {/* Template description */}
         {tplDef?.description && (
-          <View className="mt-4 p-3 rounded-lg" style={{ backgroundColor: accentTint(badgeColor, isDark ? 0.06 : 0.03), borderWidth: 1, borderColor: accentTint(badgeColor, 0.1) }}>
+          <View
+            className="mt-4 p-3 rounded-lg"
+            style={{
+              backgroundColor: accentTint(badgeColor, isDark ? 0.06 : 0.03),
+              borderWidth: 1,
+              borderColor: accentTint(badgeColor, 0.1),
+            }}
+          >
             <Text style={{ fontSize: 13, color: palette.textSecondary, lineHeight: 18 }}>{tplDef.description}</Text>
           </View>
         )}
@@ -249,34 +308,60 @@ export default function CrewComplementDetailScreen() {
   )
 }
 
-function posCode(p: CrewPositionRef): string { return p.code }
+function posCode(p: CrewPositionRef): string {
+  return p.code
+}
 
 const PositionAccordion = memo(function PositionAccordion({
-  label, sectionColor, positions, getCount, editing, onCountChange, palette, isDark, accent,
+  label,
+  sectionColor,
+  positions,
+  getCount,
+  editing,
+  onCountChange,
+  palette,
+  isDark,
+  accent,
 }: {
-  label: string; sectionColor: string; positions: CrewPositionRef[];
-  getCount: (code: string) => string; editing: boolean;
-  onCountChange: (code: string, v: string) => void;
-  palette: Palette; isDark: boolean; accent: string
+  label: string
+  sectionColor: string
+  positions: CrewPositionRef[]
+  getCount: (code: string) => string
+  editing: boolean
+  onCountChange: (code: string, v: string) => void
+  palette: Palette
+  isDark: boolean
+  accent: string
 }) {
   const [expanded, setExpanded] = useState(true)
   const sectionTotal = positions.reduce((s, p) => s + (parseInt(getCount(p.code), 10) || 0), 0)
 
   return (
-    <View className="rounded-xl mb-3 overflow-hidden" style={{
-      borderWidth: 1, borderColor: palette.cardBorder, backgroundColor: palette.card,
-    }}>
+    <View
+      className="rounded-xl mb-3 overflow-hidden"
+      style={{
+        borderWidth: 1,
+        borderColor: palette.cardBorder,
+        backgroundColor: palette.card,
+      }}
+    >
       {/* Accordion header */}
       <Pressable
-        onPress={() => setExpanded(prev => !prev)}
+        onPress={() => setExpanded((prev) => !prev)}
         className="flex-row items-center px-4 py-3 active:opacity-70"
         style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)' }}
       >
         <View style={{ width: 3, height: 16, borderRadius: 2, backgroundColor: sectionColor, marginRight: 8 }} />
-        <ChevronRight size={14} color={palette.textTertiary} strokeWidth={2}
-          style={{ transform: [{ rotate: expanded ? '90deg' : '0deg' }], marginRight: 6 }} />
+        <ChevronRight
+          size={14}
+          color={palette.textTertiary}
+          strokeWidth={2}
+          style={{ transform: [{ rotate: expanded ? '90deg' : '0deg' }], marginRight: 6 }}
+        />
         <Text style={{ fontSize: 15, fontWeight: '700', color: palette.text, flex: 1 }}>{label}</Text>
-        <Text style={{ fontSize: 15, fontWeight: '700', fontFamily: 'monospace', color: sectionColor }}>{sectionTotal}</Text>
+        <Text style={{ fontSize: 15, fontWeight: '700', fontFamily: 'monospace', color: sectionColor }}>
+          {sectionTotal}
+        </Text>
       </Pressable>
 
       {/* Horizontal position row */}
@@ -286,9 +371,14 @@ const PositionAccordion = memo(function PositionAccordion({
             const color = p.color ?? accent
             const val = getCount(p.code)
             return (
-              <View key={p._id} className="items-center flex-1 py-3" style={{
-                borderLeftWidth: i > 0 ? 1 : 0, borderLeftColor: palette.cardBorder,
-              }}>
+              <View
+                key={p._id}
+                className="items-center flex-1 py-3"
+                style={{
+                  borderLeftWidth: i > 0 ? 1 : 0,
+                  borderLeftColor: palette.cardBorder,
+                }}
+              >
                 {/* Position code label */}
                 <View className="flex-row items-center mb-2" style={{ gap: 3 }}>
                   <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: color }} />
@@ -303,19 +393,26 @@ const PositionAccordion = memo(function PositionAccordion({
                     maxLength={3}
                     textAlign="center"
                     style={{
-                      fontSize: 22, fontWeight: '800', fontFamily: 'monospace', color: accent,
-                      width: 44, height: 40, borderRadius: 8,
-                      borderWidth: 1, borderColor: accentTint(accent, 0.3),
+                      fontSize: 22,
+                      fontWeight: '800',
+                      fontFamily: 'monospace',
+                      color: accent,
+                      width: 44,
+                      height: 40,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: accentTint(accent, 0.3),
                       backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
                     }}
                   />
                 ) : (
-                  <Text style={{ fontSize: 22, fontWeight: '800', fontFamily: 'monospace', color: accent }}>
-                    {val}
-                  </Text>
+                  <Text style={{ fontSize: 22, fontWeight: '800', fontFamily: 'monospace', color: accent }}>{val}</Text>
                 )}
                 {/* Position name below */}
-                <Text style={{ fontSize: 11, color: palette.textTertiary, marginTop: 3, textAlign: 'center' }} numberOfLines={1}>
+                <Text
+                  style={{ fontSize: 11, color: palette.textTertiary, marginTop: 3, textAlign: 'center' }}
+                  numberOfLines={1}
+                >
                   {p.name}
                 </Text>
               </View>

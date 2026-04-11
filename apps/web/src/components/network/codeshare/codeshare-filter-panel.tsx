@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, ChevronDown, Filter, Search, Loader2 } from 'lucide-react'
@@ -56,9 +56,7 @@ export function CodeshareFilterPanel({ forceCollapsed = false, loading = false, 
 
   const periodMissing = !dateFrom || !dateTo
 
-  const activeCount = [dateFrom, dateTo].filter(Boolean).length
-    + (status ? 1 : 0)
-    + (agreementType ? 1 : 0)
+  const activeCount = [dateFrom, dateTo].filter(Boolean).length + (status ? 1 : 0) + (agreementType ? 1 : 0)
 
   function handleGo() {
     if (periodMissing) return
@@ -80,21 +78,36 @@ export function CodeshareFilterPanel({ forceCollapsed = false, loading = false, 
       {/* Collapsed view */}
       <div
         className="absolute inset-0 flex flex-col items-center cursor-pointer hover:bg-hz-border/20 transition-colors"
-        onClick={() => { if (collapsed) setCollapsed(false) }}
-        style={{ opacity: collapsed ? 1 : 0, pointerEvents: collapsed ? 'auto' : 'none', transition: 'opacity 200ms ease' }}
+        onClick={() => {
+          if (collapsed) setCollapsed(false)
+        }}
+        style={{
+          opacity: collapsed ? 1 : 0,
+          pointerEvents: collapsed ? 'auto' : 'none',
+          transition: 'opacity 200ms ease',
+        }}
       >
         <div className="h-12 w-full flex items-center justify-center">
           <ChevronRight size={16} className="text-hz-text-secondary" />
         </div>
-        <div className="flex-1 flex items-center justify-center" style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)' }}>
-          <span className="text-[13px] font-semibold uppercase tracking-wider text-hz-text-tertiary whitespace-nowrap">Filters</span>
+        <div
+          className="flex-1 flex items-center justify-center"
+          style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)' }}
+        >
+          <span className="text-[13px] font-semibold uppercase tracking-wider text-hz-text-tertiary whitespace-nowrap">
+            Filters
+          </span>
         </div>
       </div>
 
       {/* Expanded view */}
       <div
         className="flex flex-col h-full min-w-[300px]"
-        style={{ opacity: collapsed ? 0 : 1, pointerEvents: collapsed ? 'none' : 'auto', transition: 'opacity 200ms ease' }}
+        style={{
+          opacity: collapsed ? 0 : 1,
+          pointerEvents: collapsed ? 'none' : 'auto',
+          transition: 'opacity 200ms ease',
+        }}
       >
         {/* Header */}
         <div
@@ -105,7 +118,9 @@ export function CodeshareFilterPanel({ forceCollapsed = false, loading = false, 
             <Filter size={14} className="text-module-accent" />
             <span className="text-[15px] font-bold">Filters</span>
             {activeCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-module-accent text-white text-[13px] font-bold">{activeCount}</span>
+              <span className="px-2 py-0.5 rounded-full bg-module-accent text-white text-[13px] font-bold">
+                {activeCount}
+              </span>
             )}
           </div>
           <button onClick={() => setCollapsed(true)} className="p-1 rounded-md hover:bg-hz-border/30 transition-colors">
@@ -115,26 +130,14 @@ export function CodeshareFilterPanel({ forceCollapsed = false, loading = false, 
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
-
           {/* Period */}
           <FilterSection label="Period">
-            <DateRangePicker
-              from={dateFrom}
-              to={dateTo}
-              onChangeFrom={setDateFrom}
-              onChangeTo={setDateTo}
-              inline
-            />
+            <DateRangePicker from={dateFrom} to={dateTo} onChangeFrom={setDateFrom} onChangeTo={setDateTo} inline />
           </FilterSection>
 
           {/* Status */}
           <FilterSection label="Agreement Status">
-            <Dropdown
-              value={status || null}
-              options={STATUSES}
-              onChange={setStatus}
-              placeholder="All Statuses"
-            />
+            <Dropdown value={status || null} options={STATUSES} onChange={setStatus} placeholder="All Statuses" />
           </FilterSection>
 
           {/* Agreement Type */}
@@ -146,7 +149,6 @@ export function CodeshareFilterPanel({ forceCollapsed = false, loading = false, 
               placeholder="All Types"
             />
           </FilterSection>
-
         </div>
 
         {/* Go Button */}

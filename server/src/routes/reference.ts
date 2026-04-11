@@ -2346,11 +2346,9 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
 
     // Protect standard templates — only custom rows can be deleted
     if (['standard', 'aug1', 'aug2'].includes(doc.templateKey)) {
-      return reply
-        .code(400)
-        .send({
-          error: 'Standard, Aug 1, and Aug 2 templates cannot be deleted. Use the table to set counts to 0 instead.',
-        })
+      return reply.code(400).send({
+        error: 'Standard, Aug 1, and Aug 2 templates cannot be deleted. Use the table to set counts to 0 instead.',
+      })
     }
 
     await CrewComplement.findByIdAndDelete(id)
@@ -2724,12 +2722,10 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     if (raw.code) raw.code = (raw.code as string).toUpperCase()
     const parsed = ltGroupCreateSchema.safeParse(raw)
     if (!parsed.success)
-      return reply
-        .code(400)
-        .send({
-          error: 'Validation failed',
-          details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
-        })
+      return reply.code(400).send({
+        error: 'Validation failed',
+        details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+      })
     const body = parsed.data
     const existing = await MppLeadTimeGroup.findOne({ operatorId: body.operatorId, code: body.code }).lean()
     if (existing) return reply.code(409).send({ error: `Group code '${body.code}' already exists` })
@@ -2750,12 +2746,10 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     if (raw.code) raw.code = (raw.code as string).toUpperCase()
     const parsed = ltGroupUpdateSchema.safeParse(raw)
     if (!parsed.success)
-      return reply
-        .code(400)
-        .send({
-          error: 'Validation failed',
-          details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
-        })
+      return reply.code(400).send({
+        error: 'Validation failed',
+        details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+      })
     const doc = await MppLeadTimeGroup.findByIdAndUpdate(
       id,
       { $set: { ...parsed.data, updatedAt: new Date().toISOString() } },
@@ -2802,12 +2796,10 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     const raw = req.body as Record<string, unknown>
     const parsed = ltItemCreateSchema.safeParse(raw)
     if (!parsed.success)
-      return reply
-        .code(400)
-        .send({
-          error: 'Validation failed',
-          details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
-        })
+      return reply.code(400).send({
+        error: 'Validation failed',
+        details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+      })
     const body = parsed.data
     const maxSort = await MppLeadTimeItem.findOne({ groupId: body.groupId }).sort({ sortOrder: -1 }).lean()
     const id = crypto.randomUUID()
@@ -2824,12 +2816,10 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string }
     const parsed = ltItemUpdateSchema.safeParse(req.body)
     if (!parsed.success)
-      return reply
-        .code(400)
-        .send({
-          error: 'Validation failed',
-          details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
-        })
+      return reply.code(400).send({
+        error: 'Validation failed',
+        details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+      })
     const doc = await MppLeadTimeItem.findByIdAndUpdate(
       id,
       { $set: { ...parsed.data, updatedAt: new Date().toISOString() } },

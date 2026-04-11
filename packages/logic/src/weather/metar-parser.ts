@@ -21,7 +21,7 @@ export interface ParsedMetar {
 
 export function computeFlightCategory(
   ceilingFeet: number | null,
-  visibilityMeters: number | null
+  visibilityMeters: number | null,
 ): 'VFR' | 'MVFR' | 'IFR' | 'LIFR' {
   const ceil = ceilingFeet ?? 99999
   const vis = visibilityMeters ?? 99999
@@ -59,9 +59,7 @@ function parseVisibility(token: string): number | null {
   const sm = token.match(/^(\d+(?:\/\d+)?)SM$/)
   if (sm) {
     const parts = sm[1].split('/')
-    const val = parts.length === 2
-      ? Number(parts[0]) / Number(parts[1])
-      : parseFloat(sm[1])
+    const val = parts.length === 2 ? Number(parts[0]) / Number(parts[1]) : parseFloat(sm[1])
     return Math.round(val * 1609.34)
   }
   return null
@@ -77,7 +75,7 @@ function parseCloud(token: string): { code: string; baseFeet: number | null } | 
 function parseTemp(token: string): { temp: number; dewpoint: number } | null {
   const m = token.match(/^(M?\d{1,2})\/(M?\d{1,2})$/)
   if (!m) return null
-  const p = (s: string) => s.startsWith('M') ? -parseInt(s.slice(1), 10) : parseInt(s, 10)
+  const p = (s: string) => (s.startsWith('M') ? -parseInt(s.slice(1), 10) : parseInt(s, 10))
   return { temp: p(m[1]), dewpoint: p(m[2]) }
 }
 
@@ -88,10 +86,36 @@ function parseAltimeter(token: string): number | null {
 }
 
 const WX_CODES = new Set([
-  'DZ', 'RA', 'SN', 'SG', 'IC', 'PL', 'GR', 'GS', 'UP',
-  'BR', 'FG', 'FU', 'VA', 'DU', 'SA', 'HZ', 'PY',
-  'PO', 'SQ', 'FC', 'SS', 'DS',
-  'TS', 'SH', 'FZ', 'MI', 'PR', 'BC', 'DR', 'BL',
+  'DZ',
+  'RA',
+  'SN',
+  'SG',
+  'IC',
+  'PL',
+  'GR',
+  'GS',
+  'UP',
+  'BR',
+  'FG',
+  'FU',
+  'VA',
+  'DU',
+  'SA',
+  'HZ',
+  'PY',
+  'PO',
+  'SQ',
+  'FC',
+  'SS',
+  'DS',
+  'TS',
+  'SH',
+  'FZ',
+  'MI',
+  'PR',
+  'BC',
+  'DR',
+  'BL',
 ])
 
 function isWeatherPhenomena(token: string): boolean {
@@ -125,7 +149,10 @@ export function parseMetar(raw: string, referenceDate = new Date()): ParsedMetar
 
   while (idx < tokens.length) {
     const tok = tokens[idx]
-    if (tok === 'RMK') { remarks = tokens.slice(idx + 1).join(' '); break }
+    if (tok === 'RMK') {
+      remarks = tokens.slice(idx + 1).join(' ')
+      break
+    }
     if (tok === 'CAVOK') {
       visibilityMeters = 9999
       clouds.push({ code: 'CAVOK', baseFeet: null })
@@ -145,31 +172,63 @@ export function parseMetar(raw: string, referenceDate = new Date()): ParsedMetar
     }
 
     const vis = parseVisibility(tok)
-    if (vis !== null) { visibilityMeters = vis; idx++; continue }
+    if (vis !== null) {
+      visibilityMeters = vis
+      idx++
+      continue
+    }
 
-    if (isWeatherPhenomena(tok)) { weatherPhenomena.push(tok); idx++; continue }
+    if (isWeatherPhenomena(tok)) {
+      weatherPhenomena.push(tok)
+      idx++
+      continue
+    }
 
     const cloud = parseCloud(tok)
-    if (cloud) { clouds.push(cloud); idx++; continue }
+    if (cloud) {
+      clouds.push(cloud)
+      idx++
+      continue
+    }
 
     const temp = parseTemp(tok)
-    if (temp) { temperatureC = temp.temp; dewpointC = temp.dewpoint; idx++; continue }
+    if (temp) {
+      temperatureC = temp.temp
+      dewpointC = temp.dewpoint
+      idx++
+      continue
+    }
 
     const alt = parseAltimeter(tok)
-    if (alt !== null) { altimeterHpa = alt; idx++; continue }
+    if (alt !== null) {
+      altimeterHpa = alt
+      idx++
+      continue
+    }
 
     idx++
   }
 
-  const ceilingLayer = clouds.find(c => ['BKN', 'OVC', 'VV'].includes(c.code))
+  const ceilingLayer = clouds.find((c) => ['BKN', 'OVC', 'VV'].includes(c.code))
   const ceilingFeet = ceilingLayer?.baseFeet ?? null
   const flightCategory = computeFlightCategory(ceilingFeet, visibilityMeters)
 
   return {
-    stationIcao, observedAt, rawMetar: raw,
-    windDirectionDeg, windSpeedKts, windGustKts, windVariable,
-    visibilityMeters, ceilingFeet, flightCategory,
-    temperatureC, dewpointC, altimeterHpa,
-    weatherPhenomena, clouds, remarks,
+    stationIcao,
+    observedAt,
+    rawMetar: raw,
+    windDirectionDeg,
+    windSpeedKts,
+    windGustKts,
+    windVariable,
+    visibilityMeters,
+    ceilingFeet,
+    flightCategory,
+    temperatureC,
+    dewpointC,
+    altimeterHpa,
+    weatherPhenomena,
+    clouds,
+    remarks,
   }
 }

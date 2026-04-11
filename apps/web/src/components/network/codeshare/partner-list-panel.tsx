@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useMemo } from 'react'
 import { Search, Plus } from 'lucide-react'
@@ -21,9 +21,7 @@ function statusLabel(s: string) {
 }
 
 /** Embedded partner list — renders inside the content glass panel, not as standalone panel. */
-export function PartnerListPanel({
-  agreements, selectedId, onSelect, onNewAgreement, isDark,
-}: PartnerListPanelProps) {
+export function PartnerListPanel({ agreements, selectedId, onSelect, onNewAgreement, isDark }: PartnerListPanelProps) {
   const [search, setSearch] = useState('')
   const palette = isDark ? colors.dark : colors.light
   const accent = MODULE_THEMES.network.accent
@@ -34,9 +32,8 @@ export function PartnerListPanel({
   const filtered = useMemo(() => {
     if (!search.trim()) return agreements
     const q = search.toLowerCase()
-    return agreements.filter(a =>
-      a.partnerAirlineName.toLowerCase().includes(q) ||
-      a.partnerAirlineCode.toLowerCase().includes(q)
+    return agreements.filter(
+      (a) => a.partnerAirlineName.toLowerCase().includes(q) || a.partnerAirlineCode.toLowerCase().includes(q),
     )
   }, [agreements, search])
 
@@ -67,7 +64,7 @@ export function PartnerListPanel({
           <input
             type="text"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search partners..."
             className="w-full pl-9 pr-3 h-9 rounded-xl text-[13px] outline-none"
             style={{ background: inputBg, border: `1px solid ${glassBorder}`, color: palette.text }}
@@ -77,7 +74,7 @@ export function PartnerListPanel({
 
       {/* Partner list */}
       <div className="flex-1 overflow-y-auto px-2 pb-2">
-        {filtered.map(a => {
+        {filtered.map((a) => {
           const isSelected = selectedId === a._id
           const sc = STATUS_COLORS[a.status] || STATUS_COLORS.pending
 

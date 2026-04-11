@@ -23,7 +23,7 @@ const scenarioSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'scenarios',
-  }
+  },
 )
 
 scenarioSchema.index({ operatorId: 1, seasonCode: 1 })

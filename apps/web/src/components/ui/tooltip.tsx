@@ -16,17 +16,20 @@ export function Tooltip({ content, children, delay = 400 }: TooltipProps) {
   const [coords, setCoords] = useState({ x: 0, y: 0 })
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const show = useCallback((e: React.MouseEvent) => {
-    const el = e.currentTarget as HTMLElement
-    timerRef.current = setTimeout(() => {
-      const rect = el.getBoundingClientRect()
-      setCoords({
-        x: rect.left + rect.width / 2,
-        y: rect.top - 6,
-      })
-      setVisible(true)
-    }, delay)
-  }, [delay])
+  const show = useCallback(
+    (e: React.MouseEvent) => {
+      const el = e.currentTarget as HTMLElement
+      timerRef.current = setTimeout(() => {
+        const rect = el.getBoundingClientRect()
+        setCoords({
+          x: rect.left + rect.width / 2,
+          y: rect.top - 6,
+        })
+        setVisible(true)
+      }, delay)
+    },
+    [delay],
+  )
 
   const hide = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current)
@@ -34,7 +37,9 @@ export function Tooltip({ content, children, delay = 400 }: TooltipProps) {
   }, [])
 
   useEffect(() => {
-    return () => { if (timerRef.current) clearTimeout(timerRef.current) }
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
   }, [])
 
   if (!content) return children
@@ -79,13 +84,9 @@ function TooltipPortal({ x, y, content }: { x: number; y: number; content: strin
           fontWeight: 500,
           fontFamily: 'Inter, system-ui, sans-serif',
           whiteSpace: 'nowrap',
-          boxShadow: isDark
-            ? '0 4px 16px rgba(0,0,0,0.4)'
-            : '0 4px 16px rgba(0,0,0,0.15)',
+          boxShadow: isDark ? '0 4px 16px rgba(0,0,0,0.4)' : '0 4px 16px rgba(0,0,0,0.15)',
           backdropFilter: 'blur(20px) saturate(1.6)',
-          background: isDark
-            ? 'rgba(244,244,245,0.92)'
-            : 'rgba(24,24,27,0.88)',
+          background: isDark ? 'rgba(244,244,245,0.92)' : 'rgba(24,24,27,0.88)',
           color: isDark ? '#18181b' : '#fafafa',
         }}
       >
@@ -99,9 +100,7 @@ function TooltipPortal({ x, y, content }: { x: number; y: number; content: strin
           margin: '0 auto',
           borderLeft: '5px solid transparent',
           borderRight: '5px solid transparent',
-          borderTop: isDark
-            ? '5px solid rgba(244,244,245,0.92)'
-            : '5px solid rgba(24,24,27,0.88)',
+          borderTop: isDark ? '5px solid rgba(244,244,245,0.92)' : '5px solid rgba(24,24,27,0.88)',
         }}
       />
     </div>

@@ -7,7 +7,7 @@ let fetchPromise: Promise<string> | null = null
 function resolveOperatorId(): Promise<string> {
   if (cachedId) return Promise.resolve(cachedId)
   if (fetchPromise) return fetchPromise
-  fetchPromise = api.getOperators().then(ops => {
+  fetchPromise = api.getOperators().then((ops) => {
     cachedId = ops[0]?._id ?? ''
     return cachedId
   })
@@ -21,7 +21,10 @@ function resolveOperatorId(): Promise<string> {
 export function useOperatorId(): string {
   const [id, setId] = useState(cachedId ?? '')
   useEffect(() => {
-    if (cachedId) { setId(cachedId); return }
+    if (cachedId) {
+      setId(cachedId)
+      return
+    }
     resolveOperatorId().then(setId)
   }, [])
   return id

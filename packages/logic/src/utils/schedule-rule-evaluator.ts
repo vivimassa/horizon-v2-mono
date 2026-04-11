@@ -79,11 +79,7 @@ const OPERATOR_COUNTRY = 'VN'
 
 // ─── Main evaluator ──────────────────────────────────────────
 
-export function evaluateRules(
-  flight: FlightForEval,
-  aircraft: AircraftForEval,
-  rules: ScheduleRule[]
-): EvalResult {
+export function evaluateRules(flight: FlightForEval, aircraft: AircraftForEval, rules: ScheduleRule[]): EvalResult {
   const violations: RuleViolation[] = []
   let totalPenalty = 0
 
@@ -107,7 +103,7 @@ export function evaluateRules(
     const violated = checkViolation(rule.action, flightMatches)
 
     if (violated) {
-      const cost = rule.enforcement === 'hard' ? Infinity : (rule.penalty_cost || 3000)
+      const cost = rule.enforcement === 'hard' ? Infinity : rule.penalty_cost || 3000
       violations.push({
         ruleId: rule.id,
         ruleName: rule.name,
@@ -121,7 +117,7 @@ export function evaluateRules(
     }
   }
 
-  const hasHardViolation = violations.some(v => v.enforcement === 'hard')
+  const hasHardViolation = violations.some((v) => v.enforcement === 'hard')
 
   return {
     allowed: !hasHardViolation,
@@ -134,11 +130,16 @@ export function evaluateRules(
 
 function matchesScope(ac: AircraftForEval, rule: ScheduleRule): boolean {
   switch (rule.scope_type) {
-    case 'all': return true
-    case 'type': return rule.scope_values.includes(ac.icaoType)
-    case 'family': return ac.family !== null && rule.scope_values.includes(ac.family)
-    case 'registration': return rule.scope_values.includes(ac.registration)
-    default: return false
+    case 'all':
+      return true
+    case 'type':
+      return rule.scope_values.includes(ac.icaoType)
+    case 'family':
+      return ac.family !== null && rule.scope_values.includes(ac.family)
+    case 'registration':
+      return rule.scope_values.includes(ac.registration)
+    default:
+      return false
   }
 }
 
@@ -180,19 +181,23 @@ function matchesCriteria(flight: FlightForEval, rule: ScheduleRule): boolean {
       const fromMin = fh * 60 + fm
       const toMin = th * 60 + tm
       const std = flight.stdMinutes % 1440
-      return fromMin <= toMin
-        ? std >= fromMin && std <= toMin
-        : std >= fromMin || std <= toMin
+      return fromMin <= toMin ? std >= fromMin && std <= toMin : std >= fromMin || std <= toMin
     }
     case 'block_time': {
       const mins = cv.minutes || 0
       switch (cv.operator || 'gt') {
-        case 'gt': return flight.blockMinutes > mins
-        case 'lt': return flight.blockMinutes < mins
-        case 'gte': return flight.blockMinutes >= mins
-        case 'lte': return flight.blockMinutes <= mins
-        case 'eq': return flight.blockMinutes === mins
-        default: return false
+        case 'gt':
+          return flight.blockMinutes > mins
+        case 'lt':
+          return flight.blockMinutes < mins
+        case 'gte':
+          return flight.blockMinutes >= mins
+        case 'lte':
+          return flight.blockMinutes <= mins
+        case 'eq':
+          return flight.blockMinutes === mins
+        default:
+          return false
       }
     }
     case 'overnight': {
@@ -203,7 +208,8 @@ function matchesCriteria(flight: FlightForEval, rule: ScheduleRule): boolean {
       const isoDay = jsDay === 0 ? 7 : jsDay
       return (cv.days || []).includes(isoDay)
     }
-    default: return false
+    default:
+      return false
   }
 }
 
@@ -225,7 +231,8 @@ function checkViolation(action: string, flightMatches: boolean): boolean {
       // Positive rules — handled via bonus in evaluateBonus()
       return false
 
-    default: return false
+    default:
+      return false
   }
 }
 
@@ -235,11 +242,7 @@ function checkViolation(action: string, flightMatches: boolean): boolean {
  * Returns a BONUS (positive number) if the aircraft is preferred
  * for this flight by must_fly/should_fly rules.
  */
-export function evaluateBonus(
-  flight: FlightForEval,
-  aircraft: AircraftForEval,
-  rules: ScheduleRule[]
-): number {
+export function evaluateBonus(flight: FlightForEval, aircraft: AircraftForEval, rules: ScheduleRule[]): number {
   let bonus = 0
 
   for (const rule of rules) {
@@ -257,9 +260,9 @@ export function evaluateBonus(
 
     // This aircraft SHOULD/MUST fly this flight — give it a bonus
     if (rule.action === 'must_fly') {
-      bonus += 50000  // Very strong pull
+      bonus += 50000 // Very strong pull
     } else {
-      bonus += rule.penalty_cost || 3000  // Same scale as penalty
+      bonus += rule.penalty_cost || 3000 // Same scale as penalty
     }
   }
 

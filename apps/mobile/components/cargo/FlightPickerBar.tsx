@@ -41,7 +41,10 @@ export function FlightPickerBar({
           className="flex-1 flex-row items-center rounded-xl px-4 py-3"
           style={{ backgroundColor: palette.card, borderWidth: 1, borderColor: palette.cardBorder }}
         >
-          <Text className="flex-1" style={{ fontSize: 14, fontWeight: '600', color: selectedFlight ? palette.text : palette.textTertiary }}>
+          <Text
+            className="flex-1"
+            style={{ fontSize: 14, fontWeight: '600', color: selectedFlight ? palette.text : palette.textTertiary }}
+          >
             {selectedFlight ? selectedFlight.id : 'Select flight...'}
           </Text>
           <Search size={16} color={palette.textTertiary} strokeWidth={2} />
@@ -64,12 +67,22 @@ export function FlightPickerBar({
       </View>
 
       <Modal visible={showPicker} transparent animationType="fade">
-        <Pressable className="flex-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={() => setShowPicker(false)}>
+        <Pressable
+          className="flex-1"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onPress={() => setShowPicker(false)}
+        >
           <View className="flex-1" />
           <Pressable onPress={() => {}}>
-            <View className="rounded-t-2xl" style={{ backgroundColor: isDark ? '#1e1e24' : '#ffffff', maxHeight: 400, paddingBottom: 40 }}>
+            <View
+              className="rounded-t-2xl"
+              style={{ backgroundColor: isDark ? '#1e1e24' : '#ffffff', maxHeight: 400, paddingBottom: 40 }}
+            >
               <View className="px-4 pt-4 pb-2">
-                <View className="flex-row items-center rounded-lg px-3 py-2.5" style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f3f4f6' }}>
+                <View
+                  className="flex-row items-center rounded-lg px-3 py-2.5"
+                  style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#f3f4f6' }}
+                >
                   <Search size={14} color={palette.textTertiary} strokeWidth={2} />
                   <TextInput
                     placeholder="Search flights..."
@@ -93,7 +106,12 @@ export function FlightPickerBar({
                       onPress={() => onPickFlight(f.id)}
                       className="flex-row items-center px-4 py-3"
                       style={{
-                        backgroundColor: f.id === selectedId ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)') : 'transparent',
+                        backgroundColor:
+                          f.id === selectedId
+                            ? isDark
+                              ? 'rgba(255,255,255,0.06)'
+                              : 'rgba(0,0,0,0.03)'
+                            : 'transparent',
                         borderBottomWidth: 1,
                         borderBottomColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
                       }}
@@ -107,9 +125,15 @@ export function FlightPickerBar({
                         </View>
                         <View className="flex-row items-center mt-1">
                           <Text style={{ fontSize: 12, color: palette.textSecondary }}>{f.dep}</Text>
-                          <Plane size={10} color={palette.textTertiary} style={{ marginHorizontal: 4, transform: [{ rotate: '45deg' }] }} />
+                          <Plane
+                            size={10}
+                            color={palette.textTertiary}
+                            style={{ marginHorizontal: 4, transform: [{ rotate: '45deg' }] }}
+                          />
                           <Text style={{ fontSize: 12, color: palette.textSecondary }}>{f.arr}</Text>
-                          <Text style={{ fontSize: 12, color: palette.textTertiary, marginLeft: 'auto' }}>{f.aircraftType}</Text>
+                          <Text style={{ fontSize: 12, color: palette.textTertiary, marginLeft: 'auto' }}>
+                            {f.aircraftType}
+                          </Text>
                         </View>
                       </View>
                     </Pressable>

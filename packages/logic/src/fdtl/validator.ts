@@ -10,10 +10,10 @@ export interface Flight {
   departureAirport: string
   arrivalAirport: string
   aircraftType: string
-  std: string       // local ISO datetime
-  sta: string       // local ISO datetime
-  stdUtc: string    // UTC ISO datetime
-  staUtc: string    // UTC ISO datetime
+  std: string // local ISO datetime
+  sta: string // local ISO datetime
+  stdUtc: string // UTC ISO datetime
+  staUtc: string // UTC ISO datetime
   blockMinutes: number
 }
 
@@ -98,11 +98,7 @@ function getReportMinutes(
   )
 }
 
-function getDebriefMinutes(
-  rtMap: Map<string, number>,
-  flight: Flight,
-  defaultMinutes: number,
-): number {
+function getDebriefMinutes(rtMap: Map<string, number>, flight: Flight, defaultMinutes: number): number {
   const routeType = getRouteType(flight.departureAirport, flight.arrivalAirport)
   const colKey = flight.aircraftType.toLowerCase()
   return (
@@ -122,13 +118,13 @@ function parseRowKey(rowKey: string): { startMin: number; endMin: number; crosse
   const m = rowKey.match(/^(\d{2})(\d{2})-(\d{2})(\d{2})$/)
   if (!m) return null
   const startMin = parseInt(m[1], 10) * 60 + parseInt(m[2], 10)
-  const endMin   = parseInt(m[3], 10) * 60 + parseInt(m[4], 10)
+  const endMin = parseInt(m[3], 10) * 60 + parseInt(m[4], 10)
   return { startMin, endMin, crosses: startMin > endMin }
 }
 
 function lookupMaxFDP(
   ruleSet: SerializedRuleSet,
-  dutyStartMins: number,   // minutes since midnight of report time
+  dutyStartMins: number, // minutes since midnight of report time
   opSectors: number,
 ): { maxFdpMinutes: number; rowKey: string; colKey: string } {
   const { fdpTable } = ruleSet
@@ -143,10 +139,11 @@ function lookupMaxFDP(
     if (!parsed) continue
     const { startMin, endMin, crosses } = parsed
     const d = ((dutyStartMins % 1440) + 1440) % 1440
-    const matches = crosses
-      ? (d >= startMin || d < endMin)
-      : (d >= startMin && d < endMin)
-    if (matches) { matchedRowKey = rowKey; break }
+    const matches = crosses ? d >= startMin || d < endMin : d >= startMin && d < endMin
+    if (matches) {
+      matchedRowKey = rowKey
+      break
+    }
   }
 
   // Find matching col: colKeys like ['1-2', '3', '4', ..., '10+']
@@ -155,14 +152,23 @@ function lookupMaxFDP(
     if (colKey.includes('+')) {
       // e.g. '10+' — match if opSectors >= threshold
       const threshold = parseInt(colKey, 10)
-      if (opSectors >= threshold) { matchedColKey = colKey; break }
+      if (opSectors >= threshold) {
+        matchedColKey = colKey
+        break
+      }
     } else if (colKey.includes('-')) {
       // e.g. '1-2' — range
       const [lo, hi] = colKey.split('-').map(Number)
-      if (opSectors >= lo && opSectors <= hi) { matchedColKey = colKey; break }
+      if (opSectors >= lo && opSectors <= hi) {
+        matchedColKey = colKey
+        break
+      }
     } else {
       // exact integer
-      if (opSectors === parseInt(colKey, 10)) { matchedColKey = colKey; break }
+      if (opSectors === parseInt(colKey, 10)) {
+        matchedColKey = colKey
+        break
+      }
     }
   }
 
@@ -184,7 +190,7 @@ function lookupCabinRestMinimum(
   for (const c of table.cells) cellMap.set(c.key, c.minutes)
 
   // Find matching row: 'fdp_lte_HHMM' or 'fdp_HHMM_HHMM'
-  const matchedRowKey = table.rowKeys.find(rowKey => {
+  const matchedRowKey = table.rowKeys.find((rowKey) => {
     if (rowKey.startsWith('fdp_lte_')) {
       const capHHMM = rowKey.slice(-4)
       const capMin = parseInt(capHHMM.slice(0, 2)) * 60 + parseInt(capHHMM.slice(2, 4))
@@ -206,7 +212,7 @@ function lookupCabinRestMinimum(
 }
 
 function lookupRule(ruleSet: SerializedRuleSet, code: string): string | null {
-  const r = ruleSet.rules.find(r => r.code === code)
+  const r = ruleSet.rules.find((r) => r.code === code)
   return r?.value ?? null
 }
 
@@ -224,7 +230,10 @@ function splitDutyDays(flights: Flight[]): Flight[][] {
   let current: Flight[] = [flights[0]]
   for (let i = 1; i < flights.length; i++) {
     const gap = (new Date(flights[i].stdUtc).getTime() - new Date(flights[i - 1].staUtc).getTime()) / 60000
-    if (gap > 8 * 60) { days.push(current); current = [] }
+    if (gap > 8 * 60) {
+      days.push(current)
+      current = []
+    }
     current.push(flights[i])
   }
   days.push(current)
@@ -234,20 +243,13 @@ function splitDutyDays(flights: Flight[]): Flight[][] {
 // ─── Public timing helpers (used by buildSegments for display) ────────────────
 
 /** Resolve the effective report time for a single flight using the DB lookup cascade. */
-export function resolveReportMinutes(
-  ruleSet: SerializedRuleSet,
-  flight: Flight,
-  isDeadhead: boolean,
-): number {
+export function resolveReportMinutes(ruleSet: SerializedRuleSet, flight: Flight, isDeadhead: boolean): number {
   const rtMap = buildReportingTimesMap(ruleSet)
   return getReportMinutes(rtMap, flight, isDeadhead, ruleSet.defaultReportMinutes)
 }
 
 /** Resolve the effective debrief time for a single flight using the DB lookup cascade. */
-export function resolveDebriefMinutes(
-  ruleSet: SerializedRuleSet,
-  flight: Flight,
-): number {
+export function resolveDebriefMinutes(ruleSet: SerializedRuleSet, flight: Flight): number {
   const rtMap = buildReportingTimesMap(ruleSet)
   return getDebriefMinutes(rtMap, flight, ruleSet.defaultDebriefMinutes)
 }
@@ -269,7 +271,7 @@ export function validatePairingClient(
   const dutyDays = splitDutyDays(flights)
   const rtMap = buildReportingTimesMap(ruleSet)
   let primaryTableRef: string | undefined
-  const fdpMinutesForDay: number[] = []  // tracked for augmented suggestion computation
+  const fdpMinutesForDay: number[] = [] // tracked for augmented suggestion computation
 
   // Derive effective cockpit count: complementKey is the authoritative signal when
   // cockpitCount was not stored yet or loaded as the DB default (2).
@@ -279,11 +281,10 @@ export function validatePairingClient(
     if (crewConfig.complementKey === 'aug1' && crewConfig.cockpitCount <= 2) return 3
     return crewConfig.cockpitCount
   })()
-  const isAugmented = crewConfig && crewConfig.facilityClass && (
-    effectiveCockpitCount > 2 ||
-    crewConfig.complementKey === 'aug1' ||
-    crewConfig.complementKey === 'aug2'
-  )
+  const isAugmented =
+    crewConfig &&
+    crewConfig.facilityClass &&
+    (effectiveCockpitCount > 2 || crewConfig.complementKey === 'aug1' || crewConfig.complementKey === 'aug2')
 
   for (let di = 0; di < dutyDays.length; di++) {
     const day = dutyDays[di]
@@ -294,13 +295,13 @@ export function validatePairingClient(
     // FDP math uses UTC — correct across timezone boundaries
     const reportTime = new Date(new Date(firstFlight.stdUtc).getTime() - reportMin * 60000)
 
-    const opFlights    = day.filter(f => !deadheadIds.has(f.id))
+    const opFlights = day.filter((f) => !deadheadIds.has(f.id))
     const lastOpFlight = opFlights.length > 0 ? opFlights[opFlights.length - 1] : day[day.length - 1]
-    const debriefMin   = getDebriefMinutes(rtMap, lastOpFlight, ruleSet.defaultDebriefMinutes)
+    const debriefMin = getDebriefMinutes(rtMap, lastOpFlight, ruleSet.defaultDebriefMinutes)
     // FDP ends at chocks-on (STA) of last operating sector per CAAV VAR 15 — debrief is NOT included.
-    const fdpMinutes   = (new Date(lastOpFlight.staUtc).getTime() - reportTime.getTime()) / 60000
-    const debriefTime  = new Date(new Date(lastOpFlight.staUtc).getTime() + debriefMin * 60000)
-    const opSectors    = opFlights.length
+    const fdpMinutes = (new Date(lastOpFlight.staUtc).getTime() - reportTime.getTime()) / 60000
+    const debriefTime = new Date(new Date(lastOpFlight.staUtc).getTime() + debriefMin * 60000)
+    const opSectors = opFlights.length
     fdpMinutesForDay.push(fdpMinutes)
 
     // FDP limit check — branch on crew complement
@@ -310,31 +311,33 @@ export function validatePairingClient(
         // Look up from augmentedLimits by crew count + facility class.
         // Use effectiveCockpitCount (derived from complementKey when stored count is wrong).
         const exactLimit = ruleSet.augmentedLimits.find(
-          a => a.crewCount === effectiveCockpitCount && a.facilityClass === crewConfig.facilityClass,
+          (a) => a.crewCount === effectiveCockpitCount && a.facilityClass === crewConfig.facilityClass,
         )
         // Fallback: cap crew count at 4 if the table only has entries up to 4
-        const effectiveLimit = exactLimit ?? ruleSet.augmentedLimits.find(
-          a => a.crewCount === Math.min(effectiveCockpitCount, 4) && a.facilityClass === crewConfig.facilityClass,
-        )
+        const effectiveLimit =
+          exactLimit ??
+          ruleSet.augmentedLimits.find(
+            (a) => a.crewCount === Math.min(effectiveCockpitCount, 4) && a.facilityClass === crewConfig.facilityClass,
+          )
 
         // CAAV VAR 15 safe defaults when no augmented limits are seeded:
         // 3 pilots: CLASS_3=14:00(840), CLASS_2=15:00(900), CLASS_1=16:00(960)
         // 4 pilots: CLASS_3=15:00(900), CLASS_2=16:00(960), CLASS_1=17:00(1020)
         const FALLBACK_AUG: Record<string, Record<string, number>> = {
-          'CLASS_1': { '3': 960, '4': 1020 },
-          'CLASS_2': { '3': 900, '4': 960  },
-          'CLASS_3': { '3': 840, '4': 900  },
+          CLASS_1: { '3': 960, '4': 1020 },
+          CLASS_2: { '3': 900, '4': 960 },
+          CLASS_3: { '3': 840, '4': 900 },
         }
         const fc = crewConfig.facilityClass ?? ''
-        const fallbackMinutes = FALLBACK_AUG[fc]?.[String(Math.min(effectiveCockpitCount, 4))]
-          ?? (effectiveCockpitCount >= 4 ? 1020 : 960)
+        const fallbackMinutes =
+          FALLBACK_AUG[fc]?.[String(Math.min(effectiveCockpitCount, 4))] ?? (effectiveCockpitCount >= 4 ? 1020 : 960)
 
         const maxFdpMinutes = effectiveLimit?.maxFdpMinutes ?? fallbackMinutes
 
         if (!effectiveLimit) {
           console.warn(
             `[FDTL] No augmented limits in ruleSet for ${effectiveCockpitCount} pilots / ${fc}. ` +
-            `Using fallback ${fmt(maxFdpMinutes)}. Seed FDTL augmented limits to fix.`
+              `Using fallback ${fmt(maxFdpMinutes)}. Seed FDTL augmented limits to fix.`,
           )
         }
 
@@ -344,24 +347,22 @@ export function validatePairingClient(
         if (di === 0) primaryTableRef = ref
 
         const fdpStatus: LegalityCheck['status'] =
-          fdpMinutes > maxFdpMinutes ? 'violation' :
-          fdpMinutes > maxFdpMinutes * 0.92 ? 'warning' : 'pass'
+          fdpMinutes > maxFdpMinutes ? 'violation' : fdpMinutes > maxFdpMinutes * 0.92 ? 'warning' : 'pass'
 
         checks.push({
-          label:   `FDP Day ${di + 1}`,
-          actual:  fmt(fdpMinutes),
-          limit:   fmt(maxFdpMinutes),
-          status:  fdpStatus,
+          label: `FDP Day ${di + 1}`,
+          actual: fmt(fdpMinutes),
+          limit: fmt(maxFdpMinutes),
+          status: fdpStatus,
           fdtlRef: ref,
         })
-
       } else if (ruleSet.fdpTable) {
         // ── STANDARD FDP LIMIT — Table 01 lookup ────────────────────────────
         // Band lookup uses LOCAL report time at departure airport (CAAV §15.025)
         const reportDayMins = (() => {
-          const stdLocal = firstFlight.std.slice(11, 16)  // "HH:MM"
+          const stdLocal = firstFlight.std.slice(11, 16) // "HH:MM"
           const [h, m] = stdLocal.split(':').map(Number)
-          return ((h * 60 + m - reportMin) % 1440 + 1440) % 1440
+          return (((h * 60 + m - reportMin) % 1440) + 1440) % 1440
         })()
         const { maxFdpMinutes, rowKey, colKey } = lookupMaxFDP(ruleSet, reportDayMins, opSectors)
 
@@ -369,14 +370,13 @@ export function validatePairingClient(
         if (di === 0) primaryTableRef = ref
 
         const fdpStatus: LegalityCheck['status'] =
-          fdpMinutes > maxFdpMinutes ? 'violation' :
-          fdpMinutes > maxFdpMinutes * 0.92 ? 'warning' : 'pass'
+          fdpMinutes > maxFdpMinutes ? 'violation' : fdpMinutes > maxFdpMinutes * 0.92 ? 'warning' : 'pass'
 
         checks.push({
-          label:   `FDP Day ${di + 1}`,
-          actual:  fmt(fdpMinutes),
-          limit:   fmt(maxFdpMinutes),
-          status:  fdpStatus,
+          label: `FDP Day ${di + 1}`,
+          actual: fmt(fdpMinutes),
+          limit: fmt(maxFdpMinutes),
+          status: fdpStatus,
           fdtlRef: ref,
         })
       }
@@ -384,18 +384,17 @@ export function validatePairingClient(
 
     // Sector check
     const maxSectorsInt = (() => {
-      const r = ruleSet.rules.find(r => r.code === 'MAX_DAILY_SECTORS')
+      const r = ruleSet.rules.find((r) => r.code === 'MAX_DAILY_SECTORS')
       if (!r) return 10
       const v = parseInt(r.value, 10)
       return isNaN(v) ? 10 : v
     })()
     checks.push({
-      label:  `Op. Sectors Day ${di + 1}`,
+      label: `Op. Sectors Day ${di + 1}`,
       actual: String(opSectors),
-      limit:  String(maxSectorsInt),
+      limit: String(maxSectorsInt),
       status: opSectors > maxSectorsInt ? 'violation' : opSectors >= maxSectorsInt - 2 ? 'warning' : 'pass',
     })
-
   }
 
   // ── Cabin crew in-flight rest validation ─────────────────────────────────────
@@ -405,7 +404,7 @@ export function validatePairingClient(
   if (isAugmented && ruleSet.cabinRestTable && crewConfig) {
     const totalCabin = crewConfig.totalCabinCrew ?? 0
     const minOpCabin = crewConfig.minOperatingCabin ?? 0
-    const restAtOnce = totalCabin - minOpCabin  // how many cabin crew can rest simultaneously
+    const restAtOnce = totalCabin - minOpCabin // how many cabin crew can rest simultaneously
 
     if (totalCabin > 0 && minOpCabin > 0 && restAtOnce > 0) {
       const { taxiOutMinutes, taxiInMinutes, climbMinutes, descentMinutes } = ruleSet.cruiseTimeDeductions
@@ -417,7 +416,7 @@ export function validatePairingClient(
 
       for (let di = 0; di < dutyDays.length; di++) {
         const day = dutyDays[di]
-        const opFlights = day.filter(f => !deadheadIds.has(f.id))
+        const opFlights = day.filter((f) => !deadheadIds.has(f.id))
         if (opFlights.length === 0) continue
 
         // Total block time across all operating sectors in this duty day
@@ -431,21 +430,26 @@ export function validatePairingClient(
 
         if (requiredRest) {
           const restStatus: LegalityCheck['status'] =
-            requiredRest.minutes === -1 ? 'violation' :
-            actualRestPerPerson < requiredRest.minutes ? 'violation' :
-            actualRestPerPerson < requiredRest.minutes * 1.1 ? 'warning' : 'pass'
+            requiredRest.minutes === -1
+              ? 'violation'
+              : actualRestPerPerson < requiredRest.minutes
+                ? 'violation'
+                : actualRestPerPerson < requiredRest.minutes * 1.1
+                  ? 'warning'
+                  : 'pass'
 
           const deductionDetail = `Block ${fmt(totalBlockMinutes)} − ${fmt(totalDeduction)} deductions = ${fmt(availableCruise)} cruise`
           const crewDetail = `${totalCabin} crew, ${minOpCabin} min operating → ${restAtOnce} rest at once, ${restRotations} rotations`
 
           checks.push({
-            label:   `Cabin rest Day ${di + 1}`,
-            actual:  fmt(actualRestPerPerson),
-            limit:   requiredRest.minutes === -1 ? 'N/A' : fmt(requiredRest.minutes),
-            status:  restStatus,
-            fdtlRef: requiredRest.minutes === -1
-              ? `Cabin crew in-flight rest not allowed for FDP ${fmt(actualFdp)} with ${crewConfig.facilityClass?.replace('CLASS_1', 'Class 1').replace('CLASS_2', 'Class 2').replace('CLASS_3', 'Class 3')} (Table 05). ${deductionDetail}. ${crewDetail}`
-              : `Cabin crew rest: ${fmt(actualRestPerPerson)} per person (need ${fmt(requiredRest.minutes)} min). ${deductionDetail}. ${crewDetail}`,
+            label: `Cabin rest Day ${di + 1}`,
+            actual: fmt(actualRestPerPerson),
+            limit: requiredRest.minutes === -1 ? 'N/A' : fmt(requiredRest.minutes),
+            status: restStatus,
+            fdtlRef:
+              requiredRest.minutes === -1
+                ? `Cabin crew in-flight rest not allowed for FDP ${fmt(actualFdp)} with ${crewConfig.facilityClass?.replace('CLASS_1', 'Class 1').replace('CLASS_2', 'Class 2').replace('CLASS_3', 'Class 3')} (Table 05). ${deductionDetail}. ${crewDetail}`
+                : `Cabin crew rest: ${fmt(actualRestPerPerson)} per person (need ${fmt(requiredRest.minutes)} min). ${deductionDetail}. ${crewDetail}`,
           })
         }
       }
@@ -454,37 +458,36 @@ export function validatePairingClient(
 
   // ── Operational base checks ───────────────────────────────────────────────
   const first = flights[0]
-  const last  = flights[flights.length - 1]
+  const last = flights[flights.length - 1]
   const bases = baseAirports ?? (homeBase ? [homeBase] : [])
   const depIsBase = bases.length === 0 || bases.includes(first.departureAirport)
   const arrIsBase = bases.length === 0 || bases.includes(last.arrivalAirport)
   const openPairing = bases.length > 0 && (!depIsBase || !arrIsBase)
-  const crossBase   = depIsBase && arrIsBase && first.departureAirport !== last.arrivalAirport
+  const crossBase = depIsBase && arrIsBase && first.departureAirport !== last.arrivalAirport
 
   checks.push({
-    label:          'Returns to base',
-    actual:         last.arrivalAirport,
-    limit:          first.departureAirport,
-    status:         first.departureAirport === last.arrivalAirport ? 'pass' : 'warning',
-    isOperational:  openPairing,
+    label: 'Returns to base',
+    actual: last.arrivalAirport,
+    limit: first.departureAirport,
+    status: first.departureAirport === last.arrivalAirport ? 'pass' : 'warning',
+    isOperational: openPairing,
   })
-
 
   // ── Aircraft family / variant check ─────────────────────────────────────────
   let isMult = false
   if (icaoToFamily && Object.keys(icaoToFamily).length > 0) {
-    const opFlightsAll = flights.filter(f => !deadheadIds.has(f.id))
+    const opFlightsAll = flights.filter((f) => !deadheadIds.has(f.id))
     if (opFlightsAll.length > 1) {
-      const families = new Set(opFlightsAll.map(f => icaoToFamily[f.aircraftType] ?? f.aircraftType))
-      const types    = new Set(opFlightsAll.map(f => f.aircraftType))
+      const families = new Set(opFlightsAll.map((f) => icaoToFamily[f.aircraftType] ?? f.aircraftType))
+      const types = new Set(opFlightsAll.map((f) => f.aircraftType))
       if (families.size > 1) {
         const typeList = [...types].join(', ')
         checks.push({
-          label:         'Aircraft type',
-          actual:        typeList,
-          limit:         'Single family',
-          status:        'violation',
-          fdtlRef:       `Operating legs span multiple aircraft families (${typeList}). Crew type endorsements do not cover cross-family operations.`,
+          label: 'Aircraft type',
+          actual: typeList,
+          limit: 'Single family',
+          status: 'violation',
+          fdtlRef: `Operating legs span multiple aircraft families (${typeList}). Crew type endorsements do not cover cross-family operations.`,
           isOperational: true,
         })
       } else if (types.size > 1) {
@@ -493,13 +496,15 @@ export function validatePairingClient(
     }
   }
 
-  const overallStatus: LegalityResult['overallStatus'] =
-    checks.some(c => c.status === 'violation') ? 'violation' :
-    checks.some(c => c.status === 'warning') || isMult ? 'warning'   : 'pass'
+  const overallStatus: LegalityResult['overallStatus'] = checks.some((c) => c.status === 'violation')
+    ? 'violation'
+    : checks.some((c) => c.status === 'warning') || isMult
+      ? 'warning'
+      : 'pass'
 
   // ── Augmented suggestion — only for standard crew with FDP violations ──────
   let augmentedSuggestion: LegalityResult['augmentedSuggestion']
-  const hasFdpViolation = checks.some(c => c.label.startsWith('FDP') && c.status === 'violation')
+  const hasFdpViolation = checks.some((c) => c.label.startsWith('FDP') && c.status === 'violation')
 
   if ((!crewConfig || effectiveCockpitCount <= 2) && hasFdpViolation && ruleSet.augmentedLimits.length > 0) {
     const maxActualFdp = Math.max(...fdpMinutesForDay)
@@ -507,18 +512,16 @@ export function validatePairingClient(
     // Only suggest limits compatible with the aircraft's rest facility class
     const acFacility = crewConfig?.facilityClass ?? null
     const compatible = acFacility
-      ? ruleSet.augmentedLimits.filter(a => a.facilityClass === acFacility)
+      ? ruleSet.augmentedLimits.filter((a) => a.facilityClass === acFacility)
       : ruleSet.augmentedLimits
 
-    const sorted = [...compatible].sort(
-      (a, b) => a.crewCount - b.crewCount || a.maxFdpMinutes - b.maxFdpMinutes,
-    )
+    const sorted = [...compatible].sort((a, b) => a.crewCount - b.crewCount || a.maxFdpMinutes - b.maxFdpMinutes)
 
     for (const aug of sorted) {
       if (aug.maxFdpMinutes >= maxActualFdp) {
         augmentedSuggestion = {
           complementKey: aug.crewCount === 3 ? 'aug1' : 'aug2',
-          cockpitCount:  aug.crewCount,
+          cockpitCount: aug.crewCount,
           facilityClass: aug.facilityClass,
           facilityLabel: aug.facilityLabel,
           maxFdpMinutes: aug.maxFdpMinutes,
@@ -528,5 +531,13 @@ export function validatePairingClient(
     }
   }
 
-  return { overallStatus, checks, tableRef: primaryTableRef, openPairing, crossBase, augmentedSuggestion, isMult: isMult || undefined }
+  return {
+    overallStatus,
+    checks,
+    tableRef: primaryTableRef,
+    openPairing,
+    crossBase,
+    augmentedSuggestion,
+    isMult: isMult || undefined,
+  }
 }

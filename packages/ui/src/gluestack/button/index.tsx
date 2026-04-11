@@ -1,13 +1,7 @@
 // Gluestack-compatible Button primitive
 // Provides accessible button with loading, disabled, aria support
 import React from 'react'
-import {
-  Pressable,
-  Text,
-  ActivityIndicator,
-  type PressableProps,
-  type ViewStyle,
-} from 'react-native'
+import { Pressable, Text, ActivityIndicator, type PressableProps, type ViewStyle } from 'react-native'
 
 interface ButtonProps extends Omit<PressableProps, 'children'> {
   children?: React.ReactNode
@@ -36,13 +30,7 @@ interface ButtonIconProps {
   strokeWidth?: number
 }
 
-export function Button({
-  children,
-  className,
-  isDisabled,
-  isLoading,
-  ...props
-}: ButtonProps) {
+export function Button({ children, className, isDisabled, isLoading, ...props }: ButtonProps) {
   return (
     <Pressable
       className={className}
@@ -64,27 +52,10 @@ export function ButtonText({ children, className, style }: ButtonTextProps) {
   )
 }
 
-export function ButtonSpinner({
-  className,
-  color = '#ffffff',
-  size = 'small',
-}: ButtonSpinnerProps) {
+export function ButtonSpinner({ className, color = '#ffffff', size = 'small' }: ButtonSpinnerProps) {
   return <ActivityIndicator className={className} color={color} size={size} />
 }
 
-export function ButtonIcon({
-  as: IconComponent,
-  className,
-  size = 18,
-  color,
-  strokeWidth = 1.75,
-}: ButtonIconProps) {
-  return (
-    <IconComponent
-      size={size}
-      color={color}
-      strokeWidth={strokeWidth}
-      className={className}
-    />
-  )
+export function ButtonIcon({ as: IconComponent, className, size = 18, color, strokeWidth = 1.75 }: ButtonIconProps) {
+  return <IconComponent size={size} color={color} strokeWidth={strokeWidth} className={className} />
 }

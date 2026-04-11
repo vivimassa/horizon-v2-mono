@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState } from 'react'
 import { StickyNote, Plus, Star, Trash2, PenLine, Check, X } from 'lucide-react'
@@ -20,7 +20,7 @@ const CATEGORIES = [
 ] as const
 
 function getCatColor(cat: string): string {
-  return CATEGORIES.find(c => c.value === cat)?.color ?? '#6B7280'
+  return CATEGORIES.find((c) => c.value === cat)?.color ?? '#6B7280'
 }
 
 function fmtTime(iso: string): string {
@@ -63,7 +63,7 @@ export function MemosTab({ data, onUpdate }: MemosTabProps) {
 
   function addMemo() {
     if (!newContent.trim()) return
-    onUpdate(d => {
+    onUpdate((d) => {
       d.memos.push({
         id: crypto.randomUUID(),
         category: newCat,
@@ -78,12 +78,14 @@ export function MemosTab({ data, onUpdate }: MemosTabProps) {
   }
 
   function removeMemo(id: string) {
-    onUpdate(d => { d.memos = d.memos.filter(m => m.id !== id) })
+    onUpdate((d) => {
+      d.memos = d.memos.filter((m) => m.id !== id)
+    })
   }
 
   function togglePin(id: string) {
-    onUpdate(d => {
-      const m = d.memos.find(m => m.id === id)
+    onUpdate((d) => {
+      const m = d.memos.find((m) => m.id === id)
       if (m) m.pinned = !m.pinned
     })
   }
@@ -94,8 +96,8 @@ export function MemosTab({ data, onUpdate }: MemosTabProps) {
   }
 
   function saveEdit(id: string) {
-    onUpdate(d => {
-      const m = d.memos.find(m => m.id === id)
+    onUpdate((d) => {
+      const m = d.memos.find((m) => m.id === id)
       if (m) m.content = editContent.trim()
     })
     setEditingIdx(null)
@@ -119,12 +121,15 @@ export function MemosTab({ data, onUpdate }: MemosTabProps) {
 
       {/* Add form */}
       {showAdd && (
-        <div className="rounded-xl p-4 mb-4 space-y-3" style={{ background: inputBg, border: `1px solid ${inputBorder}` }}>
+        <div
+          className="rounded-xl p-4 mb-4 space-y-3"
+          style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
+        >
           <Dropdown
             size="sm"
             value={newCat}
             onChange={setNewCat}
-            options={CATEGORIES.map(c => ({ value: c.value, label: c.label, color: c.color }))}
+            options={CATEGORIES.map((c) => ({ value: c.value, label: c.label, color: c.color }))}
             className="w-[180px]"
             maxVisible={4}
           />
@@ -132,20 +137,33 @@ export function MemosTab({ data, onUpdate }: MemosTabProps) {
             rows={3}
             placeholder="Write a memo..."
             value={newContent}
-            onChange={e => setNewContent(e.target.value)}
+            onChange={(e) => setNewContent(e.target.value)}
             autoFocus
             className="w-full rounded-lg p-3 text-[13px] outline-none resize-none"
-            style={{ background: isDark ? 'rgba(255,255,255,0.04)' : '#fff', border: `1px solid ${inputBorder}`, color: textPrimary }}
+            style={{
+              background: isDark ? 'rgba(255,255,255,0.04)' : '#fff',
+              border: `1px solid ${inputBorder}`,
+              color: textPrimary,
+            }}
           />
           <div className="flex gap-2">
-            <button onClick={addMemo} disabled={!newContent.trim()}
+            <button
+              onClick={addMemo}
+              disabled={!newContent.trim()}
               className="h-8 px-4 rounded-lg text-[13px] font-semibold text-white disabled:opacity-30"
-              style={{ background: '#06C270' }}>
-              <Check size={14} className="inline mr-1" />Save
+              style={{ background: '#06C270' }}
+            >
+              <Check size={14} className="inline mr-1" />
+              Save
             </button>
-            <button onClick={() => { setShowAdd(false); setNewContent('') }}
+            <button
+              onClick={() => {
+                setShowAdd(false)
+                setNewContent('')
+              }}
               className="h-8 px-4 rounded-lg text-[13px] font-medium"
-              style={{ color: muted, border: `1px solid ${inputBorder}` }}>
+              style={{ color: muted, border: `1px solid ${inputBorder}` }}
+            >
               Cancel
             </button>
           </div>
@@ -156,7 +174,9 @@ export function MemosTab({ data, onUpdate }: MemosTabProps) {
       {sorted.length === 0 && !showAdd ? (
         <div className="flex flex-col items-center justify-center py-10 opacity-50">
           <StickyNote size={28} style={{ color: muted }} className="mb-3" />
-          <span className="text-[13px] font-medium" style={{ color: muted }}>No memos</span>
+          <span className="text-[13px] font-medium" style={{ color: muted }}>
+            No memos
+          </span>
         </div>
       ) : (
         <div className="space-y-2">
@@ -168,21 +188,37 @@ export function MemosTab({ data, onUpdate }: MemosTabProps) {
               <div
                 key={memo.id}
                 className="rounded-xl px-4 py-2.5 flex items-start gap-3 group"
-                style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', borderLeft: `3px solid ${color}`, border: `1px solid ${cardBorder}` }}
+                style={{
+                  background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                  borderLeft: `3px solid ${color}`,
+                  border: `1px solid ${cardBorder}`,
+                }}
               >
                 {/* Pin */}
                 <button onClick={() => togglePin(memo.id)} className="mt-0.5 shrink-0">
-                  <Star size={14} style={{ color: memo.pinned ? accent : `${muted}40`, fill: memo.pinned ? accent : 'none' }} />
+                  <Star
+                    size={14}
+                    style={{ color: memo.pinned ? accent : `${muted}40`, fill: memo.pinned ? accent : 'none' }}
+                  />
                 </button>
 
                 <div className="flex-1 min-w-0">
                   {/* Category + timestamp */}
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[13px] font-medium px-1.5 py-0.5 rounded" style={{ background: `${color}15`, color }}>
-                      {CATEGORIES.find(c => c.value === memo.category)?.label ?? memo.category}
+                    <span
+                      className="text-[13px] font-medium px-1.5 py-0.5 rounded"
+                      style={{ background: `${color}15`, color }}
+                    >
+                      {CATEGORIES.find((c) => c.value === memo.category)?.label ?? memo.category}
                     </span>
-                    {memo.author && <span className="text-[13px] shrink-0" style={{ color: muted }}>{memo.author}</span>}
-                    <span className="text-[13px] font-mono shrink-0" style={{ color: `${muted}60` }}>{fmtTime(memo.createdAt)}</span>
+                    {memo.author && (
+                      <span className="text-[13px] shrink-0" style={{ color: muted }}>
+                        {memo.author}
+                      </span>
+                    )}
+                    <span className="text-[13px] font-mono shrink-0" style={{ color: `${muted}60` }}>
+                      {fmtTime(memo.createdAt)}
+                    </span>
                   </div>
 
                   {/* Content */}
@@ -191,28 +227,42 @@ export function MemosTab({ data, onUpdate }: MemosTabProps) {
                       <input
                         type="text"
                         value={editContent}
-                        onChange={e => setEditContent(e.target.value)}
+                        onChange={(e) => setEditContent(e.target.value)}
                         autoFocus
                         className="flex-1 h-8 px-2 rounded-lg text-[13px] outline-none"
                         style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: textPrimary }}
                       />
-                      <button onClick={() => saveEdit(memo.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-white" style={{ background: '#06C270' }}>
+                      <button
+                        onClick={() => saveEdit(memo.id)}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-white"
+                        style={{ background: '#06C270' }}
+                      >
                         <Check size={13} />
                       </button>
-                      <button onClick={() => setEditingIdx(null)} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: muted, border: `1px solid ${inputBorder}` }}>
+                      <button
+                        onClick={() => setEditingIdx(null)}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center"
+                        style={{ color: muted, border: `1px solid ${inputBorder}` }}
+                      >
                         <X size={13} />
                       </button>
                     </div>
                   ) : (
-                    <p className="text-[13px]" style={{ color: textPrimary }}>{memo.content}</p>
+                    <p className="text-[13px]" style={{ color: textPrimary }}>
+                      {memo.content}
+                    </p>
                   )}
                 </div>
 
                 {/* Actions */}
                 {!isEditing && (
                   <div className="flex gap-1 opacity-0 group-hover:opacity-60 transition-opacity shrink-0">
-                    <button onClick={() => startEdit(i)} className="p-1"><PenLine size={13} style={{ color: muted }} /></button>
-                    <button onClick={() => removeMemo(memo.id)} className="p-1"><Trash2 size={13} style={{ color: '#E63535' }} /></button>
+                    <button onClick={() => startEdit(i)} className="p-1">
+                      <PenLine size={13} style={{ color: muted }} />
+                    </button>
+                    <button onClick={() => removeMemo(memo.id)} className="p-1">
+                      <Trash2 size={13} style={{ color: '#E63535' }} />
+                    </button>
                   </div>
                 )}
               </div>

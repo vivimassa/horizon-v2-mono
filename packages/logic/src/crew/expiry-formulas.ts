@@ -38,9 +38,7 @@ export const EXPIRY_FORMULAS: ExpiryFormulaDefinition[] = [
     label: 'Fixed Validity',
     description: 'Expires X months after last completion. Most common.',
     icon: 'calendar-clock',
-    fields: [
-      { key: 'validity_months', label: 'Validity Period', type: 'number', unit: 'months' },
-    ],
+    fields: [{ key: 'validity_months', label: 'Validity Period', type: 'number', unit: 'months' }],
     supportsAcType: false,
   },
   {
@@ -97,8 +95,13 @@ export const EXPIRY_FORMULAS: ExpiryFormulaDefinition[] = [
     icon: 'mountain',
     fields: [
       {
-        key: 'airport_cat', label: 'Airport Category', type: 'select',
-        options: [{ value: 'B', label: 'CAT-B' }, { value: 'C', label: 'CAT-C' }],
+        key: 'airport_cat',
+        label: 'Airport Category',
+        type: 'select',
+        options: [
+          { value: 'B', label: 'CAT-B' },
+          { value: 'C', label: 'CAT-C' },
+        ],
       },
       { key: 'rolling_days', label: 'Rolling Period', type: 'number', unit: 'days' },
     ],
@@ -132,9 +135,7 @@ export const EXPIRY_FORMULAS: ExpiryFormulaDefinition[] = [
     label: 'Route / Line Check',
     description: 'En-route check events. Multi-qual crew can alternate.',
     icon: 'map-pin',
-    fields: [
-      { key: 'validity_months', label: 'Validity Period', type: 'number', unit: 'months' },
-    ],
+    fields: [{ key: 'validity_months', label: 'Validity Period', type: 'number', unit: 'months' }],
     supportsAcType: true,
   },
   {
@@ -153,9 +154,7 @@ export const EXPIRY_FORMULAS: ExpiryFormulaDefinition[] = [
     label: 'City Pair Recency',
     description: 'Must operate to specific stations within the period.',
     icon: 'globe',
-    fields: [
-      { key: 'validity_months', label: 'Validity Period', type: 'number', unit: 'months' },
-    ],
+    fields: [{ key: 'validity_months', label: 'Validity Period', type: 'number', unit: 'months' }],
     supportsAcType: false,
   },
   {
@@ -163,9 +162,7 @@ export const EXPIRY_FORMULAS: ExpiryFormulaDefinition[] = [
     label: 'Country / Visa',
     description: 'Visa validity for specific countries. Warns before rostering.',
     icon: 'stamp',
-    fields: [
-      { key: 'validity_months', label: 'Validity Period', type: 'number', unit: 'months' },
-    ],
+    fields: [{ key: 'validity_months', label: 'Validity Period', type: 'number', unit: 'months' }],
     supportsAcType: false,
   },
 ]

@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { Send, CheckCircle, Trash2, Eye, Loader2, AlertTriangle } from 'lucide-react'
@@ -43,10 +43,12 @@ export function SendPanel({ operatorIataCode, onSent }: SendPanelProps) {
     }
   }, [])
 
-  useEffect(() => { loadHeld() }, [loadHeld])
+  useEffect(() => {
+    loadHeld()
+  }, [loadHeld])
 
   const toggleGroup = (key: string) => {
-    setSelectedGroupKeys(prev => {
+    setSelectedGroupKeys((prev) => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
@@ -58,13 +60,11 @@ export function SendPanel({ operatorIataCode, onSent }: SendPanelProps) {
     if (selectedGroupKeys.size === groups.length) {
       setSelectedGroupKeys(new Set())
     } else {
-      setSelectedGroupKeys(new Set(groups.map(g => g.key)))
+      setSelectedGroupKeys(new Set(groups.map((g) => g.key)))
     }
   }
 
-  const selectedMessageIds = groups
-    .filter(g => selectedGroupKeys.has(g.key))
-    .flatMap(g => g.messageIds)
+  const selectedMessageIds = groups.filter((g) => selectedGroupKeys.has(g.key)).flatMap((g) => g.messageIds)
 
   const handleRelease = useCallback(async () => {
     if (selectedMessageIds.length === 0) return
@@ -95,12 +95,18 @@ export function SendPanel({ operatorIataCode, onSent }: SendPanelProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 flex items-center justify-between px-5" style={{ height: 44, borderBottom: `1px solid ${sectionBorder}` }}>
+      <div
+        className="shrink-0 flex items-center justify-between px-5"
+        style={{ height: 44, borderBottom: `1px solid ${sectionBorder}` }}
+      >
         <div className="flex items-center gap-2">
           <Send size={14} className="text-module-accent" />
           <span className="text-[14px] font-bold">Outbound Held Messages</span>
           {groups.length > 0 && (
-            <span className="px-2 py-0.5 rounded-full text-[13px] font-bold" style={{ background: 'rgba(255,136,0,0.15)', color: '#FF8800' }}>
+            <span
+              className="px-2 py-0.5 rounded-full text-[13px] font-bold"
+              style={{ background: 'rgba(255,136,0,0.15)', color: '#FF8800' }}
+            >
               {groups.length} group{groups.length !== 1 ? 's' : ''}
             </span>
           )}
@@ -163,24 +169,38 @@ export function SendPanel({ operatorIataCode, onSent }: SendPanelProps) {
                       className="accent-[var(--module-accent)]"
                     />
                   </th>
-                  <th className="text-left px-3 py-2 text-[13px] font-medium text-hz-text-tertiary uppercase">Action</th>
-                  <th className="text-left px-3 py-2 text-[13px] font-medium text-hz-text-tertiary uppercase">Flight</th>
-                  <th className="text-left px-3 py-2 text-[13px] font-medium text-hz-text-tertiary uppercase">Date Range</th>
-                  <th className="text-left px-3 py-2 text-[13px] font-medium text-hz-text-tertiary uppercase">Instances</th>
-                  <th className="text-left px-3 py-2 text-[13px] font-medium text-hz-text-tertiary uppercase">Summary</th>
+                  <th className="text-left px-3 py-2 text-[13px] font-medium text-hz-text-tertiary uppercase">
+                    Action
+                  </th>
+                  <th className="text-left px-3 py-2 text-[13px] font-medium text-hz-text-tertiary uppercase">
+                    Flight
+                  </th>
+                  <th className="text-left px-3 py-2 text-[13px] font-medium text-hz-text-tertiary uppercase">
+                    Date Range
+                  </th>
+                  <th className="text-left px-3 py-2 text-[13px] font-medium text-hz-text-tertiary uppercase">
+                    Instances
+                  </th>
+                  <th className="text-left px-3 py-2 text-[13px] font-medium text-hz-text-tertiary uppercase">
+                    Summary
+                  </th>
                   <th className="w-10" />
                 </tr>
               </thead>
               <tbody>
-                {groups.map(g => {
+                {groups.map((g) => {
                   const selected = selectedGroupKeys.has(g.key)
                   return (
                     <tr
                       key={g.key}
                       className="transition-colors"
                       style={{ borderBottom: `1px solid ${sectionBorder}` }}
-                      onMouseEnter={e => { e.currentTarget.style.background = rowHover }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = rowHover
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent'
+                      }}
                     >
                       <td className="px-3 py-2.5">
                         <input
@@ -198,7 +218,9 @@ export function SendPanel({ operatorIataCode, onSent }: SendPanelProps) {
                         {g.dateFrom === g.dateTo ? g.dateFrom : `${g.dateFrom} \u2013 ${g.dateTo}`}
                       </td>
                       <td className="px-3 py-2.5 text-[13px] font-semibold text-center">{g.instanceCount}</td>
-                      <td className="px-3 py-2.5 text-[13px] text-hz-text-secondary truncate max-w-[300px]">{g.summary}</td>
+                      <td className="px-3 py-2.5 text-[13px] text-hz-text-secondary truncate max-w-[300px]">
+                        {g.summary}
+                      </td>
                       <td className="px-3 py-2.5">
                         <button
                           onClick={() => setPreviewMsg(g.messages[0])}
@@ -233,7 +255,10 @@ export function SendPanel({ operatorIataCode, onSent }: SendPanelProps) {
 
             <div className="grid grid-cols-2 gap-2">
               <PreviewField label="Type" value={previewMsg.messageType} />
-              <PreviewField label="Action" value={`${previewMsg.actionCode} \u2014 ${ACTION_LABELS[previewMsg.actionCode] || ''}`} />
+              <PreviewField
+                label="Action"
+                value={`${previewMsg.actionCode} \u2014 ${ACTION_LABELS[previewMsg.actionCode] || ''}`}
+              />
               <PreviewField label="Flight" value={previewMsg.flightNumber || '\u2014'} />
               <PreviewField label="Date" value={previewMsg.flightDate || '\u2014'} />
             </div>

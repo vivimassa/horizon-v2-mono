@@ -52,28 +52,32 @@ const statusUpdateSchema = z.object({
 
 const holdBatchSchema = z.object({
   operatorId: z.string().min(1),
-  before: z.array(z.object({
-    id: z.string(),
-    flightNumber: z.string(),
-    instanceDate: z.string(),
-    depStation: z.string(),
-    arrStation: z.string(),
-    stdUtc: z.string(),
-    staUtc: z.string(),
-    aircraftTypeIcao: z.string(),
-    status: z.string(),
-  })),
-  after: z.array(z.object({
-    id: z.string(),
-    flightNumber: z.string(),
-    instanceDate: z.string(),
-    depStation: z.string(),
-    arrStation: z.string(),
-    stdUtc: z.string(),
-    staUtc: z.string(),
-    aircraftTypeIcao: z.string(),
-    status: z.string(),
-  })),
+  before: z.array(
+    z.object({
+      id: z.string(),
+      flightNumber: z.string(),
+      instanceDate: z.string(),
+      depStation: z.string(),
+      arrStation: z.string(),
+      stdUtc: z.string(),
+      staUtc: z.string(),
+      aircraftTypeIcao: z.string(),
+      status: z.string(),
+    }),
+  ),
+  after: z.array(
+    z.object({
+      id: z.string(),
+      flightNumber: z.string(),
+      instanceDate: z.string(),
+      depStation: z.string(),
+      arrStation: z.string(),
+      stdUtc: z.string(),
+      staUtc: z.string(),
+      aircraftTypeIcao: z.string(),
+      status: z.string(),
+    }),
+  ),
   operatorIataCode: z.string().min(1).max(3),
 })
 
@@ -86,16 +90,18 @@ const applyInboundSchema = z.object({
   actionCode: z.string().min(1),
   flightNumber: z.string().min(1),
   flightDate: z.string().min(1),
-  changes: z.record(z.string(), z.object({
-    from: z.string().optional(),
-    to: z.string(),
-  })),
+  changes: z.record(
+    z.string(),
+    z.object({
+      from: z.string().optional(),
+      to: z.string(),
+    }),
+  ),
 })
 
 // ── Routes ─────────────────────────────────────────────────
 
 export async function scheduleMessageRoutes(app: FastifyInstance): Promise<void> {
-
   // ── GET /schedule-messages — Paginated message log ──
   app.get('/schedule-messages', async (req, reply) => {
     const q = messageLogQuery.parse(req.query)
@@ -128,11 +134,7 @@ export async function scheduleMessageRoutes(app: FastifyInstance): Promise<void>
     }
 
     const [messages, total] = await Promise.all([
-      ScheduleMessageLog.find(filter)
-        .sort({ createdAtUtc: -1 })
-        .skip(q.offset)
-        .limit(q.limit)
-        .lean(),
+      ScheduleMessageLog.find(filter).sort({ createdAtUtc: -1 }).skip(q.offset).limit(q.limit).lean(),
       ScheduleMessageLog.countDocuments(filter),
     ])
 
@@ -143,10 +145,7 @@ export async function scheduleMessageRoutes(app: FastifyInstance): Promise<void>
   app.get('/schedule-messages/stats', async (req, reply) => {
     const { operatorId } = operatorQuery.parse(req.query)
 
-    const docs = await ScheduleMessageLog.find(
-      { operatorId },
-      { status: 1, createdAtUtc: 1 },
-    ).lean()
+    const docs = await ScheduleMessageLog.find({ operatorId }, { status: 1, createdAtUtc: 1 }).lean()
 
     const weekAgo = new Date()
     weekAgo.setDate(weekAgo.getDate() - 7)
@@ -154,12 +153,12 @@ export async function scheduleMessageRoutes(app: FastifyInstance): Promise<void>
 
     return {
       total: docs.length,
-      held: docs.filter(d => d.status === 'held').length,
-      pending: docs.filter(d => d.status === 'pending').length,
-      sent: docs.filter(d => d.status === 'sent').length,
-      applied: docs.filter(d => d.status === 'applied').length,
-      rejected: docs.filter(d => d.status === 'rejected').length,
-      thisWeek: docs.filter(d => (d.createdAtUtc || '') > weekAgoIso).length,
+      held: docs.filter((d) => d.status === 'held').length,
+      pending: docs.filter((d) => d.status === 'pending').length,
+      sent: docs.filter((d) => d.status === 'sent').length,
+      applied: docs.filter((d) => d.status === 'applied').length,
+      rejected: docs.filter((d) => d.status === 'rejected').length,
+      thisWeek: docs.filter((d) => (d.createdAtUtc || '') > weekAgoIso).length,
     }
   })
 
@@ -251,13 +250,16 @@ export async function scheduleMessageRoutes(app: FastifyInstance): Promise<void>
     await ScheduleMessageLog.insertMany(docs)
 
     // Neutralization: find NEW+CNL pairs among all held messages
-    const allHeld = await ScheduleMessageLog.find({
-      operatorId,
-      status: 'held',
-      direction: 'outbound',
-    }, { _id: 1, actionCode: 1, flightNumber: 1, flightDate: 1, changes: 1 }).lean()
+    const allHeld = await ScheduleMessageLog.find(
+      {
+        operatorId,
+        status: 'held',
+        direction: 'outbound',
+      },
+      { _id: 1, actionCode: 1, flightNumber: 1, flightDate: 1, changes: 1 },
+    ).lean()
 
-    const heldRefs: HeldMessageRef[] = allHeld.map(m => ({
+    const heldRefs: HeldMessageRef[] = allHeld.map((m) => ({
       id: m._id as string,
       actionCode: m.actionCode as string,
       flightNumber: m.flightNumber as string,
@@ -267,24 +269,20 @@ export async function scheduleMessageRoutes(app: FastifyInstance): Promise<void>
 
     const toNeutralize = findNeutralizablePairs(heldRefs)
     if (toNeutralize.length > 0) {
-      await ScheduleMessageLog.updateMany(
-        { _id: { $in: toNeutralize } },
-        { status: 'neutralized', updatedAtUtc: now },
-      )
+      await ScheduleMessageLog.updateMany({ _id: { $in: toNeutralize } }, { status: 'neutralized', updatedAtUtc: now })
     }
 
     // Count remaining held (grouped by flight+action+changes)
-    const remaining = await ScheduleMessageLog.find({
-      operatorId,
-      status: 'held',
-      direction: 'outbound',
-    }, { flightNumber: 1, actionCode: 1, changes: 1 }).lean()
+    const remaining = await ScheduleMessageLog.find(
+      {
+        operatorId,
+        status: 'held',
+        direction: 'outbound',
+      },
+      { flightNumber: 1, actionCode: 1, changes: 1 },
+    ).lean()
 
-    const keys = new Set(
-      remaining.map(m =>
-        `${m.flightNumber}:${m.actionCode}:${JSON.stringify(m.changes || {})}`
-      )
-    )
+    const keys = new Set(remaining.map((m) => `${m.flightNumber}:${m.actionCode}:${JSON.stringify(m.changes || {})}`))
 
     return { held: keys.size, neutralized: toNeutralize.length }
   })
@@ -334,7 +332,7 @@ export async function scheduleMessageRoutes(app: FastifyInstance): Promise<void>
       })
     }
 
-    const instanceIds = instances.map(i => i._id)
+    const instanceIds = instances.map((i) => i._id)
 
     switch (data.actionCode) {
       case 'CNL': {
@@ -364,10 +362,7 @@ export async function scheduleMessageRoutes(app: FastifyInstance): Promise<void>
           const mins = parseInt(t.slice(0, 2)) * 60 + parseInt(t.slice(2))
           update['schedule.staUtc'] = mins
         }
-        await FlightInstance.updateMany(
-          { _id: { $in: instanceIds } },
-          update,
-        )
+        await FlightInstance.updateMany({ _id: { $in: instanceIds } }, update)
         break
       }
       case 'EQT': {
@@ -398,10 +393,7 @@ export async function scheduleMessageRoutes(app: FastifyInstance): Promise<void>
           const t = data.changes['sta'].to
           update['schedule.staUtc'] = parseInt(t.slice(0, 2)) * 60 + parseInt(t.slice(2))
         }
-        await FlightInstance.updateMany(
-          { _id: { $in: instanceIds } },
-          update,
-        )
+        await FlightInstance.updateMany({ _id: { $in: instanceIds } }, update)
         break
       }
       default:
@@ -428,7 +420,12 @@ export async function scheduleMessageRoutes(app: FastifyInstance): Promise<void>
     if (dateFrom) periodFilter.effectiveUntil = { $gte: dateFrom }
     if (dateTo) periodFilter.effectiveFrom = { $lte: dateTo }
 
-    const baseFilter: Record<string, unknown> = { operatorId, isActive: { $ne: false }, scenarioId: null, ...periodFilter }
+    const baseFilter: Record<string, unknown> = {
+      operatorId,
+      isActive: { $ne: false },
+      scenarioId: null,
+      ...periodFilter,
+    }
 
     const targetFilter: Record<string, unknown> = { operatorId, isActive: { $ne: false }, ...periodFilter }
     if (targetScenarioId) targetFilter.scenarioId = targetScenarioId
@@ -440,7 +437,7 @@ export async function scheduleMessageRoutes(app: FastifyInstance): Promise<void>
     ])
 
     const messages = computeScheduleDiff(
-      baseFlights.map(f => ({
+      baseFlights.map((f) => ({
         _id: f._id as string,
         flightNumber: `${f.airlineCode}${f.flightNumber}`,
         depStation: f.depStation as string,
@@ -453,7 +450,7 @@ export async function scheduleMessageRoutes(app: FastifyInstance): Promise<void>
         effectiveUntil: f.effectiveUntil as string,
         status: f.status as string,
       })),
-      targetFlights.map(f => ({
+      targetFlights.map((f) => ({
         _id: f._id as string,
         flightNumber: `${f.airlineCode}${f.flightNumber}`,
         depStation: f.depStation as string,
@@ -465,7 +462,7 @@ export async function scheduleMessageRoutes(app: FastifyInstance): Promise<void>
         effectiveFrom: f.effectiveFrom as string,
         effectiveUntil: f.effectiveUntil as string,
         status: f.status as string,
-      }))
+      })),
     )
 
     return { messages, baseCount: baseFlights.length, targetCount: targetFlights.length }

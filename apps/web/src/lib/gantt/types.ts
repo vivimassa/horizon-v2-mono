@@ -83,13 +83,13 @@ export type BarLabelMode = 'flightNo' | 'sector'
 export type FleetSortOrder = 'type' | 'registration' | 'utilization'
 
 export const ZOOM_CONFIG: Record<ZoomLevel, { days: number; hoursPerTick: number }> = {
-  '1D':  { days: 1,  hoursPerTick: 1 },
-  '2D':  { days: 2,  hoursPerTick: 2 },
-  '3D':  { days: 3,  hoursPerTick: 2 },
-  '4D':  { days: 4,  hoursPerTick: 3 },
-  '5D':  { days: 5,  hoursPerTick: 4 },
-  '6D':  { days: 6,  hoursPerTick: 4 },
-  '7D':  { days: 7,  hoursPerTick: 6 },
+  '1D': { days: 1, hoursPerTick: 1 },
+  '2D': { days: 2, hoursPerTick: 2 },
+  '3D': { days: 3, hoursPerTick: 2 },
+  '4D': { days: 4, hoursPerTick: 3 },
+  '5D': { days: 5, hoursPerTick: 4 },
+  '6D': { days: 6, hoursPerTick: 4 },
+  '7D': { days: 7, hoursPerTick: 6 },
   '14D': { days: 14, hoursPerTick: 12 },
   '21D': { days: 21, hoursPerTick: 24 },
   '28D': { days: 28, hoursPerTick: 24 },
@@ -98,8 +98,8 @@ export const ZOOM_CONFIG: Record<ZoomLevel, { days: number; hoursPerTick: number
 export const ROW_HEIGHT_LEVELS = [
   { label: 'compact', rowH: 32, barH: 22, fontSize: 10 },
   { label: 'default', rowH: 44, barH: 28, fontSize: 11 },
-  { label: 'large',   rowH: 56, barH: 36, fontSize: 12 },
-  { label: 'xlarge',  rowH: 72, barH: 48, fontSize: 13 },
+  { label: 'large', rowH: 56, barH: 36, fontSize: 12 },
+  { label: 'xlarge', rowH: 72, barH: 48, fontSize: 13 },
 ] as const
 
 // ── Layout Types (output of layout engine, used by canvas renderer) ──

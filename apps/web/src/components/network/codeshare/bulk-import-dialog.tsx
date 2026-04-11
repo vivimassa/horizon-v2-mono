@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useEffect, useMemo } from 'react'
 import { X, Loader2, ChevronLeft } from 'lucide-react'
@@ -17,9 +17,7 @@ interface BulkImportDialogProps {
   onMappingChanged: () => void
 }
 
-export function BulkImportDialog({
-  open, onOpenChange, agreement, isDark, onMappingChanged,
-}: BulkImportDialogProps) {
+export function BulkImportDialog({ open, onOpenChange, agreement, isDark, onMappingChanged }: BulkImportDialogProps) {
   const palette = isDark ? colors.dark : colors.light
   const accent = MODULE_THEMES.network.accent
   const glassBg = isDark ? 'rgba(25,25,33,0.95)' : 'rgba(255,255,255,0.95)'
@@ -38,7 +36,8 @@ export function BulkImportDialog({
   useEffect(() => {
     if (!open) return
     setLoading(true)
-    api.getCodeshareUnmappedFlights(agreement._id, getOperatorId())
+    api
+      .getCodeshareUnmappedFlights(agreement._id, getOperatorId())
       .then(setFlights)
       .finally(() => setLoading(false))
   }, [open, agreement._id])
@@ -46,13 +45,10 @@ export function BulkImportDialog({
   const needsAlloc = agreement.agreementType === 'block_space' || agreement.agreementType === 'hard_block'
   const allocTotal = Object.values(cabinAllocs).reduce((s, v) => s + v.seats, 0)
 
-  const selectedFlights = useMemo(
-    () => flights.filter(f => selected.has(f.flightNumber)),
-    [flights, selected]
-  )
+  const selectedFlights = useMemo(() => flights.filter((f) => selected.has(f.flightNumber)), [flights, selected])
 
   function toggleFlight(flightNumber: string) {
-    setSelected(prev => {
+    setSelected((prev) => {
       const next = new Set(prev)
       if (next.has(flightNumber)) next.delete(flightNumber)
       else next.add(flightNumber)
@@ -61,7 +57,7 @@ export function BulkImportDialog({
   }
 
   function selectAll() {
-    setSelected(new Set(flights.map(f => f.flightNumber)))
+    setSelected(new Set(flights.map((f) => f.flightNumber)))
   }
 
   function deselectAll() {
@@ -75,7 +71,7 @@ export function BulkImportDialog({
   async function handleImport() {
     setImporting(true)
     try {
-      const mappings = selectedFlights.map(f => ({
+      const mappings = selectedFlights.map((f) => ({
         operatingFlightNumber: f.flightNumber,
         marketingFlightNumber: getMarketingNumber(f.flightNumber),
         departureIata: f.depStation,
@@ -119,14 +115,20 @@ export function BulkImportDialog({
       <div
         className="w-[640px] max-h-[85vh] rounded-2xl overflow-hidden flex flex-col"
         style={{ background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: 'blur(24px)' }}
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: `1px solid ${glassBorder}` }}>
+        <div
+          className="flex items-center justify-between px-5 py-4 shrink-0"
+          style={{ borderBottom: `1px solid ${glassBorder}` }}
+        >
           <h2 className="text-[18px] font-bold" style={{ color: palette.text }}>
             Bulk Import Mappings
           </h2>
-          <button onClick={() => onOpenChange(false)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-hz-border/20">
+          <button
+            onClick={() => onOpenChange(false)}
+            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-hz-border/20"
+          >
             <X size={18} style={{ color: palette.textSecondary }} />
           </button>
         </div>
@@ -137,26 +139,43 @@ export function BulkImportDialog({
             <>
               {/* Marketing prefix */}
               <div className="flex items-center gap-3 mb-3">
-                <label className="text-[13px] font-medium" style={{ color: palette.textSecondary }}>Marketing prefix:</label>
+                <label className="text-[13px] font-medium" style={{ color: palette.textSecondary }}>
+                  Marketing prefix:
+                </label>
                 <input
                   value={prefix}
-                  onChange={e => setPrefix(e.target.value)}
+                  onChange={(e) => setPrefix(e.target.value)}
                   className="w-16 px-2 h-8 rounded-lg text-[13px] font-mono outline-none text-center"
                   style={inputStyle}
                 />
                 <div className="flex-1" />
-                <button onClick={selectAll} className="text-[13px] font-medium" style={{ color: accent }}>Select all</button>
-                <button onClick={deselectAll} className="text-[13px] font-medium" style={{ color: palette.textSecondary }}>Deselect all</button>
+                <button onClick={selectAll} className="text-[13px] font-medium" style={{ color: accent }}>
+                  Select all
+                </button>
+                <button
+                  onClick={deselectAll}
+                  className="text-[13px] font-medium"
+                  style={{ color: palette.textSecondary }}
+                >
+                  Deselect all
+                </button>
               </div>
 
               {/* Flight list */}
               {loading ? (
-                <div className="text-center py-8 text-[13px]" style={{ color: palette.textTertiary }}>Loading unmapped flights...</div>
+                <div className="text-center py-8 text-[13px]" style={{ color: palette.textTertiary }}>
+                  Loading unmapped flights...
+                </div>
               ) : flights.length === 0 ? (
-                <div className="text-center py-8 text-[13px]" style={{ color: palette.textTertiary }}>All flights are already mapped</div>
+                <div className="text-center py-8 text-[13px]" style={{ color: palette.textTertiary }}>
+                  All flights are already mapped
+                </div>
               ) : (
-                <div className="space-y-0.5 max-h-[40vh] overflow-y-auto rounded-xl" style={{ background: inputBg, border: `1px solid ${glassBorder}` }}>
-                  {flights.map(f => {
+                <div
+                  className="space-y-0.5 max-h-[40vh] overflow-y-auto rounded-xl"
+                  style={{ background: inputBg, border: `1px solid ${glassBorder}` }}
+                >
+                  {flights.map((f) => {
                     const isChecked = selected.has(f.flightNumber)
                     return (
                       <button
@@ -170,21 +189,37 @@ export function BulkImportDialog({
                         <span
                           className="w-4 h-4 rounded border flex items-center justify-center shrink-0"
                           style={{
-                            borderColor: isChecked ? accent : (isDark ? 'rgba(255,255,255,0.20)' : 'rgba(0,0,0,0.20)'),
+                            borderColor: isChecked ? accent : isDark ? 'rgba(255,255,255,0.20)' : 'rgba(0,0,0,0.20)',
                             background: isChecked ? accent : 'transparent',
                           }}
                         >
                           {isChecked && (
                             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                              <path d="M2 5l2.5 2.5L8 3" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              <path
+                                d="M2 5l2.5 2.5L8 3"
+                                stroke="#fff"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
                             </svg>
                           )}
                         </span>
 
-                        <span className="font-mono text-[13px] font-semibold" style={{ color: accent }}>{f.flightNumber}</span>
-                        <span className="font-mono text-[13px]" style={{ color: palette.textSecondary }}>{f.depStation}&rarr;{f.arrStation}</span>
-                        <span className="text-[13px]" style={{ color: palette.textTertiary }}>{f.daysOfWeek}</span>
-                        {f.aircraftTypeIcao && <span className="text-[13px] font-mono" style={{ color: palette.textTertiary }}>{f.aircraftTypeIcao}</span>}
+                        <span className="font-mono text-[13px] font-semibold" style={{ color: accent }}>
+                          {f.flightNumber}
+                        </span>
+                        <span className="font-mono text-[13px]" style={{ color: palette.textSecondary }}>
+                          {f.depStation}&rarr;{f.arrStation}
+                        </span>
+                        <span className="text-[13px]" style={{ color: palette.textTertiary }}>
+                          {f.daysOfWeek}
+                        </span>
+                        {f.aircraftTypeIcao && (
+                          <span className="text-[13px] font-mono" style={{ color: palette.textTertiary }}>
+                            {f.aircraftTypeIcao}
+                          </span>
+                        )}
                         <div className="flex-1" />
                         <span className="text-[13px] font-mono" style={{ color: palette.textTertiary }}>
                           &rarr; {agreement.partnerAirlineCode} {getMarketingNumber(f.flightNumber)}
@@ -208,21 +243,47 @@ export function BulkImportDialog({
               <table className="w-full mb-3">
                 <thead>
                   <tr>
-                    <th className="text-[13px] font-semibold uppercase tracking-wider text-left px-2.5 py-2" style={{ color: palette.textTertiary }}>Operating</th>
-                    <th className="text-[13px] font-semibold uppercase tracking-wider text-left px-2.5 py-2" style={{ color: palette.textTertiary }}>Marketing</th>
-                    <th className="text-[13px] font-semibold uppercase tracking-wider text-left px-2.5 py-2" style={{ color: palette.textTertiary }}>Route</th>
-                    <th className="text-[13px] font-semibold uppercase tracking-wider text-left px-2.5 py-2" style={{ color: palette.textTertiary }}>DOW</th>
+                    <th
+                      className="text-[13px] font-semibold uppercase tracking-wider text-left px-2.5 py-2"
+                      style={{ color: palette.textTertiary }}
+                    >
+                      Operating
+                    </th>
+                    <th
+                      className="text-[13px] font-semibold uppercase tracking-wider text-left px-2.5 py-2"
+                      style={{ color: palette.textTertiary }}
+                    >
+                      Marketing
+                    </th>
+                    <th
+                      className="text-[13px] font-semibold uppercase tracking-wider text-left px-2.5 py-2"
+                      style={{ color: palette.textTertiary }}
+                    >
+                      Route
+                    </th>
+                    <th
+                      className="text-[13px] font-semibold uppercase tracking-wider text-left px-2.5 py-2"
+                      style={{ color: palette.textTertiary }}
+                    >
+                      DOW
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {selectedFlights.map(f => (
+                  {selectedFlights.map((f) => (
                     <tr key={f._id} style={{ borderBottom: `1px solid ${glassBorder}` }}>
-                      <td className="px-2.5 py-2 font-mono text-[13px] font-semibold" style={{ color: accent }}>{f.flightNumber}</td>
+                      <td className="px-2.5 py-2 font-mono text-[13px] font-semibold" style={{ color: accent }}>
+                        {f.flightNumber}
+                      </td>
                       <td className="px-2.5 py-2 font-mono text-[13px] font-semibold" style={{ color: accent }}>
                         {agreement.partnerAirlineCode} {getMarketingNumber(f.flightNumber)}
                       </td>
-                      <td className="px-2.5 py-2 font-mono text-[13px]" style={{ color: palette.textSecondary }}>{f.depStation}&rarr;{f.arrStation}</td>
-                      <td className="px-2.5 py-2 text-[13px]" style={{ color: palette.textSecondary }}>{f.daysOfWeek}</td>
+                      <td className="px-2.5 py-2 font-mono text-[13px]" style={{ color: palette.textSecondary }}>
+                        {f.depStation}&rarr;{f.arrStation}
+                      </td>
+                      <td className="px-2.5 py-2 text-[13px]" style={{ color: palette.textSecondary }}>
+                        {f.daysOfWeek}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -231,16 +292,27 @@ export function BulkImportDialog({
               {/* Cabin allocations for block/hard */}
               {needsAlloc && (
                 <div className="pt-3" style={{ borderTop: `1px solid ${glassBorder}` }}>
-                  <div className="text-[13px] font-semibold mb-2" style={{ color: palette.text }}>Default Seat Allocation (applied to all)</div>
-                  {CABIN_CLASSES.map(cc => (
+                  <div className="text-[13px] font-semibold mb-2" style={{ color: palette.text }}>
+                    Default Seat Allocation (applied to all)
+                  </div>
+                  {CABIN_CLASSES.map((cc) => (
                     <div key={cc.code} className="grid grid-cols-[60px_120px_80px_80px] gap-2 mb-1.5 items-center">
-                      <span className="text-[13px] font-mono font-semibold" style={{ color: cc.color }}>{cc.code}</span>
-                      <span className="text-[13px]" style={{ color: palette.textSecondary }}>{cc.name}</span>
+                      <span className="text-[13px] font-mono font-semibold" style={{ color: cc.color }}>
+                        {cc.code}
+                      </span>
+                      <span className="text-[13px]" style={{ color: palette.textSecondary }}>
+                        {cc.name}
+                      </span>
                       <input
                         type="number"
                         min={0}
                         value={cabinAllocs[cc.code]?.seats ?? 0}
-                        onChange={e => setCabinAllocs(s => ({ ...s, [cc.code]: { seats: parseInt(e.target.value) || 0, release: s[cc.code]?.release ?? 72 } }))}
+                        onChange={(e) =>
+                          setCabinAllocs((s) => ({
+                            ...s,
+                            [cc.code]: { seats: parseInt(e.target.value) || 0, release: s[cc.code]?.release ?? 72 },
+                          }))
+                        }
                         placeholder="Seats"
                         className="h-8 px-2 rounded-lg text-[13px] font-mono outline-none text-center"
                         style={inputStyle}
@@ -250,7 +322,12 @@ export function BulkImportDialog({
                         min={0}
                         max={168}
                         value={cabinAllocs[cc.code]?.release ?? 72}
-                        onChange={e => setCabinAllocs(s => ({ ...s, [cc.code]: { seats: s[cc.code]?.seats ?? 0, release: parseInt(e.target.value) || 72 } }))}
+                        onChange={(e) =>
+                          setCabinAllocs((s) => ({
+                            ...s,
+                            [cc.code]: { seats: s[cc.code]?.seats ?? 0, release: parseInt(e.target.value) || 72 },
+                          }))
+                        }
                         placeholder="Release h"
                         className="h-8 px-2 rounded-lg text-[13px] font-mono outline-none text-center"
                         style={inputStyle}

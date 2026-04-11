@@ -1,48 +1,50 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import { Copy, Send, RefreshCw } from "lucide-react";
-import { DOC_STATUS_CONFIG } from "../types";
-import { MESSAGES, LDM_PREVIEW } from "../data/mock-data";
+import { useState } from 'react'
+import { Copy, Send, RefreshCw } from 'lucide-react'
+import { DOC_STATUS_CONFIG } from '../types'
+import { MESSAGES, LDM_PREVIEW } from '../data/mock-data'
 
 interface MessagesTabProps {
-  accent: string;
-  isDark: boolean;
-  glass: { panel: string; panelBorder: string };
+  accent: string
+  isDark: boolean
+  glass: { panel: string; panelBorder: string }
 }
 
 export function MessagesTab({ accent, isDark, glass }: MessagesTabProps) {
-  const [selected, setSelected] = useState("ldm");
+  const [selected, setSelected] = useState('ldm')
 
-  const textPrimary = isDark ? "#f5f5f5" : "#111";
-  const textMuted = isDark ? "#777" : "#999";
+  const textPrimary = isDark ? '#f5f5f5' : '#111'
+  const textMuted = isDark ? '#777' : '#999'
 
   return (
     <div className="flex h-full gap-2.5" style={{ padding: 16 }}>
       {/* Left: message type cards */}
       <div className="flex flex-col gap-1.5" style={{ width: 210 }}>
         {MESSAGES.map((m) => {
-          const ds = DOC_STATUS_CONFIG[m.status];
-          const isActive = selected === m.key;
+          const ds = DOC_STATUS_CONFIG[m.status]
+          const isActive = selected === m.key
           return (
             <div
               key={m.key}
               onClick={() => setSelected(m.key)}
               className="cursor-pointer transition-all duration-150"
               style={{
-                padding: "10px 12px",
+                padding: '10px 12px',
                 borderRadius: 10,
-                background: isActive ? glass.panel : "transparent",
-                border: isActive ? `1.5px solid ${accent}40` : "1.5px solid transparent",
-                backdropFilter: isActive ? "blur(12px)" : "none",
+                background: isActive ? glass.panel : 'transparent',
+                border: isActive ? `1.5px solid ${accent}40` : '1.5px solid transparent',
+                backdropFilter: isActive ? 'blur(12px)' : 'none',
               }}
             >
               <div className="flex items-center justify-between">
                 <span style={{ fontSize: 14, fontWeight: 600, color: textPrimary }}>{m.label}</span>
                 <span
                   style={{
-                    fontSize: 13, fontWeight: 600,
-                    padding: "2px 7px", borderRadius: 8,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    padding: '2px 7px',
+                    borderRadius: 8,
                     background: isDark ? `${ds.text}18` : ds.bg,
                     color: ds.text,
                   }}
@@ -52,7 +54,7 @@ export function MessagesTab({ accent, isDark, glass }: MessagesTabProps) {
               </div>
               <div style={{ fontSize: 13, color: textMuted, marginTop: 2 }}>{m.desc}</div>
             </div>
-          );
+          )
         })}
       </div>
 
@@ -61,13 +63,22 @@ export function MessagesTab({ accent, isDark, glass }: MessagesTabProps) {
         className="flex-1 flex flex-col"
         style={{
           background: glass.panel,
-          backdropFilter: "blur(16px)",
+          backdropFilter: 'blur(16px)',
           borderRadius: 12,
           border: `1px solid ${glass.panelBorder}`,
           padding: 16,
         }}
       >
-        <div style={{ fontSize: 13, fontWeight: 700, color: isDark ? "#aaa" : "#555", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: isDark ? '#aaa' : '#555',
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+            marginBottom: 10,
+          }}
+        >
           LDM Preview
         </div>
         <pre
@@ -76,11 +87,11 @@ export function MessagesTab({ accent, isDark, glass }: MessagesTabProps) {
             fontFamily: "'SF Mono','Roboto Mono',monospace",
             fontSize: 13,
             lineHeight: 1.6,
-            color: isDark ? "#ccc" : "#333",
-            background: isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)",
+            color: isDark ? '#ccc' : '#333',
+            background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
             borderRadius: 8,
             padding: 12,
-            border: `1px solid ${isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)"}`,
+            border: `1px solid ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'}`,
           }}
         >
           {LDM_PREVIEW}
@@ -89,7 +100,7 @@ export function MessagesTab({ accent, isDark, glass }: MessagesTabProps) {
           <button
             className="flex-1 flex items-center justify-center gap-1.5 cursor-pointer"
             style={{
-              padding: "8px 0",
+              padding: '8px 0',
               borderRadius: 8,
               border: `1.5px solid ${accent}30`,
               background: `${accent}08`,
@@ -104,11 +115,11 @@ export function MessagesTab({ accent, isDark, glass }: MessagesTabProps) {
           <button
             className="flex-1 flex items-center justify-center gap-1.5 cursor-pointer"
             style={{
-              padding: "8px 0",
+              padding: '8px 0',
               borderRadius: 8,
-              border: "none",
+              border: 'none',
               background: accent,
-              color: "#fff",
+              color: '#fff',
               fontSize: 13,
               fontWeight: 600,
               boxShadow: `0 2px 8px ${accent}4d`,
@@ -120,11 +131,11 @@ export function MessagesTab({ accent, isDark, glass }: MessagesTabProps) {
           <button
             className="flex items-center justify-center gap-1 cursor-pointer"
             style={{
-              padding: "8px 12px",
+              padding: '8px 12px',
               borderRadius: 8,
-              border: `1.5px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`,
-              background: isDark ? "rgba(255,255,255,0.04)" : "#fff",
-              color: isDark ? "#aaa" : "#555",
+              border: `1.5px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+              background: isDark ? 'rgba(255,255,255,0.04)' : '#fff',
+              color: isDark ? '#aaa' : '#555',
               fontSize: 13,
               fontWeight: 600,
             }}
@@ -135,5 +146,5 @@ export function MessagesTab({ accent, isDark, glass }: MessagesTabProps) {
         </div>
       </div>
     </div>
-  );
+  )
 }

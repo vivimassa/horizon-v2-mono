@@ -4,9 +4,7 @@ import MapView, { Marker } from 'react-native-maps'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { api, type AirportRef } from '@skyhub/api'
-import {
-  ChevronLeft, Pencil, Save, X, Trash2,
-} from 'lucide-react-native'
+import { ChevronLeft, Pencil, Save, X, Trash2 } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { useDevice } from '../../../hooks/useDevice'
@@ -27,7 +25,8 @@ export default function CrewBaseDetailScreen() {
   useEffect(() => {
     if (!id) return
     setError(null)
-    api.getAirport(id)
+    api
+      .getAirport(id)
       .then(setAirport)
       .catch((err: any) => setError(err.message || 'Failed to load crew base'))
       .finally(() => setLoading(false))
@@ -36,11 +35,14 @@ export default function CrewBaseDetailScreen() {
   const get = (key: keyof AirportRef) => (key in draft ? (draft as any)[key] : airport?.[key])
 
   const handleFieldChange = useCallback((key: string, value: any) => {
-    setDraft(prev => ({ ...prev, [key]: value }))
+    setDraft((prev) => ({ ...prev, [key]: value }))
   }, [])
 
   const handleSave = useCallback(async () => {
-    if (!airport || Object.keys(draft).length === 0) { setEditing(false); return }
+    if (!airport || Object.keys(draft).length === 0) {
+      setEditing(false)
+      return
+    }
     setSaving(true)
     try {
       const updated = await api.updateAirport(airport._id, draft)
@@ -49,7 +51,9 @@ export default function CrewBaseDetailScreen() {
       setEditing(false)
     } catch (err: any) {
       Alert.alert('Save Failed', err.message || 'Could not save changes')
-    } finally { setSaving(false) }
+    } finally {
+      setSaving(false)
+    }
   }, [airport, draft])
 
   const handleRemoveBase = useCallback(() => {
@@ -60,7 +64,8 @@ export default function CrewBaseDetailScreen() {
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Yes, Remove', style: 'destructive',
+          text: 'Yes, Remove',
+          style: 'destructive',
           onPress: async () => {
             try {
               await api.updateAirport(airport._id, { isCrewBase: false })
@@ -70,7 +75,7 @@ export default function CrewBaseDetailScreen() {
             }
           },
         },
-      ]
+      ],
     )
   }, [airport, router])
 
@@ -121,19 +126,35 @@ export default function CrewBaseDetailScreen() {
           <View className="flex-row items-center" style={{ gap: 8 }}>
             {editing ? (
               <>
-                <Pressable onPress={() => { setEditing(false); setDraft({}) }} className="active:opacity-60">
+                <Pressable
+                  onPress={() => {
+                    setEditing(false)
+                    setDraft({})
+                  }}
+                  className="active:opacity-60"
+                >
                   <X size={20} color={palette.textSecondary} strokeWidth={1.8} />
                 </Pressable>
-                <Pressable onPress={handleSave} disabled={saving}
+                <Pressable
+                  onPress={handleSave}
+                  disabled={saving}
                   className="px-4 py-2.5 rounded-lg active:opacity-60"
-                  style={{ backgroundColor: accent }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>{saving ? 'Saving...' : 'Save'}</Text>
+                  style={{ backgroundColor: accent }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#fff' }}>
+                    {saving ? 'Saving...' : 'Save'}
+                  </Text>
                 </Pressable>
               </>
             ) : (
-              <Pressable onPress={() => { setDraft({}); setEditing(true) }}
+              <Pressable
+                onPress={() => {
+                  setDraft({})
+                  setEditing(true)
+                }}
                 className="flex-row items-center px-3 py-1.5 rounded-lg active:opacity-60"
-                style={{ backgroundColor: accentTint(accent, isDark ? 0.15 : 0.08) }}>
+                style={{ backgroundColor: accentTint(accent, isDark ? 0.15 : 0.08) }}
+              >
                 <Pencil size={15} color={accent} strokeWidth={1.8} />
                 <Text style={{ fontSize: 14, fontWeight: '600', color: accent, marginLeft: 6 }}>Edit</Text>
               </Pressable>
@@ -166,11 +187,47 @@ export default function CrewBaseDetailScreen() {
 
           {/* Code overlay on map */}
           <View className="absolute top-3 left-3 flex-row" style={{ gap: 6 }}>
-            <View className="px-2.5 py-1 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.88)', ...Platform.select({ ios: { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }, android: { elevation: 3 } }) }}>
-              <Text style={{ fontSize: 13, color: '#666' }}>IATA: <Text style={{ fontWeight: '700', fontFamily: 'monospace', color: '#111' }}>{airport.iataCode ?? '\u2014'}</Text></Text>
+            <View
+              className="px-2.5 py-1 rounded-lg"
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.88)',
+                ...Platform.select({
+                  ios: {
+                    shadowColor: '#000',
+                    shadowOpacity: 0.1,
+                    shadowRadius: 4,
+                    shadowOffset: { width: 0, height: 2 },
+                  },
+                  android: { elevation: 3 },
+                }),
+              }}
+            >
+              <Text style={{ fontSize: 13, color: '#666' }}>
+                IATA:{' '}
+                <Text style={{ fontWeight: '700', fontFamily: 'monospace', color: '#111' }}>
+                  {airport.iataCode ?? '\u2014'}
+                </Text>
+              </Text>
             </View>
-            <View className="px-2.5 py-1 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.88)', ...Platform.select({ ios: { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } }, android: { elevation: 3 } }) }}>
-              <Text style={{ fontSize: 13, color: '#666' }}>ICAO: <Text style={{ fontWeight: '700', fontFamily: 'monospace', color: '#111' }}>{airport.icaoCode}</Text></Text>
+            <View
+              className="px-2.5 py-1 rounded-lg"
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.88)',
+                ...Platform.select({
+                  ios: {
+                    shadowColor: '#000',
+                    shadowOpacity: 0.1,
+                    shadowRadius: 4,
+                    shadowOffset: { width: 0, height: 2 },
+                  },
+                  android: { elevation: 3 },
+                }),
+              }}
+            >
+              <Text style={{ fontSize: 13, color: '#666' }}>
+                ICAO:{' '}
+                <Text style={{ fontWeight: '700', fontFamily: 'monospace', color: '#111' }}>{airport.icaoCode}</Text>
+              </Text>
             </View>
           </View>
         </View>
@@ -189,7 +246,16 @@ export default function CrewBaseDetailScreen() {
           <Field label="City" value={airport.city} palette={palette} half={isTablet} />
           <Field label="Country" value={airport.countryName ?? airport.country} palette={palette} half={isTablet} />
           <Field label="Timezone" value={airport.timezone} palette={palette} half={isTablet} />
-          <Field label="UTC Offset" value={airport.utcOffsetHours != null ? `UTC${airport.utcOffsetHours >= 0 ? '+' : ''}${airport.utcOffsetHours}` : null} palette={palette} half={isTablet} />
+          <Field
+            label="UTC Offset"
+            value={
+              airport.utcOffsetHours != null
+                ? `UTC${airport.utcOffsetHours >= 0 ? '+' : ''}${airport.utcOffsetHours}`
+                : null
+            }
+            palette={palette}
+            half={isTablet}
+          />
         </View>
 
         {/* Crew Base Configuration (editable) */}
@@ -272,31 +338,84 @@ export default function CrewBaseDetailScreen() {
 
 // ── Field components ──
 
-function Field({ label, value, palette, half }: {
-  label: string; value: any; palette: Palette; half?: boolean
-}) {
+function Field({ label, value, palette, half }: { label: string; value: any; palette: Palette; half?: boolean }) {
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...(half ? { width: '50%', paddingRight: 12 } : {}) }}>
-      <Text style={{ fontSize: 15, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
+    <View
+      style={{
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: palette.border,
+        ...(half ? { width: '50%', paddingRight: 12 } : {}),
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 15,
+          color: palette.textSecondary,
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+          fontWeight: '600',
+          marginBottom: 4,
+        }}
+      >
+        {label}
+      </Text>
       <Text style={{ fontSize: 15, fontWeight: '500', color: palette.text }}>{value ?? '\u2014'}</Text>
     </View>
   )
 }
 
-function EditableField({ label, value, editing, fieldKey, editValue, onChange, palette, accent, numeric, half }: {
-  label: string; value: any; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; accent: string; numeric?: boolean; half?: boolean
+function EditableField({
+  label,
+  value,
+  editing,
+  fieldKey,
+  editValue,
+  onChange,
+  palette,
+  accent,
+  numeric,
+  half,
+}: {
+  label: string
+  value: any
+  editing: boolean
+  fieldKey: string
+  editValue: any
+  onChange: (k: string, v: any) => void
+  palette: Palette
+  accent: string
+  numeric?: boolean
+  half?: boolean
 }) {
   const halfStyle = half ? { width: '50%' as const, paddingRight: 12 } : {}
   if (editing) {
     return (
       <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
-        <Text style={{ fontSize: 15, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
+        <Text
+          style={{
+            fontSize: 15,
+            color: palette.textSecondary,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+            fontWeight: '600',
+            marginBottom: 4,
+          }}
+        >
+          {label}
+        </Text>
         <TextInput
           value={editValue != null ? String(editValue) : ''}
           onChangeText={(v) => onChange(fieldKey, numeric ? (v === '' ? null : Number(v)) : v)}
           keyboardType={numeric ? 'numeric' : 'default'}
-          style={{ fontSize: 15, fontWeight: '500', color: palette.text, borderBottomWidth: 1, borderBottomColor: accentTint(accent, 0.3), paddingVertical: 4 }}
+          style={{
+            fontSize: 15,
+            fontWeight: '500',
+            color: palette.text,
+            borderBottomWidth: 1,
+            borderBottomColor: accentTint(accent, 0.3),
+            paddingVertical: 4,
+          }}
           placeholderTextColor={palette.textTertiary}
           placeholder={numeric ? 'Enter minutes' : undefined}
         />
@@ -305,30 +424,98 @@ function EditableField({ label, value, editing, fieldKey, editValue, onChange, p
   }
   return (
     <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...halfStyle }}>
-      <Text style={{ fontSize: 15, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
+      <Text
+        style={{
+          fontSize: 15,
+          color: palette.textSecondary,
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+          fontWeight: '600',
+          marginBottom: 4,
+        }}
+      >
+        {label}
+      </Text>
       <Text style={{ fontSize: 15, fontWeight: '500', color: palette.text }}>{value ?? '\u2014'}</Text>
     </View>
   )
 }
 
-function ToggleField({ label, value, editing, fieldKey, editValue, onChange, palette, isDark, half }: {
-  label: string; value: boolean; editing: boolean; fieldKey: string; editValue: any;
-  onChange: (k: string, v: any) => void; palette: Palette; isDark: boolean; half?: boolean
+function ToggleField({
+  label,
+  value,
+  editing,
+  fieldKey,
+  editValue,
+  onChange,
+  palette,
+  isDark,
+  half,
+}: {
+  label: string
+  value: boolean
+  editing: boolean
+  fieldKey: string
+  editValue: any
+  onChange: (k: string, v: any) => void
+  palette: Palette
+  isDark: boolean
+  half?: boolean
 }) {
   const current = editing ? !!editValue : value
   return (
-    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border, ...(half ? { width: '50%', paddingRight: 12 } : {}) }}>
-      <Text style={{ fontSize: 15, color: palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
+    <View
+      style={{
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: palette.border,
+        ...(half ? { width: '50%', paddingRight: 12 } : {}),
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 15,
+          color: palette.textSecondary,
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+          fontWeight: '600',
+          marginBottom: 4,
+        }}
+      >
+        {label}
+      </Text>
       {editing ? (
-        <Pressable onPress={() => onChange(fieldKey, !editValue)}
+        <Pressable
+          onPress={() => onChange(fieldKey, !editValue)}
           className="self-start px-3 py-1 rounded-lg"
-          style={{ backgroundColor: current ? (isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7') : (isDark ? 'rgba(220,38,38,0.15)' : '#fee2e2') }}>
-          <Text style={{ fontSize: 15, fontWeight: '600', color: current ? (isDark ? '#4ade80' : '#16a34a') : (isDark ? '#f87171' : '#dc2626') }}>
+          style={{
+            backgroundColor: current
+              ? isDark
+                ? 'rgba(22,163,74,0.15)'
+                : '#dcfce7'
+              : isDark
+                ? 'rgba(220,38,38,0.15)'
+                : '#fee2e2',
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: '600',
+              color: current ? (isDark ? '#4ade80' : '#16a34a') : isDark ? '#f87171' : '#dc2626',
+            }}
+          >
             {current ? 'Yes' : 'No'}
           </Text>
         </Pressable>
       ) : (
-        <Text style={{ fontSize: 15, fontWeight: '600', color: value ? (isDark ? '#4ade80' : '#16a34a') : palette.textSecondary }}>
+        <Text
+          style={{
+            fontSize: 15,
+            fontWeight: '600',
+            color: value ? (isDark ? '#4ade80' : '#16a34a') : palette.textSecondary,
+          }}
+        >
           {value ? 'Yes' : 'No'}
         </Text>
       )}

@@ -15,25 +15,10 @@ interface IconProps {
   className?: string
 }
 
-export function Icon({
-  icon: IconComponent,
-  size = 'md',
-  color,
-  accentActive = false,
-  className,
-}: IconProps) {
+export function Icon({ icon: IconComponent, size = 'md', color, accentActive = false, className }: IconProps) {
   const { palette, accentColor } = useTheme()
 
-  const resolvedColor = accentActive
-    ? accentColor
-    : color ?? palette.textSecondary
+  const resolvedColor = accentActive ? accentColor : (color ?? palette.textSecondary)
 
-  return (
-    <IconComponent
-      size={sizeMap[size]}
-      color={resolvedColor}
-      strokeWidth={1.75}
-      className={className}
-    />
-  )
+  return <IconComponent size={sizeMap[size]} color={resolvedColor} strokeWidth={1.75} className={className} />
 }

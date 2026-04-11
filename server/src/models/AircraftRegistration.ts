@@ -80,7 +80,7 @@ const aircraftRegistrationSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'aircraftRegistrations',
-  }
+  },
 )
 
 aircraftRegistrationSchema.index({ operatorId: 1, registration: 1 }, { unique: true })

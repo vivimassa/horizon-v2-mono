@@ -22,7 +22,7 @@ const cabinClassSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'cabinClasses',
-  }
+  },
 )
 
 cabinClassSchema.index({ operatorId: 1, code: 1 }, { unique: true })

@@ -15,7 +15,7 @@ const flightServiceTypeSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'flightServiceTypes',
-  }
+  },
 )
 
 flightServiceTypeSchema.index({ operatorId: 1, code: 1 }, { unique: true })

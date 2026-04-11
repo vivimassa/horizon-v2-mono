@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
@@ -7,12 +7,12 @@ import { useTheme } from '@/components/theme-provider'
 import { useGanttStore } from '@/stores/use-gantt-store'
 
 export function GanttContextMenu() {
-  const ctx = useGanttStore(s => s.contextMenu)
-  const closeContextMenu = useGanttStore(s => s.closeContextMenu)
-  const openFlightInfo = useGanttStore(s => s.openFlightInfo)
-  const selectedFlightIds = useGanttStore(s => s.selectedFlightIds)
-  const flights = useGanttStore(s => s.flights)
-  const layout = useGanttStore(s => s.layout)
+  const ctx = useGanttStore((s) => s.contextMenu)
+  const closeContextMenu = useGanttStore((s) => s.closeContextMenu)
+  const openFlightInfo = useGanttStore((s) => s.openFlightInfo)
+  const selectedFlightIds = useGanttStore((s) => s.selectedFlightIds)
+  const flights = useGanttStore((s) => s.flights)
+  const layout = useGanttStore((s) => s.layout)
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const ref = useRef<HTMLDivElement>(null)
@@ -21,7 +21,10 @@ export function GanttContextMenu() {
   const leaveTimer = useRef<number | null>(null)
 
   const enterAssign = useCallback(() => {
-    if (leaveTimer.current) { clearTimeout(leaveTimer.current); leaveTimer.current = null }
+    if (leaveTimer.current) {
+      clearTimeout(leaveTimer.current)
+      leaveTimer.current = null
+    }
     setAssignHover(true)
   }, [])
 
@@ -29,9 +32,14 @@ export function GanttContextMenu() {
     leaveTimer.current = window.setTimeout(() => setAssignHover(false), 120)
   }, [])
 
-  useEffect(() => { setMounted(true) }, [])
   useEffect(() => {
-    if (!ctx) { setAssignHover(false); if (leaveTimer.current) clearTimeout(leaveTimer.current) }
+    setMounted(true)
+  }, [])
+  useEffect(() => {
+    if (!ctx) {
+      setAssignHover(false)
+      if (leaveTimer.current) clearTimeout(leaveTimer.current)
+    }
   }, [ctx])
 
   useEffect(() => {
@@ -45,7 +53,9 @@ export function GanttContextMenu() {
 
   useEffect(() => {
     if (!ctx) return
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') closeContextMenu() }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeContextMenu()
+    }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [ctx, closeContextMenu])
@@ -53,13 +63,13 @@ export function GanttContextMenu() {
   if (!mounted || !ctx) return null
 
   const flightIds = [...selectedFlightIds]
-  const selectedFlts = flights.filter(f => selectedFlightIds.has(f.id))
+  const selectedFlts = flights.filter((f) => selectedFlightIds.has(f.id))
   const acType = selectedFlts[0]?.aircraftTypeIcao ?? ''
-  const hasAssigned = selectedFlts.some(f => f.aircraftReg)
+  const hasAssigned = selectedFlts.some((f) => f.aircraftReg)
   const isSingle = selectedFlightIds.size === 1
 
   // Find which aircraft row the right-clicked flight is on
-  const ctxBar = layout?.bars.find(b => b.flightId === ctx.flightId)
+  const ctxBar = layout?.bars.find((b) => b.flightId === ctx.flightId)
   const ctxRow = ctxBar ? layout?.rows[ctxBar.row] : null
   const rowReg = ctxRow?.registration ?? null
 
@@ -110,28 +120,46 @@ export function GanttContextMenu() {
       <div
         className="fixed z-[9999] rounded-xl py-1.5 overflow-hidden"
         style={{
-          left, top, minWidth: 260,
-          background: bg, border: `1px solid ${border}`,
+          left,
+          top,
+          minWidth: 260,
+          background: bg,
+          border: `1px solid ${border}`,
           backdropFilter: 'blur(20px) saturate(180%)',
           WebkitBackdropFilter: 'blur(20px) saturate(180%)',
           boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)',
           animation: 'bc-dropdown-in 100ms ease-out',
         }}
       >
-        <MenuItem icon={Info} label="Flight Information" shortcut="F1" disabled={!isSingle}
-          onClick={() => { openFlightInfo(ctx.flightId); closeContextMenu() }}
-          textColor={textColor} textMuted={textMuted} hoverBg={hoverBg} />
-        <MenuItem icon={Clock} label="Slot Details" disabled={!isSingle || !selectedFlts[0]?.slotStatus}
-          onClick={() => { window.open('/network/schedule/slot-manager', '_blank'); closeContextMenu() }}
-          textColor={textColor} textMuted={textMuted} hoverBg={hoverBg} />
+        <MenuItem
+          icon={Info}
+          label="Flight Information"
+          shortcut="F1"
+          disabled={!isSingle}
+          onClick={() => {
+            openFlightInfo(ctx.flightId)
+            closeContextMenu()
+          }}
+          textColor={textColor}
+          textMuted={textMuted}
+          hoverBg={hoverBg}
+        />
+        <MenuItem
+          icon={Clock}
+          label="Slot Details"
+          disabled={!isSingle || !selectedFlts[0]?.slotStatus}
+          onClick={() => {
+            window.open('/network/schedule/slot-manager', '_blank')
+            closeContextMenu()
+          }}
+          textColor={textColor}
+          textMuted={textMuted}
+          hoverBg={hoverBg}
+        />
         <Divider color={dividerColor} />
 
         {/* Assign Aircraft — hover triggers submenu */}
-        <div
-          className="relative"
-          onMouseEnter={enterAssign}
-          onMouseLeave={leaveAssign}
-        >
+        <div className="relative" onMouseEnter={enterAssign} onMouseLeave={leaveAssign}>
           <div
             className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] cursor-pointer transition-colors"
             style={{ color: textColor, background: assignHover ? hoverBg : 'transparent' }}
@@ -142,37 +170,65 @@ export function GanttContextMenu() {
           </div>
         </div>
 
-        <MenuItem icon={Unlink} label="Unassign Aircraft" shortcut="Alt+D" disabled={!hasAssigned}
+        <MenuItem
+          icon={Unlink}
+          label="Unassign Aircraft"
+          shortcut="Alt+D"
+          disabled={!hasAssigned}
           onClick={handleUnassign}
-          textColor={textColor} textMuted={textMuted} hoverBg={hoverBg} />
+          textColor={textColor}
+          textMuted={textMuted}
+          hoverBg={hoverBg}
+        />
         <Divider color={dividerColor} />
-        <MenuItem icon={ArrowLeftRight} label="Swap" shortcut="Alt+S"
-          onClick={() => { useGanttStore.getState().enterSwapMode(); closeContextMenu() }}
-          textColor={textColor} textMuted={textMuted} hoverBg={hoverBg} />
+        <MenuItem
+          icon={ArrowLeftRight}
+          label="Swap"
+          shortcut="Alt+S"
+          onClick={() => {
+            useGanttStore.getState().enterSwapMode()
+            closeContextMenu()
+          }}
+          textColor={textColor}
+          textMuted={textMuted}
+          hoverBg={hoverBg}
+        />
         <Divider color={dividerColor} />
-        <MenuItem icon={Trash2} label="Cancel Flight(s)" shortcut="Del" danger
-          onClick={() => { useGanttStore.getState().openCancelDialog([...selectedFlightIds]) }}
-          textColor={textColor} textMuted={textMuted} hoverBg={hoverBg} />
+        <MenuItem
+          icon={Trash2}
+          label="Cancel Flight(s)"
+          shortcut="Del"
+          danger
+          onClick={() => {
+            useGanttStore.getState().openCancelDialog([...selectedFlightIds])
+          }}
+          textColor={textColor}
+          textMuted={textMuted}
+          hoverBg={hoverBg}
+        />
       </div>
 
       {/* Assign submenu — outside main menu to avoid overflow clip, uses timer to bridge gap */}
       {assignHover && (
-        <div
-          onMouseEnter={enterAssign}
-          onMouseLeave={leaveAssign}
-        >
+        <div onMouseEnter={enterAssign} onMouseLeave={leaveAssign}>
           {/* Invisible bridge covering the 4px gap between menus */}
-          <div className="fixed z-[9999]" style={{
-            left: subFlip ? subX + 230 : left + menuVisualW,
-            top: assignRowTop,
-            width: subGap,
-            height: 60,
-          }} />
+          <div
+            className="fixed z-[9999]"
+            style={{
+              left: subFlip ? subX + 230 : left + menuVisualW,
+              top: assignRowTop,
+              width: subGap,
+              height: 60,
+            }}
+          />
           <div
             className="fixed z-[10000] rounded-xl py-1.5 overflow-hidden"
             style={{
-              left: subX, top: assignRowTop, minWidth: 230,
-              background: bg, border: `1px solid ${border}`,
+              left: subX,
+              top: assignRowTop,
+              minWidth: 230,
+              background: bg,
+              border: `1px solid ${border}`,
               backdropFilter: 'blur(20px) saturate(180%)',
               WebkitBackdropFilter: 'blur(20px) saturate(180%)',
               boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)',
@@ -183,19 +239,31 @@ export function GanttContextMenu() {
                 onClick={handleAssignHere}
                 className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] font-medium transition-colors"
                 style={{ color: textColor }}
-                onMouseEnter={e => { e.currentTarget.style.background = hoverBg }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = hoverBg
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent'
+                }}
               >
-                <span className="flex-1 text-left">Assign to <span className="font-mono font-bold">{rowReg}</span></span>
-                <span className="text-[11px] font-mono" style={{ color: textMuted }}>Alt+A</span>
+                <span className="flex-1 text-left">
+                  Assign to <span className="font-mono font-bold">{rowReg}</span>
+                </span>
+                <span className="text-[11px] font-mono" style={{ color: textMuted }}>
+                  Alt+A
+                </span>
               </button>
             )}
             <button
               onClick={handleAssignOther}
               className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] font-medium transition-colors"
               style={{ color: textColor }}
-              onMouseEnter={e => { e.currentTarget.style.background = hoverBg }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = hoverBg
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+              }}
             >
               <span className="flex-1 text-left">Assign to other aircraft...</span>
             </button>
@@ -203,29 +271,56 @@ export function GanttContextMenu() {
         </div>
       )}
     </div>,
-    document.body
+    document.body,
   )
 }
 
-function MenuItem({ icon: Icon, label, shortcut, disabled, danger, onClick, textColor, textMuted, hoverBg }: {
-  icon: typeof Info; label: string; shortcut?: string; disabled?: boolean; danger?: boolean
-  onClick: () => void; textColor: string; textMuted: string; hoverBg: string
+function MenuItem({
+  icon: Icon,
+  label,
+  shortcut,
+  disabled,
+  danger,
+  onClick,
+  textColor,
+  textMuted,
+  hoverBg,
+}: {
+  icon: typeof Info
+  label: string
+  shortcut?: string
+  disabled?: boolean
+  danger?: boolean
+  onClick: () => void
+  textColor: string
+  textMuted: string
+  hoverBg: string
 }) {
   return (
     <button
-      onClick={() => { if (!disabled) onClick() }}
+      onClick={() => {
+        if (!disabled) onClick()
+      }}
       disabled={disabled}
       className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] transition-colors"
       style={{
         color: disabled ? `${textColor}30` : danger ? '#E63535' : textColor,
         cursor: disabled ? 'default' : 'pointer',
       }}
-      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = danger ? 'rgba(255,59,59,0.10)' : hoverBg }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+      onMouseEnter={(e) => {
+        if (!disabled) e.currentTarget.style.background = danger ? 'rgba(255,59,59,0.10)' : hoverBg
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent'
+      }}
     >
       <Icon size={14} className="shrink-0" strokeWidth={1.8} />
       <span className="flex-1 text-left font-medium">{label}</span>
-      {shortcut && <span className="text-[11px] font-mono" style={{ color: textMuted }}>{shortcut}</span>}
+      {shortcut && (
+        <span className="text-[11px] font-mono" style={{ color: textMuted }}>
+          {shortcut}
+        </span>
+      )}
     </button>
   )
 }

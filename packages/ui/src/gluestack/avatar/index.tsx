@@ -21,19 +21,9 @@ export function Avatar({
   )
 }
 
-export function AvatarFallbackText({
-  children,
-  className,
-}: {
-  children: React.ReactNode
-  className?: string
-}) {
+export function AvatarFallbackText({ children, className }: { children: React.ReactNode; className?: string }) {
   const text = typeof children === 'string' ? children.slice(0, 2).toUpperCase() : ''
-  return (
-    <Text className={`text-sm font-semibold text-gray-600 dark:text-gray-300 ${className ?? ''}`}>
-      {text}
-    </Text>
-  )
+  return <Text className={`text-sm font-semibold text-gray-600 dark:text-gray-300 ${className ?? ''}`}>{text}</Text>
 }
 
 export function AvatarImage({

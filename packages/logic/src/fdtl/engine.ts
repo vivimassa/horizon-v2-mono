@@ -50,11 +50,11 @@ export async function loadRuleSet(operatorId: string): Promise<SerializedRuleSet
     }))
 
     fdpTable = {
-      tableCode:  tableRow.table_code as string,
-      rowKeys:    tableRow.row_keys as string[],
-      rowLabels:  tableRow.row_labels as string[],
-      colKeys:    tableRow.col_keys as string[],
-      colLabels:  tableRow.col_labels as string[],
+      tableCode: tableRow.table_code as string,
+      rowKeys: tableRow.row_keys as string[],
+      rowLabels: tableRow.row_labels as string[],
+      colKeys: tableRow.col_keys as string[],
+      colLabels: tableRow.col_labels as string[],
       cells,
     }
   }
@@ -64,32 +64,40 @@ export async function loadRuleSet(operatorId: string): Promise<SerializedRuleSet
   const ruleRows: any[] = [] // TODO: wire to v2 data layer
 
   // Build map: government first, then company overwrites
-  const ruleMap = new Map<string, {
-    code: string; value: string; valueType: string; unit: string
-    directionality: string | null; label: string; legalReference: string | null
-  }>()
+  const ruleMap = new Map<
+    string,
+    {
+      code: string
+      value: string
+      valueType: string
+      unit: string
+      directionality: string | null
+      label: string
+      legalReference: string | null
+    }
+  >()
 
   // First pass: government
   for (const r of (ruleRows ?? []).filter((r: any) => r.source_type === 'government')) {
     ruleMap.set(r.rule_code, {
-      code:           r.rule_code,
-      value:          r.value,
-      valueType:      r.value_type,
-      unit:           r.unit ?? '',
+      code: r.rule_code,
+      value: r.value,
+      valueType: r.value_type,
+      unit: r.unit ?? '',
       directionality: r.directionality ?? null,
-      label:          r.label,
+      label: r.label,
       legalReference: r.legal_reference ?? null,
     })
   }
   // Second pass: company overwrites (always more restrictive per FDTL Rule Advisor design)
   for (const r of (ruleRows ?? []).filter((r: any) => r.source_type === 'company')) {
     ruleMap.set(r.rule_code, {
-      code:           r.rule_code,
-      value:          r.value,
-      valueType:      r.value_type,
-      unit:           r.unit ?? '',
+      code: r.rule_code,
+      value: r.value,
+      valueType: r.value_type,
+      unit: r.unit ?? '',
       directionality: r.directionality ?? null,
-      label:          r.label,
+      label: r.label,
       legalReference: r.legal_reference ?? null,
     })
   }
@@ -104,9 +112,9 @@ export async function loadRuleSet(operatorId: string): Promise<SerializedRuleSet
     const cabinCells: any[] = [] // TODO: wire to v2 data layer
 
     cabinRestTable = {
-      rowKeys:   cabinTableRow.row_keys as string[],
+      rowKeys: cabinTableRow.row_keys as string[],
       rowLabels: cabinTableRow.row_labels as string[],
-      colKeys:   cabinTableRow.col_keys as string[],
+      colKeys: cabinTableRow.col_keys as string[],
       colLabels: cabinTableRow.col_labels as string[],
       cells: (cabinCells ?? []).map((c: any) => ({
         key: `${c.row_key}|${c.col_key}`,
@@ -126,10 +134,10 @@ export async function loadRuleSet(operatorId: string): Promise<SerializedRuleSet
   }
 
   const cruiseTimeDeductions: SerializedRuleSet['cruiseTimeDeductions'] = {
-    taxiOutMinutes:  deductionMap.get('REST_TAXI_OUT_DEDUCTION') ?? 10,
-    taxiInMinutes:   deductionMap.get('REST_TAXI_IN_DEDUCTION')  ?? 10,
-    climbMinutes:    deductionMap.get('REST_CLIMB_DEDUCTION')    ?? 30,
-    descentMinutes:  deductionMap.get('REST_DESCENT_DEDUCTION')  ?? 30,
+    taxiOutMinutes: deductionMap.get('REST_TAXI_OUT_DEDUCTION') ?? 10,
+    taxiInMinutes: deductionMap.get('REST_TAXI_IN_DEDUCTION') ?? 10,
+    climbMinutes: deductionMap.get('REST_CLIMB_DEDUCTION') ?? 30,
+    descentMinutes: deductionMap.get('REST_DESCENT_DEDUCTION') ?? 30,
   }
 
   // 7. Augmented FDP limits
@@ -146,18 +154,18 @@ export async function loadRuleSet(operatorId: string): Promise<SerializedRuleSet
   }
 
   const augmentedLimits = (augRows ?? []).map((r: any) => ({
-    crewCount:      r.crew_count     as number,
-    facilityClass:  r.facility_class as string,
-    facilityLabel:  facilityLabels.get(r.facility_class as string) ?? (r.facility_class as string),
-    maxFdpMinutes:  r.max_fdp_minutes as number,
+    crewCount: r.crew_count as number,
+    facilityClass: r.facility_class as string,
+    facilityLabel: facilityLabels.get(r.facility_class as string) ?? (r.facility_class as string),
+    maxFdpMinutes: r.max_fdp_minutes as number,
     legalReference: (r.legal_reference ?? null) as string | null,
   }))
 
   return {
     operatorId,
-    frameworkCode:         fw.code,
-    frameworkName:         fw.name,
-    defaultReportMinutes:  scheme.report_time_minutes as number,
+    frameworkCode: fw.code,
+    frameworkName: fw.name,
+    defaultReportMinutes: scheme.report_time_minutes as number,
     defaultDebriefMinutes: scheme.post_flight_minutes as number,
     reportingTimes,
     fdpTable,

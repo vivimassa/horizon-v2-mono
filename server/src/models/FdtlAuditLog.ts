@@ -18,7 +18,7 @@ const fdtlAuditLogSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'fdtlAuditLog',
-  }
+  },
 )
 
 fdtlAuditLogSchema.index({ operatorId: 1, entityType: 1, entityId: 1 })

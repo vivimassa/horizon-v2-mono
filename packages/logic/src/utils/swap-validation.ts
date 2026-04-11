@@ -30,8 +30,12 @@ export interface SwapWarning {
  * Returns a list of warnings/errors for the hypothetical post-swap state.
  */
 export function validateSwap(
-  sideA: SwapFlight[], regA: string, acTypeA: string,
-  sideB: SwapFlight[], regB: string, acTypeB: string,
+  sideA: SwapFlight[],
+  regA: string,
+  acTypeA: string,
+  sideB: SwapFlight[],
+  regB: string,
+  acTypeB: string,
   rowAFlights: SwapFlight[],
   rowBFlights: SwapFlight[],
   tatMinutes: Map<string, number>,
@@ -44,9 +48,21 @@ export function validateSwap(
     const familyA = extractFamily(acTypeA)
     const familyB = extractFamily(acTypeB)
     if (familyA && familyB && familyA === familyB) {
-      warnings.push({ side: 'A', reg: regB, type: 'ac-type-mismatch', severity: 'warning', message: `${acTypeA} flights moving to ${acTypeB} aircraft (same family)` })
+      warnings.push({
+        side: 'A',
+        reg: regB,
+        type: 'ac-type-mismatch',
+        severity: 'warning',
+        message: `${acTypeA} flights moving to ${acTypeB} aircraft (same family)`,
+      })
     } else {
-      warnings.push({ side: 'A', reg: regB, type: 'ac-type-mismatch', severity: 'error', message: `${acTypeA} flights moving to ${acTypeB} aircraft (different type)` })
+      warnings.push({
+        side: 'A',
+        reg: regB,
+        type: 'ac-type-mismatch',
+        severity: 'error',
+        message: `${acTypeA} flights moving to ${acTypeB} aircraft (different type)`,
+      })
     }
   }
 
@@ -60,7 +76,13 @@ export function validateSwap(
 
   // If no warnings at all, add an "ok" indicator
   if (warnings.length === 0) {
-    warnings.push({ side: 'A', reg: regB, type: 'chain-break', severity: 'ok', message: 'Swap looks clean — no conflicts detected' })
+    warnings.push({
+      side: 'A',
+      reg: regB,
+      type: 'chain-break',
+      severity: 'ok',
+      message: 'Swap looks clean — no conflicts detected',
+    })
   }
 
   return warnings
@@ -68,8 +90,8 @@ export function validateSwap(
 
 /** Build the post-swap flight list for a row: remove outgoing, add incoming */
 function buildPostSwapRow(rowFlights: SwapFlight[], remove: SwapFlight[], add: SwapFlight[]): SwapFlight[] {
-  const removeIds = new Set(remove.map(f => f.id))
-  const remaining = rowFlights.filter(f => !removeIds.has(f.id))
+  const removeIds = new Set(remove.map((f) => f.id))
+  const remaining = rowFlights.filter((f) => !removeIds.has(f.id))
   return [...remaining, ...add].sort((a, b) => {
     const dd = a.date.getTime() - b.date.getTime()
     return dd !== 0 ? dd : a.stdMinutes - b.stdMinutes
@@ -85,7 +107,7 @@ function validateSide(
   tatMinutes: Map<string, number>,
   warnings: SwapWarning[],
 ) {
-  const incomingIds = new Set(incoming.map(f => f.id))
+  const incomingIds = new Set(incoming.map((f) => f.id))
 
   for (let i = 0; i < fullRow.length; i++) {
     const curr = fullRow[i]
@@ -100,7 +122,8 @@ function validateSide(
     // Time overlap check
     if (sameDay && curr.staMinutes > next.stdMinutes) {
       warnings.push({
-        side, reg: targetReg,
+        side,
+        reg: targetReg,
         type: 'time-overlap',
         severity: 'error',
         message: `Time overlap on ${targetReg}: flight ending at ${fmtMin(curr.staMinutes)} overlaps with departure at ${fmtMin(next.stdMinutes)}`,
@@ -111,7 +134,8 @@ function validateSide(
     // Station chain continuity
     if (sameDay && curr.arrStation !== next.depStation) {
       warnings.push({
-        side, reg: targetReg,
+        side,
+        reg: targetReg,
         type: 'chain-break',
         severity: 'warning',
         message: `Chain break on ${targetReg}: arrives ${curr.arrStation}, next departs ${next.depStation}`,
@@ -124,7 +148,8 @@ function validateSide(
       const minTat = tatMinutes.get(targetReg) ?? 45
       if (gap >= 0 && gap < minTat) {
         warnings.push({
-          side, reg: targetReg,
+          side,
+          reg: targetReg,
           type: 'tat-insufficient',
           severity: 'warning',
           message: `Tight turnaround on ${targetReg}: ${gap}min gap (min ${minTat}min)`,

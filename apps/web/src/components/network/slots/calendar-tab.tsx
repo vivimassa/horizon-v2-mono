@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { colors } from '@skyhub/ui/theme'
@@ -34,7 +34,9 @@ export function CalendarTab({ airport, seasonCode, onNavigateToUtilization, isDa
     }
   }, [airport.iataCode, seasonCode])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   // Compute all week numbers across all series
   const allWeeks = useMemo(() => {
@@ -60,19 +62,24 @@ export function CalendarTab({ airport, seasonCode, onNavigateToUtilization, isDa
   return (
     <div className="flex-1 flex overflow-hidden min-h-0">
       {/* Fixed left labels */}
-      <div className="w-[220px] shrink-0 overflow-y-auto"
-        style={{ borderRight: `1px solid ${glassBorder}` }}>
+      <div className="w-[220px] shrink-0 overflow-y-auto" style={{ borderRight: `1px solid ${glassBorder}` }}>
         {/* Header spacer */}
-        <div className="h-8 px-3 flex items-center text-[13px] uppercase tracking-wide font-medium"
-          style={{ color: palette.textTertiary, borderBottom: `1px solid ${glassBorder}` }}>
+        <div
+          className="h-8 px-3 flex items-center text-[13px] uppercase tracking-wide font-medium"
+          style={{ color: palette.textTertiary, borderBottom: `1px solid ${glassBorder}` }}
+        >
           Series
         </div>
 
-        {seriesList.map(s => (
-          <div key={s._id} className="h-7 px-3 flex items-center gap-2 truncate"
-            style={{ borderBottom: `1px solid ${glassBorder}` }}>
+        {seriesList.map((s) => (
+          <div
+            key={s._id}
+            className="h-7 px-3 flex items-center gap-2 truncate"
+            style={{ borderBottom: `1px solid ${glassBorder}` }}
+          >
             <span className="text-[13px] font-mono font-semibold truncate" style={{ color: palette.text }}>
-              {s.arrivalFlightNumber || ''}{s.departureFlightNumber ? `/${s.departureFlightNumber}` : ''}
+              {s.arrivalFlightNumber || ''}
+              {s.departureFlightNumber ? `/${s.departureFlightNumber}` : ''}
             </span>
             <span className="text-[13px] shrink-0" style={{ color: palette.textTertiary }}>
               {s.arrivalOriginIata || ''}\u2192{s.departureDestIata || ''}
@@ -84,28 +91,41 @@ export function CalendarTab({ airport, seasonCode, onNavigateToUtilization, isDa
       {/* Scrollable grid */}
       <div className="flex-1 overflow-auto">
         {/* Week headers */}
-        <div className="flex sticky top-0" style={{ background: isDark ? 'rgba(25,25,33,0.95)' : 'rgba(255,255,255,0.95)' }}>
-          {allWeeks.map(wk => (
-            <div key={wk} className="w-8 h-8 shrink-0 flex items-center justify-center text-[13px] font-mono"
-              style={{ color: palette.textTertiary, borderBottom: `1px solid ${glassBorder}`, borderRight: `1px solid ${glassBorder}` }}>
+        <div
+          className="flex sticky top-0"
+          style={{ background: isDark ? 'rgba(25,25,33,0.95)' : 'rgba(255,255,255,0.95)' }}
+        >
+          {allWeeks.map((wk) => (
+            <div
+              key={wk}
+              className="w-8 h-8 shrink-0 flex items-center justify-center text-[13px] font-mono"
+              style={{
+                color: palette.textTertiary,
+                borderBottom: `1px solid ${glassBorder}`,
+                borderRight: `1px solid ${glassBorder}`,
+              }}
+            >
               {wk}
             </div>
           ))}
         </div>
 
         {/* Grid rows */}
-        {seriesList.map(s => {
+        {seriesList.map((s) => {
           const weeks = calendar[s._id] || []
-          const weekMap = new Map(weeks.map(w => [w.weekNumber, w]))
+          const weekMap = new Map(weeks.map((w) => [w.weekNumber, w]))
 
           return (
             <div key={s._id} className="flex">
-              {allWeeks.map(wk => {
+              {allWeeks.map((wk) => {
                 const w = weekMap.get(wk)
                 if (!w) {
                   return (
-                    <div key={wk} className="w-8 h-7 shrink-0"
-                      style={{ borderBottom: `1px solid ${glassBorder}`, borderRight: `1px solid ${glassBorder}` }} />
+                    <div
+                      key={wk}
+                      className="w-8 h-7 shrink-0"
+                      style={{ borderBottom: `1px solid ${glassBorder}`, borderRight: `1px solid ${glassBorder}` }}
+                    />
                   )
                 }
 
@@ -118,10 +138,16 @@ export function CalendarTab({ airport, seasonCode, onNavigateToUtilization, isDa
                 else cellColor = 'transparent'
 
                 return (
-                  <div key={wk} className="w-8 h-7 shrink-0 flex items-center justify-center cursor-pointer"
+                  <div
+                    key={wk}
+                    className="w-8 h-7 shrink-0 flex items-center justify-center cursor-pointer"
                     style={{ borderBottom: `1px solid ${glassBorder}`, borderRight: `1px solid ${glassBorder}` }}
-                    title={`W${wk}: ${w.operated} operated, ${w.cancelled} cancelled, ${w.jnus} JNUS / ${w.total} total`}>
-                    <div className="w-3 h-3 rounded-sm" style={{ background: cellColor, opacity: 0.7 + utilPct * 0.3 }} />
+                    title={`W${wk}: ${w.operated} operated, ${w.cancelled} cancelled, ${w.jnus} JNUS / ${w.total} total`}
+                  >
+                    <div
+                      className="w-3 h-3 rounded-sm"
+                      style={{ background: cellColor, opacity: 0.7 + utilPct * 0.3 }}
+                    />
                   </div>
                 )
               })}

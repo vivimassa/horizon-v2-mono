@@ -10,13 +10,15 @@ interface FilterSectionProps {
 export function FilterSection({ label, children, palette }: FilterSectionProps) {
   return (
     <View style={{ gap: 8 }}>
-      <Text style={{
-        fontSize: 13,
-        fontWeight: '600',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-        color: palette.textTertiary,
-      }}>
+      <Text
+        style={{
+          fontSize: 13,
+          fontWeight: '600',
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+          color: palette.textTertiary,
+        }}
+      >
         {label}
       </Text>
       {children}

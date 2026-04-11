@@ -10,14 +10,14 @@ export interface SsimRecord {
   airline: string
   flightNumber: string
   serviceType: string
-  effectiveFrom: string   // YYYY-MM-DD
-  effectiveTo: string     // YYYY-MM-DD
-  daysOfWeek: string      // "1234567" format (our DB format)
+  effectiveFrom: string // YYYY-MM-DD
+  effectiveTo: string // YYYY-MM-DD
+  daysOfWeek: string // "1234567" format (our DB format)
   departureIata: string
-  std: string             // HHMM
+  std: string // HHMM
   arrivalIata: string
-  sta: string             // HHMM
-  aircraftType: string    // IATA 3-letter
+  sta: string // HHMM
+  aircraftType: string // IATA 3-letter
   rawLine: string
   lineNumber: number
   errors: string[]
@@ -100,7 +100,7 @@ function formatSsimDow(dow: string): string {
  *   [68-70] = Aircraft type (IATA 3-letter)
  */
 export function parseSsim(content: string): SsimParseResult {
-  const lines = content.split(/\r?\n/).filter(l => l.trim().length > 0)
+  const lines = content.split(/\r?\n/).filter((l) => l.trim().length > 0)
   const records: SsimRecord[] = []
   const errors: { line: number; message: string; raw: string }[] = []
   let headerCarrier = ''
@@ -135,7 +135,10 @@ export function parseSsim(content: string): SsimParseResult {
 
     const rec: SsimRecord = {
       airline: line.slice(2, 4).trim(),
-      flightNumber: line.slice(2, 8).trim().replace(/^(\D+)0*/, '$1'), // "HZ0100" → "HZ100"
+      flightNumber: line
+        .slice(2, 8)
+        .trim()
+        .replace(/^(\D+)0*/, '$1'), // "HZ0100" → "HZ100"
       serviceType: line[11]?.trim() || 'J',
       effectiveFrom: parseSsimDate(line.slice(12, 19)),
       effectiveTo: parseSsimDate(line.slice(19, 26)),
@@ -185,26 +188,23 @@ export interface SsimFlightInput {
 }
 
 /** Generate a complete SSIM Chapter 7 file */
-export function generateSsim(
-  carrierCode: string,
-  seasonCode: string,
-  flights: SsimFlightInput[],
-): string {
+export function generateSsim(carrierCode: string, seasonCode: string, flights: SsimFlightInput[]): string {
   const lines: string[] = []
   const carrier = carrierCode.padEnd(2).slice(0, 2)
 
   // Record Type 1 — Header
-  const header = '1'
-    + ' '             // serial
-    + carrier         // airline
-    + '   '           // spare
-    + seasonCode.padEnd(6).slice(0, 6) // season
-    + '       '       // period from (optional)
-    + '       '       // period to
-    + formatSsimDate(new Date().toISOString().split('T')[0]) // creation date
-    + 'SSIM'          // data title
-    + ' '             // quality indicator
-    + carrier         // airline (dup)
+  const header =
+    '1' +
+    ' ' + // serial
+    carrier + // airline
+    '   ' + // spare
+    seasonCode.padEnd(6).slice(0, 6) + // season
+    '       ' + // period from (optional)
+    '       ' + // period to
+    formatSsimDate(new Date().toISOString().split('T')[0]) + // creation date
+    'SSIM' + // data title
+    ' ' + // quality indicator
+    carrier // airline (dup)
   lines.push(header.padEnd(200))
 
   // Record Type 2 — Flight legs
@@ -213,26 +213,27 @@ export function generateSsim(
     const fltNumOnly = f.flightNumber.replace(/\D/g, '')
     const fltPadded = fltNumOnly.padStart(4, '0')
 
-    const rec = '2'                                        // [0]    Record type
-      + ' '                                              // [1]    Op suffix
-      + carrier                                          // [2-3]  Airline
-      + fltPadded                                        // [4-7]  Flight number
-      + ' '                                              // [8]    Itinerary var
-      + '01'                                             // [9-10] Leg sequence
-      + (f.serviceType || 'J').slice(0, 1)               // [11]   Service type
-      + formatSsimDate(f.effectiveFrom)                  // [12-18] From
-      + formatSsimDate(f.effectiveTo)                    // [19-25] To
-      + formatSsimDow(f.daysOfWeek)                      // [26-32] DOW
-      + '   '                                            // [33-35] Freq rate
-      + f.departureIata.padEnd(3).slice(0, 3)            // [36-38] DEP
-      + (f.std || '0000').padEnd(4).slice(0, 4)          // [39-42] STD pax
-      + (f.std || '0000').padEnd(4).slice(0, 4)          // [43-46] STD a/c
-      + '     '                                          // [47-51] UTC var dep
-      + f.arrivalIata.padEnd(3).slice(0, 3)              // [52-54] ARR
-      + (f.sta || '0000').padEnd(4).slice(0, 4)          // [55-58] STA pax
-      + (f.sta || '0000').padEnd(4).slice(0, 4)          // [59-62] STA a/c
-      + '     '                                          // [63-67] UTC var arr
-      + (f.aircraftTypeIata || '   ').padEnd(3).slice(0, 3) // [68-70] A/C type
+    const rec =
+      '2' + // [0]    Record type
+      ' ' + // [1]    Op suffix
+      carrier + // [2-3]  Airline
+      fltPadded + // [4-7]  Flight number
+      ' ' + // [8]    Itinerary var
+      '01' + // [9-10] Leg sequence
+      (f.serviceType || 'J').slice(0, 1) + // [11]   Service type
+      formatSsimDate(f.effectiveFrom) + // [12-18] From
+      formatSsimDate(f.effectiveTo) + // [19-25] To
+      formatSsimDow(f.daysOfWeek) + // [26-32] DOW
+      '   ' + // [33-35] Freq rate
+      f.departureIata.padEnd(3).slice(0, 3) + // [36-38] DEP
+      (f.std || '0000').padEnd(4).slice(0, 4) + // [39-42] STD pax
+      (f.std || '0000').padEnd(4).slice(0, 4) + // [43-46] STD a/c
+      '     ' + // [47-51] UTC var dep
+      f.arrivalIata.padEnd(3).slice(0, 3) + // [52-54] ARR
+      (f.sta || '0000').padEnd(4).slice(0, 4) + // [55-58] STA pax
+      (f.sta || '0000').padEnd(4).slice(0, 4) + // [59-62] STA a/c
+      '     ' + // [63-67] UTC var arr
+      (f.aircraftTypeIata || '   ').padEnd(3).slice(0, 3) // [68-70] A/C type
 
     lines.push(rec.padEnd(200))
   }
@@ -247,14 +248,14 @@ export function generateSsim(
 // ─── ASM/SSM Helpers ─────────────────────────────────────────
 
 export const ASM_ACTION_CODES = ['NEW', 'TIM', 'CNL', 'EQT', 'CON', 'RIN', 'RPL', 'FLT', 'SKD'] as const
-export type AsmActionCode = typeof ASM_ACTION_CODES[number]
+export type AsmActionCode = (typeof ASM_ACTION_CODES)[number]
 
 export interface AsmParsed {
   messageType: 'ASM' | 'SSM'
   actionCode: AsmActionCode | string
   airline: string
   flightNumber: string
-  flightDate: string        // YYYY-MM-DD
+  flightDate: string // YYYY-MM-DD
   changes: Record<string, { from?: string; to: string }>
   rawMessage: string
   errors: string[]
@@ -295,8 +296,15 @@ export function parseAsmMessage(raw: string): AsmParsed {
     errors: [],
   }
 
-  const lines = raw.trim().split(/\r?\n/).map(l => l.trim()).filter(Boolean)
-  if (lines.length === 0) { result.errors.push('Empty message'); return result }
+  const lines = raw
+    .trim()
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+  if (lines.length === 0) {
+    result.errors.push('Empty message')
+    return result
+  }
 
   let lineIdx = 0
 
@@ -312,7 +320,11 @@ export function parseAsmMessage(raw: string): AsmParsed {
   }
 
   // Line 3: Optional message reference (contains digits and letters, often has E or /) — skip
-  if (lineIdx < lines.length && /\d/.test(lines[lineIdx]) && !ASM_ACTION_CODES.includes(lines[lineIdx].split(/\s/)[0] as AsmActionCode)) {
+  if (
+    lineIdx < lines.length &&
+    /\d/.test(lines[lineIdx]) &&
+    !ASM_ACTION_CODES.includes(lines[lineIdx].split(/\s/)[0] as AsmActionCode)
+  ) {
     lineIdx++
   }
 

@@ -1,46 +1,30 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import {
-  colors,
-  accentTint,
-  getStatusColors,
-  typography,
-  type StatusKey,
-  type Palette,
-} from "@skyhub/ui/theme";
+import { useState } from 'react'
+import { colors, accentTint, getStatusColors, typography, type StatusKey, type Palette } from '@skyhub/ui/theme'
 
-const ALL_STATUSES: StatusKey[] = [
-  "onTime",
-  "delayed",
-  "cancelled",
-  "departed",
-  "diverted",
-  "scheduled",
-];
+const ALL_STATUSES: StatusKey[] = ['onTime', 'delayed', 'cancelled', 'departed', 'diverted', 'scheduled']
 
 const STATUS_LABELS: Record<StatusKey, string> = {
-  onTime: "On Time",
-  delayed: "Delayed",
-  cancelled: "Cancelled",
-  departed: "Departed",
-  diverted: "Diverted",
-  scheduled: "Scheduled",
-};
+  onTime: 'On Time',
+  delayed: 'Delayed',
+  cancelled: 'Cancelled',
+  departed: 'Departed',
+  diverted: 'Diverted',
+  scheduled: 'Scheduled',
+}
 
 export default function DesignSystemPage() {
-  const [isDark, setIsDark] = useState(false);
-  const [accentColor, setAccentColor] = useState<string>(colors.defaultAccent);
+  const [isDark, setIsDark] = useState(false)
+  const [accentColor, setAccentColor] = useState<string>(colors.defaultAccent)
 
-  const palette: Palette = isDark ? colors.dark : colors.light;
+  const palette: Palette = isDark ? colors.dark : colors.light
 
   return (
     <div
       className="min-h-screen p-6 transition-colors"
       style={{
-        background: isDark
-          ? "linear-gradient(180deg, #1a1a1a, #141414)"
-          : "linear-gradient(180deg, #ffffff, #f5f5f5)",
+        background: isDark ? 'linear-gradient(180deg, #1a1a1a, #141414)' : 'linear-gradient(180deg, #ffffff, #f5f5f5)',
         color: palette.text,
       }}
     >
@@ -74,7 +58,7 @@ export default function DesignSystemPage() {
               border: `1px solid ${palette.border}`,
             }}
           >
-            {isDark ? "Light" : "Dark"}
+            {isDark ? 'Light' : 'Dark'}
           </button>
         </div>
 
@@ -88,18 +72,12 @@ export default function DesignSystemPage() {
                 onClick={() => setAccentColor(hex)}
                 className="rounded-lg px-3 py-2 text-center cursor-pointer"
                 style={{
-                  backgroundColor:
-                    hex === accentColor ? accentTint(hex, 0.15) : "transparent",
+                  backgroundColor: hex === accentColor ? accentTint(hex, 0.15) : 'transparent',
                   border: `1px solid ${hex === accentColor ? hex : palette.border}`,
                 }}
               >
-                <div
-                  className="w-4 h-4 rounded-full mx-auto mb-1"
-                  style={{ backgroundColor: hex }}
-                />
-                <span style={{ fontSize: 11, fontWeight: 600, color: palette.text }}>
-                  {name}
-                </span>
+                <div className="w-4 h-4 rounded-full mx-auto mb-1" style={{ backgroundColor: hex }} />
+                <span style={{ fontSize: 11, fontWeight: 600, color: palette.text }}>{name}</span>
               </button>
             ))}
           </div>
@@ -114,27 +92,18 @@ export default function DesignSystemPage() {
         </Card>
         <div className="h-2" />
         <Card palette={palette} pressable>
-          <p style={{ fontSize: 14, color: palette.text }}>
-            Compact pressable card. Hover to see effect.
-          </p>
+          <p style={{ fontSize: 14, color: palette.text }}>Compact pressable card. Hover to see effect.</p>
         </Card>
 
         {/* List Items */}
         <SectionHeader title="List Items" accentColor={accentColor} palette={palette} />
         <Card palette={palette} padding="none">
-          <ListItemRow
-            title="Airport VVTS"
-            subtitle="Ho Chi Minh City"
-            palette={palette}
-            showChevron
-          />
+          <ListItemRow title="Airport VVTS" subtitle="Ho Chi Minh City" palette={palette} showChevron />
           <ListItemRow
             title="Aircraft VN-A321"
             subtitle="Airbus A321"
             palette={palette}
-            rightElement={
-              <StatusChipEl status="onTime" isDark={isDark} />
-            }
+            rightElement={<StatusChipEl status="onTime" isDark={isDark} />}
           />
           <ListItemRow
             title="Active Item"
@@ -181,7 +150,7 @@ export default function DesignSystemPage() {
                     color: palette.textTertiary,
                     width: 110,
                     flexShrink: 0,
-                    textTransform: "uppercase",
+                    textTransform: 'uppercase',
                     letterSpacing: 0.5,
                   }}
                 >
@@ -208,9 +177,9 @@ export default function DesignSystemPage() {
         <SectionHeader title="Badges" accentColor={accentColor} palette={palette} />
         <Card palette={palette}>
           <div className="flex gap-2">
-            <BadgeEl label="12" bg={isDark ? "rgba(255,255,255,0.10)" : "#e8e8e8"} textColor={palette.textSecondary} />
+            <BadgeEl label="12" bg={isDark ? 'rgba(255,255,255,0.10)' : '#e8e8e8'} textColor={palette.textSecondary} />
             <BadgeEl label="New" bg={accentTint(accentColor, 0.12)} textColor={accentColor} />
-            <BadgeEl label="0" bg={isDark ? "rgba(255,255,255,0.06)" : "#f0f0f0"} textColor={palette.textTertiary} />
+            <BadgeEl label="0" bg={isDark ? 'rgba(255,255,255,0.06)' : '#f0f0f0'} textColor={palette.textTertiary} />
           </div>
         </Card>
 
@@ -219,42 +188,25 @@ export default function DesignSystemPage() {
         <Card palette={palette}>
           <div className="flex flex-col items-center py-10 px-6">
             <div style={{ color: palette.textTertiary, fontSize: 32 }}>?</div>
-            <p
-              className="mt-3 text-center"
-              style={{ fontSize: 14, fontWeight: 500, color: palette.textSecondary }}
-            >
+            <p className="mt-3 text-center" style={{ fontSize: 14, fontWeight: 500, color: palette.textSecondary }}>
               No results
             </p>
-            <p
-              className="mt-1 text-center"
-              style={{ fontSize: 12, color: palette.textTertiary }}
-            >
+            <p className="mt-1 text-center" style={{ fontSize: 12, color: palette.textTertiary }}>
               Try adjusting your search
             </p>
           </div>
         </Card>
       </div>
     </div>
-  );
+  )
 }
 
 /* ── Helper components (inline, web-only) ── */
 
-function SectionHeader({
-  title,
-  accentColor,
-  palette,
-}: {
-  title: string;
-  accentColor: string;
-  palette: Palette;
-}) {
+function SectionHeader({ title, accentColor, palette }: { title: string; accentColor: string; palette: Palette }) {
   return (
     <div className="flex items-center mt-6 mb-2">
-      <div
-        className="w-[3px] h-4 rounded-full mr-2"
-        style={{ backgroundColor: accentColor }}
-      />
+      <div className="w-[3px] h-4 rounded-full mr-2" style={{ backgroundColor: accentColor }} />
       <span
         style={{
           fontSize: 15,
@@ -266,7 +218,7 @@ function SectionHeader({
         {title}
       </span>
     </div>
-  );
+  )
 }
 
 function Card({
@@ -275,25 +227,25 @@ function Card({
   pressable,
   padding,
 }: {
-  children: React.ReactNode;
-  palette: Palette;
-  pressable?: boolean;
-  padding?: "none" | "standard";
+  children: React.ReactNode
+  palette: Palette
+  pressable?: boolean
+  padding?: 'none' | 'standard'
 }) {
   return (
     <div
-      className={`rounded-xl border ${padding === "none" ? "" : "p-4"} ${
-        pressable ? "cursor-pointer hover:scale-[0.99] transition-transform" : ""
+      className={`rounded-xl border ${padding === 'none' ? '' : 'p-4'} ${
+        pressable ? 'cursor-pointer hover:scale-[0.99] transition-transform' : ''
       }`}
       style={{
         backgroundColor: palette.card,
         borderColor: palette.cardBorder,
-        boxShadow: "0 1px 6px rgba(0,0,0,0.06)",
+        boxShadow: '0 1px 6px rgba(0,0,0,0.06)',
       }}
     >
       {children}
     </div>
-  );
+  )
 }
 
 function ListItemRow({
@@ -306,14 +258,14 @@ function ListItemRow({
   accentColor,
   isLast,
 }: {
-  title: string;
-  subtitle: string;
-  palette: Palette;
-  showChevron?: boolean;
-  rightElement?: React.ReactNode;
-  isActive?: boolean;
-  accentColor?: string;
-  isLast?: boolean;
+  title: string
+  subtitle: string
+  palette: Palette
+  showChevron?: boolean
+  rightElement?: React.ReactNode
+  isActive?: boolean
+  accentColor?: string
+  isLast?: boolean
 }) {
   return (
     <div>
@@ -321,38 +273,23 @@ function ListItemRow({
         className="flex items-center px-3 py-2.5 cursor-pointer hover:opacity-80"
         style={{
           minHeight: 44,
-          backgroundColor: isActive && accentColor
-            ? accentTint(accentColor, 0.08)
-            : undefined,
+          backgroundColor: isActive && accentColor ? accentTint(accentColor, 0.08) : undefined,
         }}
       >
         <div className="flex-1 mr-2">
-          <p style={{ fontSize: 13, fontWeight: 500, color: palette.text }}>
-            {title}
-          </p>
-          <p style={{ fontSize: 11, color: palette.textSecondary, marginTop: 2 }}>
-            {subtitle}
-          </p>
+          <p style={{ fontSize: 13, fontWeight: 500, color: palette.text }}>{title}</p>
+          <p style={{ fontSize: 11, color: palette.textSecondary, marginTop: 2 }}>{subtitle}</p>
         </div>
         {rightElement}
-        {showChevron && (
-          <span style={{ color: palette.textTertiary, fontSize: 14 }}>
-            {">"}
-          </span>
-        )}
+        {showChevron && <span style={{ color: palette.textTertiary, fontSize: 14 }}>{'>'}</span>}
       </div>
-      {!isLast && (
-        <div
-          className="ml-3 mr-3"
-          style={{ height: 0.5, backgroundColor: palette.border }}
-        />
-      )}
+      {!isLast && <div className="ml-3 mr-3" style={{ height: 0.5, backgroundColor: palette.border }} />}
     </div>
-  );
+  )
 }
 
 function StatusChipEl({ status, isDark }: { status: StatusKey; isDark: boolean }) {
-  const { bg, text } = getStatusColors(status, isDark);
+  const { bg, text } = getStatusColors(status, isDark)
   return (
     <span
       className="rounded-md px-2 py-0.5 inline-block"
@@ -360,7 +297,7 @@ function StatusChipEl({ status, isDark }: { status: StatusKey; isDark: boolean }
     >
       {STATUS_LABELS[status]}
     </span>
-  );
+  )
 }
 
 function ButtonEl({
@@ -370,35 +307,35 @@ function ButtonEl({
   palette,
   disabled,
 }: {
-  label: string;
-  variant: "primary" | "secondary" | "ghost" | "destructive";
-  accent: string;
-  palette: Palette;
-  disabled?: boolean;
+  label: string
+  variant: 'primary' | 'secondary' | 'ghost' | 'destructive'
+  accent: string
+  palette: Palette
+  disabled?: boolean
 }) {
   const styles: Record<string, React.CSSProperties> = {
     primary: {
       backgroundColor: accent,
-      color: "#fff",
-      border: "none",
-      boxShadow: "0 1px 6px rgba(0,0,0,0.06)",
+      color: '#fff',
+      border: 'none',
+      boxShadow: '0 1px 6px rgba(0,0,0,0.06)',
     },
     secondary: {
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
       color: accent,
       border: `1px solid ${accent}`,
     },
     ghost: {
-      backgroundColor: "transparent",
+      backgroundColor: 'transparent',
       color: accent,
-      border: "none",
+      border: 'none',
     },
     destructive: {
-      backgroundColor: "rgba(220,38,38,0.1)",
-      color: "#dc2626",
-      border: "none",
+      backgroundColor: 'rgba(220,38,38,0.1)',
+      color: '#dc2626',
+      border: 'none',
     },
-  };
+  }
 
   return (
     <button
@@ -412,18 +349,10 @@ function ButtonEl({
     >
       {label}
     </button>
-  );
+  )
 }
 
-function BadgeEl({
-  label,
-  bg,
-  textColor,
-}: {
-  label: string;
-  bg: string;
-  textColor: string;
-}) {
+function BadgeEl({ label, bg, textColor }: { label: string; bg: string; textColor: string }) {
   return (
     <span
       className="rounded-md px-2 py-0.5"
@@ -431,5 +360,5 @@ function BadgeEl({
     >
       {label}
     </span>
-  );
+  )
 }

@@ -1,28 +1,28 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import type { CityPairRef } from "@skyhub/api";
-import { Search, ChevronRight } from "lucide-react";
-import { CountryFlag } from "@/components/ui/country-flag";
+import { useState } from 'react'
+import type { CityPairRef } from '@skyhub/api'
+import { Search, ChevronRight } from 'lucide-react'
+import { CountryFlag } from '@/components/ui/country-flag'
 
 const ROUTE_TYPE_LABELS: Record<string, string> = {
-  domestic: "Domestic",
-  regional: "Regional",
-  international: "International",
-  "long-haul": "Long-Haul",
-  "ultra-long-haul": "Ultra Long-Haul",
-  unknown: "Unclassified",
-};
+  domestic: 'Domestic',
+  regional: 'Regional',
+  international: 'International',
+  'long-haul': 'Long-Haul',
+  'ultra-long-haul': 'Ultra Long-Haul',
+  unknown: 'Unclassified',
+}
 
 interface CityPairListProps {
-  groups: [string, CityPairRef[]][];
-  totalCount: number;
-  filteredCount: number;
-  selected: CityPairRef | null;
-  onSelect: (cp: CityPairRef) => void;
-  search: string;
-  onSearchChange: (value: string) => void;
-  loading: boolean;
+  groups: [string, CityPairRef[]][]
+  totalCount: number
+  filteredCount: number
+  selected: CityPairRef | null
+  onSelect: (cp: CityPairRef) => void
+  search: string
+  onSearchChange: (value: string) => void
+  loading: boolean
 }
 
 export function CityPairList({
@@ -35,16 +35,16 @@ export function CityPairList({
   onSearchChange,
   loading,
 }: CityPairListProps) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
   const toggleGroup = (name: string) => {
     setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
-  };
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -82,7 +82,7 @@ export function CityPairList({
               >
                 <ChevronRight
                   className={`h-3 w-3 shrink-0 text-hz-text-secondary/50 transition-transform duration-200 ${
-                    !collapsed.has(routeType) ? "rotate-90" : ""
+                    !collapsed.has(routeType) ? 'rotate-90' : ''
                   }`}
                 />
                 <span className="text-[12px] font-medium uppercase tracking-wider text-hz-text-secondary/70">
@@ -94,25 +94,29 @@ export function CityPairList({
               {!collapsed.has(routeType) && (
                 <div className="space-y-0.5">
                   {pairs.map((cp) => {
-                    const isSelected = selected?._id === cp._id;
-                    const label1 = cp.station1Iata || cp.station1Icao;
-                    const label2 = cp.station2Iata || cp.station2Icao;
+                    const isSelected = selected?._id === cp._id
+                    const label1 = cp.station1Iata || cp.station1Icao
+                    const label2 = cp.station2Iata || cp.station2Icao
                     return (
                       <button
                         key={cp._id}
                         onClick={() => onSelect(cp)}
                         className={`w-full text-left flex items-center gap-2 px-3 py-2.5 rounded-xl transition-all duration-150 ${
                           isSelected
-                            ? "border-l-[3px] border-l-module-accent bg-module-accent/[0.08]"
-                            : "border-l-[3px] border-l-transparent hover:bg-hz-border/30"
+                            ? 'border-l-[3px] border-l-module-accent bg-module-accent/[0.08]'
+                            : 'border-l-[3px] border-l-transparent hover:bg-hz-border/30'
                         }`}
                       >
                         {/* Route codes */}
-                        <span className={`text-[13px] font-bold shrink-0 ${isSelected ? "text-module-accent" : "text-hz-text-secondary"}`}>
+                        <span
+                          className={`text-[13px] font-bold shrink-0 ${isSelected ? 'text-module-accent' : 'text-hz-text-secondary'}`}
+                        >
                           {label1}
                         </span>
                         <span className="text-[11px] text-hz-text-secondary/50">↔</span>
-                        <span className={`text-[13px] font-bold shrink-0 ${isSelected ? "text-module-accent" : "text-hz-text-secondary"}`}>
+                        <span
+                          className={`text-[13px] font-bold shrink-0 ${isSelected ? 'text-module-accent' : 'text-hz-text-secondary'}`}
+                        >
                           {label2}
                         </span>
                         {/* Cities */}
@@ -122,7 +126,7 @@ export function CityPairList({
                               ? `${cp.station1City} – ${cp.station2City}`
                               : cp.station1Name && cp.station2Name
                                 ? `${cp.station1Name.split(' ')[0]} – ${cp.station2Name.split(' ')[0]}`
-                                : ""}
+                                : ''}
                           </div>
                         </div>
                         {/* Distance */}
@@ -132,7 +136,7 @@ export function CityPairList({
                           </span>
                         )}
                       </button>
-                    );
+                    )
                   })}
                 </div>
               )}
@@ -141,5 +145,5 @@ export function CityPairList({
         )}
       </div>
     </div>
-  );
+  )
 }

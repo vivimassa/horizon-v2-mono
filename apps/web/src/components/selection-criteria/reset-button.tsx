@@ -1,7 +1,7 @@
-"use client";
+'use client'
 
 interface ResetButtonProps {
-  onClick: () => void;
+  onClick: () => void
 }
 
 /** Secondary reset button — below Go button */
@@ -14,5 +14,5 @@ export function ResetButton({ onClick }: ResetButtonProps) {
     >
       Reset
     </button>
-  );
+  )
 }

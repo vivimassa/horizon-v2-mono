@@ -16,7 +16,7 @@ export function useCargoState() {
         (f) =>
           f.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
           f.dep.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          f.arr.toLowerCase().includes(searchQuery.toLowerCase())
+          f.arr.toLowerCase().includes(searchQuery.toLowerCase()),
       )
     : MOCK_FLIGHTS
 

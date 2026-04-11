@@ -28,10 +28,23 @@ export function KpiStrip({ totalWeight, totalCapacity, cgMac, dockCount, accent,
           className="flex-1 rounded-lg px-2 py-2"
           style={{ backgroundColor: palette.card, borderWidth: 1, borderColor: palette.cardBorder }}
         >
-          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 14, fontWeight: '700', color: kpi.hl ? accent : palette.text }}>
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+            style={{ fontSize: 14, fontWeight: '700', color: kpi.hl ? accent : palette.text }}
+          >
             {kpi.value}
           </Text>
-          <Text style={{ fontSize: 8, fontWeight: '600', color: palette.textTertiary, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+          <Text
+            style={{
+              fontSize: 8,
+              fontWeight: '600',
+              color: palette.textTertiary,
+              textTransform: 'uppercase',
+              letterSpacing: 0.3,
+            }}
+          >
             {kpi.label}
           </Text>
         </View>

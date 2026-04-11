@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useRef, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -7,15 +7,17 @@ import { useTheme } from '@/components/theme-provider'
 import { useGanttStore } from '@/stores/use-gantt-store'
 
 export function RowContextMenu() {
-  const ctx = useGanttStore(s => s.rowContextMenu)
-  const close = useGanttStore(s => s.closeRowContextMenu)
-  const openRotation = useGanttStore(s => s.openRotationPopover)
+  const ctx = useGanttStore((s) => s.rowContextMenu)
+  const close = useGanttStore((s) => s.closeRowContextMenu)
+  const openRotation = useGanttStore((s) => s.openRotationPopover)
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const ref = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (!ctx) return
@@ -28,7 +30,9 @@ export function RowContextMenu() {
 
   useEffect(() => {
     if (!ctx) return
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close()
+    }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [ctx, close])
@@ -53,8 +57,11 @@ export function RowContextMenu() {
       data-gantt-overlay
       className="fixed z-[9999] rounded-xl py-1.5 overflow-hidden"
       style={{
-        left, top, minWidth: 200,
-        background: bg, border: `1px solid ${border}`,
+        left,
+        top,
+        minWidth: 200,
+        background: bg,
+        border: `1px solid ${border}`,
         backdropFilter: 'blur(20px) saturate(180%)',
         WebkitBackdropFilter: 'blur(20px) saturate(180%)',
         boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)',
@@ -62,17 +69,26 @@ export function RowContextMenu() {
       }}
     >
       <button
-        onClick={() => { openRotation(ctx.x, ctx.y, ctx.registration, ctx.aircraftTypeIcao, ctx.date); close() }}
+        onClick={() => {
+          openRotation(ctx.x, ctx.y, ctx.registration, ctx.aircraftTypeIcao, ctx.date)
+          close()
+        }}
         className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] font-medium transition-colors"
         style={{ color: textColor }}
-        onMouseEnter={e => { e.currentTarget.style.background = hoverBg }}
-        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = hoverBg
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'transparent'
+        }}
       >
         <RotateCcw size={14} className="shrink-0" strokeWidth={1.8} />
         <span className="flex-1 text-left">Daily Rotation</span>
-        <span className="text-[11px] font-mono" style={{ color: textMuted }}>F4</span>
+        <span className="text-[11px] font-mono" style={{ color: textMuted }}>
+          F4
+        </span>
       </button>
     </div>,
-    document.body
+    document.body,
   )
 }

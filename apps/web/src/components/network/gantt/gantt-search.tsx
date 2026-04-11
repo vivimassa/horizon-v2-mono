@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Search, X, ChevronUp, ChevronDown, Link2Off } from 'lucide-react'
@@ -17,9 +17,9 @@ export function GanttSearch({ open, onClose }: GanttSearchProps) {
   const isDark = theme === 'dark'
   const palette = isDark ? colors.dark : colors.light
 
-  const flights = useGanttStore(s => s.flights)
-  const layout = useGanttStore(s => s.layout)
-  const selectFlight = useGanttStore(s => s.selectFlight)
+  const flights = useGanttStore((s) => s.flights)
+  const layout = useGanttStore((s) => s.layout)
+  const selectFlight = useGanttStore((s) => s.selectFlight)
 
   const [query, setQuery] = useState('')
   const [chainBreakFilter, setChainBreakFilter] = useState(false)
@@ -95,14 +95,17 @@ export function GanttSearch({ open, onClose }: GanttSearchProps) {
   }, [matches.length, matchIdx])
 
   // Navigate to current match
-  const navigateToMatch = useCallback((idx: number) => {
-    const flight = matches[idx]
-    if (!flight) return
-    selectFlight(flight.id, false)
-    // Scroll canvas to the flight's time
-    useGanttStore.getState().scrollTargetMs = flight.stdUtc
-    useGanttStore.setState({ scrollTargetMs: flight.stdUtc })
-  }, [matches, selectFlight])
+  const navigateToMatch = useCallback(
+    (idx: number) => {
+      const flight = matches[idx]
+      if (!flight) return
+      selectFlight(flight.id, false)
+      // Scroll canvas to the flight's time
+      useGanttStore.getState().scrollTargetMs = flight.stdUtc
+      useGanttStore.setState({ scrollTargetMs: flight.stdUtc })
+    },
+    [matches, selectFlight],
+  )
 
   // Auto-navigate on match change
   useEffect(() => {
@@ -127,7 +130,10 @@ export function GanttSearch({ open, onClose }: GanttSearchProps) {
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { onClose(); return }
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
       if (e.key === 'Enter') {
         e.preventDefault()
         if (e.shiftKey) goPrev()
@@ -164,7 +170,9 @@ export function GanttSearch({ open, onClose }: GanttSearchProps) {
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2.5" style={{ borderBottom: `1px solid ${glassBorder}` }}>
         <Search size={14} style={{ color: palette.textTertiary }} />
-        <span className="text-[13px] font-semibold flex-1" style={{ color: palette.text }}>Search Flights and AC Registrations</span>
+        <span className="text-[13px] font-semibold flex-1" style={{ color: palette.text }}>
+          Search Flights and AC Registrations
+        </span>
         <button onClick={onClose} className="p-1 rounded-md transition-colors hover:bg-black/5 dark:hover:bg-white/5">
           <X size={14} style={{ color: palette.textTertiary }} />
         </button>
@@ -177,7 +185,10 @@ export function GanttSearch({ open, onClose }: GanttSearchProps) {
             ref={inputRef}
             type="text"
             value={query}
-            onChange={e => { setQuery(e.target.value); setMatchIdx(0) }}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setMatchIdx(0)
+            }}
             placeholder="Flight number or registration..."
             className="w-full h-10 pl-3 pr-20 rounded-lg text-[14px] outline-none transition-colors"
             style={{
@@ -190,9 +201,12 @@ export function GanttSearch({ open, onClose }: GanttSearchProps) {
           {/* Match counter */}
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
             {hasQuery && (
-              <span className="text-[11px] font-mono font-medium px-1" style={{
-                color: noMatch ? '#E63535' : palette.textTertiary,
-              }}>
+              <span
+                className="text-[11px] font-mono font-medium px-1"
+                style={{
+                  color: noMatch ? '#E63535' : palette.textTertiary,
+                }}
+              >
                 {noMatch ? 'No match' : `${matchIdx + 1}/${matches.length}`}
               </span>
             )}
@@ -201,7 +215,10 @@ export function GanttSearch({ open, onClose }: GanttSearchProps) {
 
         {/* Chain break toggle */}
         <button
-          onClick={() => { setChainBreakFilter(v => !v); setMatchIdx(0) }}
+          onClick={() => {
+            setChainBreakFilter((v) => !v)
+            setMatchIdx(0)
+          }}
           className="w-full h-9 px-3 rounded-lg text-[12px] font-medium flex items-center gap-2 transition-all"
           style={{
             background: chainBreakFilter ? (isDark ? 'rgba(255,136,0,0.10)' : 'rgba(255,136,0,0.08)') : inputBg,
@@ -212,7 +229,9 @@ export function GanttSearch({ open, onClose }: GanttSearchProps) {
           <Link2Off size={14} />
           <span className="flex-1 text-left">Flights with chain breaks</span>
           {chainBreakFilter && (
-            <span className="text-[11px] font-mono font-bold" style={{ color: '#FF8800' }}>{chainBreakIds.size}</span>
+            <span className="text-[11px] font-mono font-bold" style={{ color: '#FF8800' }}>
+              {chainBreakIds.size}
+            </span>
           )}
         </button>
 
@@ -221,24 +240,41 @@ export function GanttSearch({ open, onClose }: GanttSearchProps) {
           <div className="text-[11px] font-medium" style={{ color: palette.textTertiary }}>
             {hasQuery && matches.length > 0
               ? `${matches.length} flight${matches.length !== 1 ? 's' : ''} found`
-              : hasQuery ? '' : 'Enter to navigate results'
-            }
+              : hasQuery
+                ? ''
+                : 'Enter to navigate results'}
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={goPrev} disabled={matches.length === 0}
+            <button
+              onClick={goPrev}
+              disabled={matches.length === 0}
               className="w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30"
               style={{ color: palette.textSecondary }}
-              onMouseEnter={e => { if (matches.length > 0) e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-              title="Previous (Shift+Enter)">
+              onMouseEnter={(e) => {
+                if (matches.length > 0)
+                  e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+              }}
+              title="Previous (Shift+Enter)"
+            >
               <ChevronUp size={16} />
             </button>
-            <button onClick={goNext} disabled={matches.length === 0}
+            <button
+              onClick={goNext}
+              disabled={matches.length === 0}
               className="w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30"
               style={{ color: palette.textSecondary }}
-              onMouseEnter={e => { if (matches.length > 0) e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-              title="Next (Enter)">
+              onMouseEnter={(e) => {
+                if (matches.length > 0)
+                  e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+              }}
+              title="Next (Enter)"
+            >
               <ChevronDown size={16} />
             </button>
           </div>

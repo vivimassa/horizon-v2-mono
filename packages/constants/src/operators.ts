@@ -54,7 +54,7 @@ export function getAccessibleModules(operator: OperatorWithRole | null): ModuleN
   const modules: ModuleName[] = ['home']
 
   // Add enabled modules
-  operator.enabled_modules.forEach(module => {
+  operator.enabled_modules.forEach((module) => {
     if (!modules.includes(module as ModuleName)) {
       modules.push(module as ModuleName)
     }

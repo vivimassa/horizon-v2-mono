@@ -42,7 +42,7 @@ const TabButton = memo(function TabButton({
   const inactiveIconColor = isDark ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.26)'
   const activeLabelColor = isDark ? 'rgba(255,255,255,0.90)' : accent
   const inactiveLabelColor = isDark ? 'rgba(255,255,255,0.26)' : 'rgba(0,0,0,0.30)'
-  const glowColor = isDark ? 'rgba(255,255,255,0.25)' : accentTint(accent, 0.20)
+  const glowColor = isDark ? 'rgba(255,255,255,0.25)' : accentTint(accent, 0.2)
 
   // Animate spotlight opacity and icon scale
   const spotlightAnim = useRef(new Animated.Value(active ? 1 : 0)).current
@@ -106,11 +106,7 @@ const TabButton = memo(function TabButton({
 
       {/* Icon with scale animation */}
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-        <Icon
-          size={isTablet ? 24 : 20}
-          color={active ? activeIconColor : inactiveIconColor}
-          strokeWidth={1.75}
-        />
+        <Icon size={isTablet ? 24 : 20} color={active ? activeIconColor : inactiveIconColor} strokeWidth={1.75} />
       </Animated.View>
 
       <Text
@@ -134,10 +130,7 @@ export function SpotlightDock({ tabs, activeIndex, onTabChange, isDark: isDarkPr
   const isTablet = width >= 768
 
   return (
-    <View
-      className="absolute bottom-0 left-0 right-0"
-      style={{ height: 56, zIndex: 50 }}
-    >
+    <View className="absolute bottom-0 left-0 right-0" style={{ height: 56, zIndex: 50 }}>
       <View
         className="flex-1 flex-row"
         style={{

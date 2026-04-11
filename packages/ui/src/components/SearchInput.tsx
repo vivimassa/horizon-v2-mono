@@ -18,12 +18,7 @@ interface SearchInputProps {
   autoFocus?: boolean
 }
 
-export function SearchInput({
-  placeholder = 'Search...',
-  value,
-  onChangeText,
-  autoFocus = false,
-}: SearchInputProps) {
+export function SearchInput({ placeholder = 'Search...', value, onChangeText, autoFocus = false }: SearchInputProps) {
   const { palette, accentColor } = useTheme()
   const [isFocused, setIsFocused] = useState(false)
 

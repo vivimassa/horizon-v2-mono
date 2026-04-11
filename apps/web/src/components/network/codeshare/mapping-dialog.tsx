@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useEffect, useMemo } from 'react'
 import { X, Loader2, Search, ToggleLeft, ToggleRight } from 'lucide-react'
@@ -21,7 +21,12 @@ interface MappingDialogProps {
 const DOW_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 export function MappingDialog({
-  open, onOpenChange, agreement, mapping, isDark, onMappingChanged,
+  open,
+  onOpenChange,
+  agreement,
+  mapping,
+  isDark,
+  onMappingChanged,
 }: MappingDialogProps) {
   const palette = isDark ? colors.dark : colors.light
   const accent = MODULE_THEMES.network.accent
@@ -54,7 +59,8 @@ export function MappingDialog({
   useEffect(() => {
     if (!open || manual) return
     setLoading(true)
-    api.getCodeshareOperatingFlights(getOperatorId())
+    api
+      .getCodeshareOperatingFlights(getOperatorId())
       .then(setFlights)
       .finally(() => setLoading(false))
   }, [open, manual])
@@ -64,10 +70,11 @@ export function MappingDialog({
     if (!flightSearch.trim()) return flights.slice(0, 50)
     const q = flightSearch.toLowerCase()
     return flights
-      .filter(f =>
-        f.flightNumber.toLowerCase().includes(q) ||
-        f.depStation.toLowerCase().includes(q) ||
-        f.arrStation.toLowerCase().includes(q)
+      .filter(
+        (f) =>
+          f.flightNumber.toLowerCase().includes(q) ||
+          f.depStation.toLowerCase().includes(q) ||
+          f.arrStation.toLowerCase().includes(q),
       )
       .slice(0, 50)
   }, [flights, flightSearch])
@@ -83,7 +90,7 @@ export function MappingDialog({
 
   function toggleDow(dayNum: number) {
     const d = String(dayNum)
-    setDow(prev => prev.includes(d) ? prev.replace(d, '') : (prev + d).split('').sort().join(''))
+    setDow((prev) => (prev.includes(d) ? prev.replace(d, '') : (prev + d).split('').sort().join('')))
   }
 
   const needsAlloc = agreement.agreementType === 'block_space' || agreement.agreementType === 'hard_block'
@@ -158,14 +165,20 @@ export function MappingDialog({
       <div
         className="w-[600px] max-h-[85vh] rounded-2xl overflow-hidden flex flex-col"
         style={{ background: glassBg, border: `1px solid ${glassBorder}`, backdropFilter: 'blur(24px)' }}
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: `1px solid ${glassBorder}` }}>
+        <div
+          className="flex items-center justify-between px-5 py-4 shrink-0"
+          style={{ borderBottom: `1px solid ${glassBorder}` }}
+        >
           <h2 className="text-[18px] font-bold" style={{ color: palette.text }}>
             {isEdit ? 'Edit Mapping' : 'Add Mapping'}
           </h2>
-          <button onClick={() => onOpenChange(false)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-hz-border/20">
+          <button
+            onClick={() => onOpenChange(false)}
+            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-hz-border/20"
+          >
             <X size={18} style={{ color: palette.textSecondary }} />
           </button>
         </div>
@@ -173,7 +186,10 @@ export function MappingDialog({
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           {error && (
-            <div className="text-[13px] px-3 py-2 rounded-xl" style={{ background: 'rgba(255,59,59,0.1)', color: '#FF3B3B', border: '1px solid rgba(255,59,59,0.2)' }}>
+            <div
+              className="text-[13px] px-3 py-2 rounded-xl"
+              style={{ background: 'rgba(255,59,59,0.1)', color: '#FF3B3B', border: '1px solid rgba(255,59,59,0.2)' }}
+            >
               {error}
             </div>
           )}
@@ -197,34 +213,61 @@ export function MappingDialog({
             <div>
               <label className="block text-[13px] font-medium mb-1 text-hz-text-tertiary">Operating Flight</label>
               <div className="relative mb-2">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={14} style={{ color: palette.textTertiary }} />
+                <Search
+                  className="absolute left-3 top-1/2 -translate-y-1/2"
+                  size={14}
+                  style={{ color: palette.textTertiary }}
+                />
                 <input
                   value={flightSearch}
-                  onChange={e => setFlightSearch(e.target.value)}
+                  onChange={(e) => setFlightSearch(e.target.value)}
                   placeholder="Search by flight, departure, arrival..."
                   className="w-full pl-9 pr-3 h-9 rounded-xl text-[13px] outline-none"
                   style={inputStyle}
                 />
               </div>
-              <div className="max-h-40 overflow-y-auto rounded-xl" style={{ background: inputBg, border: `1px solid ${glassBorder}` }}>
-                {loading && <div className="text-[13px] text-center py-4" style={{ color: palette.textTertiary }}>Loading flights...</div>}
-                {filteredFlights.map(f => (
+              <div
+                className="max-h-40 overflow-y-auto rounded-xl"
+                style={{ background: inputBg, border: `1px solid ${glassBorder}` }}
+              >
+                {loading && (
+                  <div className="text-[13px] text-center py-4" style={{ color: palette.textTertiary }}>
+                    Loading flights...
+                  </div>
+                )}
+                {filteredFlights.map((f) => (
                   <button
                     key={f._id}
                     type="button"
                     onClick={() => selectFlight(f)}
                     className="w-full flex items-center gap-3 px-3 py-2 text-left transition-colors"
                     style={{
-                      background: selectedFlight?._id === f._id ? accentTint(accent, isDark ? 0.15 : 0.1) : 'transparent',
+                      background:
+                        selectedFlight?._id === f._id ? accentTint(accent, isDark ? 0.15 : 0.1) : 'transparent',
                       borderBottom: `1px solid ${glassBorder}`,
                     }}
-                    onMouseEnter={e => { if (selectedFlight?._id !== f._id) e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }}
-                    onMouseLeave={e => { if (selectedFlight?._id !== f._id) e.currentTarget.style.background = 'transparent' }}
+                    onMouseEnter={(e) => {
+                      if (selectedFlight?._id !== f._id)
+                        e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedFlight?._id !== f._id) e.currentTarget.style.background = 'transparent'
+                    }}
                   >
-                    <span className="font-mono text-[13px] font-semibold" style={{ color: accent }}>{f.flightNumber}</span>
-                    <span className="font-mono text-[13px]" style={{ color: palette.textSecondary }}>{f.depStation}&rarr;{f.arrStation}</span>
-                    <span className="text-[13px]" style={{ color: palette.textTertiary }}>{f.daysOfWeek}</span>
-                    {f.aircraftTypeIcao && <span className="text-[13px] font-mono" style={{ color: palette.textTertiary }}>{f.aircraftTypeIcao}</span>}
+                    <span className="font-mono text-[13px] font-semibold" style={{ color: accent }}>
+                      {f.flightNumber}
+                    </span>
+                    <span className="font-mono text-[13px]" style={{ color: palette.textSecondary }}>
+                      {f.depStation}&rarr;{f.arrStation}
+                    </span>
+                    <span className="text-[13px]" style={{ color: palette.textTertiary }}>
+                      {f.daysOfWeek}
+                    </span>
+                    {f.aircraftTypeIcao && (
+                      <span className="text-[13px] font-mono" style={{ color: palette.textTertiary }}>
+                        {f.aircraftTypeIcao}
+                      </span>
+                    )}
                   </button>
                 ))}
                 {!loading && filteredFlights.length === 0 && (
@@ -235,8 +278,11 @@ export function MappingDialog({
               </div>
               {selectedFlight && (
                 <div className="text-[13px] mt-2 font-medium" style={{ color: palette.textSecondary }}>
-                  Selected: <span className="font-mono font-semibold" style={{ color: accent }}>{selectedFlight.flightNumber}</span>
-                  {' '}{selectedFlight.depStation}&rarr;{selectedFlight.arrStation}
+                  Selected:{' '}
+                  <span className="font-mono font-semibold" style={{ color: accent }}>
+                    {selectedFlight.flightNumber}
+                  </span>{' '}
+                  {selectedFlight.depStation}&rarr;{selectedFlight.arrStation}
                 </div>
               )}
             </div>
@@ -248,7 +294,7 @@ export function MappingDialog({
               <FormField label="Operating Flight *">
                 <input
                   value={operatingFlt}
-                  onChange={e => setOperatingFlt(e.target.value)}
+                  onChange={(e) => setOperatingFlt(e.target.value)}
                   placeholder="151"
                   className="w-full px-3 h-9 rounded-xl text-[13px] outline-none font-mono"
                   style={inputStyle}
@@ -257,7 +303,7 @@ export function MappingDialog({
               <FormField label="Departure IATA">
                 <input
                   value={departure}
-                  onChange={e => setDeparture(e.target.value)}
+                  onChange={(e) => setDeparture(e.target.value)}
                   maxLength={4}
                   placeholder="SGN"
                   className="w-full px-3 h-9 rounded-xl text-[13px] outline-none font-mono uppercase"
@@ -268,7 +314,7 @@ export function MappingDialog({
               <FormField label="Arrival IATA">
                 <input
                   value={arrival}
-                  onChange={e => setArrival(e.target.value)}
+                  onChange={(e) => setArrival(e.target.value)}
                   maxLength={4}
                   placeholder="ICN"
                   className="w-full px-3 h-9 rounded-xl text-[13px] outline-none font-mono uppercase"
@@ -281,7 +327,7 @@ export function MappingDialog({
           <FormField label="Marketing Flight Number *">
             <input
               value={marketingFlt}
-              onChange={e => setMarketingFlt(e.target.value)}
+              onChange={(e) => setMarketingFlt(e.target.value)}
               placeholder="5151"
               className="w-full px-3 h-9 rounded-xl text-[13px] outline-none font-mono"
               style={inputStyle}
@@ -317,7 +363,7 @@ export function MappingDialog({
             <FormField label="Agreed Aircraft Type">
               <input
                 value={agreedAcType}
-                onChange={e => setAgreedAcType(e.target.value)}
+                onChange={(e) => setAgreedAcType(e.target.value)}
                 maxLength={4}
                 placeholder="A321"
                 className="w-full px-3 h-9 rounded-xl text-[13px] outline-none font-mono uppercase"
@@ -328,7 +374,7 @@ export function MappingDialog({
               <FormField label="Status">
                 <select
                   value={status}
-                  onChange={e => setStatus(e.target.value as any)}
+                  onChange={(e) => setStatus(e.target.value as any)}
                   className="w-full h-9 pl-3 pr-8 rounded-xl text-[13px] appearance-none cursor-pointer outline-none"
                   style={inputStyle}
                 >
@@ -345,7 +391,7 @@ export function MappingDialog({
               <input
                 type="date"
                 value={effectiveFrom}
-                onChange={e => setEffectiveFrom(e.target.value)}
+                onChange={(e) => setEffectiveFrom(e.target.value)}
                 className="w-full px-3 h-9 rounded-xl text-[13px] outline-none"
                 style={inputStyle}
               />
@@ -354,7 +400,7 @@ export function MappingDialog({
               <input
                 type="date"
                 value={effectiveUntil}
-                onChange={e => setEffectiveUntil(e.target.value)}
+                onChange={(e) => setEffectiveUntil(e.target.value)}
                 className="w-full px-3 h-9 rounded-xl text-[13px] outline-none"
                 style={inputStyle}
               />
@@ -364,16 +410,27 @@ export function MappingDialog({
           {/* Seat allocation section */}
           {needsAlloc && (
             <div className="pt-2" style={{ borderTop: `1px solid ${glassBorder}` }}>
-              <div className="text-[13px] font-semibold mb-2" style={{ color: palette.text }}>Seat Allocation</div>
-              {CABIN_CLASSES.map(cc => (
+              <div className="text-[13px] font-semibold mb-2" style={{ color: palette.text }}>
+                Seat Allocation
+              </div>
+              {CABIN_CLASSES.map((cc) => (
                 <div key={cc.code} className="grid grid-cols-[60px_120px_80px_80px] gap-2 mb-1.5 items-center">
-                  <span className="text-[13px] font-mono font-semibold" style={{ color: cc.color }}>{cc.code}</span>
-                  <span className="text-[13px]" style={{ color: palette.textSecondary }}>{cc.name}</span>
+                  <span className="text-[13px] font-mono font-semibold" style={{ color: cc.color }}>
+                    {cc.code}
+                  </span>
+                  <span className="text-[13px]" style={{ color: palette.textSecondary }}>
+                    {cc.name}
+                  </span>
                   <input
                     type="number"
                     min={0}
                     value={cabinAllocs[cc.code]?.seats ?? 0}
-                    onChange={e => setCabinAllocs(s => ({ ...s, [cc.code]: { seats: parseInt(e.target.value) || 0, release: s[cc.code]?.release ?? 72 } }))}
+                    onChange={(e) =>
+                      setCabinAllocs((s) => ({
+                        ...s,
+                        [cc.code]: { seats: parseInt(e.target.value) || 0, release: s[cc.code]?.release ?? 72 },
+                      }))
+                    }
                     placeholder="0"
                     className="h-8 px-2 rounded-lg text-[13px] font-mono outline-none text-center"
                     style={inputStyle}
@@ -383,7 +440,12 @@ export function MappingDialog({
                     min={0}
                     max={168}
                     value={cabinAllocs[cc.code]?.release ?? 72}
-                    onChange={e => setCabinAllocs(s => ({ ...s, [cc.code]: { seats: s[cc.code]?.seats ?? 0, release: parseInt(e.target.value) || 72 } }))}
+                    onChange={(e) =>
+                      setCabinAllocs((s) => ({
+                        ...s,
+                        [cc.code]: { seats: s[cc.code]?.seats ?? 0, release: parseInt(e.target.value) || 72 },
+                      }))
+                    }
                     className="h-8 px-2 rounded-lg text-[13px] font-mono outline-none text-center"
                     style={inputStyle}
                   />
@@ -407,11 +469,11 @@ export function MappingDialog({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={saving || (!operatingFlt || !marketingFlt)}
+            disabled={saving || !operatingFlt || !marketingFlt}
             className="h-9 px-4 rounded-xl text-[13px] font-medium transition-colors hover:opacity-90 disabled:opacity-50"
             style={{ background: accent, color: '#ffffff' }}
           >
-            {saving ? <Loader2 size={14} className="animate-spin" /> : (isEdit ? 'Update' : 'Add Mapping')}
+            {saving ? <Loader2 size={14} className="animate-spin" /> : isEdit ? 'Update' : 'Add Mapping'}
           </button>
         </div>
       </div>

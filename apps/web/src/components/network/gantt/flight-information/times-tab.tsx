@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useTheme } from '@/components/theme-provider'
 import type { FlightDetail } from '@/lib/gantt/flight-detail-types'
@@ -54,19 +54,25 @@ export function TimesTab({ data, onUpdate }: TimesTabProps) {
   const greenLine = '#22c55e'
 
   const scheduledMap: Record<string, number> = { atdUtc: data.stdUtc, ataUtc: data.staUtc }
-  const nextIdx = OOOI.findIndex(p => data.actual[p.key] == null)
+  const nextIdx = OOOI.findIndex((p) => data.actual[p.key] == null)
 
-  function handleTimeChange(key: typeof OOOI[number]['key'], value: string) {
+  function handleTimeChange(key: (typeof OOOI)[number]['key'], value: string) {
     const ms = value ? parseTimeToMs(value, data.operatingDate) : null
-    onUpdate(d => { d.actual[key] = ms })
+    onUpdate((d) => {
+      d.actual[key] = ms
+    })
   }
 
   function handleDepInfoChange(field: 'terminal' | 'gate' | 'stand' | 'ctot', value: string) {
-    onUpdate(d => { d.depInfo[field] = value || null })
+    onUpdate((d) => {
+      d.depInfo[field] = value || null
+    })
   }
 
   function handleArrInfoChange(field: 'terminal' | 'gate' | 'stand', value: string) {
-    onUpdate(d => { d.arrInfo[field] = value || null })
+    onUpdate((d) => {
+      d.arrInfo[field] = value || null
+    })
   }
 
   return (
@@ -100,21 +106,33 @@ export function TimesTab({ data, onUpdate }: TimesTabProps) {
 
                   <div className="w-[24px] h-[24px] flex items-center justify-center relative z-10">
                     {isComplete ? (
-                      <div className="w-6 h-6 rounded-full flex items-center justify-center"
-                        style={{ background: '#22c55e', boxShadow: '0 0 10px rgba(34,197,94,0.35)' }}>
+                      <div
+                        className="w-6 h-6 rounded-full flex items-center justify-center"
+                        style={{ background: '#22c55e', boxShadow: '0 0 10px rgba(34,197,94,0.35)' }}
+                      >
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                          <path d="M2.5 6l2.5 2.5L9.5 4" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          <path
+                            d="M2.5 6l2.5 2.5L9.5 4"
+                            stroke="#fff"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
                         </svg>
                       </div>
                     ) : isCurrent ? (
-                      <div className="w-6 h-6 rounded-full"
-                        style={{ background: '#F59E0B', boxShadow: '0 0 10px rgba(245,158,11,0.35)' }} />
+                      <div
+                        className="w-6 h-6 rounded-full"
+                        style={{ background: '#F59E0B', boxShadow: '0 0 10px rgba(245,158,11,0.35)' }}
+                      />
                     ) : (
-                      <div className="w-6 h-6 rounded-full"
+                      <div
+                        className="w-6 h-6 rounded-full"
                         style={{
                           border: `2px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.10)'}`,
                           background: isDark ? '#1F1F28' : '#F2F2F5',
-                        }} />
+                        }}
+                      />
                     )}
                   </div>
 
@@ -122,7 +140,7 @@ export function TimesTab({ data, onUpdate }: TimesTabProps) {
                     type="text"
                     placeholder="HH:MM"
                     value={fmtUtc(val)}
-                    onChange={e => handleTimeChange(phase.key, e.target.value)}
+                    onChange={(e) => handleTimeChange(phase.key, e.target.value)}
                     className="w-[76px] h-[36px] text-center rounded-lg text-[15px] font-mono font-bold outline-none"
                     style={{
                       background: inputBg,
@@ -133,8 +151,10 @@ export function TimesTab({ data, onUpdate }: TimesTabProps) {
                   />
 
                   {variance && (
-                    <span className="px-2 py-0.5 rounded-full text-white text-[13px] font-mono font-bold"
-                      style={{ background: variance.color }}>
+                    <span
+                      className="px-2 py-0.5 rounded-full text-white text-[13px] font-mono font-bold"
+                      style={{ background: variance.color }}
+                    >
                       {variance.text}
                     </span>
                   )}
@@ -146,7 +166,10 @@ export function TimesTab({ data, onUpdate }: TimesTabProps) {
       </div>
 
       {/* Middle column: Origin card */}
-      <div className="col-span-4 rounded-2xl p-4 relative overflow-hidden" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+      <div
+        className="col-span-4 rounded-2xl p-4 relative overflow-hidden"
+        style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
+      >
         <h3 className="text-[14px] font-bold uppercase tracking-[0.15em] mb-2" style={{ color: accent }}>
           Origin
         </h3>
@@ -154,23 +177,57 @@ export function TimesTab({ data, onUpdate }: TimesTabProps) {
           {data.depAirport?.name ?? data.depStation}
         </div>
 
-        <StationInput label="Terminal" value={data.depInfo.terminal ?? ''} onChange={v => handleDepInfoChange('terminal', v)}
-          inputBg={inputBg} inputBorder={inputBorder} muted={muted} text={textPrimary} />
-        <StationInput label="Gate" value={data.depInfo.gate ?? ''} onChange={v => handleDepInfoChange('gate', v)}
-          inputBg={inputBg} inputBorder={inputBorder} muted={muted} text={textPrimary} />
-        <StationInput label="Stand" value={data.depInfo.stand ?? ''} onChange={v => handleDepInfoChange('stand', v)}
-          inputBg={inputBg} inputBorder={inputBorder} muted={muted} text={textPrimary} />
-        <StationInput label="CTOT" value={data.depInfo.ctot ?? ''} onChange={v => handleDepInfoChange('ctot', v)}
-          inputBg={inputBg} inputBorder={inputBorder} muted={muted} text={textPrimary} placeholder="HH:MM" />
+        <StationInput
+          label="Terminal"
+          value={data.depInfo.terminal ?? ''}
+          onChange={(v) => handleDepInfoChange('terminal', v)}
+          inputBg={inputBg}
+          inputBorder={inputBorder}
+          muted={muted}
+          text={textPrimary}
+        />
+        <StationInput
+          label="Gate"
+          value={data.depInfo.gate ?? ''}
+          onChange={(v) => handleDepInfoChange('gate', v)}
+          inputBg={inputBg}
+          inputBorder={inputBorder}
+          muted={muted}
+          text={textPrimary}
+        />
+        <StationInput
+          label="Stand"
+          value={data.depInfo.stand ?? ''}
+          onChange={(v) => handleDepInfoChange('stand', v)}
+          inputBg={inputBg}
+          inputBorder={inputBorder}
+          muted={muted}
+          text={textPrimary}
+        />
+        <StationInput
+          label="CTOT"
+          value={data.depInfo.ctot ?? ''}
+          onChange={(v) => handleDepInfoChange('ctot', v)}
+          inputBg={inputBg}
+          inputBorder={inputBorder}
+          muted={muted}
+          text={textPrimary}
+          placeholder="HH:MM"
+        />
 
-        <span className="absolute bottom-0 right-2 z-0 text-[80px] font-mono font-black tracking-tighter leading-none select-none pointer-events-none"
-          style={{ color: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }}>
+        <span
+          className="absolute bottom-0 right-2 z-0 text-[80px] font-mono font-black tracking-tighter leading-none select-none pointer-events-none"
+          style={{ color: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }}
+        >
           {data.depStation}
         </span>
       </div>
 
       {/* Right column: Destination card */}
-      <div className="col-span-4 rounded-2xl p-4 relative overflow-hidden" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+      <div
+        className="col-span-4 rounded-2xl p-4 relative overflow-hidden"
+        style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
+      >
         <h3 className="text-[14px] font-bold uppercase tracking-[0.15em] mb-2" style={{ color: accent }}>
           Destination
         </h3>
@@ -178,15 +235,38 @@ export function TimesTab({ data, onUpdate }: TimesTabProps) {
           {data.arrAirport?.name ?? data.arrStation}
         </div>
 
-        <StationInput label="Terminal" value={data.arrInfo.terminal ?? ''} onChange={v => handleArrInfoChange('terminal', v)}
-          inputBg={inputBg} inputBorder={inputBorder} muted={muted} text={textPrimary} />
-        <StationInput label="Gate" value={data.arrInfo.gate ?? ''} onChange={v => handleArrInfoChange('gate', v)}
-          inputBg={inputBg} inputBorder={inputBorder} muted={muted} text={textPrimary} />
-        <StationInput label="Stand" value={data.arrInfo.stand ?? ''} onChange={v => handleArrInfoChange('stand', v)}
-          inputBg={inputBg} inputBorder={inputBorder} muted={muted} text={textPrimary} />
+        <StationInput
+          label="Terminal"
+          value={data.arrInfo.terminal ?? ''}
+          onChange={(v) => handleArrInfoChange('terminal', v)}
+          inputBg={inputBg}
+          inputBorder={inputBorder}
+          muted={muted}
+          text={textPrimary}
+        />
+        <StationInput
+          label="Gate"
+          value={data.arrInfo.gate ?? ''}
+          onChange={(v) => handleArrInfoChange('gate', v)}
+          inputBg={inputBg}
+          inputBorder={inputBorder}
+          muted={muted}
+          text={textPrimary}
+        />
+        <StationInput
+          label="Stand"
+          value={data.arrInfo.stand ?? ''}
+          onChange={(v) => handleArrInfoChange('stand', v)}
+          inputBg={inputBg}
+          inputBorder={inputBorder}
+          muted={muted}
+          text={textPrimary}
+        />
 
-        <span className="absolute bottom-0 right-2 z-0 text-[80px] font-mono font-black tracking-tighter leading-none select-none pointer-events-none"
-          style={{ color: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }}>
+        <span
+          className="absolute bottom-0 right-2 z-0 text-[80px] font-mono font-black tracking-tighter leading-none select-none pointer-events-none"
+          style={{ color: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' }}
+        >
           {data.arrStation}
         </span>
       </div>
@@ -194,9 +274,24 @@ export function TimesTab({ data, onUpdate }: TimesTabProps) {
   )
 }
 
-function StationInput({ label, value, onChange, placeholder, inputBg, inputBorder, muted, text }: {
-  label: string; value: string; onChange: (v: string) => void; placeholder?: string
-  inputBg: string; inputBorder: string; muted: string; text: string
+function StationInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  inputBg,
+  inputBorder,
+  muted,
+  text,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  inputBg: string
+  inputBorder: string
+  muted: string
+  text: string
 }) {
   return (
     <div className="flex items-center gap-3 mb-3 relative z-10">
@@ -207,7 +302,7 @@ function StationInput({ label, value, onChange, placeholder, inputBg, inputBorde
         type="text"
         placeholder={placeholder ?? '—'}
         value={value}
-        onChange={e => onChange(e.target.value)}
+        onChange={(e) => onChange(e.target.value)}
         className="w-[120px] h-[36px] text-center rounded-lg text-[15px] font-bold outline-none"
         style={{
           background: inputBg,

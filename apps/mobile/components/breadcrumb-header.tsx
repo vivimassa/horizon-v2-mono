@@ -103,7 +103,13 @@ export function BreadcrumbHeader({ moduleCode }: BreadcrumbHeaderProps) {
           />
           <Image
             source={logo}
-            style={{ width: 150, height: 40, opacity: isDark ? 0.85 : 0.9, marginRight: -30, tintColor: isDark ? '#ffffff' : undefined }}
+            style={{
+              width: 150,
+              height: 40,
+              opacity: isDark ? 0.85 : 0.9,
+              marginRight: -30,
+              tintColor: isDark ? '#ffffff' : undefined,
+            }}
             resizeMode="contain"
           />
         </View>

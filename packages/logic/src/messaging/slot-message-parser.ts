@@ -90,15 +90,23 @@ export interface ParseError {
 
 const KNOWN_SMI = ['SCR', 'SAL', 'SHL', 'SMA', 'SIR', 'SAQ', 'WCR', 'WIR']
 
-const AIRLINE_ACTION_CODES = new Set([
-  'N', 'Y', 'B', 'V', 'F', 'C', 'M', 'R', 'L', 'I', 'D', 'A', 'P', 'Z',
-])
+const AIRLINE_ACTION_CODES = new Set(['N', 'Y', 'B', 'V', 'F', 'C', 'M', 'R', 'L', 'I', 'D', 'A', 'P', 'Z'])
 const COORDINATOR_ACTION_CODES = new Set(['K', 'H', 'O', 'U', 'X', 'T', 'W'])
 const ALL_ACTION_CODES = new Set([...AIRLINE_ACTION_CODES, ...COORDINATOR_ACTION_CODES])
 
 const MONTHS: Record<string, number> = {
-  JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5,
-  JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11,
+  JAN: 0,
+  FEB: 1,
+  MAR: 2,
+  APR: 3,
+  MAY: 4,
+  JUN: 5,
+  JUL: 6,
+  AUG: 7,
+  SEP: 8,
+  OCT: 9,
+  NOV: 10,
+  DEC: 11,
 }
 
 const MONTH_NAMES = Object.keys(MONTHS)
@@ -119,7 +127,7 @@ export function parseSlotMessage(rawText: string): ParsedSlotMessage {
     errors: [],
   }
 
-  const lines = rawText.split(/\r?\n/).map(l => l.trimEnd())
+  const lines = rawText.split(/\r?\n/).map((l) => l.trimEnd())
   let headerParsed = false
   let lineIndex = 0
 
@@ -248,7 +256,11 @@ export function parseSlotMessage(rawText: string): ParsedSlotMessage {
       result.errors.push({ line: dl.lineNumber, message: `Invalid arrival time: ${dl.arrivalTime}`, severity: 'error' })
     }
     if (dl.departureTime !== null && (dl.departureTime < 0 || dl.departureTime > 2359)) {
-      result.errors.push({ line: dl.lineNumber, message: `Invalid departure time: ${dl.departureTime}`, severity: 'error' })
+      result.errors.push({
+        line: dl.lineNumber,
+        message: `Invalid departure time: ${dl.departureTime}`,
+        severity: 'error',
+      })
     }
   }
 
@@ -289,7 +301,10 @@ function parseDataLine(line: string, lineNumber: number, errors: ParseError[]): 
   result.isDepartureOnly = isDepartureOnly
 
   // Split into tokens
-  const tokens = line.substring(isDepartureOnly ? 2 : 1).trim().split(/\s+/)
+  const tokens = line
+    .substring(isDepartureOnly ? 2 : 1)
+    .trim()
+    .split(/\s+/)
 
   if (tokens.length < 5) {
     errors.push({ line: lineNumber, message: `Too few tokens in data line (${tokens.length})`, severity: 'error' })
@@ -426,7 +441,7 @@ export function convertParsedLineToSlotSeries(
   line: ParsedSlotLine,
   airportIata: string,
   seasonCode: string,
-  operatorId: string
+  operatorId: string,
 ): Partial<SlotSeries> {
   const statusMap: Record<string, string> = {
     K: 'confirmed',

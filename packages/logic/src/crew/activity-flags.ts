@@ -103,8 +103,7 @@ export const ACTIVITY_FLAG_GROUPS: ActivityFlagGroup[] = [
       {
         key: 'is_simulator',
         label: 'Simulator',
-        description:
-          'Simulator session (FSTD/FFS) — enables simulator-specific settings below',
+        description: 'Simulator session (FSTD/FFS) — enables simulator-specific settings below',
       },
       {
         key: 'is_training',
@@ -144,6 +143,4 @@ export const ACTIVITY_FLAG_GROUPS: ActivityFlagGroup[] = [
 export const ACTIVITY_FLAGS: ActivityFlag[] = ACTIVITY_FLAG_GROUPS.flatMap((g) => g.flags)
 
 /** Map from flag key → flag definition for quick lookup. */
-export const ACTIVITY_FLAG_MAP = new Map<string, ActivityFlag>(
-  ACTIVITY_FLAGS.map((f) => [f.key, f])
-)
+export const ACTIVITY_FLAG_MAP = new Map<string, ActivityFlag>(ACTIVITY_FLAGS.map((f) => [f.key, f]))

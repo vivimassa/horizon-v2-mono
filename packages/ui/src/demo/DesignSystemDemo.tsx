@@ -54,14 +54,7 @@ import {
 import { Checkbox, CheckboxIndicator, CheckboxLabel } from '../gluestack/checkbox'
 import { RadioGroup, Radio, RadioLabel } from '../gluestack/radio'
 import { Switch } from '../gluestack/switch'
-import {
-  Modal,
-  ModalBackdrop,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-} from '../gluestack/modal'
+import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalBody, ModalFooter } from '../gluestack/modal'
 import {
   Actionsheet,
   ActionsheetBackdrop,
@@ -69,16 +62,9 @@ import {
   ActionsheetItem,
   ActionsheetItemText,
 } from '../gluestack/actionsheet'
-import {
-  Toast,
-  ToastTitle,
-  ToastDescription,
-  useToast,
-} from '../gluestack/toast'
+import { Toast, ToastTitle, ToastDescription, useToast } from '../gluestack/toast'
 
-const ALL_STATUSES: StatusKey[] = [
-  'onTime', 'delayed', 'cancelled', 'departed', 'diverted', 'scheduled',
-]
+const ALL_STATUSES: StatusKey[] = ['onTime', 'delayed', 'cancelled', 'departed', 'diverted', 'scheduled']
 
 const DEMO_ICONS = [
   { name: 'Aircraft', icon: Plane },
@@ -141,11 +127,7 @@ export function DesignSystemDemo() {
         </View>
       </View>
 
-      <ScrollView
-        className="flex-1"
-        contentContainerClassName="px-4 pb-8 pt-2"
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView className="flex-1" contentContainerClassName="px-4 pb-8 pt-2" showsVerticalScrollIndicator={false}>
         {/* Accent Presets */}
         <SectionHeader title="Accent Color" />
         <Card padding="compact">
@@ -156,9 +138,7 @@ export function DesignSystemDemo() {
                 onPress={() => setAccentColor(hex)}
                 className="rounded-lg px-3 py-2 items-center"
                 style={{
-                  backgroundColor: hex === accentColor
-                    ? accentTint(hex, 0.15)
-                    : 'transparent',
+                  backgroundColor: hex === accentColor ? accentTint(hex, 0.15) : 'transparent',
                   borderWidth: 1,
                   borderColor: hex === accentColor ? hex : palette.border,
                 }}
@@ -215,11 +195,7 @@ export function DesignSystemDemo() {
 
         {/* Search */}
         <SectionHeader title="Search" />
-        <SearchInput
-          placeholder="Search airports..."
-          value={searchText}
-          onChangeText={setSearchText}
-        />
+        <SearchInput placeholder="Search airports..." value={searchText} onChangeText={setSearchText} />
 
         {/* Status Chips */}
         <SectionHeader title="Status Chips" />
@@ -250,9 +226,7 @@ export function DesignSystemDemo() {
           <View className="gap-4">
             <FormControl>
               <FormControlLabel>
-                <FormControlLabelText style={{ color: palette.textSecondary }}>
-                  Airport Name
-                </FormControlLabelText>
+                <FormControlLabelText style={{ color: palette.textSecondary }}>Airport Name</FormControlLabelText>
               </FormControlLabel>
               <Input
                 className="flex-row items-center rounded-[10px] border h-10 px-3"
@@ -276,9 +250,7 @@ export function DesignSystemDemo() {
 
             <FormControl>
               <FormControlLabel>
-                <FormControlLabelText style={{ color: palette.textSecondary }}>
-                  Base Airport
-                </FormControlLabelText>
+                <FormControlLabelText style={{ color: palette.textSecondary }}>Base Airport</FormControlLabelText>
               </FormControlLabel>
               <Select selectedValue={selectValue} onValueChange={setSelectValue}>
                 <SelectTrigger
@@ -293,10 +265,7 @@ export function DesignSystemDemo() {
                 </SelectTrigger>
                 <SelectPortal>
                   <SelectBackdrop />
-                  <SelectContent
-                    className="rounded-xl"
-                    style={{ backgroundColor: palette.card }}
-                  >
+                  <SelectContent className="rounded-xl" style={{ backgroundColor: palette.card }}>
                     <SelectItem label="SGN - Tan Son Nhat" value="VVTS" />
                     <SelectItem label="HAN - Noi Bai" value="VVNB" />
                     <SelectItem label="DAD - Da Nang" value="VVDN" />
@@ -306,11 +275,7 @@ export function DesignSystemDemo() {
             </FormControl>
 
             <View className="flex-row items-center gap-6">
-              <Checkbox
-                value="notifications"
-                isChecked={checkboxChecked}
-                onChange={setCheckboxChecked}
-              >
+              <Checkbox value="notifications" isChecked={checkboxChecked} onChange={setCheckboxChecked}>
                 <CheckboxIndicator />
                 <CheckboxLabel style={{ color: palette.text }}>Notifications</CheckboxLabel>
               </Checkbox>
@@ -346,10 +311,7 @@ export function DesignSystemDemo() {
                 toast.show({
                   duration: 3000,
                   render: () => (
-                    <Toast
-                      className="border"
-                      style={{ backgroundColor: palette.card, borderColor: palette.border }}
-                    >
+                    <Toast className="border" style={{ backgroundColor: palette.card, borderColor: palette.border }}>
                       <ToastTitle style={{ color: palette.text }}>Flight Updated</ToastTitle>
                       <ToastDescription style={{ color: palette.textSecondary }}>
                         VJ-123 departure time changed to 14:30 UTC
@@ -374,10 +336,7 @@ export function DesignSystemDemo() {
             {DEMO_ICONS.map(({ name, icon }) => (
               <View key={name} className="items-center w-14">
                 <Icon icon={icon} size="md" />
-                <Text
-                  className="text-[11px] mt-1 text-center"
-                  style={{ color: palette.textSecondary }}
-                >
+                <Text className="text-[11px] mt-1 text-center" style={{ color: palette.textSecondary }}>
                   {name}
                 </Text>
               </View>
@@ -388,11 +347,7 @@ export function DesignSystemDemo() {
         {/* Empty State */}
         <SectionHeader title="Empty State" />
         <Card>
-          <EmptyState
-            icon={Search}
-            title="No results"
-            subtitle="Try adjusting your search"
-          />
+          <EmptyState icon={Search} title="No results" subtitle="Try adjusting your search" />
         </Card>
       </ScrollView>
 
@@ -428,19 +383,13 @@ export function DesignSystemDemo() {
           style={{ backgroundColor: palette.card, borderColor: palette.cardBorder }}
         >
           <ActionsheetItem onPress={() => {}}>
-            <ActionsheetItemText style={{ color: palette.text }}>
-              View Flight Details
-            </ActionsheetItemText>
+            <ActionsheetItemText style={{ color: palette.text }}>View Flight Details</ActionsheetItemText>
           </ActionsheetItem>
           <ActionsheetItem onPress={() => {}}>
-            <ActionsheetItemText style={{ color: palette.text }}>
-              Edit Crew Assignment
-            </ActionsheetItemText>
+            <ActionsheetItemText style={{ color: palette.text }}>Edit Crew Assignment</ActionsheetItemText>
           </ActionsheetItem>
           <ActionsheetItem onPress={() => {}}>
-            <ActionsheetItemText style={{ color: '#dc2626' }}>
-              Cancel Flight
-            </ActionsheetItemText>
+            <ActionsheetItemText style={{ color: '#dc2626' }}>Cancel Flight</ActionsheetItemText>
           </ActionsheetItem>
         </ActionsheetContent>
       </Actionsheet>

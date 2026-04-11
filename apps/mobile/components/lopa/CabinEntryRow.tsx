@@ -14,9 +14,14 @@ interface CabinEntryRowProps {
 }
 
 export const CabinEntryRow = memo(function CabinEntryRow({
-  cabin, cabinClasses, palette, isDark, onChangeSeats, onRemove,
+  cabin,
+  cabinClasses,
+  palette,
+  isDark,
+  onChangeSeats,
+  onRemove,
 }: CabinEntryRowProps) {
-  const cc = cabinClasses.find(c => c.code === cabin.classCode)
+  const cc = cabinClasses.find((c) => c.code === cabin.classCode)
   const color = modeColor(cc?.color || '#9ca3af', isDark)
   const name = cc?.name || cabin.classCode
 
@@ -24,8 +29,11 @@ export const CabinEntryRow = memo(function CabinEntryRow({
     <View
       className="flex-row items-center rounded-xl"
       style={{
-        borderWidth: 1, borderColor: palette.cardBorder,
-        paddingHorizontal: 12, paddingVertical: 10, gap: 10,
+        borderWidth: 1,
+        borderColor: palette.cardBorder,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        gap: 10,
       }}
     >
       <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: color }} />
@@ -41,10 +49,17 @@ export const CabinEntryRow = memo(function CabinEntryRow({
         keyboardType="number-pad"
         selectTextOnFocus
         style={{
-          width: 64, textAlign: 'right',
-          fontSize: 14, fontWeight: '700', fontFamily: 'monospace', color: palette.text,
-          borderWidth: 1, borderColor: palette.cardBorder, borderRadius: 8,
-          paddingHorizontal: 8, paddingVertical: 4,
+          width: 64,
+          textAlign: 'right',
+          fontSize: 14,
+          fontWeight: '700',
+          fontFamily: 'monospace',
+          color: palette.text,
+          borderWidth: 1,
+          borderColor: palette.cardBorder,
+          borderRadius: 8,
+          paddingHorizontal: 8,
+          paddingVertical: 4,
           backgroundColor: palette.card,
         }}
       />

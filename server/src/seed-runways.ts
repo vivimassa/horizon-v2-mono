@@ -17,21 +17,30 @@ const AIRPORTS_CSV = 'https://davidmegginson.github.io/ourairports-data/airports
 const RUNWAYS_CSV = 'https://davidmegginson.github.io/ourairports-data/runways.csv'
 
 function parseCSV(text: string): Record<string, string>[] {
-  const lines = text.split('\n').filter(l => l.trim())
+  const lines = text.split('\n').filter((l) => l.trim())
   if (lines.length === 0) return []
-  const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim())
-  return lines.slice(1).map(line => {
+  const headers = lines[0].split(',').map((h) => h.replace(/"/g, '').trim())
+  return lines.slice(1).map((line) => {
     const values: string[] = []
     let current = ''
     let inQuotes = false
     for (const ch of line) {
-      if (ch === '"') { inQuotes = !inQuotes; continue }
-      if (ch === ',' && !inQuotes) { values.push(current.trim()); current = ''; continue }
+      if (ch === '"') {
+        inQuotes = !inQuotes
+        continue
+      }
+      if (ch === ',' && !inQuotes) {
+        values.push(current.trim())
+        current = ''
+        continue
+      }
       current += ch
     }
     values.push(current.trim())
     const obj: Record<string, string> = {}
-    headers.forEach((h, i) => { obj[h] = values[i] ?? '' })
+    headers.forEach((h, i) => {
+      obj[h] = values[i] ?? ''
+    })
     return obj
   })
 }
@@ -92,7 +101,7 @@ async function main() {
       continue
     }
 
-    const runways = rawRunways.map(r => {
+    const runways = rawRunways.map((r) => {
       const lengthFt = Number(r.length_ft) || null
       const widthFt = Number(r.width_ft) || null
       const leIdent = r.le_ident || ''
@@ -114,7 +123,7 @@ async function main() {
       }
     })
 
-    const active = runways.filter(r => r.status !== 'closed')
+    const active = runways.filter((r) => r.status !== 'closed')
     const longestFt = active.reduce((max, r) => {
       const ft = r.lengthFt ?? 0
       return ft > max ? ft : max
@@ -128,7 +137,7 @@ async function main() {
       },
     })
 
-    const ids = runways.map(r => r.identifier).join(', ')
+    const ids = runways.map((r) => r.identifier).join(', ')
     console.log(`  OK   ${airport.icaoCode} — ${runways.length} runways: ${ids}`)
     updated++
   }
@@ -137,7 +146,7 @@ async function main() {
   await mongoose.disconnect()
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('Seed failed:', err)
   process.exit(1)
 })

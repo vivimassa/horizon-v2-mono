@@ -43,7 +43,7 @@ const scheduleMessageLogSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'scheduleMessageLogs',
-  }
+  },
 )
 
 // Primary log query: operator + newest first

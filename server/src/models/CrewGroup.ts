@@ -15,7 +15,7 @@ const crewGroupSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'crewGroups',
-  }
+  },
 )
 
 crewGroupSchema.index({ operatorId: 1, name: 1 }, { unique: true })

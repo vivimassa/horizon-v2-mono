@@ -1,74 +1,52 @@
-"use client";
+'use client'
 
-import React, { useState, useCallback, useRef, useEffect } from "react";
-import type {
-  AircraftTypeRef,
-  CrewComplementRef,
-  CrewPositionRef,
-} from "@skyhub/api";
-import {
-  COMPLEMENT_TEMPLATES,
-  POSITION_DEFAULT_COLORS,
-} from "@skyhub/logic";
-import {
-  BedDouble,
-  AlertTriangle,
-  ChevronRight,
-  Gauge,
-  Star,
-  Plus,
-  Trash2,
-  Sparkles,
-  Info,
-} from "lucide-react";
-import { ACCENT } from "./crew-complements-shell";
+import React, { useState, useCallback, useRef, useEffect } from 'react'
+import type { AircraftTypeRef, CrewComplementRef, CrewPositionRef } from '@skyhub/api'
+import { COMPLEMENT_TEMPLATES, POSITION_DEFAULT_COLORS } from '@skyhub/logic'
+import { BedDouble, AlertTriangle, ChevronRight, Gauge, Star, Plus, Trash2, Sparkles, Info } from 'lucide-react'
+import { ACCENT } from './crew-complements-shell'
 
 // ── Helpers ──
 
 function posVal(counts: Record<string, number>, code: string): number {
-  return counts[code.toUpperCase()] ?? 0;
+  return counts[code.toUpperCase()] ?? 0
 }
 
-function totalCrew(
-  counts: Record<string, number>,
-  positions: CrewPositionRef[]
-): number {
-  return positions.reduce((sum, p) => sum + posVal(counts, p.code), 0);
+function totalCrew(counts: Record<string, number>, positions: CrewPositionRef[]): number {
+  return positions.reduce((sum, p) => sum + posVal(counts, p.code), 0)
 }
 
 function posColor(p: CrewPositionRef): string {
-  return p.color || POSITION_DEFAULT_COLORS[p.code] || "#888888";
+  return p.color || POSITION_DEFAULT_COLORS[p.code] || '#888888'
 }
 
 function getTemplateDisplay(key: string) {
-  const known = COMPLEMENT_TEMPLATES.find((t) => t.key === key);
-  if (known) return known;
+  const known = COMPLEMENT_TEMPLATES.find((t) => t.key === key)
+  if (known) return known
   return {
     key,
-    badge: key.toUpperCase().replace(/[_-]/g, " "),
-    badgeColor: "#6B7280",
-    label: key
-      .replace(/[_-]/g, " ")
-      .replace(/\b\w/g, (l) => l.toUpperCase()),
-    description: "Custom crew complement",
-  };
+    badge: key.toUpperCase().replace(/[_-]/g, ' '),
+    badgeColor: '#6B7280',
+    label: key.replace(/[_-]/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+    description: 'Custom crew complement',
+  }
 }
 
-const PROTECTED_KEYS = new Set(["standard", "aug1", "aug2"]);
+const PROTECTED_KEYS = new Set(['standard', 'aug1', 'aug2'])
 
 // ── Props ──
 
 interface Props {
-  aircraftType: AircraftTypeRef;
-  complements: CrewComplementRef[];
-  cockpitPositions: CrewPositionRef[];
-  cabinPositions: CrewPositionRef[];
-  onCountChange: (id: string, counts: Record<string, number>) => void;
-  onNotesChange: (id: string, notes: string | null) => void;
-  onLabelChange: (id: string, templateKey: string) => void;
-  onSeedForType: (icaoType: string) => void;
-  onAddRow: (icaoType: string, templateKey: string) => void;
-  onDeleteRow: (id: string) => void;
+  aircraftType: AircraftTypeRef
+  complements: CrewComplementRef[]
+  cockpitPositions: CrewPositionRef[]
+  cabinPositions: CrewPositionRef[]
+  onCountChange: (id: string, counts: Record<string, number>) => void
+  onNotesChange: (id: string, notes: string | null) => void
+  onLabelChange: (id: string, templateKey: string) => void
+  onSeedForType: (icaoType: string) => void
+  onAddRow: (icaoType: string, templateKey: string) => void
+  onDeleteRow: (id: string) => void
 }
 
 export function CrewComplementTable({
@@ -83,12 +61,10 @@ export function CrewComplementTable({
   onAddRow,
   onDeleteRow,
 }: Props) {
-  const allPositions = [...cockpitPositions, ...cabinPositions];
-  const hasRest =
-    aircraftType.crewRest?.cockpitClass != null ||
-    aircraftType.crewRest?.cabinClass != null;
+  const allPositions = [...cockpitPositions, ...cabinPositions]
+  const hasRest = aircraftType.crewRest?.cockpitClass != null || aircraftType.crewRest?.cabinClass != null
 
-  const stdRow = complements.find((c) => c.templateKey === "standard");
+  const stdRow = complements.find((c) => c.templateKey === 'standard')
 
   // ── Seed empty state ──
   if (complements.length === 0) {
@@ -97,16 +73,10 @@ export function CrewComplementTable({
         <TypeHeader aircraftType={aircraftType} count={0} />
         <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6">
           <div className="text-center">
-            <h3 className="text-[15px] font-semibold text-hz-text mb-1">
-              No complements for {aircraftType.icaoType}
-            </h3>
+            <h3 className="text-[15px] font-semibold text-hz-text mb-1">No complements for {aircraftType.icaoType}</h3>
             <p className="text-[13px] text-hz-text-secondary max-w-sm">
-              Seed Standard, Augmented 1, and Augmented 2 defaults based on your{" "}
-              <a
-                href="/admin/crew-positions"
-                className="font-semibold underline"
-                style={{ color: ACCENT }}
-              >
+              Seed Standard, Augmented 1, and Augmented 2 defaults based on your{' '}
+              <a href="/admin/crew-positions" className="font-semibold underline" style={{ color: ACCENT }}>
                 crew positions
               </a>
               .
@@ -122,7 +92,7 @@ export function CrewComplementTable({
           </button>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -132,17 +102,11 @@ export function CrewComplementTable({
 
       {/* Table */}
       <div className="flex-1 overflow-auto px-6 pt-3 pb-6">
-        <table
-          className="w-full"
-          style={{ tableLayout: "fixed", borderCollapse: "separate", borderSpacing: 0 }}
-        >
+        <table className="w-full" style={{ tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: 0 }}>
           <thead>
             {/* Group labels row */}
             <tr>
-              <th
-                className="w-[240px] text-left pr-4"
-                rowSpan={2}
-              >
+              <th className="w-[240px] text-left pr-4" rowSpan={2}>
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-hz-text-tertiary">
                   Complement
                 </span>
@@ -164,9 +128,7 @@ export function CrewComplementTable({
               )}
 
               {/* Spacer between groups */}
-              {cockpitPositions.length > 0 && cabinPositions.length > 0 && (
-                <th className="w-3" rowSpan={2} />
-              )}
+              {cockpitPositions.length > 0 && cabinPositions.length > 0 && <th className="w-3" rowSpan={2} />}
 
               {/* Cabin group label */}
               {cabinPositions.length > 0 && (
@@ -185,9 +147,7 @@ export function CrewComplementTable({
 
               <th className="w-4" rowSpan={2} />
               <th className="w-[60px] text-center align-bottom">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-hz-text-tertiary">
-                  Total
-                </span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-hz-text-tertiary">Total</span>
               </th>
               <th className="w-8" rowSpan={2} />
               <th className="text-left align-bottom" rowSpan={2}>
@@ -201,9 +161,9 @@ export function CrewComplementTable({
             {/* Position badges row */}
             <tr>
               {allPositions.map((pos, i) => {
-                const isCockpit = i < cockpitPositions.length;
-                const isFirst = isCockpit ? i === 0 : i === cockpitPositions.length;
-                const isLast = isCockpit ? i === cockpitPositions.length - 1 : i === allPositions.length - 1;
+                const isCockpit = i < cockpitPositions.length
+                const isFirst = isCockpit ? i === 0 : i === cockpitPositions.length
+                const isLast = isCockpit ? i === cockpitPositions.length - 1 : i === allPositions.length - 1
                 return (
                   <th
                     key={pos.code}
@@ -228,7 +188,7 @@ export function CrewComplementTable({
                       </span>
                     </div>
                   </th>
-                );
+                )
               })}
               {/* Empty cell under TOTAL (not rowSpan'd anymore) */}
               <th />
@@ -262,90 +222,58 @@ export function CrewComplementTable({
           />
           <div className="flex-1 h-px bg-hz-border/30" />
           <span className="text-[11px] text-hz-text-tertiary">
-            Position columns from{" "}
-            <a
-              href="/admin/crew-positions"
-              className="underline"
-              style={{ color: ACCENT }}
-            >
+            Position columns from{' '}
+            <a href="/admin/crew-positions" className="underline" style={{ color: ACCENT }}>
               5.4.2 Crew Positions
             </a>
           </span>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 // ── Type Header ──
 
-function TypeHeader({
-  aircraftType,
-  count,
-}: {
-  aircraftType: AircraftTypeRef;
-  count: number;
-}) {
+function TypeHeader({ aircraftType, count }: { aircraftType: AircraftTypeRef; count: number }) {
   return (
     <div className="shrink-0 px-6 py-4 border-b border-hz-border">
       <div className="flex items-center gap-3">
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{ background: `${ACCENT}15` }}
-        >
-          <span
-            className="text-[13px] font-bold font-mono"
-            style={{ color: ACCENT }}
-          >
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${ACCENT}15` }}>
+          <span className="text-[13px] font-bold font-mono" style={{ color: ACCENT }}>
             {aircraftType.icaoType}
           </span>
         </div>
         <div className="flex-1">
-          <h2 className="text-[17px] font-bold text-hz-text">
-            {aircraftType.name}
-          </h2>
+          <h2 className="text-[17px] font-bold text-hz-text">{aircraftType.name}</h2>
           <p className="text-[12px] text-hz-text-tertiary">
-            {count} complement template{count !== 1 ? "s" : ""} ·{" "}
-            {aircraftType.family ?? aircraftType.category}
+            {count} complement template{count !== 1 ? 's' : ''} · {aircraftType.family ?? aircraftType.category}
           </p>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 // ── Rest Facility Bar ──
 
-function RestFacilityBar({
-  aircraftType,
-  hasRest,
-}: {
-  aircraftType: AircraftTypeRef;
-  hasRest: boolean;
-}) {
-  const rest = aircraftType.crewRest;
-  const acTypeUrl = `/admin/aircraft-registrations?type=${aircraftType.icaoType}`;
+function RestFacilityBar({ aircraftType, hasRest }: { aircraftType: AircraftTypeRef; hasRest: boolean }) {
+  const rest = aircraftType.crewRest
+  const acTypeUrl = `/admin/aircraft-registrations?type=${aircraftType.icaoType}`
 
   if (hasRest) {
-    const parts: string[] = [];
+    const parts: string[] = []
     if (rest?.cockpitClass) {
-      parts.push(
-        `Cockpit: ${rest.cockpitClass}` +
-          (rest.cockpitPositions ? ` · ${rest.cockpitPositions} pos` : "")
-      );
+      parts.push(`Cockpit: ${rest.cockpitClass}` + (rest.cockpitPositions ? ` · ${rest.cockpitPositions} pos` : ''))
     }
     if (rest?.cabinClass) {
-      parts.push(
-        `Cabin: ${rest.cabinClass}` +
-          (rest.cabinPositions ? ` · ${rest.cabinPositions} pos` : "")
-      );
+      parts.push(`Cabin: ${rest.cabinClass}` + (rest.cabinPositions ? ` · ${rest.cabinPositions} pos` : ''))
     }
     return (
       <div className="shrink-0 flex items-center gap-3 px-6 py-2.5 bg-violet-500/10 border-b border-violet-200/30 dark:border-violet-400/20">
         <BedDouble className="h-4 w-4 text-violet-600 dark:text-violet-400 shrink-0" />
         <span className="text-[12px] text-violet-700 dark:text-violet-300 flex-1">
-          {parts.join(" · ")} — Rest facility present. Augmented templates
-          applicable.
+          {parts.join(' · ')} — Rest facility present. Augmented templates applicable.
         </span>
         <a
           href={acTypeUrl}
@@ -354,7 +282,7 @@ function RestFacilityBar({
           Aircraft Database <ChevronRight className="h-3.5 w-3.5" />
         </a>
       </div>
-    );
+    )
   }
 
   return (
@@ -370,7 +298,7 @@ function RestFacilityBar({
         Aircraft Database <ChevronRight className="h-3.5 w-3.5" />
       </a>
     </div>
-  );
+  )
 }
 
 // ── Complement Row ──
@@ -386,65 +314,61 @@ function ComplementRow({
   onDeleteRow,
   isFirst,
 }: {
-  comp: CrewComplementRef;
-  stdRow: CrewComplementRef | undefined;
-  allPositions: CrewPositionRef[];
-  cockpitPositions: CrewPositionRef[];
-  cabinPositions: CrewPositionRef[];
-  onCountChange: (id: string, counts: Record<string, number>) => void;
-  onLabelChange: (id: string, templateKey: string) => void;
-  onDeleteRow: (id: string) => void;
-  isFirst: boolean;
+  comp: CrewComplementRef
+  stdRow: CrewComplementRef | undefined
+  allPositions: CrewPositionRef[]
+  cockpitPositions: CrewPositionRef[]
+  cabinPositions: CrewPositionRef[]
+  onCountChange: (id: string, counts: Record<string, number>) => void
+  onLabelChange: (id: string, templateKey: string) => void
+  onDeleteRow: (id: string) => void
+  isFirst: boolean
 }) {
-  const display = getTemplateDisplay(comp.templateKey);
-  const isStandard = comp.templateKey === "standard";
-  const total = totalCrew(comp.counts, allPositions);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [localCounts, setLocalCounts] = useState(comp.counts);
+  const display = getTemplateDisplay(comp.templateKey)
+  const isStandard = comp.templateKey === 'standard'
+  const total = totalCrew(comp.counts, allPositions)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [localCounts, setLocalCounts] = useState(comp.counts)
 
   // Sync external changes
   useEffect(() => {
-    setLocalCounts(comp.counts);
-  }, [comp.counts]);
+    setLocalCounts(comp.counts)
+  }, [comp.counts])
 
   // Label editing
-  const [editingLabel, setEditingLabel] = useState(false);
-  const [labelValue, setLabelValue] = useState(comp.templateKey);
-  const isProtected = PROTECTED_KEYS.has(comp.templateKey);
+  const [editingLabel, setEditingLabel] = useState(false)
+  const [labelValue, setLabelValue] = useState(comp.templateKey)
+  const isProtected = PROTECTED_KEYS.has(comp.templateKey)
 
   const commitLabel = () => {
     if (labelValue.trim() && labelValue.trim() !== comp.templateKey) {
-      onLabelChange(comp._id, labelValue.trim());
+      onLabelChange(comp._id, labelValue.trim())
     }
-    setEditingLabel(false);
-  };
+    setEditingLabel(false)
+  }
 
   // Diff chips vs standard
   const diffs =
     !isStandard && stdRow
-      ? allPositions
+      ? (allPositions
           .map((p) => {
-            const d = posVal(comp.counts, p.code) - posVal(stdRow.counts, p.code);
-            return d !== 0 ? { code: p.code, diff: d, color: posColor(p) } : null;
+            const d = posVal(comp.counts, p.code) - posVal(stdRow.counts, p.code)
+            return d !== 0 ? { code: p.code, diff: d, color: posColor(p) } : null
           })
-          .filter(Boolean) as { code: string; diff: number; color: string }[]
-      : [];
+          .filter(Boolean) as { code: string; diff: number; color: string }[])
+      : []
 
   const handleCellChange = (posCode: string, value: number) => {
-    const newCounts = { ...localCounts, [posCode]: value };
-    setLocalCounts(newCounts);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const newCounts = { ...localCounts, [posCode]: value }
+    setLocalCounts(newCounts)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
-      onCountChange(comp._id, newCounts);
-    }, 500);
-  };
+      onCountChange(comp._id, newCounts)
+    }, 500)
+  }
 
   return (
-    <tr
-      className={`border-t border-hz-border/30 group ${
-        !isFirst ? "bg-hz-border/[0.03]" : ""
-      }`}
-    >
+    <tr className={`border-t border-hz-border/30 group ${!isFirst ? 'bg-hz-border/[0.03]' : ''}`}>
       {/* Template label + badge */}
       <td className="py-4 pr-4 align-middle">
         <div className="flex items-center gap-2.5">
@@ -456,11 +380,11 @@ function ComplementRow({
               onChange={(e) => setLabelValue(e.target.value)}
               onBlur={commitLabel}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  commitLabel();
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  commitLabel()
                 }
-                if (e.key === "Escape") setEditingLabel(false);
+                if (e.key === 'Escape') setEditingLabel(false)
               }}
               className="text-[11px] font-bold min-w-[80px] w-[110px] text-center px-2 py-1 rounded-full border outline-none focus:ring-2 focus:ring-[#7c3aed]/30 dark:[filter:saturate(0.60)]"
               style={{
@@ -472,25 +396,19 @@ function ComplementRow({
             <button
               onClick={() => {
                 if (!isProtected) {
-                  setLabelValue(comp.templateKey);
-                  setEditingLabel(true);
+                  setLabelValue(comp.templateKey)
+                  setEditingLabel(true)
                 }
               }}
               className="shrink-0 text-[11px] font-bold w-[90px] text-center py-1 rounded-full text-white dark:[filter:saturate(0.60)]"
               style={{ backgroundColor: display.badgeColor }}
-              title={
-                isProtected
-                  ? display.description
-                  : "Click to rename"
-              }
+              title={isProtected ? display.description : 'Click to rename'}
             >
               {display.badge}
             </button>
           )}
           <div className="min-w-0">
-            <div className="text-[13px] font-medium text-hz-text">
-              {display.label}
-            </div>
+            <div className="text-[13px] font-medium text-hz-text">{display.label}</div>
           </div>
         </div>
       </td>
@@ -500,10 +418,7 @@ function ComplementRow({
         <React.Fragment key={pos.code}>
           {i === cockpitPositions.length && cabinPositions.length > 0 && <td />}
           <td className="text-center py-4 px-0 align-middle">
-            <CountCell
-              value={posVal(localCounts, pos.code)}
-              onChange={(v) => handleCellChange(pos.code, v)}
-            />
+            <CountCell value={posVal(localCounts, pos.code)} onChange={(v) => handleCellChange(pos.code, v)} />
           </td>
         </React.Fragment>
       ))}
@@ -513,10 +428,7 @@ function ComplementRow({
 
       {/* Total */}
       <td className="text-center py-4 align-middle">
-        <span
-          className="text-[15px] font-bold tabular-nums"
-          style={{ color: ACCENT }}
-        >
+        <span className="text-[15px] font-bold tabular-nums" style={{ color: ACCENT }}>
           {totalCrew(localCounts, allPositions)}
         </span>
       </td>
@@ -538,7 +450,8 @@ function ComplementRow({
                   border: `1px solid ${d.diff > 0 ? `${d.color}30` : 'rgba(239,68,68,0.2)'}`,
                 }}
               >
-                {d.diff > 0 ? '+' : ''}{d.diff} {d.code}
+                {d.diff > 0 ? '+' : ''}
+                {d.diff} {d.code}
               </span>
             ))}
           </div>
@@ -564,32 +477,26 @@ function ComplementRow({
         )}
       </td>
     </tr>
-  );
+  )
 }
 
 // ── Count Cell ──
 
-function CountCell({
-  value,
-  onChange,
-}: {
-  value: number;
-  onChange: (v: number) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [localVal, setLocalVal] = useState(String(value));
-  const inputRef = useRef<HTMLInputElement>(null);
+function CountCell({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [localVal, setLocalVal] = useState(String(value))
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    setLocalVal(String(value));
-  }, [value]);
+    setLocalVal(String(value))
+  }, [value])
 
   const commit = () => {
-    const num = Math.max(0, parseInt(localVal) || 0);
-    setLocalVal(String(num));
-    onChange(num);
-    setEditing(false);
-  };
+    const num = Math.max(0, parseInt(localVal) || 0)
+    setLocalVal(String(num))
+    onChange(num)
+    setEditing(false)
+  }
 
   if (editing) {
     return (
@@ -599,33 +506,31 @@ function CountCell({
         type="text"
         inputMode="numeric"
         value={localVal}
-        onChange={(e) => setLocalVal(e.target.value.replace(/\D/g, ""))}
+        onChange={(e) => setLocalVal(e.target.value.replace(/\D/g, ''))}
         onBlur={commit}
         onKeyDown={(e) => {
-          if (e.key === "Enter") commit();
-          if (e.key === "Escape") {
-            setLocalVal(String(value));
-            setEditing(false);
+          if (e.key === 'Enter') commit()
+          if (e.key === 'Escape') {
+            setLocalVal(String(value))
+            setEditing(false)
           }
-          if (e.key === "Tab") commit();
+          if (e.key === 'Tab') commit()
         }}
         className="w-10 h-8 text-center text-[14px] font-bold tabular-nums rounded-lg border-2 border-[#7c3aed]/40 outline-none focus:ring-2 focus:ring-[#7c3aed]/30 bg-hz-bg text-hz-text"
       />
-    );
+    )
   }
 
   return (
     <button
       onClick={() => setEditing(true)}
       className={`w-10 h-8 rounded-lg text-[14px] font-bold tabular-nums transition-all duration-150 hover:bg-hz-border/40 ${
-        value > 0
-          ? "text-hz-text"
-          : "text-hz-text-tertiary/50"
+        value > 0 ? 'text-hz-text' : 'text-hz-text-tertiary/50'
       }`}
     >
       {value}
     </button>
-  );
+  )
 }
 
 // ── Add Row Button ──
@@ -635,24 +540,24 @@ function AddRowButton({
   existingKeys,
   onAdd,
 }: {
-  icaoType: string;
-  existingKeys: string[];
-  onAdd: (icaoType: string, templateKey: string) => void;
+  icaoType: string
+  existingKeys: string[]
+  onAdd: (icaoType: string, templateKey: string) => void
 }) {
-  const [open, setOpen] = useState(false);
-  const [customKey, setCustomKey] = useState("");
+  const [open, setOpen] = useState(false)
+  const [customKey, setCustomKey] = useState('')
 
   const handleAdd = () => {
-    const key = customKey.trim().toLowerCase().replace(/\s+/g, "_");
-    if (!key) return;
+    const key = customKey.trim().toLowerCase().replace(/\s+/g, '_')
+    if (!key) return
     if (existingKeys.includes(key)) {
-      alert(`Template "${key}" already exists for this type.`);
-      return;
+      alert(`Template "${key}" already exists for this type.`)
+      return
     }
-    onAdd(icaoType, key);
-    setCustomKey("");
-    setOpen(false);
-  };
+    onAdd(icaoType, key)
+    setCustomKey('')
+    setOpen(false)
+  }
 
   if (!open) {
     return (
@@ -663,7 +568,7 @@ function AddRowButton({
         <Plus className="h-3 w-3" />
         Add Custom Template
       </button>
-    );
+    )
   }
 
   return (
@@ -675,10 +580,10 @@ function AddRowButton({
         value={customKey}
         onChange={(e) => setCustomKey(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter") handleAdd();
-          if (e.key === "Escape") {
-            setCustomKey("");
-            setOpen(false);
+          if (e.key === 'Enter') handleAdd()
+          if (e.key === 'Escape') {
+            setCustomKey('')
+            setOpen(false)
           }
         }}
         className="w-40 px-3 py-1.5 rounded-lg text-[12px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-[#7c3aed]/30 text-hz-text"
@@ -692,13 +597,13 @@ function AddRowButton({
       </button>
       <button
         onClick={() => {
-          setCustomKey("");
-          setOpen(false);
+          setCustomKey('')
+          setOpen(false)
         }}
         className="px-2 py-1.5 rounded-lg text-[12px] text-hz-text-secondary hover:bg-hz-border/30"
       >
         Cancel
       </button>
     </div>
-  );
+  )
 }

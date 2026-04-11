@@ -67,9 +67,12 @@ export interface FlightDetail {
   depInfo: { terminal: string | null; gate: string | null; stand: string | null; ctot: string | null }
   arrInfo: { terminal: string | null; gate: string | null; stand: string | null }
   pax: {
-    adultExpected: number | null; adultActual: number | null
-    childExpected: number | null; childActual: number | null
-    infantExpected: number | null; infantActual: number | null
+    adultExpected: number | null
+    adultActual: number | null
+    childExpected: number | null
+    childActual: number | null
+    infantExpected: number | null
+    infantActual: number | null
   } | null
   fuel: { initial: number | null; uplift: number | null; burn: number | null; flightPlan: number | null } | null
   cargo: Array<{ category: string; weight: number | null; pieces: number | null }>

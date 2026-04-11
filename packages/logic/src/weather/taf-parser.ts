@@ -25,7 +25,10 @@ export interface ParsedTaf {
 }
 
 export function parseTafHeader(raw: string): {
-  stationIcao: string; issuedAt: Date; validFrom: Date; validTo: Date
+  stationIcao: string
+  issuedAt: Date
+  validFrom: Date
+  validTo: Date
 } | null {
   const m = raw.match(/TAF\s+(?:AMD\s+|COR\s+)?(\w{4})\s+(\d{6})Z\s+(\d{4})\/(\d{4})/)
   if (!m) return null

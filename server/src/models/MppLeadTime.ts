@@ -15,7 +15,7 @@ const mppLeadTimeGroupSchema = new Schema(
     createdAt: { type: String, default: null },
     updatedAt: { type: String, default: null },
   },
-  { _id: false, timestamps: false, collection: 'mppLeadTimeGroups' }
+  { _id: false, timestamps: false, collection: 'mppLeadTimeGroups' },
 )
 
 mppLeadTimeGroupSchema.index({ operatorId: 1, code: 1 }, { unique: true })
@@ -38,7 +38,7 @@ const mppLeadTimeItemSchema = new Schema(
     createdAt: { type: String, default: null },
     updatedAt: { type: String, default: null },
   },
-  { _id: false, timestamps: false, collection: 'mppLeadTimeItems' }
+  { _id: false, timestamps: false, collection: 'mppLeadTimeItems' },
 )
 
 mppLeadTimeItemSchema.index({ operatorId: 1, groupId: 1 })

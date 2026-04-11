@@ -49,7 +49,7 @@ export function getTimezoneAbbreviation(ianaTimezone: string, atDate?: Date): st
       timeZone: ianaTimezone,
       timeZoneName: 'short',
     }).formatToParts(date)
-    const tzPart = parts.find(p => p.type === 'timeZoneName')
+    const tzPart = parts.find((p) => p.type === 'timeZoneName')
     return tzPart?.value ?? ianaTimezone
   } catch {
     return ianaTimezone
@@ -102,7 +102,7 @@ export function getUtcOffsetFromTimezone(tz: string): number | null {
     const now = new Date()
     const fmt = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'shortOffset' })
     const parts = fmt.formatToParts(now)
-    const tzPart = parts.find(p => p.type === 'timeZoneName')
+    const tzPart = parts.find((p) => p.type === 'timeZoneName')
     if (!tzPart) return null
     // tzPart.value is like "GMT+7", "GMT-5", "GMT+5:30", "GMT"
     const val = tzPart.value.replace('GMT', '')

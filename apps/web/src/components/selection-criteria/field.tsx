@@ -1,9 +1,9 @@
-import type { ReactNode } from "react";
+import type { ReactNode } from 'react'
 
 interface FieldProps {
-  label: string;
-  required?: boolean;
-  children: ReactNode;
+  label: string
+  required?: boolean
+  children: ReactNode
 }
 
 /** Wrapper for a filter input — displays uppercase label above the control */
@@ -16,5 +16,5 @@ export function Field({ label, required, children }: FieldProps) {
       </label>
       {children}
     </div>
-  );
+  )
 }

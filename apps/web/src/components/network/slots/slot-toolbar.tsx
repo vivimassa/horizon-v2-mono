@@ -1,10 +1,18 @@
-"use client"
+'use client'
 
 import { forwardRef, useState, type ReactNode } from 'react'
 import {
-  Plus, CalendarSync, Download, FileText, Upload,
-  Search, Clock, LayoutGrid, List,
-  ChevronUp, ChevronDown,
+  Plus,
+  CalendarSync,
+  Download,
+  FileText,
+  Upload,
+  Search,
+  Clock,
+  LayoutGrid,
+  List,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
@@ -24,8 +32,16 @@ interface SlotToolbarProps {
 }
 
 export function SlotToolbar({
-  onNewRequest, onImportSchedule, onImportSAL, onGenerateSCR, onExport,
-  onSearch, showSlotFlags, onToggleSlotFlags, viewMode, onToggleViewMode,
+  onNewRequest,
+  onImportSchedule,
+  onImportSAL,
+  onGenerateSCR,
+  onExport,
+  onSearch,
+  showSlotFlags,
+  onToggleSlotFlags,
+  viewMode,
+  onToggleViewMode,
 }: SlotToolbarProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -41,7 +57,12 @@ export function SlotToolbar({
     { icon: Download, label: 'SAL', tooltip: 'Import SAL message', onClick: onImportSAL },
     { icon: FileText, label: 'SCR', tooltip: 'Generate SCR message', onClick: onGenerateSCR },
     { icon: Upload, label: 'Export', tooltip: 'Export slot data', onClick: onExport },
-    { icon: viewMode === 'grid' ? List : LayoutGrid, label: viewMode === 'grid' ? 'List' : 'Grid', tooltip: viewMode === 'grid' ? 'Switch to list view' : 'Switch to grid view', onClick: onToggleViewMode },
+    {
+      icon: viewMode === 'grid' ? List : LayoutGrid,
+      label: viewMode === 'grid' ? 'List' : 'Grid',
+      tooltip: viewMode === 'grid' ? 'Switch to list view' : 'Switch to grid view',
+      onClick: onToggleViewMode,
+    },
     { icon: Search, label: 'Search', tooltip: 'Search flights', onClick: onSearch },
   ]
 
@@ -55,7 +76,10 @@ export function SlotToolbar({
     >
       {/* Collapsed: icon-only row */}
       {collapsed && (
-        <div className="flex items-center gap-0.5 px-2" style={{ height: 52, animation: 'bc-dropdown-in 150ms ease-out' }}>
+        <div
+          className="flex items-center gap-0.5 px-2"
+          style={{ height: 52, animation: 'bc-dropdown-in 150ms ease-out' }}
+        >
           {toolbarItems.map((item, i) => (
             <div key={i} className="relative">
               <Tooltip content={item.tooltip ?? item.label}>
@@ -67,8 +91,12 @@ export function SlotToolbar({
                     background: item.active ? activeBg : undefined,
                     color: item.active ? (isDark ? '#5B8DEF' : '#1e40af') : undefined,
                   }}
-                  onMouseEnter={e => { if (!item.active) e.currentTarget.style.background = hoverBg }}
-                  onMouseLeave={e => { if (!item.active) e.currentTarget.style.background = item.active ? activeBg : 'transparent' }}
+                  onMouseEnter={(e) => {
+                    if (!item.active) e.currentTarget.style.background = hoverBg
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!item.active) e.currentTarget.style.background = item.active ? activeBg : 'transparent'
+                  }}
                 >
                   <item.icon size={18} strokeWidth={1.6} />
                 </button>
@@ -76,7 +104,10 @@ export function SlotToolbar({
             </div>
           ))}
           <div className="flex-1" />
-          <button onClick={() => setCollapsed(false)} className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-hz-border/20 transition-colors">
+          <button
+            onClick={() => setCollapsed(false)}
+            className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-hz-border/20 transition-colors"
+          >
             <ChevronDown size={16} className="text-hz-text-tertiary" />
           </button>
         </div>
@@ -84,40 +115,100 @@ export function SlotToolbar({
 
       {/* Expanded: ribbon layout */}
       {!collapsed && (
-        <div className="flex items-stretch gap-0 w-full" style={{ minHeight: 120, animation: 'bc-dropdown-in 150ms ease-out' }}>
+        <div
+          className="flex items-stretch gap-0 w-full"
+          style={{ minHeight: 120, animation: 'bc-dropdown-in 150ms ease-out' }}
+        >
           {/* Data */}
           <RibbonSection label="Data">
-            <RibbonBtn icon={Plus} label="New" onClick={onNewRequest} isDark={isDark} hoverBg={hoverBg} activeBg={activeBg} tooltip="New slot request" />
-            <RibbonBtn icon={CalendarSync} label="Import" onClick={onImportSchedule} isDark={isDark} hoverBg={hoverBg} activeBg={activeBg} tooltip="Import from schedule" />
+            <RibbonBtn
+              icon={Plus}
+              label="New"
+              onClick={onNewRequest}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="New slot request"
+            />
+            <RibbonBtn
+              icon={CalendarSync}
+              label="Import"
+              onClick={onImportSchedule}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Import from schedule"
+            />
           </RibbonSection>
           <Divider isDark={isDark} />
 
           {/* Messages */}
           <RibbonSection label="Messages">
-            <RibbonBtn icon={Download} label="SAL" onClick={onImportSAL} isDark={isDark} hoverBg={hoverBg} activeBg={activeBg} tooltip="Import SAL message" />
-            <RibbonBtn icon={FileText} label="SCR" onClick={onGenerateSCR} isDark={isDark} hoverBg={hoverBg} activeBg={activeBg} tooltip="Generate SCR message" />
-            <RibbonBtn icon={Upload} label="Export" onClick={onExport} isDark={isDark} hoverBg={hoverBg} activeBg={activeBg} tooltip="Export slot data" />
+            <RibbonBtn
+              icon={Download}
+              label="SAL"
+              onClick={onImportSAL}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Import SAL message"
+            />
+            <RibbonBtn
+              icon={FileText}
+              label="SCR"
+              onClick={onGenerateSCR}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Generate SCR message"
+            />
+            <RibbonBtn
+              icon={Upload}
+              label="Export"
+              onClick={onExport}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Export slot data"
+            />
           </RibbonSection>
           <Divider isDark={isDark} />
 
           {/* Display */}
           <RibbonSection label="Display">
-            <RibbonBtn icon={viewMode === 'grid' ? List : LayoutGrid} label={viewMode === 'grid' ? 'List' : 'Grid'}
-              onClick={onToggleViewMode} isDark={isDark} hoverBg={hoverBg} activeBg={activeBg}
-              tooltip={viewMode === 'grid' ? 'Switch to list view' : 'Switch to grid view'} />
+            <RibbonBtn
+              icon={viewMode === 'grid' ? List : LayoutGrid}
+              label={viewMode === 'grid' ? 'List' : 'Grid'}
+              onClick={onToggleViewMode}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip={viewMode === 'grid' ? 'Switch to list view' : 'Switch to grid view'}
+            />
           </RibbonSection>
           <Divider isDark={isDark} />
 
           {/* Navigate */}
           <RibbonSection label="Navigate">
-            <RibbonBtn icon={Search} label="Search" onClick={onSearch} isDark={isDark} hoverBg={hoverBg} activeBg={activeBg} tooltip="Search flights" />
+            <RibbonBtn
+              icon={Search}
+              label="Search"
+              onClick={onSearch}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Search flights"
+            />
           </RibbonSection>
 
           <div className="flex-1" />
 
           {/* Collapse toggle */}
           <div className="flex items-start pt-2 pr-2">
-            <button onClick={() => setCollapsed(true)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-hz-border/20 transition-colors">
+            <button
+              onClick={() => setCollapsed(true)}
+              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-hz-border/20 transition-colors"
+            >
               <ChevronUp size={14} className="text-hz-text-tertiary" />
             </button>
           </div>
@@ -132,9 +223,7 @@ export function SlotToolbar({
 function RibbonSection({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col items-center self-stretch justify-between pt-2 pb-1.5 px-3">
-      <div className="flex items-center justify-center gap-2 flex-1">
-        {children}
-      </div>
+      <div className="flex items-center justify-center gap-2 flex-1">{children}</div>
       <div className="w-full text-center border-t border-hz-border/20 pt-0.5 mt-0.5">
         <span className="text-[13px] text-hz-text-tertiary/50 font-medium leading-none whitespace-nowrap">{label}</span>
       </div>
@@ -142,10 +231,21 @@ function RibbonSection({ label, children }: { label: string; children: ReactNode
   )
 }
 
-const RibbonBtn = forwardRef<HTMLButtonElement, {
-  icon: LucideIcon; label: string; onClick?: () => void; active?: boolean; disabled?: boolean
-  isDark: boolean; hoverBg: string; activeBg: string; tooltip?: string; badge?: number
-}>(({ icon: Icon, label, onClick, active, disabled, isDark, hoverBg, activeBg, tooltip, badge }, ref) => {
+const RibbonBtn = forwardRef<
+  HTMLButtonElement,
+  {
+    icon: LucideIcon
+    label: string
+    onClick?: () => void
+    active?: boolean
+    disabled?: boolean
+    isDark: boolean
+    hoverBg: string
+    activeBg: string
+    tooltip?: string
+    badge?: number
+  }
+>(({ icon: Icon, label, onClick, active, disabled, isDark, hoverBg, activeBg, tooltip, badge }, ref) => {
   return (
     <Tooltip content={tooltip ?? label}>
       <button
@@ -154,12 +254,17 @@ const RibbonBtn = forwardRef<HTMLButtonElement, {
         disabled={disabled || !onClick}
         className="flex flex-col items-center justify-center gap-1 rounded-lg transition-colors disabled:opacity-30 relative"
         style={{
-          width: 72, height: 72,
+          width: 72,
+          height: 72,
           background: active ? activeBg : undefined,
           color: active ? (isDark ? '#5B8DEF' : '#1e40af') : undefined,
         }}
-        onMouseEnter={e => { if (!active && !disabled) e.currentTarget.style.background = hoverBg }}
-        onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? activeBg : 'transparent' }}
+        onMouseEnter={(e) => {
+          if (!active && !disabled) e.currentTarget.style.background = hoverBg
+        }}
+        onMouseLeave={(e) => {
+          if (!active) e.currentTarget.style.background = active ? activeBg : 'transparent'
+        }}
       >
         <Icon size={26} strokeWidth={1.4} />
         <span className="text-[13px] font-medium leading-none">{label}</span>

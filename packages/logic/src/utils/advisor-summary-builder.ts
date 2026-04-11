@@ -96,10 +96,7 @@ interface SummaryBuilderInput {
 }
 
 export function buildAdvisorSummary(input: SummaryBuilderInput): AdvisorInput {
-  const {
-    assignedFlights, overflow, chainBreaks,
-    registrations, aircraftTypes, method, rules,
-  } = input
+  const { assignedFlights, overflow, chainBreaks, registrations, aircraftTypes, method, rules } = input
 
   // ── Summary ──
   const usedRegs = new Set<string>()
@@ -109,7 +106,7 @@ export function buildAdvisorSummary(input: SummaryBuilderInput): AdvisorInput {
 
   const summary: AdvisorInput['summary'] = {
     totalFlights: assignedFlights.length + overflow.length,
-    assignedFlights: assignedFlights.filter(f => f.assignedReg).length,
+    assignedFlights: assignedFlights.filter((f) => f.assignedReg).length,
     overflowFlights: overflow.length,
     totalAircraft: registrations.length,
     aircraftUsed: usedRegs.size,
@@ -118,18 +115,25 @@ export function buildAdvisorSummary(input: SummaryBuilderInput): AdvisorInput {
   }
 
   // ── Fleet breakdown ──
-  const byType = new Map<string, {
-    flights: number
-    aircraft: Set<string>
-    blockMinutes: number
-    overflow: number
-    chainBreaks: number
-  }>()
+  const byType = new Map<
+    string,
+    {
+      flights: number
+      aircraft: Set<string>
+      blockMinutes: number
+      overflow: number
+      chainBreaks: number
+    }
+  >()
 
   for (const f of assignedFlights) {
     const type = f.aircraftTypeIcao || 'UNKN'
     const entry = byType.get(type) || {
-      flights: 0, aircraft: new Set<string>(), blockMinutes: 0, overflow: 0, chainBreaks: 0,
+      flights: 0,
+      aircraft: new Set<string>(),
+      blockMinutes: 0,
+      overflow: 0,
+      chainBreaks: 0,
     }
     entry.flights++
     if (f.assignedReg) {
@@ -142,52 +146,49 @@ export function buildAdvisorSummary(input: SummaryBuilderInput): AdvisorInput {
   for (const f of overflow) {
     const type = f.aircraftTypeIcao || 'UNKN'
     const entry = byType.get(type) || {
-      flights: 0, aircraft: new Set<string>(), blockMinutes: 0, overflow: 0, chainBreaks: 0,
+      flights: 0,
+      aircraft: new Set<string>(),
+      blockMinutes: 0,
+      overflow: 0,
+      chainBreaks: 0,
     }
     entry.overflow++
     byType.set(type, entry)
   }
 
-  const fleetBreakdown: AdvisorInput['fleetBreakdown'] = Array.from(
-    byType.entries()
-  ).map(([icaoType, data]) => ({
+  const fleetBreakdown: AdvisorInput['fleetBreakdown'] = Array.from(byType.entries()).map(([icaoType, data]) => ({
     icaoType,
     totalFlights: data.flights + data.overflow,
     aircraftCount: data.aircraft.size,
-    avgUtilizationHours: data.aircraft.size > 0
-      ? Math.round((data.blockMinutes / data.aircraft.size / 60) * 10) / 10
-      : 0,
+    avgUtilizationHours:
+      data.aircraft.size > 0 ? Math.round((data.blockMinutes / data.aircraft.size / 60) * 10) / 10 : 0,
     overflowCount: data.overflow,
     chainBreakCount: data.chainBreaks,
   }))
 
   // ── Top overflow (max 20) ──
-  const topOverflow: AdvisorInput['topOverflow'] = overflow
-    .slice(0, 20)
-    .map(f => ({
-      flightNumber: f.flightNumber || '?',
-      route: `${f.depStation}-${f.arrStation}`,
-      date: f.date.toISOString().slice(0, 10),
-      aircraftType: f.aircraftTypeIcao || 'UNKN',
-      reason: 'no_aircraft',
-    }))
+  const topOverflow: AdvisorInput['topOverflow'] = overflow.slice(0, 20).map((f) => ({
+    flightNumber: f.flightNumber || '?',
+    route: `${f.depStation}-${f.arrStation}`,
+    date: f.date.toISOString().slice(0, 10),
+    aircraftType: f.aircraftTypeIcao || 'UNKN',
+    reason: 'no_aircraft',
+  }))
 
   // ── Top chain breaks (max 15) ──
-  const topChainBreaks: AdvisorInput['topChainBreaks'] = chainBreaks
-    .slice(0, 15)
-    .map(cb => {
-      const flight = assignedFlights.find(f => f.id === cb.flightId)
-      return {
-        flightNumber: flight?.flightNumber || '?',
-        aircraft: flight?.assignedReg || '?',
-        prevArrival: cb.prevArr,
-        nextDeparture: cb.nextDep,
-        gapMinutes: 0,
-      }
-    })
+  const topChainBreaks: AdvisorInput['topChainBreaks'] = chainBreaks.slice(0, 15).map((cb) => {
+    const flight = assignedFlights.find((f) => f.id === cb.flightId)
+    return {
+      flightNumber: flight?.flightNumber || '?',
+      aircraft: flight?.assignedReg || '?',
+      prevArrival: cb.prevArr,
+      nextDeparture: cb.nextDep,
+      gapMinutes: 0,
+    }
+  })
 
   // ── Active rules ──
-  const activeRules: AdvisorInput['activeRules'] = (rules || []).map(r => ({
+  const activeRules: AdvisorInput['activeRules'] = (rules || []).map((r) => ({
     name: r.name || 'Unnamed rule',
     scope: `${r.scope_type}: ${r.scope_values.join(', ') || 'all'}`,
     action: r.action,
@@ -207,8 +208,7 @@ export function buildAdvisorSummary(input: SummaryBuilderInput): AdvisorInput {
 
   const utilList = Array.from(regUtilization.entries())
     .map(([reg, data]) => {
-      const acType = registrations.find(r => r.registration === reg)
-        ?.aircraft_types?.icao_type || 'UNKN'
+      const acType = registrations.find((r) => r.registration === reg)?.aircraft_types?.icao_type || 'UNKN'
       return {
         registration: reg,
         icaoType: acType,
@@ -218,10 +218,9 @@ export function buildAdvisorSummary(input: SummaryBuilderInput): AdvisorInput {
     })
     .sort((a, b) => b.blockHours - a.blockHours)
 
-  const utilizationExtremes = [
-    ...utilList.slice(0, 5),
-    ...utilList.slice(-5),
-  ].filter((v, i, arr) => arr.findIndex(x => x.registration === v.registration) === i)
+  const utilizationExtremes = [...utilList.slice(0, 5), ...utilList.slice(-5)].filter(
+    (v, i, arr) => arr.findIndex((x) => x.registration === v.registration) === i,
+  )
 
   return {
     summary,

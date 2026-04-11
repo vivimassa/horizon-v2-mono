@@ -47,7 +47,7 @@ const charterContractSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'charterContracts',
-  }
+  },
 )
 
 charterContractSchema.index({ operatorId: 1, status: 1 })

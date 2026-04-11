@@ -29,10 +29,20 @@ export function HoldTabBar({ active, onSelect, holds, accent, palette, isDark }:
               borderColor: isActive ? accent : palette.cardBorder,
             }}
           >
-            <Text style={{ fontSize: 13, fontWeight: '700', color: isActive ? '#fff' : palette.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: '700',
+                color: isActive ? '#fff' : palette.textSecondary,
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+              }}
+            >
               {tab.label}
             </Text>
-            <Text style={{ fontSize: 11, color: isActive ? 'rgba(255,255,255,0.7)' : palette.textTertiary, marginTop: 2 }}>
+            <Text
+              style={{ fontSize: 11, color: isActive ? 'rgba(255,255,255,0.7)' : palette.textTertiary, marginTop: 2 }}
+            >
               {hold.weight.toLocaleString()} kg / {hold.percent}%
             </Text>
           </Pressable>

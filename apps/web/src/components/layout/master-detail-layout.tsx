@@ -1,16 +1,16 @@
-"use client";
+'use client'
 
-import { type ReactNode } from "react";
-import { WEB_LAYOUT } from "@/lib/fonts";
-import { useTheme } from "@/components/theme-provider";
+import { type ReactNode } from 'react'
+import { WEB_LAYOUT } from '@/lib/fonts'
+import { useTheme } from '@/components/theme-provider'
 
 interface MasterDetailLayoutProps {
   /** Left panel content (list, search, filters) */
-  left: ReactNode;
+  left: ReactNode
   /** Center panel content — flex-1, always present */
-  center: ReactNode;
+  center: ReactNode
   /** Optional right panel content (info, inspector) */
-  right?: ReactNode;
+  right?: ReactNode
 }
 
 /**
@@ -20,13 +20,9 @@ interface MasterDetailLayoutProps {
  *   - 2-panel: left (320px) + center (flex-1)
  *   - 3-panel: left (320px) + center (flex-1) + right (320px)
  */
-export function MasterDetailLayout({
-  left,
-  center,
-  right,
-}: MasterDetailLayoutProps) {
-  const { theme } = useTheme();
-  const panelBg = theme === "dark" ? "#191921" : "#FFFFFF";
+export function MasterDetailLayout({ left, center, right }: MasterDetailLayoutProps) {
+  const { theme } = useTheme()
+  const panelBg = theme === 'dark' ? '#191921' : '#FFFFFF'
 
   return (
     <div className="flex h-full overflow-hidden gap-3 px-5 pt-4 pb-5">
@@ -56,5 +52,5 @@ export function MasterDetailLayout({
         </aside>
       )}
     </div>
-  );
+  )
 }

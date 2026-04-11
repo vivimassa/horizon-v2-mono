@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
@@ -7,10 +7,10 @@ import { useTheme } from '@/components/theme-provider'
 import { useGanttStore } from '@/stores/use-gantt-store'
 
 export function AssignPopover() {
-  const pop = useGanttStore(s => s.assignPopover)
-  const close = useGanttStore(s => s.closeAssignPopover)
-  const aircraft = useGanttStore(s => s.aircraft)
-  const assignToAircraft = useGanttStore(s => s.assignToAircraft)
+  const pop = useGanttStore((s) => s.assignPopover)
+  const close = useGanttStore((s) => s.closeAssignPopover)
+  const aircraft = useGanttStore((s) => s.aircraft)
+  const assignToAircraft = useGanttStore((s) => s.assignToAircraft)
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const ref = useRef<HTMLDivElement>(null)
@@ -19,8 +19,15 @@ export function AssignPopover() {
   const [assigning, setAssigning] = useState(false)
   const [confirmTarget, setConfirmTarget] = useState<{ registration: string; typeIcao: string } | null>(null)
 
-  useEffect(() => { setMounted(true) }, [])
-  useEffect(() => { if (pop) { setSearch(''); setConfirmTarget(null) } }, [pop])
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+  useEffect(() => {
+    if (pop) {
+      setSearch('')
+      setConfirmTarget(null)
+    }
+  }, [pop])
 
   useEffect(() => {
     if (!pop) return
@@ -28,12 +35,20 @@ export function AssignPopover() {
       if (ref.current && !ref.current.contains(e.target as Node)) close()
     }
     const id = setTimeout(() => document.addEventListener('mousedown', handler), 100)
-    return () => { clearTimeout(id); document.removeEventListener('mousedown', handler) }
+    return () => {
+      clearTimeout(id)
+      document.removeEventListener('mousedown', handler)
+    }
   }, [pop, close])
 
   useEffect(() => {
     if (!pop) return
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') { if (confirmTarget) setConfirmTarget(null); else close() } }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (confirmTarget) setConfirmTarget(null)
+        else close()
+      }
+    }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [pop, close, confirmTarget])
@@ -41,13 +56,14 @@ export function AssignPopover() {
   // Show ALL aircraft, sorted: matching type first, then others
   const available = useMemo(() => {
     if (!pop) return []
-    let list = aircraft.filter(ac => ac.status === 'active')
+    let list = aircraft.filter((ac) => ac.status === 'active')
     if (search) {
       const q = search.toLowerCase()
-      list = list.filter(ac =>
-        ac.registration.toLowerCase().includes(q) ||
-        (ac.aircraftTypeIcao && ac.aircraftTypeIcao.toLowerCase().includes(q)) ||
-        (ac.homeBaseIcao && ac.homeBaseIcao.toLowerCase().includes(q))
+      list = list.filter(
+        (ac) =>
+          ac.registration.toLowerCase().includes(q) ||
+          (ac.aircraftTypeIcao && ac.aircraftTypeIcao.toLowerCase().includes(q)) ||
+          (ac.homeBaseIcao && ac.homeBaseIcao.toLowerCase().includes(q)),
       )
     }
     // Sort: matching type first
@@ -105,8 +121,11 @@ export function AssignPopover() {
       <div
         className="fixed z-[9999] rounded-xl overflow-hidden"
         style={{
-          left, top, width: w,
-          background: bg, border: `1px solid ${border}`,
+          left,
+          top,
+          width: w,
+          background: bg,
+          border: `1px solid ${border}`,
           backdropFilter: 'blur(20px) saturate(180%)',
           WebkitBackdropFilter: 'blur(20px) saturate(180%)',
           boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)',
@@ -115,26 +134,34 @@ export function AssignPopover() {
         {/* Header */}
         <div className="flex items-center justify-between px-3 pt-3 pb-2">
           <div>
-            <span className="text-[14px] font-bold" style={{ color: text }}>Assign Aircraft</span>
+            <span className="text-[14px] font-bold" style={{ color: text }}>
+              Assign Aircraft
+            </span>
             <span className="text-[13px] ml-2" style={{ color: textSec }}>
               {count} flight{count > 1 ? 's' : ''} · {pop.aircraftTypeIcao}
             </span>
           </div>
-          <button onClick={close} className="w-6 h-6 rounded-md flex items-center justify-center opacity-60 hover:opacity-100"
-            style={{ background: inputBg }}>
+          <button
+            onClick={close}
+            className="w-6 h-6 rounded-md flex items-center justify-center opacity-60 hover:opacity-100"
+            style={{ background: inputBg }}
+          >
             <X size={14} style={{ color: text }} />
           </button>
         </div>
 
         {/* Search */}
         <div className="px-3 pb-2">
-          <div className="flex items-center gap-2 h-8 px-2.5 rounded-lg" style={{ background: inputBg, border: `1px solid ${border}` }}>
+          <div
+            className="flex items-center gap-2 h-8 px-2.5 rounded-lg"
+            style={{ background: inputBg, border: `1px solid ${border}` }}
+          >
             <Search size={13} style={{ color: textMuted }} />
             <input
               type="text"
               placeholder="Search registration or type..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               autoFocus
               className="flex-1 text-[13px] font-mono bg-transparent outline-none"
               style={{ color: text }}
@@ -145,9 +172,11 @@ export function AssignPopover() {
         {/* Aircraft list */}
         <div className="max-h-[280px] overflow-y-auto pb-2">
           {available.length === 0 ? (
-            <div className="text-center py-4 text-[13px]" style={{ color: textMuted }}>No matching aircraft</div>
+            <div className="text-center py-4 text-[13px]" style={{ color: textMuted }}>
+              No matching aircraft
+            </div>
           ) : (
-            available.map(ac => {
+            available.map((ac) => {
               const isMatch = ac.aircraftTypeIcao === pop.aircraftTypeIcao
               return (
                 <button
@@ -156,15 +185,21 @@ export function AssignPopover() {
                   disabled={assigning}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] transition-colors disabled:opacity-40"
                   style={{ color: text, background: !isMatch ? warnBg : 'transparent' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = hoverBg }}
-                  onMouseLeave={e => { e.currentTarget.style.background = !isMatch ? warnBg : 'transparent' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = hoverBg
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = !isMatch ? warnBg : 'transparent'
+                  }}
                 >
                   <span className="font-mono font-bold w-[80px] text-left shrink-0">{ac.registration}</span>
                   <span className="font-mono text-left flex-1" style={{ color: isMatch ? textSec : '#FF8800' }}>
                     {ac.aircraftTypeIcao ?? ''}
                   </span>
                   {ac.homeBaseIcao && (
-                    <span className="font-mono" style={{ color: textMuted }}>{ac.homeBaseIcao}</span>
+                    <span className="font-mono" style={{ color: textMuted }}>
+                      {ac.homeBaseIcao}
+                    </span>
                   )}
                   {!isMatch && <AlertTriangle size={13} style={{ color: '#FF8800' }} />}
                 </button>
@@ -179,7 +214,9 @@ export function AssignPopover() {
         <div
           className="fixed inset-0 z-[10000] flex items-center justify-center"
           style={{ backgroundColor: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(2px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setConfirmTarget(null) }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setConfirmTarget(null)
+          }}
         >
           <div
             className="rounded-2xl p-5 max-w-[400px] w-full mx-4"
@@ -199,7 +236,11 @@ export function AssignPopover() {
                     Aircraft Type Mismatch
                   </div>
                   <div className="text-[13px]" style={{ color: isDark ? '#8F90A6' : '#555770' }}>
-                    The selected flight{count > 1 ? 's are' : ' is'} planned for <span className="font-mono font-bold">{pop.aircraftTypeIcao}</span> but you are assigning <span className="font-mono font-bold">{confirmTarget.registration}</span> which is <span className="font-mono font-bold">{confirmTarget.typeIcao}</span>. This may affect seating capacity and performance calculations.
+                    The selected flight{count > 1 ? 's are' : ' is'} planned for{' '}
+                    <span className="font-mono font-bold">{pop.aircraftTypeIcao}</span> but you are assigning{' '}
+                    <span className="font-mono font-bold">{confirmTarget.registration}</span> which is{' '}
+                    <span className="font-mono font-bold">{confirmTarget.typeIcao}</span>. This may affect seating
+                    capacity and performance calculations.
                   </div>
                 </div>
               </div>
@@ -209,7 +250,10 @@ export function AssignPopover() {
               <button
                 onClick={() => setConfirmTarget(null)}
                 className="h-9 px-4 rounded-xl text-[13px] font-medium"
-                style={{ color: isDark ? '#8F90A6' : '#555770', border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)'}` }}
+                style={{
+                  color: isDark ? '#8F90A6' : '#555770',
+                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)'}`,
+                }}
               >
                 No, Cancel
               </button>
@@ -226,6 +270,6 @@ export function AssignPopover() {
         </div>
       )}
     </div>,
-    document.body
+    document.body,
   )
 }

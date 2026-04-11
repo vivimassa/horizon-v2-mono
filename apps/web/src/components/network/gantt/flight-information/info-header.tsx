@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { Plane, Clock, PlaneLanding, AlertTriangle, Hourglass, Users, Shield } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
@@ -18,7 +18,20 @@ function fmtBlock(min: number): string {
 function fmtDate(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00Z')
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+  const months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ]
   return `${days[d.getUTCDay()]}, ${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`
 }
 
@@ -33,21 +46,31 @@ function fmtOffset(hours: number | null): string {
 
 function statusColor(s: string): string {
   switch (s) {
-    case 'active': return '#06C270'
-    case 'draft': return '#3B82F6'
-    case 'suspended': return '#FF8800'
-    case 'cancelled': return '#FF3B3B'
-    default: return '#64748B'
+    case 'active':
+      return '#06C270'
+    case 'draft':
+      return '#3B82F6'
+    case 'suspended':
+      return '#FF8800'
+    case 'cancelled':
+      return '#FF3B3B'
+    default:
+      return '#64748B'
   }
 }
 
 function statusLabel(s: string): string {
   switch (s) {
-    case 'active': return 'Active'
-    case 'draft': return 'Draft'
-    case 'suspended': return 'Suspended'
-    case 'cancelled': return 'Cancelled'
-    default: return s
+    case 'active':
+      return 'Active'
+    case 'draft':
+      return 'Draft'
+    case 'suspended':
+      return 'Suspended'
+    case 'cancelled':
+      return 'Cancelled'
+    default:
+      return s
   }
 }
 
@@ -101,7 +124,8 @@ export function InfoHeader({ data }: { data: FlightDetail }) {
       {/* Row 1: Flight identity — matches V1 exactly */}
       <div className="flex items-center gap-3 mb-1">
         <span className="text-[22px] font-mono font-bold tracking-tight" style={{ color: accent }}>
-          {data.airlineCode}{data.flightNumber}
+          {data.airlineCode}
+          {data.flightNumber}
         </span>
         <span className="text-[16px] font-mono font-bold" style={{ color: muted }}>
           {regDisplay}
@@ -121,70 +145,107 @@ export function InfoHeader({ data }: { data: FlightDetail }) {
       <div className="flex items-start justify-between w-full mb-1">
         <div className="text-left">
           <div className="flex items-baseline gap-1.5">
-            <span className="text-[40px] font-mono font-semibold tracking-tighter leading-none" style={{ color: textPrimary }}>
+            <span
+              className="text-[40px] font-mono font-semibold tracking-tighter leading-none"
+              style={{ color: textPrimary }}
+            >
               {data.depStation}
             </span>
-            <span className="text-[13px] font-mono" style={{ color: mutedLight }}>{depOffset}</span>
+            <span className="text-[13px] font-mono" style={{ color: mutedLight }}>
+              {depOffset}
+            </span>
           </div>
         </div>
         <div className="flex-1 flex items-center justify-center px-6 pt-3">
-          <div className="flex-1 h-0" style={{ borderTop: `2px dashed ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'}` }} />
+          <div
+            className="flex-1 h-0"
+            style={{ borderTop: `2px dashed ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'}` }}
+          />
           <div
             className="w-10 h-10 rounded-full flex items-center justify-center mx-3 shrink-0"
-            style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}
+            style={{
+              background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+              border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+            }}
           >
             <Plane size={20} className="rotate-45" style={{ color: muted, fill: muted }} />
           </div>
-          <div className="flex-1 h-0" style={{ borderTop: `2px dashed ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'}` }} />
+          <div
+            className="flex-1 h-0"
+            style={{ borderTop: `2px dashed ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'}` }}
+          />
         </div>
         <div className="text-right">
           <div className="flex items-baseline gap-1.5 justify-end">
-            <span className="text-[13px] font-mono" style={{ color: mutedLight }}>{arrOffset}</span>
-            <span className="text-[40px] font-mono font-semibold tracking-tighter leading-none" style={{ color: textPrimary }}>
+            <span className="text-[13px] font-mono" style={{ color: mutedLight }}>
+              {arrOffset}
+            </span>
+            <span
+              className="text-[40px] font-mono font-semibold tracking-tighter leading-none"
+              style={{ color: textPrimary }}
+            >
               {data.arrStation}
             </span>
           </div>
         </div>
       </div>
       <div className="flex justify-between mb-5">
-        <span className="text-[13px] font-medium uppercase tracking-wider" style={{ color: muted }}>{depName}</span>
-        <span className="text-[13px] font-medium uppercase tracking-wider text-right" style={{ color: muted }}>{arrName}</span>
+        <span className="text-[13px] font-medium uppercase tracking-wider" style={{ color: muted }}>
+          {depName}
+        </span>
+        <span className="text-[13px] font-medium uppercase tracking-wider text-right" style={{ color: muted }}>
+          {arrName}
+        </span>
       </div>
 
       {/* Row 3: OOOI Progress Timeline — spans full width, D.CLOSE under DEP, IN under ARR */}
       <div className="relative w-full mb-5" style={{ height: 60 }}>
         {/* Line between first and last dot */}
-        <div className="absolute h-[2px]" style={{
-          top: 9, left: '5%', right: '5%',
-          background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-        }} />
+        <div
+          className="absolute h-[2px]"
+          style={{
+            top: 9,
+            left: '5%',
+            right: '5%',
+            background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+          }}
+        />
         {OOOI_PHASES.map((phase, i) => {
           const val = data.actual[phase.key]
           const isComplete = val != null
           const isFirst = phase.isFirst && !isComplete
-          const dotBg = isComplete
-            ? '#22c55e'
-            : isFirst
-              ? '#3B82F6'
-              : (isDark ? '#1F1F28' : '#F2F2F5')
+          const dotBg = isComplete ? '#22c55e' : isFirst ? '#3B82F6' : isDark ? '#1F1F28' : '#F2F2F5'
           // Evenly space from 5% to 95%
           const pct = 5 + i * 22.5
 
           return (
-            <div key={phase.key} className="absolute flex flex-col items-center z-10"
-              style={{ left: `${pct}%`, top: 0, transform: 'translateX(-50%)' }}>
+            <div
+              key={phase.key}
+              className="absolute flex flex-col items-center z-10"
+              style={{ left: `${pct}%`, top: 0, transform: 'translateX(-50%)' }}
+            >
               <div
                 className="w-5 h-5 rounded-full"
                 style={{
                   background: dotBg,
-                  border: (isComplete || isFirst) ? 'none' : `2px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'}`,
+                  border:
+                    isComplete || isFirst
+                      ? 'none'
+                      : `2px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'}`,
                   boxShadow: isComplete
                     ? '0 0 8px rgba(34,197,94,0.3)'
-                    : isFirst ? '0 0 8px rgba(59,130,246,0.3)' : 'none',
+                    : isFirst
+                      ? '0 0 8px rgba(59,130,246,0.3)'
+                      : 'none',
                 }}
               />
-              <span className="text-[13px] font-mono font-medium mt-1.5 whitespace-nowrap" style={{ color: muted }}>{phase.label}</span>
-              <span className="text-[13px] font-mono whitespace-nowrap" style={{ color: isComplete ? textPrimary : mutedLight }}>
+              <span className="text-[13px] font-mono font-medium mt-1.5 whitespace-nowrap" style={{ color: muted }}>
+                {phase.label}
+              </span>
+              <span
+                className="text-[13px] font-mono whitespace-nowrap"
+                style={{ color: isComplete ? textPrimary : mutedLight }}
+              >
                 {val ? fmtUtc(val) : '—'}
               </span>
             </div>
@@ -212,10 +273,18 @@ export function InfoHeader({ data }: { data: FlightDetail }) {
                 <Icon size={18} style={{ color: kpi.alert ? '#E63535' : accent }} />
               </div>
               <div>
-                <div className="text-[13px] font-bold uppercase tracking-tight leading-none"
-                  style={{ color: kpi.alert ? '#E63535' : muted }}>{kpi.label}</div>
-                <div className="text-[18px] font-mono font-bold leading-none mt-1"
-                  style={{ color: kpi.alert ? '#E63535' : textPrimary }}>{kpi.value}</div>
+                <div
+                  className="text-[13px] font-bold uppercase tracking-tight leading-none"
+                  style={{ color: kpi.alert ? '#E63535' : muted }}
+                >
+                  {kpi.label}
+                </div>
+                <div
+                  className="text-[18px] font-mono font-bold leading-none mt-1"
+                  style={{ color: kpi.alert ? '#E63535' : textPrimary }}
+                >
+                  {kpi.value}
+                </div>
               </div>
             </div>
           )

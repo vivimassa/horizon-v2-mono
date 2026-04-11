@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useMemo } from 'react'
 import { Copy, Download } from 'lucide-react'
@@ -16,16 +16,20 @@ interface SsimTabProps {
 function formatDateSsim(d: string): string {
   if (!d) return ''
   const dt = new Date(d + 'T00:00:00')
-  const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
+  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
   return `${String(dt.getDate()).padStart(2, '0')}${months[dt.getMonth()]}${String(dt.getFullYear()).slice(2)}`
 }
 
 function statusChar(s: string): string {
   switch (s) {
-    case 'active': return 'J'
-    case 'pending': return 'W'
-    case 'cancelled': return 'X'
-    default: return 'J'
+    case 'active':
+      return 'J'
+    case 'pending':
+      return 'W'
+    case 'cancelled':
+      return 'X'
+    default:
+      return 'J'
   }
 }
 
@@ -42,7 +46,9 @@ export function SsimTab({ agreement, mappings, operatorCode, isDark }: SsimTabPr
     lines.push(`/ Partner: ${agreement.partnerAirlineName} (${agreement.partnerAirlineCode})`)
     lines.push(`/ Operating carrier: ${operatorCode}`)
     lines.push(`/ Agreement type: ${agreement.agreementType.replace(/_/g, ' ')}`)
-    lines.push(`/ Effective: ${agreement.effectiveFrom}${agreement.effectiveUntil ? ' to ' + agreement.effectiveUntil : ' onwards'}`)
+    lines.push(
+      `/ Effective: ${agreement.effectiveFrom}${agreement.effectiveUntil ? ' to ' + agreement.effectiveUntil : ' onwards'}`,
+    )
     lines.push(`/ Generated: ${new Date().toISOString().slice(0, 19).replace('T', ' ')} UTC`)
     lines.push(`/ Mappings: ${mappings.length}`)
     lines.push(`/`)
@@ -79,7 +85,9 @@ export function SsimTab({ agreement, mappings, operatorCode, isDark }: SsimTabPr
   return (
     <div className="flex-1 overflow-y-auto px-5 py-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-[15px] font-semibold" style={{ color: palette.text }}>SSIM Output</h3>
+        <h3 className="text-[15px] font-semibold" style={{ color: palette.text }}>
+          SSIM Output
+        </h3>
         <div className="flex gap-2">
           <button
             onClick={handleCopy}

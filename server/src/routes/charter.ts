@@ -12,7 +12,9 @@ const operatorQuery = z.object({ operatorId: z.string().min(1) })
 const contractCreateSchema = z.object({
   operatorId: z.string().min(1),
   contractNumber: z.string().min(1),
-  contractType: z.enum(['passenger', 'cargo', 'government', 'acmi', 'humanitarian', 'hajj', 'sports', 'other']).default('passenger'),
+  contractType: z
+    .enum(['passenger', 'cargo', 'government', 'acmi', 'humanitarian', 'hajj', 'sports', 'other'])
+    .default('passenger'),
   clientName: z.string().min(1),
   clientContactName: z.string().nullable().optional(),
   clientContactEmail: z.string().nullable().optional(),
@@ -88,7 +90,6 @@ function nowIso(): string {
 // ── Routes ──
 
 export async function charterRoutes(app: FastifyInstance): Promise<void> {
-
   // ── GET /charter/contracts ──
   app.get('/charter/contracts', async (req) => {
     const { operatorId } = operatorQuery.parse(req.query)
@@ -116,7 +117,7 @@ export async function charterRoutes(app: FastifyInstance): Promise<void> {
     const updated = await CharterContract.findByIdAndUpdate(
       req.params.id,
       { ...body, updatedAt: nowIso() },
-      { new: true, lean: true }
+      { new: true, lean: true },
     )
     if (!updated) throw { statusCode: 404, message: 'Contract not found' }
     return updated
@@ -128,7 +129,7 @@ export async function charterRoutes(app: FastifyInstance): Promise<void> {
     const result = await CharterContract.findByIdAndUpdate(
       req.params.id,
       { status, updatedAt: nowIso() },
-      { new: true, lean: true }
+      { new: true, lean: true },
     )
     if (!result) throw { statusCode: 404, message: 'Contract not found' }
     return { ok: true }
@@ -140,7 +141,7 @@ export async function charterRoutes(app: FastifyInstance): Promise<void> {
 
     // Cascade: delete all flights and their linked scheduled flights
     const flights = await CharterFlight.find({ contractId }).lean()
-    const sfIds = flights.map(f => f.scheduledFlightId).filter(Boolean)
+    const sfIds = flights.map((f) => f.scheduledFlightId).filter(Boolean)
     if (sfIds.length) await ScheduledFlight.deleteMany({ _id: { $in: sfIds } })
     await CharterFlight.deleteMany({ contractId })
     await CharterContract.findByIdAndDelete(contractId)
@@ -234,12 +235,19 @@ export async function charterRoutes(app: FastifyInstance): Promise<void> {
 
     const flights = await CharterFlight.find({ contractId, status: { $ne: 'cancelled' } }).lean()
     if (!flights.length) {
-      return { totalFlights: 0, revenueFlights: 0, positioningFlights: 0, totalBlockMinutes: 0, estimatedRevenue: 0, paxTotal: 0 }
+      return {
+        totalFlights: 0,
+        revenueFlights: 0,
+        positioningFlights: 0,
+        totalBlockMinutes: 0,
+        estimatedRevenue: 0,
+        paxTotal: 0,
+      }
     }
 
     const contract = await CharterContract.findById(contractId).lean()
 
-    const revenueFlights = flights.filter(f => f.legType === 'revenue').length
+    const revenueFlights = flights.filter((f) => f.legType === 'revenue').length
     const totalBlockMinutes = flights.reduce((sum, f) => sum + (f.blockMinutes || 0), 0)
 
     let estimatedRevenue = 0
@@ -252,7 +260,7 @@ export async function charterRoutes(app: FastifyInstance): Promise<void> {
     return {
       totalFlights: flights.length,
       revenueFlights,
-      positioningFlights: flights.filter(f => f.legType === 'positioning').length,
+      positioningFlights: flights.filter((f) => f.legType === 'positioning').length,
       totalBlockMinutes,
       estimatedRevenue,
       paxTotal: flights.reduce((sum, f) => sum + (f.paxBooked || 0), 0),
@@ -273,8 +281,7 @@ export async function charterRoutes(app: FastifyInstance): Promise<void> {
     const { contractId, operatorCode, homeBase } = positioningGenSchema.parse(req.body)
 
     const flights = await CharterFlight.find({ contractId }).sort({ flightDate: 1, stdUtc: 1 }).lean()
-    const revenueFlights = flights
-      .filter(f => f.legType === 'revenue' && f.status !== 'cancelled')
+    const revenueFlights = flights.filter((f) => f.legType === 'revenue' && f.status !== 'cancelled')
 
     if (!revenueFlights.length) return { legs: [] }
 

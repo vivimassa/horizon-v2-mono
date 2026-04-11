@@ -29,11 +29,11 @@ export interface SlotSeriesForMessage {
   arrivalTime?: number
   departureTime?: number
   overnightIndicator?: number
-  periodStart: string   // ISO date
+  periodStart: string // ISO date
   periodEnd: string
   daysOfOperation: string
   seats: number
-  aircraftType: string  // 3-char
+  aircraftType: string // 3-char
   arrivalServiceType?: string
   departureServiceType?: string
   flexibilityArrival?: string
@@ -44,7 +44,7 @@ export interface SlotSeriesForMessage {
 
 // ── Constants ──
 
-const MONTH_NAMES = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC']
+const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
 
 // ── Generators ──
 

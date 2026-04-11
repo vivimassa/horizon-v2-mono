@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState } from 'react'
 import { Edit3, Save, X } from 'lucide-react'
@@ -64,7 +64,9 @@ export function DetailsTab({ agreement, isDark, onUpdated }: DetailsTabProps) {
     return (
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-[15px] font-semibold" style={{ color: palette.text }}>Agreement Details</h3>
+          <h3 className="text-[15px] font-semibold" style={{ color: palette.text }}>
+            Agreement Details
+          </h3>
           <button
             onClick={() => setEditing(true)}
             className="h-8 px-3.5 rounded-xl text-[13px] font-medium flex items-center gap-1.5 transition-colors"
@@ -79,10 +81,22 @@ export function DetailsTab({ agreement, isDark, onUpdated }: DetailsTabProps) {
           <FieldDisplay label="IATA Code" value={agreement.partnerAirlineCode} mono palette={palette} />
           <FieldDisplay label="Partner Airline Name" value={agreement.partnerAirlineName} palette={palette} />
           <FieldDisplay label="ICAO Code" value={agreement.partnerNumericCode || '\u2014'} mono palette={palette} />
-          <FieldDisplay label="Agreement Type" value={AGREEMENT_TYPE_LABELS[agreement.agreementType]} palette={palette} />
+          <FieldDisplay
+            label="Agreement Type"
+            value={AGREEMENT_TYPE_LABELS[agreement.agreementType]}
+            palette={palette}
+          />
           <div>
-            <div className="text-[13px] uppercase tracking-wide font-medium mb-1" style={{ color: palette.textTertiary }}>Status</div>
-            <span className="text-[13px] font-semibold px-2 py-0.5 rounded-lg" style={{ background: sc.bg, color: sc.text }}>
+            <div
+              className="text-[13px] uppercase tracking-wide font-medium mb-1"
+              style={{ color: palette.textTertiary }}
+            >
+              Status
+            </div>
+            <span
+              className="text-[13px] font-semibold px-2 py-0.5 rounded-lg"
+              style={{ background: sc.bg, color: sc.text }}
+            >
               {statusLabel(agreement.status)}
             </span>
           </div>
@@ -100,7 +114,9 @@ export function DetailsTab({ agreement, isDark, onUpdated }: DetailsTabProps) {
   return (
     <div className="flex-1 overflow-y-auto px-5 py-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-[15px] font-semibold" style={{ color: palette.text }}>Edit Agreement</h3>
+        <h3 className="text-[15px] font-semibold" style={{ color: palette.text }}>
+          Edit Agreement
+        </h3>
         <div className="flex gap-2">
           <button
             onClick={() => setEditing(false)}
@@ -126,7 +142,7 @@ export function DetailsTab({ agreement, isDark, onUpdated }: DetailsTabProps) {
         <FormField label="IATA Code" required>
           <input
             value={form.partnerAirlineCode}
-            onChange={e => setForm(f => ({ ...f, partnerAirlineCode: e.target.value }))}
+            onChange={(e) => setForm((f) => ({ ...f, partnerAirlineCode: e.target.value }))}
             maxLength={3}
             className="w-full px-3 h-9 rounded-xl text-[13px] outline-none font-mono uppercase"
             style={inputStyle}
@@ -135,7 +151,7 @@ export function DetailsTab({ agreement, isDark, onUpdated }: DetailsTabProps) {
         <FormField label="Airline Name" required>
           <input
             value={form.partnerAirlineName}
-            onChange={e => setForm(f => ({ ...f, partnerAirlineName: e.target.value }))}
+            onChange={(e) => setForm((f) => ({ ...f, partnerAirlineName: e.target.value }))}
             className="w-full px-3 h-9 rounded-xl text-[13px] outline-none"
             style={inputStyle}
           />
@@ -143,7 +159,7 @@ export function DetailsTab({ agreement, isDark, onUpdated }: DetailsTabProps) {
         <FormField label="ICAO Code">
           <input
             value={form.partnerNumericCode}
-            onChange={e => setForm(f => ({ ...f, partnerNumericCode: e.target.value }))}
+            onChange={(e) => setForm((f) => ({ ...f, partnerNumericCode: e.target.value }))}
             maxLength={4}
             className="w-full px-3 h-9 rounded-xl text-[13px] outline-none font-mono"
             style={inputStyle}
@@ -152,7 +168,7 @@ export function DetailsTab({ agreement, isDark, onUpdated }: DetailsTabProps) {
         <FormField label="Agreement Type">
           <select
             value={form.agreementType}
-            onChange={e => setForm(f => ({ ...f, agreementType: e.target.value as any }))}
+            onChange={(e) => setForm((f) => ({ ...f, agreementType: e.target.value as any }))}
             className="w-full h-9 pl-3 pr-8 rounded-xl text-[13px] appearance-none cursor-pointer outline-none"
             style={inputStyle}
           >
@@ -164,7 +180,7 @@ export function DetailsTab({ agreement, isDark, onUpdated }: DetailsTabProps) {
         <FormField label="Status">
           <select
             value={form.status}
-            onChange={e => setForm(f => ({ ...f, status: e.target.value as any }))}
+            onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as any }))}
             className="w-full h-9 pl-3 pr-8 rounded-xl text-[13px] appearance-none cursor-pointer outline-none"
             style={inputStyle}
           >
@@ -178,7 +194,7 @@ export function DetailsTab({ agreement, isDark, onUpdated }: DetailsTabProps) {
           <input
             type="date"
             value={form.effectiveFrom}
-            onChange={e => setForm(f => ({ ...f, effectiveFrom: e.target.value }))}
+            onChange={(e) => setForm((f) => ({ ...f, effectiveFrom: e.target.value }))}
             className="w-full px-3 h-9 rounded-xl text-[13px] outline-none"
             style={inputStyle}
           />
@@ -187,7 +203,7 @@ export function DetailsTab({ agreement, isDark, onUpdated }: DetailsTabProps) {
           <input
             type="date"
             value={form.effectiveUntil}
-            onChange={e => setForm(f => ({ ...f, effectiveUntil: e.target.value }))}
+            onChange={(e) => setForm((f) => ({ ...f, effectiveUntil: e.target.value }))}
             className="w-full px-3 h-9 rounded-xl text-[13px] outline-none"
             style={inputStyle}
           />
@@ -196,7 +212,7 @@ export function DetailsTab({ agreement, isDark, onUpdated }: DetailsTabProps) {
           <FormField label="Notes">
             <textarea
               value={form.notes}
-              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
               rows={3}
               className="w-full px-3 py-2 rounded-xl text-[13px] outline-none resize-none"
               style={inputStyle}
@@ -208,9 +224,7 @@ export function DetailsTab({ agreement, isDark, onUpdated }: DetailsTabProps) {
   )
 }
 
-function FieldDisplay({ label, value, mono, palette }: {
-  label: string; value: string; mono?: boolean; palette: any
-}) {
+function FieldDisplay({ label, value, mono, palette }: { label: string; value: string; mono?: boolean; palette: any }) {
   return (
     <div>
       <div className="text-[13px] uppercase tracking-wide font-medium mb-1" style={{ color: palette.textTertiary }}>
@@ -227,7 +241,8 @@ function FormField({ label, required, children }: { label: string; required?: bo
   return (
     <div>
       <label className="block text-[13px] uppercase tracking-wide font-medium mb-1 text-hz-text-tertiary">
-        {label}{required && ' *'}
+        {label}
+        {required && ' *'}
       </label>
       {children}
     </div>

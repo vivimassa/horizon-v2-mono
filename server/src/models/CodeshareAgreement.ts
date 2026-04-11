@@ -29,7 +29,7 @@ const codeshareAgreementSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'codeshareAgreements',
-  }
+  },
 )
 
 codeshareAgreementSchema.index({ operatorId: 1, partnerAirlineCode: 1 }, { unique: true })

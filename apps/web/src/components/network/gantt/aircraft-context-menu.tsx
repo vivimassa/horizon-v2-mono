@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useRef, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -7,15 +7,17 @@ import { useTheme } from '@/components/theme-provider'
 import { useGanttStore } from '@/stores/use-gantt-store'
 
 export function AircraftContextMenu() {
-  const ctx = useGanttStore(s => s.aircraftContextMenu)
-  const close = useGanttStore(s => s.closeAircraftContextMenu)
-  const openPopover = useGanttStore(s => s.openAircraftPopover)
+  const ctx = useGanttStore((s) => s.aircraftContextMenu)
+  const close = useGanttStore((s) => s.closeAircraftContextMenu)
+  const openPopover = useGanttStore((s) => s.openAircraftPopover)
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const ref = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (!ctx) return
@@ -28,7 +30,9 @@ export function AircraftContextMenu() {
 
   useEffect(() => {
     if (!ctx) return
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close()
+    }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [ctx, close])
@@ -54,7 +58,9 @@ export function AircraftContextMenu() {
       data-gantt-overlay
       className="fixed z-[9999] rounded-xl py-1.5 overflow-hidden"
       style={{
-        left, top, minWidth: 220,
+        left,
+        top,
+        minWidth: 220,
         background: bg,
         border: `1px solid ${border}`,
         backdropFilter: 'blur(20px) saturate(180%)',
@@ -70,14 +76,20 @@ export function AircraftContextMenu() {
         }}
         className="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] font-medium transition-colors"
         style={{ color: textColor }}
-        onMouseEnter={e => { e.currentTarget.style.background = hoverBg }}
-        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = hoverBg
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'transparent'
+        }}
       >
         <Plane size={14} className="shrink-0" strokeWidth={1.8} />
         <span className="flex-1 text-left">Aircraft Info</span>
-        <span className="text-[11px] font-mono" style={{ color: textMuted }}>F2</span>
+        <span className="text-[11px] font-mono" style={{ color: textMuted }}>
+          F2
+        </span>
       </button>
     </div>,
-    document.body
+    document.body,
   )
 }

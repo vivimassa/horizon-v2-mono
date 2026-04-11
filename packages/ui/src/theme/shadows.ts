@@ -28,7 +28,7 @@ export const shadowStyles = {
 
   /** Level 03 — Dropdowns, popovers, floating action cards */
   raised: Platform.select({
-    ios: { shadowColor: SHADOW_COLOR, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.10, shadowRadius: 4 },
+    ios: { shadowColor: SHADOW_COLOR, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 4 },
     android: { elevation: 4 },
     default: {},
   }),

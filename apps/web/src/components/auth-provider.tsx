@@ -110,7 +110,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (bootstrapped.current) return
     bootstrapped.current = true
-
     ;(async () => {
       const { refresh } = readTokens()
       if (!refresh) {

@@ -1,32 +1,32 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import type { CabinClassRef, LopaConfigRef } from "@skyhub/api";
-import { Search, Plus, ChevronRight, Plane, Star, LayoutGrid } from "lucide-react";
-import { useTheme } from "@/components/theme-provider";
-import { modeColor } from "@skyhub/ui/theme";
+import { useState } from 'react'
+import type { CabinClassRef, LopaConfigRef } from '@skyhub/api'
+import { Search, Plus, ChevronRight, Plane, Star, LayoutGrid } from 'lucide-react'
+import { useTheme } from '@/components/theme-provider'
+import { modeColor } from '@skyhub/ui/theme'
 
-type ViewMode = "cabin-classes" | "lopa-configs";
+type ViewMode = 'cabin-classes' | 'lopa-configs'
 
 interface LopaListProps {
-  viewMode: ViewMode;
-  onViewChange: (mode: ViewMode) => void;
+  viewMode: ViewMode
+  onViewChange: (mode: ViewMode) => void
   // Cabin classes
-  cabinClasses: CabinClassRef[];
-  cabinClassTotal: number;
-  selectedClass: CabinClassRef | null;
-  onSelectClass: (cc: CabinClassRef) => void;
+  cabinClasses: CabinClassRef[]
+  cabinClassTotal: number
+  selectedClass: CabinClassRef | null
+  onSelectClass: (cc: CabinClassRef) => void
   // LOPA configs
-  configGroups: [string, LopaConfigRef[]][];
-  configTotal: number;
-  configFilteredCount: number;
-  selectedConfig: LopaConfigRef | null;
-  onSelectConfig: (lc: LopaConfigRef) => void;
+  configGroups: [string, LopaConfigRef[]][]
+  configTotal: number
+  configFilteredCount: number
+  selectedConfig: LopaConfigRef | null
+  onSelectConfig: (lc: LopaConfigRef) => void
   // Shared
-  search: string;
-  onSearchChange: (value: string) => void;
-  loading: boolean;
-  onCreateClick: () => void;
+  search: string
+  onSearchChange: (value: string) => void
+  loading: boolean
+  onCreateClick: () => void
 }
 
 export function LopaList({
@@ -46,23 +46,23 @@ export function LopaList({
   loading,
   onCreateClick,
 }: LopaListProps) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
   const toggleGroup = (name: string) => {
     setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
-  };
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
 
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
 
-  const isCabinMode = viewMode === "cabin-classes";
-  const totalCount = isCabinMode ? cabinClassTotal : configTotal;
-  const filteredCount = isCabinMode ? cabinClasses.length : configFilteredCount;
+  const isCabinMode = viewMode === 'cabin-classes'
+  const totalCount = isCabinMode ? cabinClassTotal : configTotal
+  const filteredCount = isCabinMode ? cabinClasses.length : configFilteredCount
 
   return (
     <div className="flex flex-col h-full">
@@ -84,21 +84,17 @@ export function LopaList({
         {/* Segment toggle */}
         <div className="flex rounded-lg border border-hz-border overflow-hidden">
           <button
-            onClick={() => onViewChange("cabin-classes")}
+            onClick={() => onViewChange('cabin-classes')}
             className={`flex-1 py-1.5 text-[12px] font-semibold transition-colors ${
-              isCabinMode
-                ? "text-white bg-module-accent"
-                : "text-hz-text-secondary hover:text-hz-text"
+              isCabinMode ? 'text-white bg-module-accent' : 'text-hz-text-secondary hover:text-hz-text'
             }`}
           >
             Cabin Classes
           </button>
           <button
-            onClick={() => onViewChange("lopa-configs")}
+            onClick={() => onViewChange('lopa-configs')}
             className={`flex-1 py-1.5 text-[12px] font-semibold transition-colors ${
-              !isCabinMode
-                ? "text-white bg-module-accent"
-                : "text-hz-text-secondary hover:text-hz-text"
+              !isCabinMode ? 'text-white bg-module-accent' : 'text-hz-text-secondary hover:text-hz-text'
             }`}
           >
             Configurations
@@ -110,7 +106,7 @@ export function LopaList({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-hz-text-secondary" />
           <input
             type="text"
-            placeholder={isCabinMode ? "Search code or name..." : "Search aircraft type or config..."}
+            placeholder={isCabinMode ? 'Search code or name...' : 'Search aircraft type or config...'}
             className="w-full pl-9 pr-3 py-2 rounded-lg text-[13px] border border-hz-border bg-hz-bg outline-none focus:ring-2 focus:ring-module-accent/30 placeholder:text-hz-text-secondary/50 text-hz-text"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
@@ -135,20 +131,20 @@ export function LopaList({
           ) : (
             <div className="space-y-0.5">
               {cabinClasses.map((cc) => {
-                const isSelected = selectedClass?._id === cc._id;
+                const isSelected = selectedClass?._id === cc._id
                 return (
                   <button
                     key={cc._id}
                     onClick={() => onSelectClass(cc)}
                     className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 ${
                       isSelected
-                        ? "border-l-[3px] border-l-module-accent bg-module-accent/[0.08]"
-                        : "border-l-[3px] border-l-transparent hover:bg-hz-border/30"
+                        ? 'border-l-[3px] border-l-module-accent bg-module-accent/[0.08]'
+                        : 'border-l-[3px] border-l-transparent hover:bg-hz-border/30'
                     }`}
                   >
                     <span
                       className="shrink-0 w-5 h-5 rounded-full border border-hz-border/50"
-                      style={{ backgroundColor: modeColor(cc.color || "#9ca3af", isDark) }}
+                      style={{ backgroundColor: modeColor(cc.color || '#9ca3af', isDark) }}
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
@@ -156,78 +152,73 @@ export function LopaList({
                         <span className="text-[13px] font-medium truncate">{cc.name}</span>
                       </div>
                     </div>
-                    <span className="text-[13px] text-hz-text-tertiary font-mono shrink-0">
-                      #{cc.sortOrder}
-                    </span>
+                    <span className="text-[13px] text-hz-text-tertiary font-mono shrink-0">#{cc.sortOrder}</span>
                   </button>
-                );
+                )
               })}
             </div>
           )
-        ) : (
-          // ── LOPA Configs list (grouped by aircraft type) ──
-          configGroups.length === 0 ? (
-            <div className="py-12 flex flex-col items-center justify-center gap-3">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-module-accent/10">
-                <Plane size={24} className="text-module-accent" />
-              </div>
-              <p className="text-[14px] font-medium text-hz-text-secondary">No configurations found</p>
-              <p className="text-[13px] text-hz-text-tertiary">Create a LOPA configuration to get started.</p>
+        ) : // ── LOPA Configs list (grouped by aircraft type) ──
+        configGroups.length === 0 ? (
+          <div className="py-12 flex flex-col items-center justify-center gap-3">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-module-accent/10">
+              <Plane size={24} className="text-module-accent" />
             </div>
-          ) : (
-            configGroups.map(([aircraftType, configs]) => (
-              <div key={aircraftType}>
-                <button
-                  onClick={() => toggleGroup(aircraftType)}
-                  className="w-full flex items-center gap-2 px-2 py-2 mt-1 first:mt-0 hover:text-hz-text-secondary transition-colors"
-                >
-                  <ChevronRight
-                    className={`h-3 w-3 shrink-0 text-hz-text-secondary/50 transition-transform duration-200 ${
-                      !collapsed.has(aircraftType) ? "rotate-90" : ""
-                    }`}
-                  />
-                  <Plane className="h-3.5 w-3.5 text-hz-text-secondary/50" />
-                  <span className="text-[12px] font-bold font-mono uppercase tracking-wider text-hz-text-secondary/70">
-                    {aircraftType}
-                  </span>
-                  <span className="text-[13px] text-hz-text-secondary/40">({configs.length})</span>
-                  <div className="flex-1 h-px bg-hz-border/50 ml-1" />
-                </button>
-                {!collapsed.has(aircraftType) && (
-                  <div className="space-y-0.5">
-                    {configs.map((config) => {
-                      const isSelected = selectedConfig?._id === config._id;
-                      return (
-                        <button
-                          key={config._id}
-                          onClick={() => onSelectConfig(config)}
-                          className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 ${
-                            isSelected
-                              ? "border-l-[3px] border-l-module-accent bg-module-accent/[0.08]"
-                              : "border-l-[3px] border-l-transparent hover:bg-hz-border/30"
-                          }`}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[13px] font-medium truncate">{config.configName}</span>
-                              {config.isDefault && (
-                                <Star className="h-3 w-3 shrink-0" style={{ color: "#E67A00" }} />
-                              )}
-                            </div>
-                            <div className="text-[12px] text-hz-text-secondary truncate">
-                              {config.totalSeats} seats · {config.cabins.length} cabin{config.cabins.length !== 1 ? "s" : ""}
-                            </div>
+            <p className="text-[14px] font-medium text-hz-text-secondary">No configurations found</p>
+            <p className="text-[13px] text-hz-text-tertiary">Create a LOPA configuration to get started.</p>
+          </div>
+        ) : (
+          configGroups.map(([aircraftType, configs]) => (
+            <div key={aircraftType}>
+              <button
+                onClick={() => toggleGroup(aircraftType)}
+                className="w-full flex items-center gap-2 px-2 py-2 mt-1 first:mt-0 hover:text-hz-text-secondary transition-colors"
+              >
+                <ChevronRight
+                  className={`h-3 w-3 shrink-0 text-hz-text-secondary/50 transition-transform duration-200 ${
+                    !collapsed.has(aircraftType) ? 'rotate-90' : ''
+                  }`}
+                />
+                <Plane className="h-3.5 w-3.5 text-hz-text-secondary/50" />
+                <span className="text-[12px] font-bold font-mono uppercase tracking-wider text-hz-text-secondary/70">
+                  {aircraftType}
+                </span>
+                <span className="text-[13px] text-hz-text-secondary/40">({configs.length})</span>
+                <div className="flex-1 h-px bg-hz-border/50 ml-1" />
+              </button>
+              {!collapsed.has(aircraftType) && (
+                <div className="space-y-0.5">
+                  {configs.map((config) => {
+                    const isSelected = selectedConfig?._id === config._id
+                    return (
+                      <button
+                        key={config._id}
+                        onClick={() => onSelectConfig(config)}
+                        className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 ${
+                          isSelected
+                            ? 'border-l-[3px] border-l-module-accent bg-module-accent/[0.08]'
+                            : 'border-l-[3px] border-l-transparent hover:bg-hz-border/30'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[13px] font-medium truncate">{config.configName}</span>
+                            {config.isDefault && <Star className="h-3 w-3 shrink-0" style={{ color: '#E67A00' }} />}
                           </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ))
-          )
+                          <div className="text-[12px] text-hz-text-secondary truncate">
+                            {config.totalSeats} seats · {config.cabins.length} cabin
+                            {config.cabins.length !== 1 ? 's' : ''}
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          ))
         )}
       </div>
     </div>
-  );
+  )
 }

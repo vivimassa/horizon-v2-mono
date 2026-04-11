@@ -1,37 +1,34 @@
-"use client";
+'use client'
 
-import {
-  Plane, LayoutDashboard, Package, Scale,
-  MessageSquare, FileText, BadgeCheck,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import type { StationFlight } from "./types";
-import { FlightHeader } from "./FlightHeader";
-import { OverviewTab } from "./tabs/OverviewTab";
-import { LoadingTab } from "./tabs/LoadingTab";
-import { WBTab } from "./tabs/WBTab";
-import { MessagesTab } from "./tabs/MessagesTab";
-import { DocsTab } from "./tabs/DocsTab";
-import { CaptainTab } from "./tabs/CaptainTab";
+import { Plane, LayoutDashboard, Package, Scale, MessageSquare, FileText, BadgeCheck } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import type { StationFlight } from './types'
+import { FlightHeader } from './FlightHeader'
+import { OverviewTab } from './tabs/OverviewTab'
+import { LoadingTab } from './tabs/LoadingTab'
+import { WBTab } from './tabs/WBTab'
+import { MessagesTab } from './tabs/MessagesTab'
+import { DocsTab } from './tabs/DocsTab'
+import { CaptainTab } from './tabs/CaptainTab'
 
 interface WorkspacePanelProps {
-  flight: StationFlight | null;
-  activeTab: string;
-  onTabChange: (tab: string) => void;
-  accent: string;
-  accentDark: string;
-  isDark: boolean;
-  glass: { panel: string; panelBorder: string; panelShadow: string };
+  flight: StationFlight | null
+  activeTab: string
+  onTabChange: (tab: string) => void
+  accent: string
+  accentDark: string
+  isDark: boolean
+  glass: { panel: string; panelBorder: string; panelShadow: string }
 }
 
 const TABS: { key: string; label: string; icon: LucideIcon }[] = [
-  { key: "overview", label: "Overview", icon: LayoutDashboard },
-  { key: "loading", label: "Loading", icon: Package },
-  { key: "wb", label: "W&B", icon: Scale },
-  { key: "messages", label: "Messages", icon: MessageSquare },
-  { key: "docs", label: "Documents", icon: FileText },
-  { key: "captain", label: "Captain", icon: BadgeCheck },
-];
+  { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { key: 'loading', label: 'Loading', icon: Package },
+  { key: 'wb', label: 'W&B', icon: Scale },
+  { key: 'messages', label: 'Messages', icon: MessageSquare },
+  { key: 'docs', label: 'Documents', icon: FileText },
+  { key: 'captain', label: 'Captain', icon: BadgeCheck },
+]
 
 export function WorkspacePanel({
   flight,
@@ -49,9 +46,9 @@ export function WorkspacePanel({
         className="flex-1 flex items-center justify-center"
         style={{
           borderRadius: 14,
-          background: isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.2)",
-          backdropFilter: "blur(12px)",
-          border: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.3)"}`,
+          background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.2)',
+          backdropFilter: 'blur(12px)',
+          border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.3)'}`,
         }}
       >
         <div className="text-center">
@@ -59,19 +56,17 @@ export function WorkspacePanel({
             size={48}
             strokeWidth={1}
             style={{
-              margin: "0 auto 12px",
+              margin: '0 auto 12px',
               opacity: 0.15,
-              color: isDark ? "#888" : "#555",
-              transform: "rotate(-45deg)",
+              color: isDark ? '#888' : '#555',
+              transform: 'rotate(-45deg)',
             }}
           />
-          <div style={{ fontSize: 16, fontWeight: 600, color: isDark ? "#ccc" : "#555" }}>
-            Select a flight
-          </div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: isDark ? '#ccc' : '#555' }}>Select a flight</div>
           <div
             style={{
               fontSize: 13,
-              color: isDark ? "#777" : "#999",
+              color: isDark ? '#777' : '#999',
               marginTop: 4,
               maxWidth: 260,
               lineHeight: 1.5,
@@ -81,7 +76,7 @@ export function WorkspacePanel({
           </div>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -89,11 +84,11 @@ export function WorkspacePanel({
       className="flex-1 flex flex-col overflow-hidden"
       style={{
         borderRadius: 14,
-        background: isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.35)",
-        backdropFilter: "blur(20px)",
+        background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.35)',
+        backdropFilter: 'blur(20px)',
         border: `1px solid ${glass.panelBorder}`,
         boxShadow: glass.panelShadow,
-        animation: "ws-in 0.3s cubic-bezier(0.16,1,0.3,1)",
+        animation: 'ws-in 0.3s cubic-bezier(0.16,1,0.3,1)',
       }}
     >
       <FlightHeader flight={flight} accent={accent} accentDark={accentDark} isDark={isDark} />
@@ -102,50 +97,46 @@ export function WorkspacePanel({
       <div
         className="flex items-center gap-1"
         style={{
-          borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"}`,
-          padding: "8px 16px",
-          background: isDark ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.3)",
+          borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+          padding: '8px 16px',
+          background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.3)',
         }}
       >
         {TABS.map(({ key, label, icon: Icon }) => {
-          const isActive = activeTab === key;
+          const isActive = activeTab === key
           return (
             <button
               key={key}
               onClick={() => onTabChange(key)}
               className="flex items-center gap-1.5 cursor-pointer transition-all duration-150"
               style={{
-                padding: "7px 14px",
+                padding: '7px 14px',
                 borderRadius: 10,
                 fontSize: 13,
                 fontWeight: isActive ? 600 : 400,
-                color: isActive ? accent : isDark ? "#888" : "#777",
-                background: isActive
-                  ? isDark ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.7)"
-                  : "transparent",
+                color: isActive ? accent : isDark ? '#888' : '#777',
+                background: isActive ? (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.7)') : 'transparent',
                 border: isActive
-                  ? `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`
-                  : "1px solid transparent",
-                boxShadow: isActive
-                  ? isDark ? "0 1px 4px rgba(0,0,0,0.2)" : "0 1px 4px rgba(0,0,0,0.06)"
-                  : "none",
+                  ? `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`
+                  : '1px solid transparent',
+                boxShadow: isActive ? (isDark ? '0 1px 4px rgba(0,0,0,0.2)' : '0 1px 4px rgba(0,0,0,0.06)') : 'none',
               }}
             >
               <Icon size={15} strokeWidth={isActive ? 2 : 1.5} />
               {label}
             </button>
-          );
+          )
         })}
       </div>
 
       {/* Tab content */}
       <div className="flex-1 overflow-hidden min-h-0">
-        {activeTab === "overview" && <OverviewTab flight={flight} accent={accent} isDark={isDark} glass={glass} />}
-        {activeTab === "loading" && <LoadingTab isDark={isDark} />}
-        {activeTab === "wb" && <WBTab isDark={isDark} />}
-        {activeTab === "messages" && <MessagesTab accent={accent} isDark={isDark} glass={glass} />}
-        {activeTab === "docs" && <DocsTab accent={accent} isDark={isDark} glass={glass} />}
-        {activeTab === "captain" && <CaptainTab isDark={isDark} />}
+        {activeTab === 'overview' && <OverviewTab flight={flight} accent={accent} isDark={isDark} glass={glass} />}
+        {activeTab === 'loading' && <LoadingTab isDark={isDark} />}
+        {activeTab === 'wb' && <WBTab isDark={isDark} />}
+        {activeTab === 'messages' && <MessagesTab accent={accent} isDark={isDark} glass={glass} />}
+        {activeTab === 'docs' && <DocsTab accent={accent} isDark={isDark} glass={glass} />}
+        {activeTab === 'captain' && <CaptainTab isDark={isDark} />}
       </div>
 
       <style>{`
@@ -155,5 +146,5 @@ export function WorkspacePanel({
         }
       `}</style>
     </div>
-  );
+  )
 }

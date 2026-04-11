@@ -81,23 +81,28 @@ export interface OptimizerResult {
 
 // ── SA presets ────────────────────────────────────────────────
 
-const SA_PRESETS: Record<OptimizerPreset, {
-  timeBudgetMs: number; initialTemp: number; coolingRate: number
-}> = {
-  quick:  { timeBudgetMs: 5_000,  initialTemp: 5000,  coolingRate: 0.999  },
-  normal: { timeBudgetMs: 15_000, initialTemp: 8000,  coolingRate: 0.9995 },
-  deep:   { timeBudgetMs: 30_000, initialTemp: 10000, coolingRate: 0.9998 },
+const SA_PRESETS: Record<
+  OptimizerPreset,
+  {
+    timeBudgetMs: number
+    initialTemp: number
+    coolingRate: number
+  }
+> = {
+  quick: { timeBudgetMs: 5_000, initialTemp: 5000, coolingRate: 0.999 },
+  normal: { timeBudgetMs: 15_000, initialTemp: 8000, coolingRate: 0.9995 },
+  deep: { timeBudgetMs: 30_000, initialTemp: 10000, coolingRate: 0.9998 },
 }
 
 // ── SA cost weights ──────────────────────────────────────────
 
-const COST_OVERFLOW          = 50_000
-const COST_CHAIN_BREAK       = 5_000
-const COST_CHAIN_BREAK_FUEL  = 500     // Relaxed — accept chain breaks for fuel savings
-const COST_TAT_VIOLATION     = 3_000
-const COST_IDLE_PER_HOUR     = 200
-const COST_UTIL_BALANCE      = 10
-const COST_FUEL_PER_KG       = 1       // 1:1 — fuel kg IS the cost unit in fuel mode
+const COST_OVERFLOW = 50_000
+const COST_CHAIN_BREAK = 5_000
+const COST_CHAIN_BREAK_FUEL = 500 // Relaxed — accept chain breaks for fuel savings
+const COST_TAT_VIOLATION = 3_000
+const COST_IDLE_PER_HOUR = 200
+const COST_UTIL_BALANCE = 10
+const COST_FUEL_PER_KG = 1 // 1:1 — fuel kg IS the cost unit in fuel mode
 
 // ── Internal types ───────────────────────────────────────────
 
@@ -124,15 +129,12 @@ interface AircraftSlot {
 // ── Helpers ──────────────────────────────────────────────────
 
 function getTatMs(types: GanttAircraftType[], icao: string): number {
-  const t = types.find(t => t.icaoType === icao)
+  const t = types.find((t) => t.icaoType === icao)
   return (t?.tatDefaultMinutes ?? 30) * 60_000
 }
 
 /** Build per-registration fuel burn rate map (kg/hr). Falls back to type average, then 0. */
-function buildBurnRateMap(
-  aircraft: GanttAircraft[],
-  aircraftTypes: GanttAircraftType[],
-): Map<string, number> {
+function buildBurnRateMap(aircraft: GanttAircraft[], aircraftTypes: GanttAircraftType[]): Map<string, number> {
   const rates = new Map<string, number>()
 
   // Compute per-type averages from registrations that have rates
@@ -183,7 +185,8 @@ function buildBlocks(flights: GanttFlight[]): FlightBlock[] {
 
   for (const [rotId, legs] of rotationMap) {
     legs.sort((a, b) => (a.rotationSequence ?? 0) - (b.rotationSequence ?? 0) || a.stdUtc - b.stdUtc)
-    const first = legs[0], last = legs[legs.length - 1]
+    const first = legs[0],
+      last = legs[legs.length - 1]
     blocks.push({
       id: `rot_${rotId}`,
       flights: legs,
@@ -192,7 +195,7 @@ function buildBlocks(flights: GanttFlight[]): FlightBlock[] {
       endMs: last.staUtc,
       depStation: first.depStation,
       arrStation: last.arrStation,
-      pinnedReg: legs.find(f => f.aircraftReg)?.aircraftReg ?? null,
+      pinnedReg: legs.find((f) => f.aircraftReg)?.aircraftReg ?? null,
     })
   }
 
@@ -237,7 +240,12 @@ function greedyAssign(
   aircraftTypes: GanttAircraftType[],
   method: OptimizerMethod,
   burnRates: Map<string, number> | null = null,
-): { assignments: Map<string, string>; overflow: GanttFlight[]; chainBreaks: ChainBreak[]; slots: Map<string, AircraftSlot> } {
+): {
+  assignments: Map<string, string>
+  overflow: GanttFlight[]
+  chainBreaks: ChainBreak[]
+  slots: Map<string, AircraftSlot>
+} {
   const assignments = new Map<string, string>()
   const overflow: GanttFlight[] = []
   const chainBreaks: ChainBreak[] = []
@@ -277,13 +285,13 @@ function greedyAssign(
   for (const [icaoType, typeBlocks] of blocksByType) {
     const regs = acByType.get(icaoType)
     if (!regs || regs.length === 0) {
-      for (const b of typeBlocks) overflow.push(...b.flights.filter(f => !f.aircraftReg))
+      for (const b of typeBlocks) overflow.push(...b.flights.filter((f) => !f.aircraftReg))
       continue
     }
     const tatMs = getTatMs(aircraftTypes, icaoType)
 
-    const pinned = typeBlocks.filter(b => b.pinnedReg)
-    const free = typeBlocks.filter(b => !b.pinnedReg)
+    const pinned = typeBlocks.filter((b) => b.pinnedReg)
+    const free = typeBlocks.filter((b) => !b.pinnedReg)
 
     // Step 1: Record pinned blocks
     for (const block of pinned) {
@@ -318,24 +326,34 @@ function greedyAssign(
           if (sameStation && !isIdle) score += 100
           else if (isIdle) score += 50
 
-          if (score > bestScore) { bestScore = score; bestReg = ac.registration }
-
+          if (score > bestScore) {
+            bestScore = score
+            bestReg = ac.registration
+          }
         } else if (method === 'balance') {
-          if (!sameStation && !isIdle) { continue }
+          if (!sameStation && !isIdle) {
+            continue
+          }
           const priority = sameStation && !isIdle ? 1 : 2
           const gap = sameStation && !isIdle ? block.startMs - slot.lastEnd : Infinity
           const score = -slot.totalBlockMs * 2 + (sameStation ? 500 : 0) + (isIdle ? 300 : 0)
           if (priority < bestPriority || (priority === bestPriority && score > bestScore)) {
-            bestPriority = priority; bestScore = score; bestGap = gap; bestReg = ac.registration
+            bestPriority = priority
+            bestScore = score
+            bestGap = gap
+            bestReg = ac.registration
           }
-
         } else {
           // minimize
-          if (!sameStation && !isIdle) { continue }
+          if (!sameStation && !isIdle) {
+            continue
+          }
           const priority = sameStation && !isIdle ? 1 : 2
           const gap = sameStation && !isIdle ? block.startMs - slot.lastEnd : Infinity
           if (priority < bestPriority || (priority === bestPriority && gap < bestGap)) {
-            bestPriority = priority; bestGap = gap; bestReg = ac.registration
+            bestPriority = priority
+            bestGap = gap
+            bestReg = ac.registration
           }
         }
       }
@@ -381,7 +399,10 @@ function greedyAssign(
           if (method === 'balance') score -= slot.totalBlockMs / 60_000
         }
 
-        if (score > bestScore) { bestScore = score; bestReg = ac.registration }
+        if (score > bestScore) {
+          bestScore = score
+          bestReg = ac.registration
+        }
       }
 
       if (bestReg) {
@@ -413,7 +434,7 @@ function computeCost(
   let cost = 0
   let chainBreakCount = 0
   let totalFuelKg = 0
-  const overflowCount = flights.filter(f => !f.aircraftReg && !assignments.has(f.id)).length
+  const overflowCount = flights.filter((f) => !f.aircraftReg && !assignments.has(f.id)).length
   cost += overflowCount * COST_OVERFLOW
 
   const byReg = new Map<string, GanttFlight[]>()
@@ -449,7 +470,7 @@ function computeCost(
           cost += chainBreakPenalty
           chainBreakCount++
         }
-        const ac = aircraft.find(a => a.registration === reg)
+        const ac = aircraft.find((a) => a.registration === reg)
         const tatMs = getTatMs(aircraftTypes, ac?.aircraftTypeIcao ?? '')
         const gap = f.stdUtc - prev.staUtc
         if (gap < tatMs && gap >= 0) {
@@ -468,7 +489,7 @@ function computeCost(
   if (method !== 'fuel' && utilizations.length > 1) {
     const mean = utilizations.reduce((a, b) => a + b, 0) / utilizations.length
     const variance = utilizations.reduce((sum, u) => sum + (u - mean) ** 2, 0) / utilizations.length
-    cost += Math.sqrt(variance) / 60_000 * COST_UTIL_BALANCE
+    cost += (Math.sqrt(variance) / 60_000) * COST_UTIL_BALANCE
   }
 
   // Fuel cost (fuel mode only)
@@ -503,7 +524,7 @@ async function runSA(
   let temp = config.initialTemp
   let iteration = 0
 
-  const movableIds = flights.filter(f => !f.aircraftReg && current.has(f.id)).map(f => f.id)
+  const movableIds = flights.filter((f) => !f.aircraftReg && current.has(f.id)).map((f) => f.id)
   if (movableIds.length < 2) return { assignments: best, overflow: greedyResult.overflow }
 
   const acByType = new Map<string, string[]>()
@@ -514,7 +535,7 @@ async function runSA(
     acByType.set(type, list)
   }
 
-  const flightMap = new Map(flights.map(f => [f.id, f]))
+  const flightMap = new Map(flights.map((f) => [f.id, f]))
 
   while (Date.now() - startTime < config.timeBudgetMs) {
     if (signal.aborted) break
@@ -529,11 +550,14 @@ async function runSA(
       let idx2 = Math.floor(Math.random() * (movableIds.length - 1))
       if (idx2 >= idx1) idx2++
 
-      const fId1 = movableIds[idx1], fId2 = movableIds[idx2]
-      const reg1 = current.get(fId1), reg2 = current.get(fId2)
+      const fId1 = movableIds[idx1],
+        fId2 = movableIds[idx2]
+      const reg1 = current.get(fId1),
+        reg2 = current.get(fId2)
       if (!reg1 || !reg2 || reg1 === reg2) continue
 
-      const f1 = flightMap.get(fId1)!, f2 = flightMap.get(fId2)!
+      const f1 = flightMap.get(fId1)!,
+        f2 = flightMap.get(fId2)!
       if (f1.aircraftTypeIcao !== f2.aircraftTypeIcao) continue
 
       current.set(fId1, reg2)
@@ -600,11 +624,11 @@ async function runSA(
         },
       })
       // Yield to event loop so React can re-render progress
-      await new Promise(r => setTimeout(r, 0))
+      await new Promise((r) => setTimeout(r, 0))
     }
   }
 
-  const finalOverflow = flights.filter(f => !f.aircraftReg && !best.has(f.id))
+  const finalOverflow = flights.filter((f) => !f.aircraftReg && !best.has(f.id))
   return { assignments: best, overflow: finalOverflow }
 }
 
@@ -623,7 +647,11 @@ export async function runOptimizer(
 
   // Phase 1: Greedy
   onProgress({
-    phase: 'greedy', percent: 0, cost: 0, bestCost: 0, elapsedMs: 0,
+    phase: 'greedy',
+    percent: 0,
+    cost: 0,
+    bestCost: 0,
+    elapsedMs: 0,
     stats: { totalFlights: flights.length, assigned: 0, overflow: 0, chainBreaks: 0 },
   })
 
@@ -631,7 +659,10 @@ export async function runOptimizer(
 
   const greedyEval = computeCost(greedy.assignments, flights, aircraft, aircraftTypes, config.method, burnRates)
   onProgress({
-    phase: 'greedy', percent: 100, cost: greedyEval.cost, bestCost: greedyEval.cost,
+    phase: 'greedy',
+    percent: 100,
+    cost: greedyEval.cost,
+    bestCost: greedyEval.cost,
     elapsedMs: Date.now() - startTime,
     stats: {
       totalFlights: flights.length,
@@ -642,14 +673,27 @@ export async function runOptimizer(
   })
 
   if (signal.aborted) {
-    return buildResult(greedy.assignments, greedy.overflow, greedy.chainBreaks, flights, aircraft, aircraftTypes, config.method, burnRates, startTime)
+    return buildResult(
+      greedy.assignments,
+      greedy.overflow,
+      greedy.chainBreaks,
+      flights,
+      aircraft,
+      aircraftTypes,
+      config.method,
+      burnRates,
+      startTime,
+    )
   }
 
-  await new Promise(r => setTimeout(r, 50))
+  await new Promise((r) => setTimeout(r, 50))
 
   // Phase 2: Simulated Annealing
   onProgress({
-    phase: 'sa', percent: 0, cost: greedyEval.cost, bestCost: greedyEval.cost,
+    phase: 'sa',
+    percent: 0,
+    cost: greedyEval.cost,
+    bestCost: greedyEval.cost,
     elapsedMs: Date.now() - startTime,
     stats: {
       totalFlights: flights.length,
@@ -659,12 +703,25 @@ export async function runOptimizer(
     },
   })
 
-  const sa = await runSA(greedy, flights, aircraft, aircraftTypes, config.preset, config.method, burnRates, onProgress, signal)
+  const sa = await runSA(
+    greedy,
+    flights,
+    aircraft,
+    aircraftTypes,
+    config.preset,
+    config.method,
+    burnRates,
+    onProgress,
+    signal,
+  )
 
   const finalChainBreaks = computeChainBreaks(sa.assignments, flights)
 
   onProgress({
-    phase: 'sa', percent: 100, cost: 0, bestCost: 0,
+    phase: 'sa',
+    percent: 100,
+    cost: 0,
+    bestCost: 0,
     elapsedMs: Date.now() - startTime,
     stats: {
       totalFlights: flights.length,
@@ -674,7 +731,17 @@ export async function runOptimizer(
     },
   })
 
-  return buildResult(sa.assignments, sa.overflow, finalChainBreaks, flights, aircraft, aircraftTypes, config.method, burnRates, startTime)
+  return buildResult(
+    sa.assignments,
+    sa.overflow,
+    finalChainBreaks,
+    flights,
+    aircraft,
+    aircraftTypes,
+    config.method,
+    burnRates,
+    startTime,
+  )
 }
 
 function computeChainBreaks(assignments: Map<string, string>, flights: GanttFlight[]): ChainBreak[] {
@@ -723,7 +790,8 @@ function buildResult(
   }
 
   // Compute period days from flight date range
-  let minMs = Infinity, maxMs = -Infinity
+  let minMs = Infinity,
+    maxMs = -Infinity
   for (const f of flights) {
     if (f.stdUtc < minMs) minMs = f.stdUtc
     if (f.staUtc > maxMs) maxMs = f.staUtc
@@ -734,21 +802,38 @@ function buildResult(
   const typeMap = new Map<string, TypeBreakdown>()
   for (const t of aircraftTypes) {
     typeMap.set(t.icaoType, {
-      icaoType: t.icaoType, typeName: t.name,
-      totalFlights: 0, assigned: 0, overflow: 0,
+      icaoType: t.icaoType,
+      typeName: t.name,
+      totalFlights: 0,
+      assigned: 0,
+      overflow: 0,
       totalBlockHours: 0,
-      aircraftCount: aircraft.filter(a => a.aircraftTypeIcao === t.icaoType).length,
+      aircraftCount: aircraft.filter((a) => a.aircraftTypeIcao === t.icaoType).length,
       avgBhPerDay: 0,
     })
   }
   for (const f of flights) {
     const icao = f.aircraftTypeIcao ?? 'UNKN'
     let entry = typeMap.get(icao)
-    if (!entry) { entry = { icaoType: icao, typeName: icao, totalFlights: 0, assigned: 0, overflow: 0, totalBlockHours: 0, aircraftCount: 0, avgBhPerDay: 0 }; typeMap.set(icao, entry) }
+    if (!entry) {
+      entry = {
+        icaoType: icao,
+        typeName: icao,
+        totalFlights: 0,
+        assigned: 0,
+        overflow: 0,
+        totalBlockHours: 0,
+        aircraftCount: 0,
+        avgBhPerDay: 0,
+      }
+      typeMap.set(icao, entry)
+    }
     entry.totalFlights++
     const reg = f.aircraftReg ?? assignments.get(f.id)
-    if (reg) { entry.assigned++; entry.totalBlockHours += f.blockMinutes / 60 }
-    else entry.overflow++
+    if (reg) {
+      entry.assigned++
+      entry.totalBlockHours += f.blockMinutes / 60
+    } else entry.overflow++
   }
   // Calculate avg BH/day per aircraft
   for (const entry of typeMap.values()) {
@@ -756,7 +841,9 @@ function buildResult(
       entry.avgBhPerDay = Math.round((entry.totalBlockHours / entry.aircraftCount / periodDays) * 10) / 10
     }
   }
-  const typeBreakdown = [...typeMap.values()].filter(t => t.totalFlights > 0).sort((a, b) => b.totalFlights - a.totalFlights)
+  const typeBreakdown = [...typeMap.values()]
+    .filter((t) => t.totalFlights > 0)
+    .sort((a, b) => b.totalFlights - a.totalFlights)
 
   // Compute fuel stats for fuel mode
   if (method === 'fuel' && burnRates) {
@@ -768,9 +855,8 @@ function buildResult(
     const baselineEval = computeCost(baselineGreedy.assignments, flights, aircraft, aircraftTypes, 'fuel', burnRates)
     stats.baselineFuelKg = Math.round(baselineEval.totalFuelKg)
 
-    stats.fuelSavingsPercent = stats.baselineFuelKg > 0
-      ? Math.round((1 - stats.totalFuelKg / stats.baselineFuelKg) * 1000) / 10
-      : 0
+    stats.fuelSavingsPercent =
+      stats.baselineFuelKg > 0 ? Math.round((1 - stats.totalFuelKg / stats.baselineFuelKg) * 1000) / 10 : 0
   }
 
   return {
@@ -802,7 +888,7 @@ export function serializeResult(
     config: { preset: config.preset, method: config.method },
     stats: result.stats,
     assignments: [...result.assignments.entries()].map(([flightId, registration]) => ({ flightId, registration })),
-    overflowFlightIds: result.overflow.map(f => f.id),
+    overflowFlightIds: result.overflow.map((f) => f.id),
     chainBreaks: result.chainBreaks,
     typeBreakdown: result.typeBreakdown,
     elapsedMs: result.elapsedMs,
@@ -811,7 +897,11 @@ export function serializeResult(
 
 /** Generate auto-name for an optimizer run */
 export function generateRunName(config: OptimizerConfig): string {
-  const methodLabels: Record<string, string> = { minimize: 'Minimize Gaps', balance: 'Balance Fleet', fuel: 'Fuel Efficient' }
+  const methodLabels: Record<string, string> = {
+    minimize: 'Minimize Gaps',
+    balance: 'Balance Fleet',
+    fuel: 'Fuel Efficient',
+  }
   const presetLabels: Record<string, string> = { quick: 'Quick', normal: 'Normal', deep: 'Deep' }
   const now = new Date()
   const dd = String(now.getDate()).padStart(2, '0')

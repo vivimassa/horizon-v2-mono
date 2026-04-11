@@ -13,10 +13,16 @@ interface SeatRowPreviewProps {
 }
 
 const SEAT_LETTERS_LEFT: Record<number, string[]> = {
-  1: ['A'], 2: ['A', 'B'], 3: ['A', 'B', 'C'], 4: ['A', 'B', 'C', 'D'],
+  1: ['A'],
+  2: ['A', 'B'],
+  3: ['A', 'B', 'C'],
+  4: ['A', 'B', 'C', 'D'],
 }
 const SEAT_LETTERS_RIGHT: Record<number, string[]> = {
-  1: ['F'], 2: ['E', 'F'], 3: ['D', 'E', 'F'], 4: ['D', 'E', 'F', 'G'],
+  1: ['F'],
+  2: ['E', 'F'],
+  3: ['D', 'E', 'F'],
+  4: ['D', 'E', 'F', 'G'],
 }
 
 function getSeatLetters(groups: number[]): string[][] {
@@ -40,7 +46,12 @@ function getSeatLetters(groups: number[]): string[][] {
 }
 
 export const SeatRowPreview = memo(function SeatRowPreview({
-  seatLayout, color, seatType, pitchIn, palette, align = 'center',
+  seatLayout,
+  color,
+  seatType,
+  pitchIn,
+  palette,
+  align = 'center',
 }: SeatRowPreviewProps) {
   const groups = useMemo(() => seatLayout.split('-').map(Number), [seatLayout])
   const letters = useMemo(() => getSeatLetters(groups), [groups])
@@ -54,7 +65,7 @@ export const SeatRowPreview = memo(function SeatRowPreview({
   const padX = 32
   const padY = 28
 
-  const groupWidths = groups.map(count => count * seatW + (count - 1) * seatGap)
+  const groupWidths = groups.map((count) => count * seatW + (count - 1) * seatGap)
   const totalW = groupWidths.reduce((s, w) => s + w, 0) + (groups.length - 1) * groupGap + padX * 2
   const totalH = seatH + padY * 2 + 20
 
@@ -84,7 +95,7 @@ export const SeatRowPreview = memo(function SeatRowPreview({
       <Svg
         viewBox={`0 0 ${totalW} ${totalH}`}
         width={Math.min(totalW * 1.2, 400)}
-        height={totalH * Math.min(totalW * 1.2, 400) / totalW}
+        height={(totalH * Math.min(totalW * 1.2, 400)) / totalW}
         style={{ maxWidth: '100%' }}
       >
         {aisles.map((aisle, i) => {
@@ -92,15 +103,23 @@ export const SeatRowPreview = memo(function SeatRowPreview({
           return (
             <G key={`aisle-${i}`}>
               <Rect
-                x={aisle.x + 4} y={padY - 2}
-                width={groupGap - 8} height={seatH + 4}
-                rx={4} fill={palette.border} opacity={0.3}
+                x={aisle.x + 4}
+                y={padY - 2}
+                width={groupGap - 8}
+                height={seatH + 4}
+                rx={4}
+                fill={palette.border}
+                opacity={0.3}
               />
               <Line
-                x1={center} y1={padY + 4}
-                x2={center} y2={padY + seatH - 4}
-                stroke={palette.textTertiary} strokeWidth={1.5}
-                strokeDasharray="4,3" opacity={0.3}
+                x1={center}
+                y1={padY + 4}
+                x2={center}
+                y2={padY + seatH - 4}
+                stroke={palette.textTertiary}
+                strokeWidth={1.5}
+                strokeDasharray="4,3"
+                opacity={0.3}
               />
             </G>
           )
@@ -108,29 +127,51 @@ export const SeatRowPreview = memo(function SeatRowPreview({
         {seats.map((seat, i) => (
           <G key={i}>
             <Rect
-              x={seat.x} y={seat.y} width={seatW} height={seatH}
-              rx={seatR} fill={color} opacity={0.15}
-              stroke={color} strokeWidth={1.5}
+              x={seat.x}
+              y={seat.y}
+              width={seatW}
+              height={seatH}
+              rx={seatR}
+              fill={color}
+              opacity={0.15}
+              stroke={color}
+              strokeWidth={1.5}
             />
             <Rect
-              x={seat.x + 2} y={seat.y + 2}
-              width={seatW - 4} height={seatBackH}
-              rx={seatR - 1} fill={color} opacity={0.4}
+              x={seat.x + 2}
+              y={seat.y + 2}
+              width={seatW - 4}
+              height={seatBackH}
+              rx={seatR - 1}
+              fill={color}
+              opacity={0.4}
             />
             <Rect
-              x={seat.x - 1} y={seat.y + seatBackH + 4}
-              width={2.5} height={seatH - seatBackH - 8}
-              rx={1} fill={color} opacity={0.35}
+              x={seat.x - 1}
+              y={seat.y + seatBackH + 4}
+              width={2.5}
+              height={seatH - seatBackH - 8}
+              rx={1}
+              fill={color}
+              opacity={0.35}
             />
             <Rect
-              x={seat.x + seatW - 1.5} y={seat.y + seatBackH + 4}
-              width={2.5} height={seatH - seatBackH - 8}
-              rx={1} fill={color} opacity={0.35}
+              x={seat.x + seatW - 1.5}
+              y={seat.y + seatBackH + 4}
+              width={2.5}
+              height={seatH - seatBackH - 8}
+              rx={1}
+              fill={color}
+              opacity={0.35}
             />
             <SvgText
-              x={seat.x + seatW / 2} y={seat.y + seatH + 14}
-              textAnchor="middle" fontSize={11} fontWeight="600"
-              fontFamily="monospace" fill={palette.textSecondary}
+              x={seat.x + seatW / 2}
+              y={seat.y + seatH + 14}
+              textAnchor="middle"
+              fontSize={11}
+              fontWeight="600"
+              fontFamily="monospace"
+              fill={palette.textSecondary}
             >
               {seat.letter}
             </SvgText>

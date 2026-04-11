@@ -58,7 +58,7 @@ const scheduledFlightSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'scheduledFlights',
-  }
+  },
 )
 
 scheduledFlightSchema.index({ operatorId: 1, seasonCode: 1, scenarioId: 1 })

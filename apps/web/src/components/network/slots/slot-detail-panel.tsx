@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { Plane, Download, FileText, Upload } from 'lucide-react'
@@ -32,19 +32,18 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'calendar', label: 'Calendar' },
 ]
 
-export function SlotDetailPanel({
-  airport,
-  seasonCode,
-  refreshKey,
-  onDataChanged,
-  isDark,
-}: SlotDetailPanelProps) {
+export function SlotDetailPanel({ airport, seasonCode, refreshKey, onDataChanged, isDark }: SlotDetailPanelProps) {
   const palette = isDark ? colors.dark : colors.light
   const accent = MODULE_THEMES.network.accent
   const [tab, setTab] = useState<TabKey>('portfolio')
   const [series, setSeries] = useState<SlotSeriesRef[]>([])
   const [stats, setStats] = useState<SlotPortfolioStats>({
-    totalSeries: 0, confirmed: 0, offered: 0, waitlisted: 0, refused: 0, atRisk80: 0,
+    totalSeries: 0,
+    confirmed: 0,
+    offered: 0,
+    waitlisted: 0,
+    refused: 0,
+    atRisk80: 0,
   })
   const [loading, setLoading] = useState(false)
   const [requestOpen, setRequestOpen] = useState(false)
@@ -67,7 +66,9 @@ export function SlotDetailPanel({
     }
   }, [airport, seasonCode])
 
-  useEffect(() => { loadData() }, [loadData, refreshKey])
+  useEffect(() => {
+    loadData()
+  }, [loadData, refreshKey])
 
   const handleChanged = useCallback(() => {
     loadData()
@@ -100,10 +101,11 @@ export function SlotDetailPanel({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-4 pb-3 shrink-0"
-        style={{ borderBottom: `1px solid ${glassBorder}` }}>
+      <div
+        className="flex items-center justify-between px-5 pt-4 pb-3 shrink-0"
+        style={{ borderBottom: `1px solid ${glassBorder}` }}
+      >
         <div className="flex items-center gap-3">
           <span className="text-[18px] font-mono font-bold" style={{ color: palette.text }}>
             {airport.iataCode}
@@ -111,12 +113,20 @@ export function SlotDetailPanel({
           <div>
             <div className="text-[14px] font-medium flex items-center gap-2" style={{ color: palette.text }}>
               {airport.name}
-              <span className="text-[13px] font-semibold px-2 py-0.5 rounded-lg"
-                style={{ background: `${levelColor}15`, color: levelColor, border: `1px solid ${levelColor}20` }}>
+              <span
+                className="text-[13px] font-semibold px-2 py-0.5 rounded-lg"
+                style={{ background: `${levelColor}15`, color: levelColor, border: `1px solid ${levelColor}20` }}
+              >
                 Level {airport.coordinationLevel}
               </span>
-              <span className="text-[13px] font-mono font-medium px-2 py-0.5 rounded-lg"
-                style={{ background: accentTint(accent, isDark ? 0.12 : 0.08), color: accent, border: `1px solid ${accentTint(accent, 0.15)}` }}>
+              <span
+                className="text-[13px] font-mono font-medium px-2 py-0.5 rounded-lg"
+                style={{
+                  background: accentTint(accent, isDark ? 0.12 : 0.08),
+                  color: accent,
+                  border: `1px solid ${accentTint(accent, 0.15)}`,
+                }}
+              >
                 {seasonCode}
               </span>
             </div>
@@ -129,19 +139,27 @@ export function SlotDetailPanel({
         </div>
 
         <div className="flex gap-2">
-          <button type="button" onClick={() => setImportOpen(true)}
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
             className="h-8 px-3.5 rounded-xl text-[13px] font-medium flex items-center gap-1.5 transition-colors duration-150 hover:opacity-80"
-            style={btnStyle}>
+            style={btnStyle}
+          >
             <Download size={14} /> Import SAL
           </button>
-          <button type="button" onClick={() => setScrOpen(true)}
+          <button
+            type="button"
+            onClick={() => setScrOpen(true)}
             className="h-8 px-3.5 rounded-xl text-[13px] font-medium flex items-center gap-1.5 transition-colors duration-150 hover:opacity-80"
-            style={btnStyle}>
+            style={btnStyle}
+          >
             <FileText size={14} /> Generate SCR
           </button>
-          <button type="button"
+          <button
+            type="button"
             className="h-8 px-3.5 rounded-xl text-[13px] font-medium flex items-center gap-1.5 transition-colors duration-150 hover:opacity-80"
-            style={btnStyle}>
+            style={btnStyle}
+          >
             <Upload size={14} /> Export
           </button>
         </div>
@@ -149,7 +167,7 @@ export function SlotDetailPanel({
 
       {/* Tabs */}
       <div className="flex px-5 shrink-0" style={{ borderBottom: `1px solid ${glassBorder}` }}>
-        {TABS.map(t => (
+        {TABS.map((t) => (
           <button
             key={t.key}
             type="button"
@@ -169,32 +187,68 @@ export function SlotDetailPanel({
       {/* Tab content */}
       {tab === 'portfolio' && (
         <PortfolioTab
-          series={series} stats={stats} airport={airport} seasonCode={seasonCode}
-          loading={loading} onNewRequest={() => setRequestOpen(true)} onDataChanged={handleChanged} isDark={isDark}
+          series={series}
+          stats={stats}
+          airport={airport}
+          seasonCode={seasonCode}
+          loading={loading}
+          onNewRequest={() => setRequestOpen(true)}
+          onDataChanged={handleChanged}
+          isDark={isDark}
         />
       )}
       {tab === 'utilization' && (
         <UtilizationTab airport={airport} seasonCode={seasonCode} onDataChanged={handleChanged} isDark={isDark} />
       )}
       {tab === 'messages' && (
-        <MessagesTab airport={airport} seasonCode={seasonCode} onImport={() => setImportOpen(true)} onDataChanged={handleChanged} isDark={isDark} />
+        <MessagesTab
+          airport={airport}
+          seasonCode={seasonCode}
+          onImport={() => setImportOpen(true)}
+          onDataChanged={handleChanged}
+          isDark={isDark}
+        />
       )}
       {tab === 'calendar' && (
-        <CalendarTab airport={airport} seasonCode={seasonCode} onNavigateToUtilization={() => setTab('utilization')} isDark={isDark} />
+        <CalendarTab
+          airport={airport}
+          seasonCode={seasonCode}
+          onNavigateToUtilization={() => setTab('utilization')}
+          isDark={isDark}
+        />
       )}
 
       {/* Dialogs */}
       {requestOpen && (
-        <SlotRequestDialog open={requestOpen} onOpenChange={setRequestOpen}
-          airportIata={airport.iataCode} seasonCode={seasonCode} onCreated={handleChanged} isDark={isDark} />
+        <SlotRequestDialog
+          open={requestOpen}
+          onOpenChange={setRequestOpen}
+          airportIata={airport.iataCode}
+          seasonCode={seasonCode}
+          onCreated={handleChanged}
+          isDark={isDark}
+        />
       )}
       {importOpen && (
-        <ImportMessageDialog open={importOpen} onOpenChange={setImportOpen}
-          airportIata={airport.iataCode} seasonCode={seasonCode} onImported={handleChanged} isDark={isDark} />
+        <ImportMessageDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          airportIata={airport.iataCode}
+          seasonCode={seasonCode}
+          onImported={handleChanged}
+          isDark={isDark}
+        />
       )}
       {scrOpen && (
-        <GenerateSCRDialog open={scrOpen} onOpenChange={setScrOpen}
-          series={series} airportIata={airport.iataCode} seasonCode={seasonCode} onGenerated={handleChanged} isDark={isDark} />
+        <GenerateSCRDialog
+          open={scrOpen}
+          onOpenChange={setScrOpen}
+          series={series}
+          airportIata={airport.iataCode}
+          seasonCode={seasonCode}
+          onGenerated={handleChanged}
+          isDark={isDark}
+        />
       )}
     </div>
   )

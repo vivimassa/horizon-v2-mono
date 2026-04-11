@@ -30,13 +30,7 @@ export function FormControl({
   )
 }
 
-export function FormControlLabel({
-  children,
-  className,
-}: {
-  children: React.ReactNode
-  className?: string
-}) {
+export function FormControlLabel({ children, className }: { children: React.ReactNode; className?: string }) {
   return <View className={className}>{children}</View>
 }
 
@@ -56,13 +50,7 @@ export function FormControlLabelText({
   )
 }
 
-export function FormControlHelper({
-  children,
-  className,
-}: {
-  children: React.ReactNode
-  className?: string
-}) {
+export function FormControlHelper({ children, className }: { children: React.ReactNode; className?: string }) {
   return <View className={className}>{children}</View>
 }
 
@@ -75,28 +63,20 @@ export function FormControlHelperText({
   className?: string
   style?: any
 }) {
-  return <Text className={`text-xs ${className ?? ''}`} style={style}>{children}</Text>
+  return (
+    <Text className={`text-xs ${className ?? ''}`} style={style}>
+      {children}
+    </Text>
+  )
 }
 
-export function FormControlError({
-  children,
-  className,
-}: {
-  children: React.ReactNode
-  className?: string
-}) {
+export function FormControlError({ children, className }: { children: React.ReactNode; className?: string }) {
   const { isInvalid } = useContext(Ctx)
   if (!isInvalid) return null
   return <View className={className}>{children}</View>
 }
 
-export function FormControlErrorText({
-  children,
-  className,
-}: {
-  children: React.ReactNode
-  className?: string
-}) {
+export function FormControlErrorText({ children, className }: { children: React.ReactNode; className?: string }) {
   return <Text className={`text-xs text-red-500 ${className ?? ''}`}>{children}</Text>
 }
 

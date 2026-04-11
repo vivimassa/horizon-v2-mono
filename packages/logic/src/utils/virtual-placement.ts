@@ -60,12 +60,12 @@ interface AircraftSlot {
 interface PlacementBlock {
   id: string
   flights: VirtualPlacementFlight[] // sorted chronologically
-  depStation: string   // first flight's departure
-  arrStation: string   // last flight's arrival
-  startDateMs: number  // earliest date epoch
-  endDateMs: number    // latest date epoch
-  startStd: number     // earliest STD minutes
-  endSta: number       // latest STA minutes
+  depStation: string // first flight's departure
+  arrStation: string // last flight's arrival
+  startDateMs: number // earliest date epoch
+  endDateMs: number // latest date epoch
+  startStd: number // earliest STD minutes
+  endSta: number // latest STA minutes
 }
 
 /**
@@ -123,11 +123,7 @@ function buildPlacementBlocks(flights: VirtualPlacementFlight[]): PlacementBlock
  * Check if ANY flight in a block overlaps any existing window on a slot.
  * Uses absolute UTC milliseconds — safe for cross-midnight UTC flights.
  */
-function blockHasTimeOverlap(
-  slot: AircraftSlot,
-  block: PlacementBlock,
-  tatMs: number,
-): boolean {
+function blockHasTimeOverlap(slot: AircraftSlot, block: PlacementBlock, tatMs: number): boolean {
   for (const f of block.flights) {
     const fStart = flightStartMs(f)
     const fEnd = flightEndMs(f)
@@ -144,11 +140,7 @@ function blockHasTimeOverlap(
  * Check if a single flight overlaps any existing window on an aircraft slot.
  * Uses absolute UTC milliseconds.
  */
-function hasTimeOverlap(
-  slot: AircraftSlot,
-  f: VirtualPlacementFlight,
-  tatMs: number,
-): boolean {
+function hasTimeOverlap(slot: AircraftSlot, f: VirtualPlacementFlight, tatMs: number): boolean {
   const fStart = flightStartMs(f)
   const fEnd = flightEndMs(f)
   for (const w of slot.windows) {
@@ -162,11 +154,7 @@ function hasTimeOverlap(
 /**
  * Place all flights in a block on a slot and update forward+backward tracking.
  */
-function placeBlockOnSlot(
-  slot: AircraftSlot,
-  block: PlacementBlock,
-  placements: Map<string, string>,
-): void {
+function placeBlockOnSlot(slot: AircraftSlot, block: PlacementBlock, placements: Map<string, string>): void {
   for (const f of block.flights) {
     placeOnSlot(slot, f, placements)
   }
@@ -175,11 +163,7 @@ function placeBlockOnSlot(
 /**
  * Place a single flight on a slot and update forward+backward tracking.
  */
-function placeOnSlot(
-  slot: AircraftSlot,
-  flight: VirtualPlacementFlight,
-  placements: Map<string, string>,
-): void {
+function placeOnSlot(slot: AircraftSlot, flight: VirtualPlacementFlight, placements: Map<string, string>): void {
   const fDateMs = flight.date.getTime()
   placements.set(flight.id, slot.registration)
   slot.windows.push({ startMs: flightStartMs(flight), endMs: flightEndMs(flight) })
@@ -235,7 +219,7 @@ export function computeVirtualPlacements(
     })
 
     // Initialize aircraft slots from their REAL assigned flights
-    const slots: AircraftSlot[] = aircraft.map(ac => {
+    const slots: AircraftSlot[] = aircraft.map((ac) => {
       const realFlights = assignedFlightsByReg.get(ac.registration) || []
       let lastArr: string | null = null
       let lastSta = 0
@@ -326,7 +310,7 @@ export function computeVirtualPlacements(
       const pass2Remaining: PlacementBlock[] = []
 
       for (const block of reversed) {
-        if (block.flights.every(f => placements.has(f.id))) continue
+        if (block.flights.every((f) => placements.has(f.id))) continue
 
         let bestIdx = -1
         let bestScore = -Infinity
@@ -364,7 +348,7 @@ export function computeVirtualPlacements(
 
       // ─── Pass 3: Fallback — place remaining on any non-overlapping slot ─
       for (const block of pass2Remaining) {
-        if (block.flights.every(f => placements.has(f.id))) continue
+        if (block.flights.every((f) => placements.has(f.id))) continue
 
         let bestIdx = -1
         let bestLoad = Infinity

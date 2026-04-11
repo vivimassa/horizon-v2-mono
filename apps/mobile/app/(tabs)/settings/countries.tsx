@@ -4,9 +4,7 @@ import { Text, View, FlatList, TextInput, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { api, type CountryRef } from '@skyhub/api'
-import {
-  Search, ChevronLeft, ChevronRight, Globe, Plus,
-} from 'lucide-react-native'
+import { Search, ChevronLeft, ChevronRight, Globe, Plus } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
@@ -20,22 +18,28 @@ export default function CountriesList() {
 
   const fetchCountries = useCallback(() => {
     setLoading(true)
-    api.getCountries()
+    api
+      .getCountries()
       .then(setCountries)
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
 
-  useFocusEffect(useCallback(() => { fetchCountries() }, [fetchCountries]))
+  useFocusEffect(
+    useCallback(() => {
+      fetchCountries()
+    }, [fetchCountries]),
+  )
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
     const list = q
-      ? countries.filter(c =>
-          c.name.toLowerCase().includes(q) ||
-          c.isoCode2.toLowerCase().includes(q) ||
-          c.isoCode3.toLowerCase().includes(q) ||
-          (c.region?.toLowerCase().includes(q))
+      ? countries.filter(
+          (c) =>
+            c.name.toLowerCase().includes(q) ||
+            c.isoCode2.toLowerCase().includes(q) ||
+            c.isoCode3.toLowerCase().includes(q) ||
+            c.region?.toLowerCase().includes(q),
         )
       : countries
 
@@ -44,75 +48,93 @@ export default function CountriesList() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
-    <BreadcrumbHeader moduleCode="6" />
-    <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
-      {/* Header */}
-      <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
-        <View className="flex-row items-center mb-3">
-          <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
-            <ChevronLeft size={24} color={accent} strokeWidth={2} />
-          </Pressable>
+      <BreadcrumbHeader moduleCode="6" />
+      <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
+        {/* Header */}
+        <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
+          <View className="flex-row items-center mb-3">
+            <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
+              <ChevronLeft size={24} color={accent} strokeWidth={2} />
+            </Pressable>
+            <View
+              className="items-center justify-center rounded-lg mr-3"
+              style={{ width: 36, height: 36, backgroundColor: accentTint(accent, isDark ? 0.15 : 0.1) }}
+            >
+              <Globe size={18} color={accent} strokeWidth={1.8} />
+            </View>
+            <View className="flex-1">
+              <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>Countries</Text>
+              <Text style={{ fontSize: 13, color: palette.textSecondary }}>
+                {filtered.length === countries.length
+                  ? `${countries.length} countries`
+                  : `${filtered.length} / ${countries.length} countries`}
+              </Text>
+            </View>
+          </View>
+
+          {/* Search */}
           <View
-            className="items-center justify-center rounded-lg mr-3"
-            style={{ width: 36, height: 36, backgroundColor: accentTint(accent, isDark ? 0.15 : 0.1) }}
+            className="flex-row items-center rounded-xl"
+            style={{
+              backgroundColor: palette.card,
+              borderWidth: 1,
+              borderColor: palette.cardBorder,
+              paddingHorizontal: 12,
+            }}
           >
-            <Globe size={18} color={accent} strokeWidth={1.8} />
-          </View>
-          <View className="flex-1">
-            <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>Countries</Text>
-            <Text style={{ fontSize: 13, color: palette.textSecondary }}>
-              {filtered.length === countries.length
-                ? `${countries.length} countries`
-                : `${filtered.length} / ${countries.length} countries`}
-            </Text>
+            <Search size={16} color={palette.textTertiary} strokeWidth={1.8} />
+            <TextInput
+              className="flex-1 py-2.5 ml-2"
+              style={{ fontSize: 14, color: palette.text }}
+              placeholder="Search name, ISO code, region…"
+              placeholderTextColor={palette.textTertiary}
+              value={search}
+              onChangeText={setSearch}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
           </View>
         </View>
 
-        {/* Search */}
-        <View className="flex-row items-center rounded-xl" style={{
-          backgroundColor: palette.card,
-          borderWidth: 1,
-          borderColor: palette.cardBorder,
-          paddingHorizontal: 12,
-        }}>
-          <Search size={16} color={palette.textTertiary} strokeWidth={1.8} />
-          <TextInput
-            className="flex-1 py-2.5 ml-2"
-            style={{ fontSize: 14, color: palette.text }}
-            placeholder="Search name, ISO code, region…"
-            placeholderTextColor={palette.textTertiary}
-            value={search}
-            onChangeText={setSearch}
-            autoCapitalize="none"
-            autoCorrect={false}
+        {loading ? (
+          <View className="flex-1 justify-center items-center">
+            <Text style={{ fontSize: 14, color: palette.textTertiary }}>Loading countries…</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filtered}
+            keyExtractor={(item) => item._id}
+            contentContainerStyle={{ paddingBottom: 100 }}
+            renderItem={({ item }) => (
+              <CountryRow
+                country={item}
+                palette={palette}
+                accent={accent}
+                isDark={isDark}
+                onPress={() =>
+                  router.push({ pathname: '/(tabs)/settings/country-detail' as any, params: { id: item._id } })
+                }
+              />
+            )}
           />
-        </View>
-      </View>
-
-      {loading ? (
-        <View className="flex-1 justify-center items-center">
-          <Text style={{ fontSize: 14, color: palette.textTertiary }}>Loading countries…</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={item => item._id}
-          contentContainerStyle={{ paddingBottom: 100 }}
-          renderItem={({ item }) => (
-            <CountryRow country={item} palette={palette} accent={accent} isDark={isDark}
-              onPress={() => router.push({ pathname: '/(tabs)/settings/country-detail' as any, params: { id: item._id } })} />
-          )}
-        />
-      )}
-    </SafeAreaView>
+        )}
+      </SafeAreaView>
     </View>
   )
 }
 
 const CountryRow = memo(function CountryRow({
-  country, palette, accent, isDark, onPress,
+  country,
+  palette,
+  accent,
+  isDark,
+  onPress,
 }: {
-  country: CountryRef; palette: Palette; accent: string; isDark: boolean; onPress: () => void
+  country: CountryRef
+  palette: Palette
+  accent: string
+  isDark: boolean
+  onPress: () => void
 }) {
   return (
     <Pressable
@@ -127,8 +149,11 @@ const CountryRow = memo(function CountryRow({
     >
       <Text
         style={{
-          width: 44, fontSize: 15, fontWeight: '700',
-          fontFamily: 'monospace', color: accent,
+          width: 44,
+          fontSize: 15,
+          fontWeight: '700',
+          fontFamily: 'monospace',
+          color: accent,
           textAlign: 'center',
         }}
       >

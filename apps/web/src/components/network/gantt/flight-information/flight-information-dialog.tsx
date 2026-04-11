@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
@@ -29,11 +29,11 @@ const TABS = [
   { id: 'audit', label: 'Audit' },
 ] as const
 
-type TabKey = typeof TABS[number]['id']
+type TabKey = (typeof TABS)[number]['id']
 
 export function FlightInformationDialog() {
-  const flightId = useGanttStore(s => s.flightInfoDialogId)
-  const closeFlightInfo = useGanttStore(s => s.closeFlightInfo)
+  const flightId = useGanttStore((s) => s.flightInfoDialogId)
+  const closeFlightInfo = useGanttStore((s) => s.closeFlightInfo)
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
@@ -46,11 +46,18 @@ export function FlightInformationDialog() {
   const [mounted, setMounted] = useState(false)
   const [dirty, setDirty] = useState(false)
 
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Fetch flight detail when dialog opens
   useEffect(() => {
-    if (!flightId) { setData(null); setDraft(null); setDirty(false); return }
+    if (!flightId) {
+      setData(null)
+      setDraft(null)
+      setDirty(false)
+      return
+    }
     const [sfId, opDate] = flightId.split('|')
     if (!sfId || !opDate) return
 
@@ -61,14 +68,17 @@ export function FlightInformationDialog() {
     setDirty(false)
 
     fetchFlightDetail(sfId, opDate, operatorId)
-      .then(d => { setData(d); setDraft(structuredClone(d)) })
-      .catch(e => setError((e as Error).message))
+      .then((d) => {
+        setData(d)
+        setDraft(structuredClone(d))
+      })
+      .catch((e) => setError((e as Error).message))
       .finally(() => setLoading(false))
   }, [flightId])
 
   // Update a nested field in draft
   const updateDraft = useCallback((updater: (d: FlightDetail) => void) => {
-    setDraft(prev => {
+    setDraft((prev) => {
       if (!prev) return prev
       const next = structuredClone(prev)
       updater(next)
@@ -135,12 +145,16 @@ export function FlightInformationDialog() {
       data-gantt-overlay
       className="fixed inset-0 z-[9998] flex items-center justify-center"
       style={{ backgroundColor: isDark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) closeFlightInfo() }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) closeFlightInfo()
+      }}
     >
       <div
         className="relative flex flex-col overflow-hidden rounded-2xl"
         style={{
-          width: 1040, maxWidth: '95vw', maxHeight: '85vh',
+          width: 1040,
+          maxWidth: '95vw',
+          maxHeight: '85vh',
           background: bg,
           border: `1px solid ${border}`,
           backdropFilter: 'blur(24px)',
@@ -178,7 +192,9 @@ export function FlightInformationDialog() {
         {/* Error state */}
         {error && !loading && (
           <div className="flex-1 flex items-center justify-center py-24">
-            <span className="text-[13px]" style={{ color: '#FF3B3B' }}>Failed to load: {error}</span>
+            <span className="text-[13px]" style={{ color: '#FF3B3B' }}>
+              Failed to load: {error}
+            </span>
           </div>
         )}
 
@@ -196,7 +212,7 @@ export function FlightInformationDialog() {
                   border: `1px solid ${border}`,
                 }}
               >
-                {TABS.map(tab => {
+                {TABS.map((tab) => {
                   const isActive = activeTab === tab.id
                   return (
                     <button
@@ -206,7 +222,9 @@ export function FlightInformationDialog() {
                       style={{
                         color: isActive ? accent : muted,
                         background: isActive
-                          ? (isDark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.70)')
+                          ? isDark
+                            ? 'rgba(255,255,255,0.10)'
+                            : 'rgba(255,255,255,0.70)'
                           : 'transparent',
                         boxShadow: isActive ? 'inset 0 1px 2px rgba(0,0,0,0.06)' : 'none',
                         fontWeight: isActive ? 700 : 600,

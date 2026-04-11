@@ -37,10 +37,10 @@ interface ScenarioFlightSnapshot extends FlightSnapshot {
  */
 export function computeScenarioDiff(
   productionFlights: FlightSnapshot[],
-  scenarioFlights: ScenarioFlightSnapshot[]
+  scenarioFlights: ScenarioFlightSnapshot[],
 ): ScheduleMessage[] {
   const messages: ScheduleMessage[] = []
-  const prodMap = new Map(productionFlights.map(f => [f._id, f]))
+  const prodMap = new Map(productionFlights.map((f) => [f._id, f]))
   const referencedProdIds = new Set<string>()
 
   for (const sf of scenarioFlights) {
@@ -49,9 +49,13 @@ export function computeScenarioDiff(
     if (!srcId) {
       // NEW — created in scenario, no production origin
       messages.push({
-        type: 'SSM', actionCode: 'NEW',
-        flightNumber: sf.flightNumber, depStation: sf.depStation, arrStation: sf.arrStation,
-        effectiveFrom: sf.effectiveFrom, effectiveUntil: sf.effectiveUntil,
+        type: 'SSM',
+        actionCode: 'NEW',
+        flightNumber: sf.flightNumber,
+        depStation: sf.depStation,
+        arrStation: sf.arrStation,
+        effectiveFrom: sf.effectiveFrom,
+        effectiveUntil: sf.effectiveUntil,
         summary: `New flight ${sf.flightNumber} ${sf.depStation}-${sf.arrStation}`,
         changes: {},
       })
@@ -63,9 +67,13 @@ export function computeScenarioDiff(
     if (!prod) {
       // Source was deleted from production — treat as NEW
       messages.push({
-        type: 'SSM', actionCode: 'NEW',
-        flightNumber: sf.flightNumber, depStation: sf.depStation, arrStation: sf.arrStation,
-        effectiveFrom: sf.effectiveFrom, effectiveUntil: sf.effectiveUntil,
+        type: 'SSM',
+        actionCode: 'NEW',
+        flightNumber: sf.flightNumber,
+        depStation: sf.depStation,
+        arrStation: sf.arrStation,
+        effectiveFrom: sf.effectiveFrom,
+        effectiveUntil: sf.effectiveUntil,
         summary: `New flight ${sf.flightNumber} ${sf.depStation}-${sf.arrStation} (source removed)`,
         changes: {},
       })
@@ -75,9 +83,13 @@ export function computeScenarioDiff(
     // Cancelled in scenario
     if (sf.status === 'cancelled') {
       messages.push({
-        type: 'ASM', actionCode: 'CNL',
-        flightNumber: prod.flightNumber, depStation: prod.depStation, arrStation: prod.arrStation,
-        effectiveFrom: prod.effectiveFrom, effectiveUntil: prod.effectiveUntil,
+        type: 'ASM',
+        actionCode: 'CNL',
+        flightNumber: prod.flightNumber,
+        depStation: prod.depStation,
+        arrStation: prod.arrStation,
+        effectiveFrom: prod.effectiveFrom,
+        effectiveUntil: prod.effectiveUntil,
         summary: `Cancelled flight ${prod.flightNumber} ${prod.depStation}-${prod.arrStation}`,
         changes: {},
       })
@@ -90,7 +102,8 @@ export function computeScenarioDiff(
     if (prod.staUtc !== sf.staUtc) changes.staUtc = { from: prod.staUtc, to: sf.staUtc }
     if (prod.depStation !== sf.depStation) changes.depStation = { from: prod.depStation, to: sf.depStation }
     if (prod.arrStation !== sf.arrStation) changes.arrStation = { from: prod.arrStation, to: sf.arrStation }
-    if (prod.aircraftTypeIcao !== sf.aircraftTypeIcao) changes.aircraftTypeIcao = { from: prod.aircraftTypeIcao, to: sf.aircraftTypeIcao }
+    if (prod.aircraftTypeIcao !== sf.aircraftTypeIcao)
+      changes.aircraftTypeIcao = { from: prod.aircraftTypeIcao, to: sf.aircraftTypeIcao }
     if (prod.daysOfWeek !== sf.daysOfWeek) changes.daysOfWeek = { from: prod.daysOfWeek, to: sf.daysOfWeek }
 
     if (Object.keys(changes).length === 0) continue
@@ -101,9 +114,13 @@ export function computeScenarioDiff(
 
     const parts = Object.entries(changes).map(([k, v]) => `${k}: ${v.from} → ${v.to}`)
     messages.push({
-      type: 'ASM', actionCode,
-      flightNumber: sf.flightNumber, depStation: sf.depStation, arrStation: sf.arrStation,
-      effectiveFrom: sf.effectiveFrom, effectiveUntil: sf.effectiveUntil,
+      type: 'ASM',
+      actionCode,
+      flightNumber: sf.flightNumber,
+      depStation: sf.depStation,
+      arrStation: sf.arrStation,
+      effectiveFrom: sf.effectiveFrom,
+      effectiveUntil: sf.effectiveUntil,
       summary: `${actionCode} ${sf.flightNumber}: ${parts.join(', ')}`,
       changes,
     })
@@ -113,9 +130,13 @@ export function computeScenarioDiff(
   for (const [prodId, prod] of prodMap) {
     if (!referencedProdIds.has(prodId) && prod.status !== 'cancelled') {
       messages.push({
-        type: 'ASM', actionCode: 'CNL',
-        flightNumber: prod.flightNumber, depStation: prod.depStation, arrStation: prod.arrStation,
-        effectiveFrom: prod.effectiveFrom, effectiveUntil: prod.effectiveUntil,
+        type: 'ASM',
+        actionCode: 'CNL',
+        flightNumber: prod.flightNumber,
+        depStation: prod.depStation,
+        arrStation: prod.arrStation,
+        effectiveFrom: prod.effectiveFrom,
+        effectiveUntil: prod.effectiveUntil,
         summary: `Cancelled flight ${prod.flightNumber} ${prod.depStation}-${prod.arrStation}`,
         changes: {},
       })
@@ -125,14 +146,11 @@ export function computeScenarioDiff(
   return messages
 }
 
-export function computeScheduleDiff(
-  baseFights: FlightSnapshot[],
-  targetFlights: FlightSnapshot[]
-): ScheduleMessage[] {
+export function computeScheduleDiff(baseFights: FlightSnapshot[], targetFlights: FlightSnapshot[]): ScheduleMessage[] {
   const messages: ScheduleMessage[] = []
 
-  const baseMap = new Map(baseFights.map(f => [f._id, f]))
-  const targetMap = new Map(targetFlights.map(f => [f._id, f]))
+  const baseMap = new Map(baseFights.map((f) => [f._id, f]))
+  const targetMap = new Map(targetFlights.map((f) => [f._id, f]))
 
   // NEW — in target but not in base
   for (const [id, tf] of targetMap) {
@@ -176,7 +194,8 @@ export function computeScheduleDiff(
     if (bf.staUtc !== tf.staUtc) changes.staUtc = { from: bf.staUtc, to: tf.staUtc }
     if (bf.depStation !== tf.depStation) changes.depStation = { from: bf.depStation, to: tf.depStation }
     if (bf.arrStation !== tf.arrStation) changes.arrStation = { from: bf.arrStation, to: tf.arrStation }
-    if (bf.aircraftTypeIcao !== tf.aircraftTypeIcao) changes.aircraftTypeIcao = { from: bf.aircraftTypeIcao, to: tf.aircraftTypeIcao }
+    if (bf.aircraftTypeIcao !== tf.aircraftTypeIcao)
+      changes.aircraftTypeIcao = { from: bf.aircraftTypeIcao, to: tf.aircraftTypeIcao }
     if (bf.daysOfWeek !== tf.daysOfWeek) changes.daysOfWeek = { from: bf.daysOfWeek, to: tf.daysOfWeek }
 
     if (Object.keys(changes).length === 0) continue

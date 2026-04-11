@@ -25,14 +25,19 @@ export function SeriesTableRow({ series, onViewDetail, isDark }: SeriesTableRowP
           borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'}`,
         }}
         onClick={() => setExpanded(!expanded)}
-        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }}
-        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+        onMouseEnter={(e) => {
+          ;(e.currentTarget as HTMLElement).style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'
+        }}
+        onMouseLeave={(e) => {
+          ;(e.currentTarget as HTMLElement).style.background = 'transparent'
+        }}
       >
         <td className="px-3 py-2.5 w-8">
-          {expanded
-            ? <ChevronDown size={14} style={{ color: palette.textSecondary }} />
-            : <ChevronRight size={14} style={{ color: palette.textSecondary }} />
-          }
+          {expanded ? (
+            <ChevronDown size={14} style={{ color: palette.textSecondary }} />
+          ) : (
+            <ChevronRight size={14} style={{ color: palette.textSecondary }} />
+          )}
         </td>
         <td className="px-3 py-2.5 text-[13px] font-mono font-semibold" style={{ color: palette.text }}>
           {series.arrivalFlightNumber || '\u2014'}
@@ -56,8 +61,10 @@ export function SeriesTableRow({ series, onViewDetail, isDark }: SeriesTableRowP
           {formatPeriod(series.periodStart, series.periodEnd)}
         </td>
         <td className="px-3 py-2.5">
-          <span className="text-[13px] font-semibold px-2 py-0.5 rounded-md inline-block"
-            style={{ background: chipStyle.bg, color: chipStyle.text, border: `1px solid ${chipStyle.border}` }}>
+          <span
+            className="text-[13px] font-semibold px-2 py-0.5 rounded-md inline-block"
+            style={{ background: chipStyle.bg, color: chipStyle.text, border: `1px solid ${chipStyle.border}` }}
+          >
             {series.status}
           </span>
         </td>
@@ -65,9 +72,15 @@ export function SeriesTableRow({ series, onViewDetail, isDark }: SeriesTableRowP
           {PRIORITY_LABELS[series.priorityCategory as PriorityCategory] || series.priorityCategory}
         </td>
         <td className="px-3 py-2.5">
-          <button type="button" onClick={e => { e.stopPropagation(); onViewDetail(series._id) }}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onViewDetail(series._id)
+            }}
             className="p-1 rounded-md transition-colors hover:opacity-80"
-            style={{ color: MODULE_THEMES.network.accent }}>
+            style={{ color: MODULE_THEMES.network.accent }}
+          >
             <Eye size={14} />
           </button>
         </td>
@@ -76,8 +89,11 @@ export function SeriesTableRow({ series, onViewDetail, isDark }: SeriesTableRowP
       {/* Expanded detail */}
       {expanded && (
         <tr>
-          <td colSpan={11} className="px-6 py-3"
-            style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)' }}>
+          <td
+            colSpan={11}
+            className="px-6 py-3"
+            style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)' }}
+          >
             <div className="grid grid-cols-4 gap-x-6 gap-y-2 text-[13px]">
               <Detail label="Aircraft" value={series.aircraftTypeIcao} palette={palette} />
               <Detail label="Seats" value={series.seats?.toString()} palette={palette} />
@@ -87,7 +103,11 @@ export function SeriesTableRow({ series, onViewDetail, isDark }: SeriesTableRowP
               <Detail label="Alloc. Dep" value={formatSlotTime(series.allocatedDepartureTime)} mono palette={palette} />
               <Detail label="Last Action" value={series.lastActionCode} palette={palette} />
               <Detail label="Coord. Code" value={series.lastCoordinatorCode} palette={palette} />
-              {series.notes && <div className="col-span-4 text-[13px]" style={{ color: palette.textSecondary }}>Notes: {series.notes}</div>}
+              {series.notes && (
+                <div className="col-span-4 text-[13px]" style={{ color: palette.textSecondary }}>
+                  Notes: {series.notes}
+                </div>
+              )}
             </div>
           </td>
         </tr>
@@ -96,7 +116,17 @@ export function SeriesTableRow({ series, onViewDetail, isDark }: SeriesTableRowP
   )
 }
 
-function Detail({ label, value, mono, palette }: { label: string; value?: string | null; mono?: boolean; palette: { text: string; textSecondary: string } }) {
+function Detail({
+  label,
+  value,
+  mono,
+  palette,
+}: {
+  label: string
+  value?: string | null
+  mono?: boolean
+  palette: { text: string; textSecondary: string }
+}) {
   return (
     <div>
       <span style={{ color: palette.textSecondary }}>{label}: </span>

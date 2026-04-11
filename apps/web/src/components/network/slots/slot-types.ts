@@ -14,34 +14,17 @@ export type SlotStatus =
   | 'cancelled'
   | 'historic'
 
-export type PriorityCategory =
-  | 'historic'
-  | 'changed_historic'
-  | 'new_entrant'
-  | 'new'
-  | 'adhoc'
+export type PriorityCategory = 'historic' | 'changed_historic' | 'new_entrant' | 'new' | 'adhoc'
 
-export type OperationStatus =
-  | 'scheduled'
-  | 'operated'
-  | 'cancelled'
-  | 'no_show'
-  | 'jnus'
+export type OperationStatus = 'scheduled' | 'operated' | 'cancelled' | 'no_show' | 'jnus'
 
 export type MessageDirection = 'inbound' | 'outbound'
 
-export type MessageType =
-  | 'SCR' | 'SAL' | 'SHL' | 'SMA'
-  | 'SIR' | 'SAQ' | 'WCR' | 'WIR'
+export type MessageType = 'SCR' | 'SAL' | 'SHL' | 'SMA' | 'SIR' | 'SAQ' | 'WCR' | 'WIR'
 
-export type AirlineActionCode =
-  | 'N' | 'Y' | 'B' | 'V' | 'F'
-  | 'C' | 'M' | 'R' | 'L' | 'I'
-  | 'D' | 'A' | 'P' | 'Z'
+export type AirlineActionCode = 'N' | 'Y' | 'B' | 'V' | 'F' | 'C' | 'M' | 'R' | 'L' | 'I' | 'D' | 'A' | 'P' | 'Z'
 
-export type CoordinatorActionCode =
-  | 'K' | 'H' | 'O' | 'U'
-  | 'X' | 'T' | 'W'
+export type CoordinatorActionCode = 'K' | 'H' | 'O' | 'U' | 'X' | 'T' | 'W'
 
 // ── Constants ──
 
@@ -82,15 +65,15 @@ export const STATUS_COLORS: Record<SlotStatus, string> = {
 }
 
 export const STATUS_CHIP_CLASSES: Record<string, { bg: string; text: string; border: string }> = {
-  confirmed:   { bg: 'rgba(6,194,112,0.12)',  text: '#06C270', border: 'rgba(6,194,112,0.18)' },
-  offered:     { bg: 'rgba(255,136,0,0.12)',   text: '#FF8800', border: 'rgba(255,136,0,0.18)' },
-  refused:     { bg: 'rgba(255,59,59,0.12)',   text: '#FF3B3B', border: 'rgba(255,59,59,0.18)' },
-  waitlisted:  { bg: 'rgba(124,58,237,0.12)',  text: '#7c3aed', border: 'rgba(124,58,237,0.18)' },
-  historic:    { bg: 'rgba(0,207,222,0.10)',   text: '#00CFDE', border: 'rgba(0,207,222,0.15)' },
-  conditional: { bg: 'rgba(0,207,222,0.10)',   text: '#00CFDE', border: 'rgba(0,207,222,0.15)' },
-  submitted:   { bg: 'rgba(0,99,247,0.10)',    text: '#0063F7', border: 'rgba(0,99,247,0.15)' },
-  draft:       { bg: 'rgba(128,128,128,0.08)', text: '#8F90A6', border: 'rgba(128,128,128,0.12)' },
-  cancelled:   { bg: 'rgba(255,59,59,0.12)',   text: '#FF3B3B', border: 'rgba(255,59,59,0.18)' },
+  confirmed: { bg: 'rgba(6,194,112,0.12)', text: '#06C270', border: 'rgba(6,194,112,0.18)' },
+  offered: { bg: 'rgba(255,136,0,0.12)', text: '#FF8800', border: 'rgba(255,136,0,0.18)' },
+  refused: { bg: 'rgba(255,59,59,0.12)', text: '#FF3B3B', border: 'rgba(255,59,59,0.18)' },
+  waitlisted: { bg: 'rgba(124,58,237,0.12)', text: '#7c3aed', border: 'rgba(124,58,237,0.18)' },
+  historic: { bg: 'rgba(0,207,222,0.10)', text: '#00CFDE', border: 'rgba(0,207,222,0.15)' },
+  conditional: { bg: 'rgba(0,207,222,0.10)', text: '#00CFDE', border: 'rgba(0,207,222,0.15)' },
+  submitted: { bg: 'rgba(0,99,247,0.10)', text: '#0063F7', border: 'rgba(0,99,247,0.15)' },
+  draft: { bg: 'rgba(128,128,128,0.08)', text: '#8F90A6', border: 'rgba(128,128,128,0.12)' },
+  cancelled: { bg: 'rgba(255,59,59,0.12)', text: '#FF3B3B', border: 'rgba(255,59,59,0.18)' },
 }
 
 export const JNUS_REASONS = [

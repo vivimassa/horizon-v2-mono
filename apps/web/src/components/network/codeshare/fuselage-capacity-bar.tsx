@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { CABIN_CLASSES } from './codeshare-types'
 
@@ -9,9 +9,7 @@ interface FuselageCapacityBarProps {
   isDark: boolean
 }
 
-export function FuselageCapacityBar({
-  cabinConfig, allocations, brandColor, isDark,
-}: FuselageCapacityBarProps) {
+export function FuselageCapacityBar({ cabinConfig, allocations, brandColor, isDark }: FuselageCapacityBarProps) {
   const totalSeats = Object.values(cabinConfig).reduce((s, v) => s + v, 0)
   if (totalSeats === 0) return null
 
@@ -29,12 +27,8 @@ export function FuselageCapacityBar({
     <div>
       {/* Labels */}
       <div className="flex mb-1 gap-0.5">
-        {segments.map(seg => (
-          <div
-            key={seg.code}
-            className="text-center"
-            style={{ width: `${(seg.seats / totalSeats) * 100}%` }}
-          >
+        {segments.map((seg) => (
+          <div key={seg.code} className="text-center" style={{ width: `${(seg.seats / totalSeats) * 100}%` }}>
             <span className="text-[13px] font-semibold" style={{ color: seg.color }}>
               {seg.code}
             </span>
@@ -46,8 +40,11 @@ export function FuselageCapacityBar({
       </div>
 
       {/* Bar */}
-      <div className="flex h-5 rounded-lg overflow-hidden gap-px" style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
-        {segments.map(seg => {
+      <div
+        className="flex h-5 rounded-lg overflow-hidden gap-px"
+        style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}
+      >
+        {segments.map((seg) => {
           const widthPct = (seg.seats / totalSeats) * 100
           const allocPct = seg.seats > 0 ? (seg.allocated / seg.seats) * 100 : 0
           return (

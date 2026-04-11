@@ -18,7 +18,7 @@ const dutyPatternSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'dutyPatterns',
-  }
+  },
 )
 
 dutyPatternSchema.index({ operatorId: 1, code: 1 }, { unique: true })

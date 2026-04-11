@@ -1,17 +1,12 @@
 // ── Charter Manager Types & Constants (Module 1.1.5) ──
 
-export type ContractType =
-  | 'passenger' | 'cargo' | 'government' | 'acmi'
-  | 'humanitarian' | 'hajj' | 'sports' | 'other'
+export type ContractType = 'passenger' | 'cargo' | 'government' | 'acmi' | 'humanitarian' | 'hajj' | 'sports' | 'other'
 
-export type ContractStatus =
-  | 'draft' | 'proposed' | 'confirmed'
-  | 'operating' | 'completed' | 'cancelled'
+export type ContractStatus = 'draft' | 'proposed' | 'confirmed' | 'operating' | 'completed' | 'cancelled'
 
 export type FlightLegType = 'revenue' | 'positioning' | 'technical'
 
-export type CharterFlightStatus =
-  | 'planned' | 'confirmed' | 'assigned' | 'operated' | 'cancelled'
+export type CharterFlightStatus = 'planned' | 'confirmed' | 'assigned' | 'operated' | 'cancelled'
 
 export const CONTRACT_TYPE_LABELS: Record<ContractType, string> = {
   passenger: 'Passenger',
@@ -37,8 +32,14 @@ export const CONTRACT_TYPE_ICONS: Record<ContractType, string> = {
 
 // ── Status styling (palette-based, not Tailwind classes) ──
 
-export function getStatusStyle(status: ContractStatus, isDark: boolean): { background: string; color: string; borderColor: string } {
-  const styles: Record<ContractStatus, { light: { bg: string; fg: string; border: string }; dark: { bg: string; fg: string; border: string } }> = {
+export function getStatusStyle(
+  status: ContractStatus,
+  isDark: boolean,
+): { background: string; color: string; borderColor: string } {
+  const styles: Record<
+    ContractStatus,
+    { light: { bg: string; fg: string; border: string }; dark: { bg: string; fg: string; border: string } }
+  > = {
     draft: {
       light: { bg: 'rgba(85,87,112,0.08)', fg: '#555770', border: 'rgba(85,87,112,0.12)' },
       dark: { bg: 'rgba(143,144,166,0.12)', fg: '#8F90A6', border: 'rgba(143,144,166,0.15)' },
@@ -68,8 +69,14 @@ export function getStatusStyle(status: ContractStatus, isDark: boolean): { backg
   return { background: s.bg, color: s.fg, borderColor: s.border }
 }
 
-export function getLegTypeStyle(legType: FlightLegType, isDark: boolean): { background: string; color: string; borderColor: string } {
-  const styles: Record<FlightLegType, { light: { bg: string; fg: string; border: string }; dark: { bg: string; fg: string; border: string } }> = {
+export function getLegTypeStyle(
+  legType: FlightLegType,
+  isDark: boolean,
+): { background: string; color: string; borderColor: string } {
+  const styles: Record<
+    FlightLegType,
+    { light: { bg: string; fg: string; border: string }; dark: { bg: string; fg: string; border: string } }
+  > = {
     revenue: {
       light: { bg: 'rgba(6,194,112,0.10)', fg: '#06C270', border: 'rgba(6,194,112,0.15)' },
       dark: { bg: 'rgba(57,217,138,0.15)', fg: '#39D98A', border: 'rgba(57,217,138,0.20)' },
@@ -89,10 +96,11 @@ export function getLegTypeStyle(legType: FlightLegType, isDark: boolean): { back
 
 // ── Status workflow transitions ──
 
-export const STATUS_TRANSITIONS: Record<ContractStatus, { label: string; target: ContractStatus; variant: 'blue' | 'green' | 'amber' | 'teal' | 'red' }[]> = {
-  draft: [
-    { label: 'Send proposal', target: 'proposed', variant: 'blue' },
-  ],
+export const STATUS_TRANSITIONS: Record<
+  ContractStatus,
+  { label: string; target: ContractStatus; variant: 'blue' | 'green' | 'amber' | 'teal' | 'red' }[]
+> = {
+  draft: [{ label: 'Send proposal', target: 'proposed', variant: 'blue' }],
   proposed: [
     { label: 'Confirm', target: 'confirmed', variant: 'green' },
     { label: 'Cancel', target: 'cancelled', variant: 'red' },
@@ -109,10 +117,11 @@ export const STATUS_TRANSITIONS: Record<ContractStatus, { label: string; target:
   cancelled: [],
 }
 
-export const TRANSITION_VARIANT_COLORS: Record<string, { bg: string; bgDark: string; text: string; textDark: string }> = {
-  blue: { bg: 'rgba(0,99,247,0.10)', bgDark: 'rgba(91,141,239,0.15)', text: '#0063F7', textDark: '#5B8DEF' },
-  green: { bg: 'rgba(6,194,112,0.10)', bgDark: 'rgba(57,217,138,0.15)', text: '#06C270', textDark: '#39D98A' },
-  amber: { bg: 'rgba(255,136,0,0.10)', bgDark: 'rgba(253,172,66,0.15)', text: '#E67A00', textDark: '#FDAC42' },
-  teal: { bg: 'rgba(0,207,222,0.10)', bgDark: 'rgba(115,223,231,0.15)', text: '#00B7C4', textDark: '#73DFE7' },
-  red: { bg: 'rgba(255,59,59,0.10)', bgDark: 'rgba(255,92,92,0.15)', text: '#E63535', textDark: '#FF5C5C' },
-}
+export const TRANSITION_VARIANT_COLORS: Record<string, { bg: string; bgDark: string; text: string; textDark: string }> =
+  {
+    blue: { bg: 'rgba(0,99,247,0.10)', bgDark: 'rgba(91,141,239,0.15)', text: '#0063F7', textDark: '#5B8DEF' },
+    green: { bg: 'rgba(6,194,112,0.10)', bgDark: 'rgba(57,217,138,0.15)', text: '#06C270', textDark: '#39D98A' },
+    amber: { bg: 'rgba(255,136,0,0.10)', bgDark: 'rgba(253,172,66,0.15)', text: '#E67A00', textDark: '#FDAC42' },
+    teal: { bg: 'rgba(0,207,222,0.10)', bgDark: 'rgba(115,223,231,0.15)', text: '#00B7C4', textDark: '#73DFE7' },
+    red: { bg: 'rgba(255,59,59,0.10)', bgDark: 'rgba(255,92,92,0.15)', text: '#E63535', textDark: '#FF5C5C' },
+  }

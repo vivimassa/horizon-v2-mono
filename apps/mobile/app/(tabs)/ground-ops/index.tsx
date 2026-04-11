@@ -13,9 +13,7 @@ export default function GroundOps() {
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
       <BreadcrumbHeader moduleCode="5" />
       <View className="px-4 pt-4">
-        <Text style={{ fontSize: fonts.xl, fontWeight: '700', color: palette.text, marginBottom: 4 }}>
-          Ground Ops
-        </Text>
+        <Text style={{ fontSize: fonts.xl, fontWeight: '700', color: palette.text, marginBottom: 4 }}>Ground Ops</Text>
         <Text style={{ fontSize: fonts.sm, color: palette.textSecondary, marginBottom: 20 }}>
           Ground handling &amp; cargo operations
         </Text>
@@ -38,9 +36,7 @@ export default function GroundOps() {
               <Package size={20} color={accent} strokeWidth={1.8} />
             </View>
             <View className="flex-1">
-              <Text style={{ fontSize: 15, fontWeight: '600', color: palette.text }}>
-                Cargo Manifest
-              </Text>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: palette.text }}>Cargo Manifest</Text>
               <Text style={{ fontSize: 12, color: palette.textSecondary, marginTop: 2 }}>
                 Aircraft loading &amp; cargo distribution
               </Text>
@@ -63,9 +59,7 @@ export default function GroundOps() {
         >
           <Truck size={20} strokeWidth={1.5} color={palette.textTertiary} />
           <View className="ml-3">
-            <Text style={{ fontSize: 13, fontWeight: '500', color: palette.textSecondary }}>
-              More coming soon
-            </Text>
+            <Text style={{ fontSize: 13, fontWeight: '500', color: palette.textSecondary }}>More coming soon</Text>
             <Text style={{ fontSize: 11, color: palette.textTertiary, marginTop: 2 }}>
               Turnaround, gate management, ground handling
             </Text>

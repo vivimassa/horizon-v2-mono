@@ -1,10 +1,7 @@
-"use client"
+'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import {
-  Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
-  Eye, X, FileText, ArrowRight,
-} from 'lucide-react'
+import { Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Eye, X, FileText, ArrowRight } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { useScheduleMessagingStore } from '@/stores/use-schedule-messaging-store'
 import { ACTION_LABELS } from '@skyhub/logic'
@@ -13,38 +10,48 @@ import type { ScheduleMessageRef } from '@skyhub/api'
 type SortKey = 'createdAtUtc' | 'flightNumber' | 'flightDate' | 'actionCode' | 'status'
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  held:       { bg: 'rgba(255,136,0,0.15)', text: '#FF8800' },
-  pending:    { bg: 'rgba(0,99,247,0.12)',  text: '#0063F7' },
-  sent:       { bg: 'rgba(6,194,112,0.12)', text: '#06C270' },
-  applied:    { bg: 'rgba(6,194,112,0.12)', text: '#06C270' },
-  rejected:   { bg: 'rgba(255,59,59,0.12)', text: '#FF3B3B' },
-  discarded:  { bg: 'rgba(85,87,112,0.15)', text: '#555770' },
-  neutralized:{ bg: 'rgba(85,87,112,0.10)', text: '#555770' },
+  held: { bg: 'rgba(255,136,0,0.15)', text: '#FF8800' },
+  pending: { bg: 'rgba(0,99,247,0.12)', text: '#0063F7' },
+  sent: { bg: 'rgba(6,194,112,0.12)', text: '#06C270' },
+  applied: { bg: 'rgba(6,194,112,0.12)', text: '#06C270' },
+  rejected: { bg: 'rgba(255,59,59,0.12)', text: '#FF3B3B' },
+  discarded: { bg: 'rgba(85,87,112,0.15)', text: '#555770' },
+  neutralized: { bg: 'rgba(85,87,112,0.10)', text: '#555770' },
 }
 
 const ACTION_COLORS: Record<string, string> = {
-  NEW: '#06C270', CNL: '#FF3B3B', TIM: '#0063F7', EQT: '#FF8800',
-  RRT: '#FF8800', RIN: '#06C270', RPL: '#0063F7', FLT: '#0063F7',
-  SKD: '#0063F7', CON: '#FF8800',
+  NEW: '#06C270',
+  CNL: '#FF3B3B',
+  TIM: '#0063F7',
+  EQT: '#FF8800',
+  RRT: '#FF8800',
+  RIN: '#06C270',
+  RPL: '#0063F7',
+  FLT: '#0063F7',
+  SKD: '#0063F7',
+  CON: '#FF8800',
 }
 
 const FIELD_LABELS: Record<string, string> = {
-  dep_station: 'Departure', arr_station: 'Arrival',
-  std: 'STD (UTC)', sta: 'STA (UTC)',
-  aircraft_type: 'Aircraft Type', service_type: 'Service Type',
+  dep_station: 'Departure',
+  arr_station: 'Arrival',
+  std: 'STD (UTC)',
+  sta: 'STA (UTC)',
+  aircraft_type: 'Aircraft Type',
+  service_type: 'Service Type',
 }
 
 export function MessageLogTable() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
-  const messages = useScheduleMessagingStore(s => s.messages)
-  const totalCount = useScheduleMessagingStore(s => s.totalCount)
-  const page = useScheduleMessagingStore(s => s.page)
-  const pageSize = useScheduleMessagingStore(s => s.pageSize)
-  const setPage = useScheduleMessagingStore(s => s.setPage)
-  const loadMessages = useScheduleMessagingStore(s => s.loadMessages)
-  const loading = useScheduleMessagingStore(s => s.loading)
+  const messages = useScheduleMessagingStore((s) => s.messages)
+  const totalCount = useScheduleMessagingStore((s) => s.totalCount)
+  const page = useScheduleMessagingStore((s) => s.page)
+  const pageSize = useScheduleMessagingStore((s) => s.pageSize)
+  const setPage = useScheduleMessagingStore((s) => s.setPage)
+  const loadMessages = useScheduleMessagingStore((s) => s.loadMessages)
+  const loading = useScheduleMessagingStore((s) => s.loading)
 
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('createdAtUtc')
@@ -59,11 +66,12 @@ export function MessageLogTable() {
   const filtered = useMemo(() => {
     if (!search.trim()) return messages
     const q = search.toLowerCase()
-    return messages.filter(m =>
-      (m.flightNumber || '').toLowerCase().includes(q) ||
-      (m.summary || '').toLowerCase().includes(q) ||
-      (m.actionCode || '').toLowerCase().includes(q) ||
-      (m.status || '').toLowerCase().includes(q)
+    return messages.filter(
+      (m) =>
+        (m.flightNumber || '').toLowerCase().includes(q) ||
+        (m.summary || '').toLowerCase().includes(q) ||
+        (m.actionCode || '').toLowerCase().includes(q) ||
+        (m.status || '').toLowerCase().includes(q),
     )
   }, [messages, search])
 
@@ -77,22 +85,34 @@ export function MessageLogTable() {
   }, [filtered, sortKey, sortDir])
 
   const handleSort = (key: SortKey) => {
-    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortKey(key); setSortDir('asc') }
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else {
+      setSortKey(key)
+      setSortDir('asc')
+    }
   }
 
   const totalPages = Math.ceil(totalCount / pageSize)
   const handlePrev = useCallback(() => {
-    if (page > 1) { setPage(page - 1); loadMessages() }
+    if (page > 1) {
+      setPage(page - 1)
+      loadMessages()
+    }
   }, [page, setPage, loadMessages])
   const handleNext = useCallback(() => {
-    if (page < totalPages) { setPage(page + 1); loadMessages() }
+    if (page < totalPages) {
+      setPage(page + 1)
+      loadMessages()
+    }
   }, [page, totalPages, setPage, loadMessages])
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 flex items-center justify-between px-5" style={{ height: 44, borderBottom: `1px solid ${sectionBorder}` }}>
+      <div
+        className="shrink-0 flex items-center justify-between px-5"
+        style={{ height: 44, borderBottom: `1px solid ${sectionBorder}` }}
+      >
         <div className="flex items-center gap-2">
           <FileText size={14} className="text-module-accent" />
           <span className="text-[14px] font-bold">Message Log</span>
@@ -104,7 +124,7 @@ export function MessageLogTable() {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-hz-text-tertiary" />
           <input
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search messages..."
             className="h-8 pl-8 pr-3 rounded-lg text-[13px] outline-none w-56"
             style={{ background: inputBg, border: `1px solid ${inputBorder}` }}
@@ -137,8 +157,12 @@ export function MessageLogTable() {
                   borderBottom: `1px solid ${sectionBorder}`,
                   background: idx % 2 === 1 ? rowHover : undefined,
                 }}
-                onMouseEnter={e => { e.currentTarget.style.background = rowHover }}
-                onMouseLeave={e => { e.currentTarget.style.background = idx % 2 === 1 ? rowHover : 'transparent' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = rowHover
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = idx % 2 === 1 ? rowHover : 'transparent'
+                }}
               >
                 <td className="px-3 py-2.5 text-[13px] text-hz-text-secondary font-mono whitespace-nowrap">
                   {formatDate(m.createdAtUtc)}
@@ -237,15 +261,21 @@ function ViewDialog({ msg, onClose, isDark }: { msg: ScheduleMessageRef; onClose
           backdropFilter: 'blur(24px)',
           boxShadow: '0 20px 60px rgba(96,97,112,0.18)',
         }}
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 shrink-0" style={{ height: 52, borderBottom: `1px solid ${sectionBorder}` }}>
+        <div
+          className="flex items-center justify-between px-5 shrink-0"
+          style={{ height: 52, borderBottom: `1px solid ${sectionBorder}` }}
+        >
           <div className="flex items-center gap-3">
             <span className="text-[15px] font-bold">Message Detail</span>
             <StatusBadge status={msg.status} />
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-hz-border/30 transition-colors">
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-hz-border/30 transition-colors"
+          >
             <X size={16} className="text-hz-text-tertiary" />
           </button>
         </div>
@@ -278,18 +308,28 @@ function ViewDialog({ msg, onClose, isDark }: { msg: ScheduleMessageRef; onClose
                 <table className="w-full">
                   <thead>
                     <tr style={{ borderBottom: `1px solid ${sectionBorder}` }}>
-                      <th className="text-left px-3 py-1.5 text-[13px] font-medium text-hz-text-tertiary uppercase">Field</th>
-                      <th className="text-left px-3 py-1.5 text-[13px] font-medium text-hz-text-tertiary uppercase">From</th>
+                      <th className="text-left px-3 py-1.5 text-[13px] font-medium text-hz-text-tertiary uppercase">
+                        Field
+                      </th>
+                      <th className="text-left px-3 py-1.5 text-[13px] font-medium text-hz-text-tertiary uppercase">
+                        From
+                      </th>
                       <th className="w-6" />
-                      <th className="text-left px-3 py-1.5 text-[13px] font-medium text-hz-text-tertiary uppercase">To</th>
+                      <th className="text-left px-3 py-1.5 text-[13px] font-medium text-hz-text-tertiary uppercase">
+                        To
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {Object.entries(msg.changes).map(([field, ch]) => (
                       <tr key={field} style={{ borderBottom: `1px solid ${sectionBorder}` }}>
                         <td className="px-3 py-1.5 text-[13px] font-medium">{FIELD_LABELS[field] || field}</td>
-                        <td className="px-3 py-1.5 text-[13px] font-mono text-hz-text-secondary">{ch.from || '\u2014'}</td>
-                        <td className="px-1 py-1.5 text-center"><ArrowRight size={12} className="text-hz-text-tertiary" /></td>
+                        <td className="px-3 py-1.5 text-[13px] font-mono text-hz-text-secondary">
+                          {ch.from || '\u2014'}
+                        </td>
+                        <td className="px-1 py-1.5 text-center">
+                          <ArrowRight size={12} className="text-hz-text-tertiary" />
+                        </td>
                         <td className="px-3 py-1.5 text-[13px] font-mono font-semibold">{ch.to}</td>
                       </tr>
                     ))}
@@ -334,8 +374,17 @@ function DField({ label, value }: { label: string; value: string }) {
   )
 }
 
-function SortHeader({ label, sortKey, current, dir, onSort }: {
-  label: string; sortKey: SortKey; current: SortKey; dir: 'asc' | 'desc'
+function SortHeader({
+  label,
+  sortKey,
+  current,
+  dir,
+  onSort,
+}: {
+  label: string
+  sortKey: SortKey
+  current: SortKey
+  dir: 'asc' | 'desc'
   onSort: (k: SortKey) => void
 }) {
   const active = current === sortKey

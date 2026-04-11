@@ -14,7 +14,7 @@ import { generateSSIM, type SSIMFlightRecord, type SSIMExportOptions } from '@sk
 function tzOffsetString(timeZone: string, at: Date): string {
   try {
     const fmt = new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'longOffset' })
-    const part = fmt.formatToParts(at).find(p => p.type === 'timeZoneName')?.value ?? 'GMT+00:00'
+    const part = fmt.formatToParts(at).find((p) => p.type === 'timeZoneName')?.value ?? 'GMT+00:00'
     const m = part.match(/GMT([+-])(\d{2}):?(\d{2})/)
     if (!m) return '+0000'
     return `${m[1]}${m[2]}${m[3]}`
@@ -80,7 +80,8 @@ function assignRotations(docs: FlightDoc[]): void {
     let current = doc
     // Follow the chain: find next flight departing from current's arrival station
     // with same DOW/period/AC type, departing after current arrives
-    for (let depth = 0; depth < 20; depth++) { // safety limit
+    for (let depth = 0; depth < 20; depth++) {
+      // safety limit
       const key = `${current.arrStation}|${current.daysOfWeek}|${current.effectiveFrom}|${current.effectiveUntil}|${current.aircraftTypeIcao}`
       const candidates = byDepKey.get(key)
       if (!candidates) break
@@ -108,7 +109,7 @@ function assignRotations(docs: FlightDoc[]): void {
     cycleNum++
     const rotationId = crypto.randomUUID()
     // Label: "57/58" or "57/58/59" from flight numbers
-    const label = chain.map(f => f.flightNumber).join('/')
+    const label = chain.map((f) => f.flightNumber).join('/')
 
     for (let i = 0; i < chain.length; i++) {
       chain[i].rotationId = rotationId
@@ -194,10 +195,8 @@ export async function ssimRoutes(app: FastifyInstance): Promise<void> {
     if (q.format === 'ssim') {
       if (!op) return reply.code(404).send({ error: 'Operator not found' })
 
-      const timeMode = q.timeMode === 'utc' ? 'utc' : 'local'  // default local
-      const opOffset = timeMode === 'utc'
-        ? '+0000'
-        : tzOffsetString(op.timezone as string, new Date())
+      const timeMode = q.timeMode === 'utc' ? 'utc' : 'local' // default local
+      const opOffset = timeMode === 'utc' ? '+0000' : tzOffsetString(op.timezone as string, new Date())
 
       // Derive season span from the flight set (min/max of effective dates)
       let seasonStart = ''
@@ -222,10 +221,7 @@ export async function ssimRoutes(app: FastifyInstance): Promise<void> {
       const acTypeDocs = distinctTypes.length
         ? await AircraftType.find({
             operatorId: q.operatorId,
-            $or: [
-              { icaoType: { $in: distinctTypes } },
-              { iataType: { $in: distinctTypes } },
-            ],
+            $or: [{ icaoType: { $in: distinctTypes } }, { iataType: { $in: distinctTypes } }],
           }).lean()
         : []
       const icaoToIata = new Map<string, string>()
@@ -275,16 +271,19 @@ export async function ssimRoutes(app: FastifyInstance): Promise<void> {
       }
 
       // Build rotation index: rotationId → seq → flight, so each leg can look up its onward.
-      const byRotation = new Map<string, Map<number, typeof flights[number]>>()
+      const byRotation = new Map<string, Map<number, (typeof flights)[number]>>()
       for (const f of flights) {
         const rid = f.rotationId as string | null
         const seq = f.rotationSequence as number | null
         if (!rid || seq == null) continue
         let m = byRotation.get(rid)
-        if (!m) { m = new Map(); byRotation.set(rid, m) }
+        if (!m) {
+          m = new Map()
+          byRotation.set(rid, m)
+        }
         m.set(seq, f)
       }
-      const onwardOf = (f: typeof flights[number]): typeof flights[number] | undefined => {
+      const onwardOf = (f: (typeof flights)[number]): (typeof flights)[number] | undefined => {
         const rid = f.rotationId as string | null
         const seq = f.rotationSequence as number | null
         if (!rid || seq == null) return undefined
@@ -293,31 +292,27 @@ export async function ssimRoutes(app: FastifyInstance): Promise<void> {
 
       const records: SSIMFlightRecord[] = flights.map((f) => {
         const onward = onwardOf(f)
-        return ({
-        airlineCode: ((f.airlineCode as string) || airlineCode).trim(),
-        flightNumber: parseInt((f.flightNumber as string) || '0', 10) || 0,
-        itineraryVariation: '01',
-        legSequence: '01',
-        serviceType: ((f.serviceType as string) || 'J').slice(0, 1),
-        periodStart: (f.effectiveFrom as string) || seasonStart,
-        periodEnd: (f.effectiveUntil as string) || seasonEnd,
-        // ScheduledFlight stores daysOfWeek as a 7-char string ("1234567" or with spaces)
-        daysOfOperation: ((f.daysOfWeek as string) || '       ').padEnd(7, ' ').slice(0, 7),
-        depStation: (f.depStation as string) || '',
-        stdUtc: (f.stdUtc as string) || '0000',
-        depUtcOffset: opOffset,
-        arrStation: (f.arrStation as string) || '',
-        staUtc: (f.staUtc as string) || '0000',
-        arrUtcOffset: opOffset,
-        aircraftTypeIata: resolveIataAcType((f.aircraftTypeIcao as string) || ''),
-        seatConfig: resolveSeatConfig((f.aircraftTypeIcao as string) || ''),
-        onwardAirlineCode: onward
-          ? ((onward.airlineCode as string) || airlineCode).trim() || undefined
-          : undefined,
-        onwardFlightNumber: onward
-          ? (parseInt((onward.flightNumber as string) || '0', 10) || undefined)
-          : undefined,
-      })
+        return {
+          airlineCode: ((f.airlineCode as string) || airlineCode).trim(),
+          flightNumber: parseInt((f.flightNumber as string) || '0', 10) || 0,
+          itineraryVariation: '01',
+          legSequence: '01',
+          serviceType: ((f.serviceType as string) || 'J').slice(0, 1),
+          periodStart: (f.effectiveFrom as string) || seasonStart,
+          periodEnd: (f.effectiveUntil as string) || seasonEnd,
+          // ScheduledFlight stores daysOfWeek as a 7-char string ("1234567" or with spaces)
+          daysOfOperation: ((f.daysOfWeek as string) || '       ').padEnd(7, ' ').slice(0, 7),
+          depStation: (f.depStation as string) || '',
+          stdUtc: (f.stdUtc as string) || '0000',
+          depUtcOffset: opOffset,
+          arrStation: (f.arrStation as string) || '',
+          staUtc: (f.staUtc as string) || '0000',
+          arrUtcOffset: opOffset,
+          aircraftTypeIata: resolveIataAcType((f.aircraftTypeIcao as string) || ''),
+          seatConfig: resolveSeatConfig((f.aircraftTypeIcao as string) || ''),
+          onwardAirlineCode: onward ? ((onward.airlineCode as string) || airlineCode).trim() || undefined : undefined,
+          onwardFlightNumber: onward ? parseInt((onward.flightNumber as string) || '0', 10) || undefined : undefined,
+        }
       })
 
       const options: SSIMExportOptions = {
@@ -342,7 +337,7 @@ export async function ssimRoutes(app: FastifyInstance): Promise<void> {
     // ── Default: Excel export ──
 
     const buffer = await generateSsimExcel(
-      flights.map(f => ({
+      flights.map((f) => ({
         aircraftTypeIcao: f.aircraftTypeIcao as string | null,
         effectiveFrom: f.effectiveFrom as string,
         effectiveUntil: f.effectiveUntil as string,
@@ -360,7 +355,7 @@ export async function ssimRoutes(app: FastifyInstance): Promise<void> {
         separatorBelow: !!(f.formatting as Record<string, unknown>)?.separatorBelow,
       })),
       q.seasonCode,
-      dateFormat
+      dateFormat,
     )
 
     reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
@@ -380,11 +375,16 @@ export async function ssimRoutes(app: FastifyInstance): Promise<void> {
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
       const mon = months[parseInt(m, 10) - 1] ?? m
       switch (dateFmt) {
-        case 'DD-MMM-YY': return `${d}-${mon}-${y.slice(2)}`
-        case 'DD/MM/YYYY': return `${d}/${m}/${y}`
-        case 'MM/DD/YYYY': return `${m}/${d}/${y}`
-        case 'DD.MM.YYYY': return `${d}.${m}.${y}`
-        default: return iso
+        case 'DD-MMM-YY':
+          return `${d}-${mon}-${y.slice(2)}`
+        case 'DD/MM/YYYY':
+          return `${d}/${m}/${y}`
+        case 'MM/DD/YYYY':
+          return `${m}/${d}/${y}`
+        case 'DD.MM.YYYY':
+          return `${d}.${m}.${y}`
+        default:
+          return iso
       }
     }
 
@@ -394,7 +394,22 @@ export async function ssimRoutes(app: FastifyInstance): Promise<void> {
 
     const sheet = workbook.addWorksheet('Schedule Template')
 
-    const headers = ['AC Type', 'From', 'To', 'DEP', 'ARR', 'Flight', 'STD', 'STA', 'Offset', 'SVC', 'Frequency', 'Block', 'TAT', 'Status']
+    const headers = [
+      'AC Type',
+      'From',
+      'To',
+      'DEP',
+      'ARR',
+      'Flight',
+      'STD',
+      'STA',
+      'Offset',
+      'SVC',
+      'Frequency',
+      'Block',
+      'TAT',
+      'Status',
+    ]
     const headerRow = sheet.addRow(headers)
     headerRow.font = { bold: true, size: 11 }
     headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F5' } }
@@ -402,10 +417,27 @@ export async function ssimRoutes(app: FastifyInstance): Promise<void> {
     headerRow.height = 24
 
     const widths = [10, 14, 14, 6, 6, 10, 6, 6, 6, 5, 10, 6, 6, 8]
-    widths.forEach((w, i) => { sheet.getColumn(i + 1).width = w })
+    widths.forEach((w, i) => {
+      sheet.getColumn(i + 1).width = w
+    })
 
     // Example row with operator's date format
-    const example = sheet.addRow(['A321', fmtDate('2026-04-01'), fmtDate('2026-04-30'), 'SGN', 'HAN', '123', '08:00', '10:00', 1, 'J', '1234567', '2:00', '', 'draft'])
+    const example = sheet.addRow([
+      'A321',
+      fmtDate('2026-04-01'),
+      fmtDate('2026-04-30'),
+      'SGN',
+      'HAN',
+      '123',
+      '08:00',
+      '10:00',
+      1,
+      'J',
+      '1234567',
+      '2:00',
+      '',
+      'draft',
+    ])
     example.alignment = { horizontal: 'center', vertical: 'middle' }
     example.font = { name: 'Consolas', size: 10, color: { argb: 'FF8F90A6' } }
 

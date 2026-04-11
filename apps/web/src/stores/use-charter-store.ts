@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { create } from 'zustand'
 import { api } from '@skyhub/api'
@@ -51,10 +51,7 @@ export const useCharterStore = create<CharterState>((set, get) => ({
     set({ selectedId: id, flights: [], stats: { ...emptyStats } })
     if (!id) return
 
-    const [flights, stats] = await Promise.all([
-      api.getCharterFlights(id),
-      api.getCharterStats(id),
-    ])
+    const [flights, stats] = await Promise.all([api.getCharterFlights(id), api.getCharterStats(id)])
     set({ flights, stats })
   },
 
@@ -62,18 +59,16 @@ export const useCharterStore = create<CharterState>((set, get) => ({
     const { selectedId } = get()
     if (!selectedId) return
 
-    const [flights, stats] = await Promise.all([
-      api.getCharterFlights(selectedId),
-      api.getCharterStats(selectedId),
-    ])
+    const [flights, stats] = await Promise.all([api.getCharterFlights(selectedId), api.getCharterStats(selectedId)])
     set({ flights, stats })
   },
 
-  reset: () => set({
-    contracts: [],
-    selectedId: null,
-    flights: [],
-    stats: { ...emptyStats },
-    dataLoaded: false,
-  }),
+  reset: () =>
+    set({
+      contracts: [],
+      selectedId: null,
+      flights: [],
+      stats: { ...emptyStats },
+      dataLoaded: false,
+    }),
 }))

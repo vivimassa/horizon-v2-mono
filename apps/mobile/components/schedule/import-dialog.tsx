@@ -16,8 +16,15 @@ interface ImportDialogProps {
 }
 
 export const ImportDialog = memo(function ImportDialog({
-  visible, onClose, onImportComplete, operatorId, scenarioId,
-  palette, accent, isDark, apiBaseUrl,
+  visible,
+  onClose,
+  onImportComplete,
+  operatorId,
+  scenarioId,
+  palette,
+  accent,
+  isDark,
+  apiBaseUrl,
 }: ImportDialogProps) {
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null)
@@ -61,19 +68,30 @@ export const ImportDialog = memo(function ImportDialog({
     }
   }, [operatorId, scenarioId, apiBaseUrl, onImportComplete])
 
-  const handleClose = () => { setResult(null); onClose() }
+  const handleClose = () => {
+    setResult(null)
+    onClose()
+  }
 
   return (
     <Modal visible={visible} transparent animationType="fade">
       <Pressable className="flex-1" style={{ backgroundColor: 'rgba(0,0,0,0.3)' }} onPress={handleClose}>
         <View className="flex-1 justify-center items-center">
-          <Pressable onPress={() => {}} className="rounded-2xl p-5"
+          <Pressable
+            onPress={() => {}}
+            className="rounded-2xl p-5"
             style={{
               width: 340,
               backgroundColor: isDark ? 'rgba(25,25,33,0.97)' : 'rgba(255,255,255,0.98)',
-              borderWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-              shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 10,
-            }}>
+              borderWidth: 1,
+              borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+              shadowColor: '#000',
+              shadowOpacity: 0.3,
+              shadowRadius: 20,
+              shadowOffset: { width: 0, height: 8 },
+              elevation: 10,
+            }}
+          >
             <View className="flex-row items-center justify-between mb-4">
               <Text style={{ fontSize: 16, fontWeight: '700', color: palette.text }}>Import SSIM</Text>
               <Pressable onPress={handleClose} className="active:opacity-60">
@@ -86,25 +104,47 @@ export const ImportDialog = memo(function ImportDialog({
             </Text>
 
             {result && (
-              <View className="flex-row items-center rounded-lg p-3 mb-4" style={{
-                backgroundColor: result.success ? (isDark ? 'rgba(22,163,74,0.15)' : '#dcfce7') : (isDark ? 'rgba(220,38,38,0.15)' : '#fee2e2'),
-                gap: 8,
-              }}>
-                {result.success
-                  ? <CheckCircle size={16} color={isDark ? '#4ade80' : '#16a34a'} strokeWidth={2} />
-                  : <AlertCircle size={16} color={isDark ? '#f87171' : '#dc2626'} strokeWidth={2} />}
-                <Text style={{ fontSize: 13, color: result.success ? (isDark ? '#4ade80' : '#16a34a') : (isDark ? '#f87171' : '#dc2626'), flex: 1 }}>
+              <View
+                className="flex-row items-center rounded-lg p-3 mb-4"
+                style={{
+                  backgroundColor: result.success
+                    ? isDark
+                      ? 'rgba(22,163,74,0.15)'
+                      : '#dcfce7'
+                    : isDark
+                      ? 'rgba(220,38,38,0.15)'
+                      : '#fee2e2',
+                  gap: 8,
+                }}
+              >
+                {result.success ? (
+                  <CheckCircle size={16} color={isDark ? '#4ade80' : '#16a34a'} strokeWidth={2} />
+                ) : (
+                  <AlertCircle size={16} color={isDark ? '#f87171' : '#dc2626'} strokeWidth={2} />
+                )}
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: result.success ? (isDark ? '#4ade80' : '#16a34a') : isDark ? '#f87171' : '#dc2626',
+                    flex: 1,
+                  }}
+                >
                   {result.message}
                 </Text>
               </View>
             )}
 
-            <Pressable onPress={handlePick} disabled={importing}
+            <Pressable
+              onPress={handlePick}
+              disabled={importing}
               className="flex-row items-center justify-center py-3.5 rounded-xl active:opacity-70"
-              style={{ backgroundColor: accent, gap: 8, opacity: importing ? 0.5 : 1 }}>
-              {importing
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Upload size={16} color="#fff" strokeWidth={2} />}
+              style={{ backgroundColor: accent, gap: 8, opacity: importing ? 0.5 : 1 }}
+            >
+              {importing ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Upload size={16} color="#fff" strokeWidth={2} />
+              )}
               <Text style={{ fontSize: 15, fontWeight: '600', color: '#fff' }}>
                 {importing ? 'Importing...' : 'Select File'}
               </Text>

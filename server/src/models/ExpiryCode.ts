@@ -15,7 +15,7 @@ const expiryCodeCategorySchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'expiryCodeCategories',
-  }
+  },
 )
 
 expiryCodeCategorySchema.index({ operatorId: 1, key: 1 }, { unique: true })
@@ -46,7 +46,7 @@ const expiryCodeSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'expiryCodes',
-  }
+  },
 )
 
 expiryCodeSchema.index({ operatorId: 1, code: 1 }, { unique: true })

@@ -28,7 +28,7 @@ const slotMessageSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'slotMessages',
-  }
+  },
 )
 
 slotMessageSchema.index({ operatorId: 1, airportIata: 1, seasonCode: 1 })

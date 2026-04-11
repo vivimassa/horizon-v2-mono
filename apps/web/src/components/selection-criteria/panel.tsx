@@ -1,21 +1,21 @@
-"use client";
+'use client'
 
-import { useState, type ReactNode } from "react";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { useState, type ReactNode } from 'react'
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 
 interface SelectionPanelProps {
   /** Panel title (shown in header) */
-  title?: string;
+  title?: string
   /** Number of active filters — shown as badge */
-  activeCount?: number;
+  activeCount?: number
   /** Content: filter fields, sections, etc. */
-  children: ReactNode;
+  children: ReactNode
   /** Pinned footer (Go/Reset buttons) */
-  footer?: ReactNode;
+  footer?: ReactNode
   /** Controlled collapsed state */
-  collapsed?: boolean;
+  collapsed?: boolean
   /** Collapse toggle callback */
-  onToggleCollapse?: () => void;
+  onToggleCollapse?: () => void
 }
 
 /**
@@ -23,16 +23,16 @@ interface SelectionPanelProps {
  * 300px expanded, 44px collapsed. Used inside MasterDetailLayout left slot.
  */
 export function SelectionPanel({
-  title = "Filters",
+  title = 'Filters',
   activeCount = 0,
   children,
   footer,
   collapsed: controlledCollapsed,
   onToggleCollapse,
 }: SelectionPanelProps) {
-  const [internalCollapsed, setInternalCollapsed] = useState(false);
-  const collapsed = controlledCollapsed ?? internalCollapsed;
-  const toggleCollapse = onToggleCollapse ?? (() => setInternalCollapsed((c) => !c));
+  const [internalCollapsed, setInternalCollapsed] = useState(false)
+  const collapsed = controlledCollapsed ?? internalCollapsed
+  const toggleCollapse = onToggleCollapse ?? (() => setInternalCollapsed((c) => !c))
 
   if (collapsed) {
     return (
@@ -52,7 +52,7 @@ export function SelectionPanel({
           </span>
         )}
       </div>
-    );
+    )
   }
 
   return (
@@ -76,16 +76,10 @@ export function SelectionPanel({
       </div>
 
       {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {children}
-      </div>
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">{children}</div>
 
       {/* Pinned footer */}
-      {footer && (
-        <div className="px-4 py-3 border-t border-hz-border shrink-0">
-          {footer}
-        </div>
-      )}
+      {footer && <div className="px-4 py-3 border-t border-hz-border shrink-0">{footer}</div>}
     </div>
-  );
+  )
 }

@@ -16,7 +16,11 @@ const fdtlRuleSchema = new Schema(
     value: { type: String, required: true },
     valueType: { type: String, enum: ['duration', 'integer', 'decimal', 'boolean', 'text'], required: true },
     unit: { type: String, default: null }, // 'hours', 'minutes', 'days', '%', etc.
-    directionality: { type: String, enum: ['MAX_LIMIT', 'MIN_LIMIT', 'BOOLEAN', 'ENUM', 'FORMULA', null], default: null },
+    directionality: {
+      type: String,
+      enum: ['MAX_LIMIT', 'MIN_LIMIT', 'BOOLEAN', 'ENUM', 'FORMULA', null],
+      default: null,
+    },
     source: { type: String, enum: ['government', 'company'], default: 'government' },
     templateValue: { type: String, default: null }, // original regulatory value
     isTemplateDefault: { type: Boolean, default: true },
@@ -30,7 +34,7 @@ const fdtlRuleSchema = new Schema(
     _id: false,
     timestamps: false,
     collection: 'fdtlRules',
-  }
+  },
 )
 
 fdtlRuleSchema.index({ operatorId: 1, frameworkCode: 1, ruleCode: 1, crewType: 1 }, { unique: true })

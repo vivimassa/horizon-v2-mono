@@ -32,8 +32,18 @@ export const CompartmentOverlay = memo(function CompartmentOverlay({
     if (isActive) {
       const pulse = Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseScale, { toValue: 1.6, duration: 800, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-          Animated.timing(pulseScale, { toValue: 1, duration: 800, easing: Easing.in(Easing.ease), useNativeDriver: true }),
+          Animated.timing(pulseScale, {
+            toValue: 1.6,
+            duration: 800,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseScale, {
+            toValue: 1,
+            duration: 800,
+            easing: Easing.in(Easing.ease),
+            useNativeDriver: true,
+          }),
         ]),
       )
       pulse.start()

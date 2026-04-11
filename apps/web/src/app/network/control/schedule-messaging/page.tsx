@@ -1,4 +1,4 @@
-import { ScheduleMessagingShell } from "@/components/network/schedule-messaging/schedule-messaging-shell"
+import { ScheduleMessagingShell } from '@/components/network/schedule-messaging/schedule-messaging-shell'
 
 export default function ScheduleMessagingPage() {
   return (

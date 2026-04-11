@@ -1,4 +1,6 @@
 import 'dotenv/config'
+import { validateServerEnv } from '@skyhub/env'
+const env = validateServerEnv()
 import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -24,7 +26,7 @@ import { codeshareRoutes } from './routes/codeshare.js'
 import { charterRoutes } from './routes/charter.js'
 import { loadOurAirportsData, startAutoRefresh } from './data/ourairports-cache.js'
 
-const port = Number(process.env.PORT) || 3001
+const port = env.PORT
 
 async function main(): Promise<void> {
   const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 /* 10MB */ })
@@ -35,9 +37,9 @@ async function main(): Promise<void> {
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true })
 
   // Plugins
-  await app.register(cors, { origin: true })
+  await app.register(cors, { origin: env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN })
   await app.register(jwt, {
-    secret: process.env.JWT_SECRET || 'dev-secret-change-me',
+    secret: env.JWT_SECRET,
   })
   await app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 } }) // 2MB
   await app.register(fastifyStatic, {
@@ -47,7 +49,7 @@ async function main(): Promise<void> {
   })
 
   // Database
-  await connectDB()
+  await connectDB(env.MONGODB_URI)
 
   // OurAirports reference data cache
   console.log('Loading OurAirports reference data…')

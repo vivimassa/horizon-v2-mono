@@ -13,6 +13,7 @@
     "@gluestack-ui/nativewind-utils": "^1.0.28",
     "@skyhub/api": "*",
     "@skyhub/constants": "*",
+    "@skyhub/env": "*",
     "@skyhub/logic": "*",
     "expo": "~54.0.33",
     "expo-blur": "^55.0.10",

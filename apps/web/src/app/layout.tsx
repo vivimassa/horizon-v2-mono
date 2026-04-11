@@ -1,25 +1,26 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-import "./mapbox-fix.css";
-import { SpotlightDock } from "@/components/SpotlightDock";
-import { Breadcrumb } from "@/components/Breadcrumb";
-import { ThemeProvider } from "@/components/theme-provider";
-import { DisplayProvider } from "@/components/display-provider";
-import { UserProvider } from "@/components/user-provider";
-import { AnimatedBodyBg } from "@/components/AnimatedBodyBg";
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import '@/lib/env' // validates env + sets API base URL (side-effect import, must be first)
+import './globals.css'
+import './mapbox-fix.css'
+import { SpotlightDock } from '@/components/SpotlightDock'
+import { Breadcrumb } from '@/components/Breadcrumb'
+import { ThemeProvider } from '@/components/theme-provider'
+import { DisplayProvider } from '@/components/display-provider'
+import { UserProvider } from '@/components/user-provider'
+import { AnimatedBodyBg } from '@/components/AnimatedBodyBg'
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: "Sky Hub",
-  description: "Airline Operations Platform",
-};
+  title: 'Sky Hub',
+  description: 'Airline Operations Platform',
+}
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
   return (
     <html lang="en" className={inter.className} suppressHydrationWarning>
@@ -36,5 +37,5 @@ export default function RootLayout({
         </ThemeProvider>
       </body>
     </html>
-  );
+  )
 }

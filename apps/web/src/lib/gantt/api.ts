@@ -1,5 +1,6 @@
 import type { GanttApiResponse } from './types'
 import type { OptimizerStats, ChainBreak, TypeBreakdown } from './tail-optimizer'
+import { authedFetch } from '../authed-fetch'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
 
@@ -20,7 +21,7 @@ export async function fetchGanttFlights(params: {
   if (params.acTypeFilter?.length) qs.set('acTypeFilter', params.acTypeFilter.join(','))
   if (params.statusFilter?.length) qs.set('statusFilter', params.statusFilter.join(','))
 
-  const res = await fetch(`${API_BASE}/gantt/flights?${qs}`)
+  const res = await authedFetch(`${API_BASE}/gantt/flights?${qs}`)
   if (!res.ok) {
     const body = await res.text().catch(() => '')
     throw new Error(`Gantt API ${res.status}: ${body}`)
@@ -33,7 +34,7 @@ export async function assignFlights(
   flightIds: string[],
   registration: string,
 ): Promise<{ updated: number }> {
-  const res = await fetch(`${API_BASE}/gantt/assign`, {
+  const res = await authedFetch(`${API_BASE}/gantt/assign`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ operatorId, flightIds, registration }),
@@ -48,7 +49,7 @@ export async function unassignFlights(operatorId: string, flightIds: string[]): 
   let totalUpdated = 0
   for (let i = 0; i < flightIds.length; i += CHUNK) {
     const chunk = flightIds.slice(i, i + CHUNK)
-    const res = await fetch(`${API_BASE}/gantt/unassign`, {
+    const res = await authedFetch(`${API_BASE}/gantt/unassign`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ operatorId, flightIds: chunk }),
@@ -64,7 +65,7 @@ export async function bulkAssignFlights(
   operatorId: string,
   assignments: { registration: string; flightIds: string[] }[],
 ): Promise<{ updated: number; verified?: number }> {
-  const res = await fetch(`${API_BASE}/gantt/bulk-assign`, {
+  const res = await authedFetch(`${API_BASE}/gantt/bulk-assign`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ operatorId, assignments }),
@@ -74,7 +75,7 @@ export async function bulkAssignFlights(
 }
 
 export async function cancelFlights(operatorId: string, flightIds: string[]): Promise<{ removed: number }> {
-  const res = await fetch(`${API_BASE}/gantt/remove-from-date`, {
+  const res = await authedFetch(`${API_BASE}/gantt/remove-from-date`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ operatorId, flightIds }),
@@ -106,7 +107,7 @@ export async function fetchCancelImpact(
   operatorId: string,
   flightIds: string[],
 ): Promise<{ impacts: SlotCancelImpact[] }> {
-  const res = await fetch(`${API_BASE}/gantt/cancel-impact`, {
+  const res = await authedFetch(`${API_BASE}/gantt/cancel-impact`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ operatorId, flightIds }),
@@ -122,7 +123,7 @@ export async function swapFlights(
   bFlightIds: string[],
   aRegistration: string | null,
 ): Promise<{ updated: number }> {
-  const res = await fetch(`${API_BASE}/gantt/swap`, {
+  const res = await authedFetch(`${API_BASE}/gantt/swap`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ operatorId, aFlightIds, aRegistration, bFlightIds, bRegistration }),
@@ -155,7 +156,7 @@ export async function saveOptimizerRun(
   operatorId: string,
   run: Omit<OptimizerRunFull, '_id' | 'createdAt'> & { operatorId?: string },
 ): Promise<{ id: string }> {
-  const res = await fetch(`${API_BASE}/gantt/optimizer/runs`, {
+  const res = await authedFetch(`${API_BASE}/gantt/optimizer/runs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...run, operatorId }),
@@ -170,21 +171,21 @@ export async function listOptimizerRuns(
   periodTo: string,
 ): Promise<OptimizerRunSummary[]> {
   const qs = new URLSearchParams({ operatorId, periodFrom, periodTo })
-  const res = await fetch(`${API_BASE}/gantt/optimizer/runs?${qs}`)
+  const res = await authedFetch(`${API_BASE}/gantt/optimizer/runs?${qs}`)
   if (!res.ok) throw new Error(`List optimizer runs API ${res.status}`)
   return res.json()
 }
 
 export async function getOptimizerRun(operatorId: string, runId: string): Promise<OptimizerRunFull> {
   const qs = new URLSearchParams({ operatorId })
-  const res = await fetch(`${API_BASE}/gantt/optimizer/runs/${runId}?${qs}`)
+  const res = await authedFetch(`${API_BASE}/gantt/optimizer/runs/${runId}?${qs}`)
   if (!res.ok) throw new Error(`Get optimizer run API ${res.status}`)
   return res.json()
 }
 
 export async function deleteOptimizerRun(operatorId: string, runId: string): Promise<{ removed: number }> {
   const qs = new URLSearchParams({ operatorId })
-  const res = await fetch(`${API_BASE}/gantt/optimizer/runs/${runId}?${qs}`, { method: 'DELETE' })
+  const res = await authedFetch(`${API_BASE}/gantt/optimizer/runs/${runId}?${qs}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`Delete optimizer run API ${res.status}`)
   return res.json()
 }

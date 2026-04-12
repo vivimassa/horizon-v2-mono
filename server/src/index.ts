@@ -98,14 +98,15 @@ async function main(): Promise<void> {
     setInterval(async () => {
       try {
         const today = new Date().toISOString().slice(0, 10)
-        const res = await fetch(`http://localhost:${port}/gantt/seed-oooi`, {
+        const res = await app.inject({
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ operatorId: 'horizon', from: today, to: today, otpTarget: 0.85 }),
+          url: '/gantt/seed-oooi',
+          headers: { 'content-type': 'application/json', 'x-internal': 'true' },
+          payload: JSON.stringify({ operatorId: 'horizon', from: today, to: today, otpTarget: 0.85 }),
         })
-        const result = await res.json()
-        if ((result as { created?: number }).created) {
-          console.log(`  OOOI sim: seeded ${(result as { created: number }).created} flights`)
+        const result = JSON.parse(res.body)
+        if (result.created) {
+          console.log(`  OOOI sim: seeded ${result.created} flights`)
         }
       } catch (e) {
         console.error('  OOOI sim error:', (e as Error).message)

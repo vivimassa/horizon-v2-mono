@@ -99,6 +99,7 @@ export function FlightInformationDialog() {
         operatingDate: draft.operatingDate,
         flightNumber: draft.flightNumber,
         actual: draft.actual,
+        estimated: draft.estimated,
         depInfo: draft.depInfo,
         arrInfo: draft.arrInfo,
         pax: draft.pax,

@@ -22,6 +22,7 @@ export async function saveFlightInstance(data: {
   operatingDate: string
   flightNumber: string
   actual: FlightDetail['actual']
+  estimated?: FlightDetail['estimated']
   depInfo: FlightDetail['depInfo']
   arrInfo: FlightDetail['arrInfo']
   pax?: FlightDetail['pax']

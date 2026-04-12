@@ -64,6 +64,10 @@ export interface FlightDetail {
     onUtc: number | null
     ataUtc: number | null
   }
+  estimated: {
+    etdUtc: number | null
+    etaUtc: number | null
+  }
   depInfo: { terminal: string | null; gate: string | null; stand: string | null; ctot: string | null }
   arrInfo: { terminal: string | null; gate: string | null; stand: string | null }
   pax: {

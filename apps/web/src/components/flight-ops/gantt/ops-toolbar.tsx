@@ -21,6 +21,8 @@ import {
   Plus,
   CheckCircle,
   Crosshair,
+  MessageSquare,
+  Radio,
 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { colors } from '@skyhub/ui/theme'
@@ -29,6 +31,8 @@ import { RibbonSection, RibbonBtn, RibbonDivider as Divider } from '@/components
 import { useGanttStore } from '@/stores/use-gantt-store'
 import { BulkAssignDialog } from '@/components/network/gantt/bulk-assign-dialog'
 import { RecoveryDialog } from './recovery-dialog'
+import { AsmMessageDialog } from './asm-message-dialog'
+import { MvtMessageDialog } from './mvt-message-dialog'
 import { CompareDialog } from '@/components/network/gantt/compare-dialog'
 import { ScenarioPanel } from '@/components/network/schedule-grid/scenario-panel'
 import { ScenarioSaveDialog } from './scenario-save-dialog'
@@ -79,6 +83,8 @@ export function OpsToolbar({
   const [activeScenarioName, setActiveScenarioName] = useState('')
   const [formatOpen, setFormatOpen] = useState(false)
   const [alertsOpen, setAlertsOpen] = useState(false)
+  const [asmOpen, setAsmOpen] = useState(false)
+  const [mvtOpen, setMvtOpen] = useState(false)
   const [compareCount, setCompareCount] = useState(0)
 
   const formatBtnRef = useRef<HTMLButtonElement>(null)
@@ -353,6 +359,9 @@ export function OpsToolbar({
               {/* Execute */}
               {cb(Link, 'Assign', () => setBulkAssignOpen(true))}
               {cb(Plus, 'Add flight', onAddFlight)}
+              {/* Communication */}
+              {cb(MessageSquare, 'ASM/SSM', () => setAsmOpen(true))}
+              {cb(Radio, 'MVT/LDM', () => setMvtOpen(true))}
               {/* Display */}
               {cb(LayoutGrid, 'Format', () => setFormatOpen((o) => !o), { active: formatOpen })}
               {cb(
@@ -495,6 +504,29 @@ export function OpsToolbar({
               hoverBg={hoverBg}
               activeBg={activeBg}
               tooltip="Add a new flight"
+            />
+          </RibbonSection>
+          <Divider isDark={isDark} />
+
+          {/* ── Communication ── */}
+          <RibbonSection label="Communication">
+            <RibbonBtn
+              icon={MessageSquare}
+              label="ASM/SSM"
+              onClick={() => setAsmOpen(true)}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Schedule change messages (ASM/SSM)"
+            />
+            <RibbonBtn
+              icon={Radio}
+              label="MVT/LDM"
+              onClick={() => setMvtOpen(true)}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Movement & load messages (MVT/LDM)"
             />
           </RibbonSection>
           <Divider isDark={isDark} />
@@ -792,6 +824,8 @@ export function OpsToolbar({
           onClose={() => setSaveDialogOpen(false)}
         />
       )}
+      {asmOpen && createPortal(<AsmMessageDialog onClose={() => setAsmOpen(false)} />, document.body)}
+      {mvtOpen && createPortal(<MvtMessageDialog onClose={() => setMvtOpen(false)} />, document.body)}
     </div>
   )
 }

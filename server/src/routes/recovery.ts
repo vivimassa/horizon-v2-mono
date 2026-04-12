@@ -405,6 +405,7 @@ export async function recoveryRoutes(app: FastifyInstance): Promise<void> {
         cancel_cost_per_flight: config.cancelCostPerFlight,
         fuel_price_per_kg: config.fuelPricePerKg,
         max_delay_per_flight_minutes: config.maxDelayPerFlightMinutes,
+        reference_time_utc_ms: nowMs,
         connection_protection_minutes: config.connectionProtectionMinutes,
         respect_curfews: config.respectCurfews,
         max_crew_duty_hours: config.maxCrewDutyHours,

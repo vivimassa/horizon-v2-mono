@@ -101,6 +101,7 @@ class SolveConfig(BaseModel):
     propagation_multiplier: float = 1.0  # delay cascade penalty (1.0 = no extra)
     min_improvement_usd: float = 0  # filter solutions below this improvement (0 = show all)
     objective_weights: ObjectiveWeights | None = None  # null = single objective mode
+    reference_time_utc_ms: int = 0  # epoch ms — 0 = use wall-clock time
 
 
 class SolveRequest(BaseModel):

@@ -88,6 +88,30 @@ async function main(): Promise<void> {
   // Start
   await app.listen({ port, host: '0.0.0.0' })
   console.log(`✓ Server listening on port ${port}`)
+
+  // ── OOOI Simulation — seed actual times every 15 minutes ──
+  const OOOI_SIM_INTERVAL = 15 * 60_000 // 15 minutes
+  const OOOI_SIM_ENABLED = process.env.OOOI_SIM !== 'false' // enabled by default, set OOOI_SIM=false to disable
+
+  if (OOOI_SIM_ENABLED) {
+    console.log('✓ OOOI simulation enabled (every 15 min)')
+    setInterval(async () => {
+      try {
+        const today = new Date().toISOString().slice(0, 10)
+        const res = await fetch(`http://localhost:${port}/gantt/seed-oooi`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ operatorId: 'horizon', from: today, to: today, otpTarget: 0.85 }),
+        })
+        const result = await res.json()
+        if ((result as { created?: number }).created) {
+          console.log(`  OOOI sim: seeded ${(result as { created: number }).created} flights`)
+        }
+      } catch (e) {
+        console.error('  OOOI sim error:', (e as Error).message)
+      }
+    }, OOOI_SIM_INTERVAL)
+  }
 }
 
 main().catch((err) => {

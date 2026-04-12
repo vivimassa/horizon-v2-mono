@@ -96,7 +96,8 @@ export function TimesTab({ data, onUpdate }: TimesTabProps) {
               const isComplete = val != null
               const isCurrent = i === nextIdx
               const displayLabel = isComplete ? phase.label : phase.schedLabel
-              const variance = varianceBadge(val, scheduledMap[phase.key] ?? 0)
+              const scheduledRef = scheduledMap[phase.key]
+              const variance = scheduledRef != null ? varianceBadge(val, scheduledRef) : null
 
               return (
                 <div key={phase.key} className="flex items-center gap-3">

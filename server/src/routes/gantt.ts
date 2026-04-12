@@ -1254,4 +1254,189 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
         : null,
     }
   })
+
+  // ── DELETE /gantt/flight-instances — Clear all flight instances for operator ──
+  app.delete('/gantt/flight-instances', async (req) => {
+    const q = req.query as Record<string, string>
+    if (!q.operatorId) return { error: 'operatorId required' }
+    const result = await FlightInstance.deleteMany({ operatorId: q.operatorId })
+    return { deleted: result.deletedCount }
+  })
+
+  // ── POST /gantt/seed-oooi — Seed realistic OOOI data for a date range ──
+  app.post('/gantt/seed-oooi', async (req, reply) => {
+    const body = req.body as Record<string, unknown>
+    const operatorId = body.operatorId as string
+    const fromDate = body.from as string // YYYY-MM-DD
+    const toDate = body.to as string // YYYY-MM-DD
+    const otpTarget = (body.otpTarget as number) ?? 0.85 // 85% on-time
+
+    if (!operatorId || !fromDate || !toDate) {
+      return reply.code(400).send({ error: 'operatorId, from, to required' })
+    }
+
+    const scheduledFlights = await ScheduledFlight.find({
+      operatorId,
+      isActive: { $ne: false },
+      status: { $ne: 'cancelled' },
+    }).lean()
+
+    const registrations = await AircraftRegistration.find({ operatorId, isActive: true }).lean()
+    const regList = registrations.map((r) => r.registration as string)
+
+    const fromMs = new Date(fromDate + 'T00:00:00Z').getTime()
+    const toMs = new Date(toDate + 'T00:00:00Z').getTime()
+    const nowMs = Date.now()
+
+    let created = 0
+    let skipped = 0
+
+    for (const sf of scheduledFlights) {
+      const dow = sf.daysOfWeek as string
+      const depOffset = (sf.departureDayOffset as number) ?? 1
+      const arrOffset = (sf.arrivalDayOffset as number) ?? 1
+      const effFromMs = new Date(
+        ((sf.effectiveFrom as string) ?? '').replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1') + 'T00:00:00Z',
+      ).getTime()
+      const effUntilMs = new Date(
+        ((sf.effectiveUntil as string) ?? '').replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1') + 'T00:00:00Z',
+      ).getTime()
+      if (isNaN(effFromMs) || isNaN(effUntilMs)) continue
+
+      const rangeStart = Math.max(effFromMs, fromMs)
+      const rangeEnd = Math.min(effUntilMs, toMs)
+
+      for (let dayMs = rangeStart; dayMs <= rangeEnd; dayMs += DAY_MS) {
+        const opDate = new Date(dayMs).toISOString().slice(0, 10)
+        const jsDay = new Date(opDate + 'T12:00:00Z').getUTCDay()
+        const ssimDay = jsDay === 0 ? 7 : jsDay
+        if (!dow.includes(String(ssimDay))) continue
+
+        const stdMs = dayMs + (depOffset - 1) * DAY_MS + timeStringToMs(sf.stdUtc as string)
+        const staMs = dayMs + (arrOffset - 1) * DAY_MS + timeStringToMs(sf.staUtc as string)
+
+        // Only seed past flights (already should have departed)
+        if (stdMs > nowMs) {
+          skipped++
+          continue
+        }
+
+        const compositeId = `${sf._id}|${opDate}`
+
+        // Determine if on-time or delayed
+        const isOnTime = Math.random() < otpTarget
+        let delayMinutes = 0
+        const delays: Array<{ code: string; minutes: number; reason: string; category: string }> = []
+
+        if (!isOnTime) {
+          // Random delay: 16-180 minutes (weighted toward shorter delays)
+          const r = Math.random()
+          if (r < 0.5)
+            delayMinutes = 16 + Math.floor(Math.random() * 30) // 16-45 min
+          else if (r < 0.8)
+            delayMinutes = 45 + Math.floor(Math.random() * 45) // 45-90 min
+          else if (r < 0.95)
+            delayMinutes = 90 + Math.floor(Math.random() * 60) // 90-150 min
+          else delayMinutes = 150 + Math.floor(Math.random() * 30) // 150-180 min
+
+          // Random delay code
+          const delayCodes = [
+            { code: '81', reason: 'ATC restrictions', category: 'ATFM' },
+            { code: '87', reason: 'Airport facility issues', category: 'ATFM' },
+            { code: '41', reason: 'Technical defect', category: 'Technical' },
+            { code: '61', reason: 'Late inbound aircraft', category: 'Reactionary' },
+            { code: '63', reason: 'Rotation late', category: 'Reactionary' },
+            { code: '93', reason: 'Weather', category: 'Weather' },
+            { code: '15', reason: 'Late boarding', category: 'Passenger' },
+            { code: '33', reason: 'Cargo loading', category: 'Cargo' },
+          ]
+          const dc = delayCodes[Math.floor(Math.random() * delayCodes.length)]
+          delays.push({ code: dc.code, minutes: delayMinutes, reason: dc.reason, category: dc.category })
+        }
+
+        const delayMs = delayMinutes * 60_000
+        // Small random variance even for on-time flights (±5 min)
+        const onTimeVariance = isOnTime ? (Math.random() * 10 - 5) * 60_000 : 0
+
+        // OOOI times
+        const doorCloseUtc = stdMs + delayMs + onTimeVariance - 5 * 60_000 // 5 min before push
+        const atdUtc = stdMs + delayMs + onTimeVariance // push back
+        const offUtc = atdUtc + (8 + Math.floor(Math.random() * 7)) * 60_000 // 8-15 min taxi
+        const blockMin = (sf.blockMinutes as number) ?? Math.round((staMs - stdMs) / 60_000)
+        const flightTimeMs = (blockMin - 12) * 60_000 // block minus avg taxi
+        const onUtc = offUtc + flightTimeMs + Math.floor((Math.random() * 6 - 3) * 60_000) // ±3 min
+        const ataUtc = onUtc + (5 + Math.floor(Math.random() * 8)) * 60_000 // 5-12 min taxi in
+
+        // Generate realistic pax
+        const totalSeats = 180
+        const loadFactor = 0.75 + Math.random() * 0.2 // 75-95%
+        const totalPax = Math.floor(totalSeats * loadFactor)
+        const children = Math.floor(totalPax * 0.05)
+        const infants = Math.floor(totalPax * 0.02)
+        const adults = totalPax - children - infants
+
+        // Only set OOOI, pax, delays — NEVER touch tail on existing instances
+        // $setOnInsert ensures new instances get the pattern tail assignment
+        await FlightInstance.findOneAndUpdate(
+          { _id: compositeId },
+          {
+            $set: {
+              operatorId,
+              scheduledFlightId: sf._id,
+              flightNumber: sf.flightNumber,
+              operatingDate: opDate,
+              dep: { icao: sf.depStation, iata: sf.depStation },
+              arr: { icao: sf.arrStation, iata: sf.arrStation },
+              schedule: { stdUtc: stdMs, staUtc: staMs },
+              estimated: { etdUtc: stdMs + delayMs, etaUtc: staMs + delayMs },
+              actual: { doorCloseUtc, atdUtc, offUtc, onUtc, ataUtc },
+              pax: {
+                adultExpected: adults,
+                adultActual: adults,
+                childExpected: children,
+                childActual: children,
+                infantExpected: infants,
+                infantActual: infants,
+              },
+              delays,
+              status: delayMinutes > 0 ? 'delayed' : 'completed',
+              syncMeta: { updatedAt: Date.now(), version: 1 },
+            },
+            $setOnInsert: {
+              tail: {
+                registration: (sf.aircraftReg as string) ?? null,
+                icaoType: (sf.aircraftTypeIcao as string) ?? null,
+              },
+            },
+          },
+          { upsert: true },
+        )
+        created++
+      }
+    }
+
+    // Repair: fix any FlightInstances with null tail by restoring from ScheduledFlight
+    const nullTailInstances = await FlightInstance.find({
+      operatorId,
+      'tail.registration': null,
+      operatingDate: { $gte: fromDate, $lte: toDate },
+    }).lean()
+
+    let repaired = 0
+    for (const inst of nullTailInstances) {
+      const sfId = inst.scheduledFlightId as string
+      const sf = scheduledFlights.find((s) => s._id === sfId)
+      if (sf?.aircraftReg) {
+        await FlightInstance.findByIdAndUpdate(inst._id, {
+          $set: {
+            'tail.registration': sf.aircraftReg,
+            'tail.icaoType': sf.aircraftTypeIcao ?? null,
+          },
+        })
+        repaired++
+      }
+    }
+
+    return { created, skipped, repaired, otpTarget }
+  })
 }

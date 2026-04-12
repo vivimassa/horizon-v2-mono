@@ -28,7 +28,7 @@ import { Tooltip } from '@/components/ui/tooltip'
 import { RibbonSection, RibbonBtn, RibbonDivider as Divider } from '@/components/ui/ribbon-primitives'
 import { useGanttStore } from '@/stores/use-gantt-store'
 import { BulkAssignDialog } from '@/components/network/gantt/bulk-assign-dialog'
-import { OptimizerDialog } from '@/components/network/gantt/optimizer-dialog'
+import { RecoveryDialog } from './recovery-dialog'
 import { CompareDialog } from '@/components/network/gantt/compare-dialog'
 import { ScenarioPanel } from '@/components/network/schedule-grid/scenario-panel'
 import { ScenarioSaveDialog } from './scenario-save-dialog'
@@ -147,27 +147,45 @@ export function OpsToolbar({
   }, [alertsOpen])
 
   const handleCenterTimebar = useCallback(() => {
-    setCenterTimebar((v) => !v)
-  }, [])
+    const next = !centerTimebar
+    setCenterTimebar(next)
+    if (next) useGanttStore.getState().goToToday()
+  }, [centerTimebar])
+
+  // Auto-recenter every 30s when enabled
+  useEffect(() => {
+    if (!centerTimebar) return
+    const id = setInterval(() => {
+      useGanttStore.setState({ scrollTargetMs: Date.now() })
+    }, 30_000)
+    return () => clearInterval(id)
+  }, [centerTimebar])
 
   // Quick-toggle scenario: F9 to enter/save, Ctrl+S to save
   const handleScenarioToggle = useCallback(async () => {
     if (scenarioId) {
-      // Already in scenario → exit back to production (discard empty draft)
+      // Already in scenario → exit back to production and refetch
       setActiveScenarioId(null)
       setActiveScenarioName('')
+      useGanttStore.getState().setScenarioId(null)
+      useGanttStore.getState().commitPeriod()
     } else {
-      // Not in scenario → quick-create and enter
+      // Not in scenario → show tint instantly, create scenario in background
       const opId = getOperatorId()
       if (!opId) return
+      // Immediate visual feedback — yellow tint appears now
+      useGanttStore.getState().setScenarioId('pending')
       const now = new Date()
       const defaultName = `Draft ${now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} ${now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
       try {
         const created = await api.createScenario({ operatorId: opId, name: defaultName, createdBy: 'OCC' })
         setActiveScenarioId(created._id)
         setActiveScenarioName(created.name)
+        useGanttStore.getState().setScenarioId(created._id)
       } catch (e) {
         console.error('Failed to quick-create scenario:', e)
+        // Revert tint on failure
+        useGanttStore.getState().setScenarioId(null)
       }
     }
   }, [scenarioId, setActiveScenarioId])
@@ -405,9 +423,7 @@ export function OpsToolbar({
           <Divider isDark={isDark} />
 
           {/* ── Disruption Recovery ── */}
-          <RibbonSection
-            label={scenarioId && activeScenarioName ? `Recovery: ${activeScenarioName}` : 'Disruption Recovery'}
-          >
+          <RibbonSection label="Disruption Recovery">
             <RibbonBtn
               icon={GitBranch}
               label={scenarioId ? 'Exit' : 'What-If'}
@@ -753,7 +769,7 @@ export function OpsToolbar({
 
       {/* ── Dialogs ── */}
       <BulkAssignDialog open={bulkAssignOpen} onClose={() => setBulkAssignOpen(false)} />
-      <OptimizerDialog open={optimizerOpen} onClose={() => setOptimizerOpen(false)} />
+      <RecoveryDialog open={optimizerOpen} onClose={() => setOptimizerOpen(false)} />
       <CompareDialog open={compareOpen} onClose={() => setCompareOpen(false)} />
       {scenarioOpen &&
         createPortal(

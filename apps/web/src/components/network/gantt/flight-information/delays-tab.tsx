@@ -123,6 +123,9 @@ export function DelaysTab({ data, onUpdate }: DelaysTabProps) {
         />
       </div>
 
+      {/* Computed delay from OOOI */}
+      <ComputedDelayBanner data={data} isDark={isDark} muted={muted} accent={accent} />
+
       <div className="grid grid-cols-2 gap-4">
         <DelaySection
           title="Departure Delays"
@@ -162,6 +165,65 @@ export function DelaysTab({ data, onUpdate }: DelaysTabProps) {
           inputBg={inputBg}
           inputBorder={inputBorder}
         />
+      </div>
+    </div>
+  )
+}
+
+function ComputedDelayBanner({
+  data,
+  isDark,
+  muted,
+  accent,
+}: {
+  data: FlightDetail
+  isDark: boolean
+  muted: string
+  accent: string
+}) {
+  const depDelayMs = data.actual.atdUtc ? data.actual.atdUtc - data.stdUtc : 0
+  const arrDelayMs = data.actual.ataUtc ? data.actual.ataUtc - data.staUtc : 0
+  const depMin = Math.round(depDelayMs / 60_000)
+  const arrMin = Math.round(arrDelayMs / 60_000)
+
+  if (depMin <= 0 && arrMin <= 0) return null
+
+  const cardBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)'
+  const cardBorder = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
+
+  return (
+    <div className="grid grid-cols-2 gap-4 mb-4">
+      <div
+        className="rounded-xl p-4 flex items-center gap-3"
+        style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
+      >
+        <div className="text-[24px] font-bold tabular-nums" style={{ color: depMin > 0 ? '#E63535' : '#06C270' }}>
+          {depMin > 0 ? `+${depMin}` : '0'}
+        </div>
+        <div>
+          <div className="text-[13px] font-semibold" style={{ color: depMin > 0 ? '#E63535' : '#06C270' }}>
+            {depMin > 0 ? 'Departure Delayed' : 'On Time'}
+          </div>
+          <div className="text-[11px]" style={{ color: muted }}>
+            ATD vs STD ({depMin > 0 ? `${depMin} min late` : 'on time'})
+          </div>
+        </div>
+      </div>
+      <div
+        className="rounded-xl p-4 flex items-center gap-3"
+        style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
+      >
+        <div className="text-[24px] font-bold tabular-nums" style={{ color: arrMin > 0 ? '#FF8800' : '#06C270' }}>
+          {arrMin > 0 ? `+${arrMin}` : '0'}
+        </div>
+        <div>
+          <div className="text-[13px] font-semibold" style={{ color: arrMin > 0 ? '#FF8800' : '#06C270' }}>
+            {arrMin > 0 ? 'Arrival Delayed' : 'On Time'}
+          </div>
+          <div className="text-[11px]" style={{ color: muted }}>
+            ATA vs STA ({arrMin > 0 ? `${arrMin} min late` : 'on time'})
+          </div>
+        </div>
       </div>
     </div>
   )

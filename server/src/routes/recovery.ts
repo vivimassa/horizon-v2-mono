@@ -34,6 +34,7 @@ const solveSchema = z.object({
     delayCostPerMinute: z.number().min(0),
     cancelCostPerFlight: z.number().min(0),
     fuelPricePerKg: z.number().min(0),
+    referenceTimeUtc: z.string().optional(), // ISO datetime override for testing
   }),
 })
 
@@ -59,9 +60,21 @@ export async function recoveryRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: 'Validation failed', details: parsed.error.issues })
     }
     const { operatorId, from, to, config } = parsed.data
-    const nowMs = Date.now()
+    // Use referenceTimeUtc for testing, or real now for live operations
+    const refStr = config.referenceTimeUtc?.trim() || null
+    const parsedRef = refStr ? new Date(refStr.endsWith('Z') ? refStr : refStr + 'Z').getTime() : NaN
+    const nowMs = !isNaN(parsedRef) ? parsedRef : Date.now()
     const lockMs = config.lockThresholdMinutes * 60_000
     const horizonEndMs = nowMs + config.horizonHours * 3_600_000
+
+    console.log('[recovery/solve] refStr:', refStr, '→ nowMs:', nowMs, '→', new Date(nowMs).toISOString())
+    console.log(
+      '[recovery/solve] lock until:',
+      new Date(nowMs + lockMs).toISOString(),
+      'horizon end:',
+      new Date(horizonEndMs).toISOString(),
+    )
+    console.log('[recovery/solve] period from:', from, 'to:', to)
 
     // ── Parallel data queries ──
     const [scheduledFlights, registrations, acTypes, instances, cityPairs, lopaConfigs, operator] = await Promise.all([
@@ -197,7 +210,11 @@ export async function recoveryRoutes(app: FastifyInstance): Promise<void> {
       const inst = instanceMap.get(flight.id)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const actual = (inst as any)?.actual
-      const hasOOOI = actual?.atdUtc || actual?.offUtc || actual?.onUtc || actual?.ataUtc
+      // When using reference time, only consider OOOI that happened BEFORE the reference
+      // (flights that "departed after" the reference time are still available in our simulation)
+      const hasOOOI = actual?.atdUtc
+        ? actual.atdUtc < nowMs // departed before reference time → locked
+        : false
 
       if (hasOOOI) {
         locked.push(flight)
@@ -209,6 +226,34 @@ export async function recoveryRoutes(app: FastifyInstance): Promise<void> {
         frozen.push(flight)
       } else {
         available.push(flight)
+      }
+    }
+
+    console.log(
+      '[recovery/solve] total:',
+      allFlights.length,
+      'departed:',
+      departedCount,
+      'threshold:',
+      thresholdCount,
+      'frozen:',
+      frozen.length,
+      'available:',
+      available.length,
+    )
+
+    // Log sample flights for debugging when nothing is available
+    if (available.length === 0 && allFlights.length > 0) {
+      // Find flights that SHOULD be available (STD between lock window and horizon)
+      const shouldBeAvailable = allFlights.filter((f) => f.std_utc > nowMs + lockMs && f.std_utc <= horizonEndMs)
+      console.log('[recovery/solve] flights in time window (should be available):', shouldBeAvailable.length)
+      for (const f of shouldBeAvailable.slice(0, 5)) {
+        const inst = instanceMap.get(f.id)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const atd = (inst as any)?.actual?.atdUtc
+        console.log(
+          `  ${f.flight_number} STD:${new Date(f.std_utc).toISOString()} ATD:${atd ? new Date(atd).toISOString() : 'null'} ATD<now:${atd != null ? atd < nowMs : 'n/a'} instExists:${!!inst}`,
+        )
       }
     }
 
@@ -285,7 +330,7 @@ export async function recoveryRoutes(app: FastifyInstance): Promise<void> {
 
       // Inject locked counts as first event
       reply.raw.write(
-        `event: locked\ndata: ${JSON.stringify({ departed: departedCount, within_threshold: thresholdCount, beyond_horizon: frozen.length })}\n\n`,
+        `event: locked\ndata: ${JSON.stringify({ departed: departedCount, within_threshold: thresholdCount, beyond_horizon: frozen.length, available: available.length })}\n\n`,
       )
 
       const reader = solverRes.body?.getReader()

@@ -70,6 +70,8 @@ export type {
   SlotUtilizationSummary,
   SlotCalendarWeekRef,
   SlotFleetAirportStats,
+  MaintenanceCheckTypeRef,
+  MaintenanceWindowRef,
 } from './client'
 
 // ─── React Query layer ───

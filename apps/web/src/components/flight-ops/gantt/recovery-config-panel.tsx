@@ -1,78 +1,76 @@
 'use client'
 
 import { useState } from 'react'
-import { Crosshair, Clock, Zap, DollarSign, Shield, TrendingUp, HelpCircle } from 'lucide-react'
+import {
+  Crosshair,
+  Clock,
+  Zap,
+  DollarSign,
+  Shield,
+  TrendingUp,
+  HelpCircle,
+  Scale,
+  SlidersHorizontal,
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
+// ── Types ──
+
 export interface RecoveryConfig {
-  objective: 'min_delay' | 'min_cancel' | 'min_cost' | 'max_revenue'
+  // Objective
+  objective: 'min_delay' | 'min_cancel' | 'min_cost' | 'max_revenue' | 'custom'
+  objectiveWeights: { delay: number; cost: number; cancel: number; revenue: number } | null
+
+  // Recovery window
   horizonHours: number
   lockThresholdMinutes: number
-  maxSolutions: number
-  maxSolveSeconds: number
+  maxDelayPerFlightMinutes: number
+  referenceTimeUtc: string
+
+  // Constraints (configured via toolbar Parameters panel)
+  respectCurfews: boolean
+  connectionProtectionMinutes: number
+  maxCrewDutyHours: number
+  maxSwapsPerAircraft: number
+  propagationMultiplier: number
+
+  // Cost model (configured via toolbar Parameters panel)
   delayCostPerMinute: number
   cancelCostPerFlight: number
   fuelPricePerKg: number
-  referenceTimeUtc: string // ISO datetime — "now" override for testing. Empty = real now.
+
+  // Solver settings (configured via toolbar Parameters panel)
+  maxSolutions: number
+  maxSolveSeconds: number
+  minImprovementUsd: number
 }
+
+// ── Constants ──
 
 interface ObjectiveOption {
   key: RecoveryConfig['objective']
   label: string
-  desc: string
   icon: LucideIcon
   color: string
 }
 
 const OBJECTIVES: ObjectiveOption[] = [
-  {
-    key: 'min_delay',
-    label: 'Min Delay',
-    desc: 'Minimize total delay across all affected flights',
-    icon: Clock,
-    color: '#FF8800',
-  },
-  {
-    key: 'min_cancel',
-    label: 'Min Cancel',
-    desc: 'Avoid flight cancellations at all costs',
-    icon: Shield,
-    color: '#E63535',
-  },
-  {
-    key: 'min_cost',
-    label: 'Min Cost',
-    desc: 'Minimize total operational cost impact',
-    icon: DollarSign,
-    color: '#06C270',
-  },
-  {
-    key: 'max_revenue',
-    label: 'Max Revenue',
-    desc: 'Protect highest-revenue flights first',
-    icon: TrendingUp,
-    color: '#0063F7',
-  },
+  { key: 'min_delay', label: 'Min Delay', icon: Clock, color: '#FF8800' },
+  { key: 'min_cancel', label: 'Min Cancel', icon: Shield, color: '#E63535' },
+  { key: 'min_cost', label: 'Min Cost', icon: DollarSign, color: '#06C270' },
+  { key: 'max_revenue', label: 'Max Revenue', icon: TrendingUp, color: '#0063F7' },
+  { key: 'custom', label: 'Custom', icon: Scale, color: '#AC5DD9' },
 ]
 
-const PARAM_TOOLTIPS: Record<string, string> = {
-  horizonHours:
-    'How far ahead the solver looks for recovery options. Flights beyond this window keep their current assignment. Shorter = faster solve, longer = better solutions.',
+const TOOLTIPS: Record<string, string> = {
+  horizonHours: 'How far ahead the solver looks. Flights beyond this window keep their current assignment.',
   lockThresholdMinutes:
-    'Flights departing within this many minutes from now are locked and cannot be reassigned. Crew is already reporting, ground handling committed.',
-  maxSolutions:
-    'Number of alternative recovery options to generate. Each option has different trade-offs (delay vs cost vs cancellations).',
-  maxSolveSeconds:
-    'Maximum time the solver will run before returning the best solutions found. Longer = potentially better solutions.',
-  delayCostPerMinute:
-    'Estimated cost per passenger per minute of delay. Used to calculate the financial impact of delaying flights. Industry avg: $15-50.',
-  cancelCostPerFlight:
-    'Estimated total cost of cancelling one flight (rebooking, compensation, lost revenue). Varies by route and load.',
-  fuelPricePerKg:
-    'Current jet fuel price per kilogram. Used to calculate operating cost differences when swapping aircraft types.',
-  referenceTimeUtc:
-    'Override the current time for testing. The solver uses this instead of "now" to classify flights as departed/available/frozen. Leave empty for live operations.',
+    'Flights departing within this many minutes are locked — crew is reporting, ground handling committed.',
+  maxDelayPerFlightMinutes: 'Maximum minutes each individual flight can be delayed. 0 = swap-only, no retiming.',
+  referenceTimeUtc: 'Override "now" for testing. Leave empty for live operations.',
 }
+
+// ── Main Component ──
 
 export function RecoveryConfigPanel({
   config,
@@ -91,59 +89,114 @@ export function RecoveryConfigPanel({
   const muted = isDark ? '#8F90A6' : '#555770'
   const border = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
   const inputBg = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)'
+  const accent = isDark ? '#5B8DEF' : '#1e40af'
+
+  // Build constraint summary chips
+  const constraintChips: string[] = []
+  if (config.respectCurfews) constraintChips.push('Curfews')
+  if (config.connectionProtectionMinutes > 0) constraintChips.push(`${config.connectionProtectionMinutes}min MCT`)
+  if (config.maxCrewDutyHours > 0) constraintChips.push(`${config.maxCrewDutyHours}h duty`)
+  if (config.maxSwapsPerAircraft > 0) constraintChips.push(`${config.maxSwapsPerAircraft} swaps`)
+  if (config.propagationMultiplier > 1.0) constraintChips.push(`${config.propagationMultiplier}x prop`)
 
   return (
     <div className="space-y-5">
-      {/* Objective selector — 4 in a row */}
+      {/* ── Objective ── */}
       <div>
-        <div className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: muted }}>
+        <div className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: muted }}>
           Recovery Objective
         </div>
-        <div className="grid grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-5 gap-2">
           {OBJECTIVES.map((obj) => {
             const active = config.objective === obj.key
             const Icon = obj.icon
             return (
               <button
                 key={obj.key}
-                onClick={() => onChange({ objective: obj.key })}
-                className="flex flex-col items-center text-center p-4 rounded-xl transition-all duration-150"
+                onClick={() => {
+                  onChange({
+                    objective: obj.key,
+                    objectiveWeights:
+                      obj.key === 'custom'
+                        ? (config.objectiveWeights ?? { delay: 25, cost: 25, cancel: 25, revenue: 25 })
+                        : null,
+                  })
+                }}
+                className="flex flex-col items-center text-center p-3 rounded-xl transition-all duration-150"
                 style={{
                   background: active ? (isDark ? `${obj.color}15` : `${obj.color}08`) : 'transparent',
                   border: `1.5px solid ${active ? obj.color : border}`,
                 }}
               >
                 <div
-                  className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3 transition-all duration-200"
+                  className="w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-all duration-200"
                   style={{
                     background: active ? `${obj.color}20` : isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-                    boxShadow: active ? `0 4px 16px ${obj.color}30` : 'none',
+                    boxShadow: active ? `0 4px 12px ${obj.color}30` : 'none',
                   }}
                 >
-                  <Icon size={28} color={active ? obj.color : muted} strokeWidth={1.4} />
+                  <Icon size={20} color={active ? obj.color : muted} strokeWidth={1.5} />
                 </div>
-                <div className="text-[14px] font-semibold mb-1" style={{ color: active ? obj.color : text }}>
+                <div className="text-[13px] font-semibold" style={{ color: active ? obj.color : text }}>
                   {obj.label}
-                </div>
-                <div className="text-[11px] leading-snug" style={{ color: muted }}>
-                  {obj.desc}
                 </div>
               </button>
             )
           })}
         </div>
+
+        {/* Blend sliders — shown when Custom selected */}
+        {config.objective === 'custom' && (
+          <div
+            className="mt-3 p-3 rounded-lg grid grid-cols-2 gap-x-6 gap-y-2.5"
+            style={{
+              background: isDark ? 'rgba(172,93,217,0.06)' : 'rgba(172,93,217,0.04)',
+              border: `1px solid ${border}`,
+            }}
+          >
+            {(['delay', 'cost', 'cancel', 'revenue'] as const).map((key) => {
+              const labels = { delay: 'Delay', cost: 'Cost', cancel: 'Cancel', revenue: 'Revenue' }
+              const clrs = { delay: '#FF8800', cost: '#06C270', cancel: '#E63535', revenue: '#0063F7' }
+              const w = config.objectiveWeights ?? { delay: 25, cost: 25, cancel: 25, revenue: 25 }
+              return (
+                <div key={key} className="flex items-center gap-2">
+                  <span className="w-14 text-[11px] font-medium shrink-0" style={{ color: clrs[key] }}>
+                    {labels[key]}
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={w[key]}
+                    onChange={(e) => {
+                      const newVal = parseInt(e.target.value)
+                      const updated = normalizeWeights(w, key, newVal)
+                      onChange({ objectiveWeights: updated })
+                    }}
+                    className="flex-1 h-1.5 accent-current"
+                    style={{ accentColor: clrs[key] }}
+                  />
+                  <span className="w-8 text-[13px] font-semibold tabular-nums text-right" style={{ color: clrs[key] }}>
+                    {w[key]}%
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Parameters */}
+      {/* ── Recovery Window ── */}
       <div>
         <div className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: muted }}>
-          Parameters
+          Recovery Window
         </div>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <ParamInput
             label="Horizon"
             unit="hours"
-            tooltip={PARAM_TOOLTIPS.horizonHours}
+            tooltip={TOOLTIPS.horizonHours}
             value={config.horizonHours}
             onChange={(v) => onChange({ horizonHours: v })}
             min={1}
@@ -158,7 +211,7 @@ export function RecoveryConfigPanel({
           <ParamInput
             label="Lock threshold"
             unit="min"
-            tooltip={PARAM_TOOLTIPS.lockThresholdMinutes}
+            tooltip={TOOLTIPS.lockThresholdMinutes}
             value={config.lockThresholdMinutes}
             onChange={(v) => onChange({ lockThresholdMinutes: v })}
             min={0}
@@ -171,27 +224,13 @@ export function RecoveryConfigPanel({
             muted={muted}
           />
           <ParamInput
-            label="Max solutions"
-            tooltip={PARAM_TOOLTIPS.maxSolutions}
-            value={config.maxSolutions}
-            onChange={(v) => onChange({ maxSolutions: v })}
-            min={1}
-            max={5}
-            step={1}
-            isDark={isDark}
-            inputBg={inputBg}
-            border={border}
-            text={text}
-            muted={muted}
-          />
-          <ParamInput
-            label="Solve timeout"
-            unit="sec"
-            tooltip={PARAM_TOOLTIPS.maxSolveSeconds}
-            value={config.maxSolveSeconds}
-            onChange={(v) => onChange({ maxSolveSeconds: v })}
-            min={5}
-            max={300}
+            label="Max delay/flight"
+            unit="min"
+            tooltip={TOOLTIPS.maxDelayPerFlightMinutes}
+            value={config.maxDelayPerFlightMinutes}
+            onChange={(v) => onChange({ maxDelayPerFlightMinutes: v })}
+            min={0}
+            max={180}
             step={5}
             isDark={isDark}
             inputBg={inputBg}
@@ -205,7 +244,7 @@ export function RecoveryConfigPanel({
             <span className="text-[11px] font-medium" style={{ color: muted }}>
               Reference time (UTC)
             </span>
-            <TooltipIcon tooltip={PARAM_TOOLTIPS.referenceTimeUtc} muted={muted} />
+            <TooltipIcon tooltip={TOOLTIPS.referenceTimeUtc} muted={muted} />
           </div>
           <input
             type="datetime-local"
@@ -214,7 +253,7 @@ export function RecoveryConfigPanel({
             className="w-full h-8 px-2.5 rounded-lg text-[13px] tabular-nums outline-none transition-colors"
             style={{ background: inputBg, border: `1px solid ${border}`, color: text }}
             onFocus={(e) => {
-              e.currentTarget.style.borderColor = isDark ? '#5B8DEF' : '#1e40af'
+              e.currentTarget.style.borderColor = accent
             }}
             onBlur={(e) => {
               e.currentTarget.style.borderColor = border
@@ -223,66 +262,46 @@ export function RecoveryConfigPanel({
         </div>
       </div>
 
-      {/* Cost weights */}
-      <div>
-        <div className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: muted }}>
-          Cost Weights
-        </div>
-        <div className="grid grid-cols-3 gap-3">
-          <ParamInput
-            label="Delay cost"
-            unit="$/pax/min"
-            tooltip={PARAM_TOOLTIPS.delayCostPerMinute}
-            value={config.delayCostPerMinute}
-            onChange={(v) => onChange({ delayCostPerMinute: v })}
-            min={0}
-            max={500}
-            step={1}
-            isDark={isDark}
-            inputBg={inputBg}
-            border={border}
-            text={text}
-            muted={muted}
-          />
-          <ParamInput
-            label="Cancel cost"
-            unit="$/flight"
-            tooltip={PARAM_TOOLTIPS.cancelCostPerFlight}
-            value={config.cancelCostPerFlight}
-            onChange={(v) => onChange({ cancelCostPerFlight: v })}
-            min={0}
-            max={200000}
-            step={1000}
-            isDark={isDark}
-            inputBg={inputBg}
-            border={border}
-            text={text}
-            muted={muted}
-          />
-          <ParamInput
-            label="Fuel price"
-            unit="$/kg"
-            tooltip={PARAM_TOOLTIPS.fuelPricePerKg}
-            value={config.fuelPricePerKg}
-            onChange={(v) => onChange({ fuelPricePerKg: v })}
-            min={0}
-            max={5}
-            step={0.01}
-            isDark={isDark}
-            inputBg={inputBg}
-            border={border}
-            text={text}
-            muted={muted}
-          />
-        </div>
+      {/* ── Active Constraint Summary ── */}
+      <div
+        className="flex items-center gap-2 px-3 py-2 rounded-lg"
+        style={{
+          background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)',
+          border: `1px solid ${border}`,
+        }}
+      >
+        <SlidersHorizontal size={13} className="shrink-0" style={{ color: muted }} />
+        {constraintChips.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5 flex-1">
+            {constraintChips.map((chip) => (
+              <span
+                key={chip}
+                className="text-[11px] font-medium px-1.5 py-0.5 rounded"
+                style={{
+                  background: isDark ? 'rgba(91,141,239,0.10)' : 'rgba(30,64,175,0.06)',
+                  color: accent,
+                }}
+              >
+                {chip}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <span className="text-[11px]" style={{ color: muted }}>
+            No constraints active
+          </span>
+        )}
+        <span className="text-[11px] shrink-0" style={{ color: muted, opacity: 0.6 }}>
+          via Parameters
+        </span>
       </div>
 
-      {/* Solve button */}
+      {/* ── Solve Button ── */}
       <button
         onClick={onSolve}
         disabled={solving}
         className="w-full h-11 rounded-xl text-[14px] font-semibold text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-50"
-        style={{ background: isDark ? '#5B8DEF' : '#1e40af' }}
+        style={{ background: accent }}
       >
         {solving ? (
           <>
@@ -297,6 +316,8 @@ export function RecoveryConfigPanel({
     </div>
   )
 }
+
+// ── Helpers ──
 
 function TooltipIcon({ tooltip, muted }: { tooltip: string; muted: string }) {
   const [show, setShow] = useState(false)
@@ -353,7 +374,6 @@ function ParamInput({
   muted: string
 }) {
   const [showTooltip, setShowTooltip] = useState(false)
-
   return (
     <div className="relative">
       <div className="flex items-center gap-1 mb-1">
@@ -390,7 +410,6 @@ function ParamInput({
           e.currentTarget.style.borderColor = border
         }}
       />
-      {/* Tooltip */}
       {showTooltip && tooltip && (
         <div
           className="absolute z-50 left-0 right-0 top-full mt-1 p-2.5 rounded-lg text-[12px] leading-relaxed"
@@ -406,4 +425,26 @@ function ParamInput({
       )}
     </div>
   )
+}
+
+function normalizeWeights(
+  current: { delay: number; cost: number; cancel: number; revenue: number },
+  changed: keyof typeof current,
+  newValue: number,
+): { delay: number; cost: number; cancel: number; revenue: number } {
+  const others = (['delay', 'cost', 'cancel', 'revenue'] as const).filter((k) => k !== changed)
+  const remaining = 100 - newValue
+  const otherSum = others.reduce((s, k) => s + current[k], 0)
+
+  const result = { ...current, [changed]: newValue }
+  if (otherSum > 0) {
+    for (const k of others) result[k] = Math.round((current[k] / otherSum) * remaining)
+  } else {
+    const each = Math.round(remaining / others.length)
+    for (const k of others) result[k] = each
+  }
+
+  const sum = result.delay + result.cost + result.cancel + result.revenue
+  if (sum !== 100) result[others[others.length - 1]] += 100 - sum
+  return result
 }

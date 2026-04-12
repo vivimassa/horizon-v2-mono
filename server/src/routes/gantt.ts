@@ -435,6 +435,16 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       z.object({
         registration: z.string().min(1),
         flightIds: z.array(z.string().min(1)),
+        delays: z
+          .array(
+            z.object({
+              flightId: z.string().min(1),
+              delayMinutes: z.number().int().min(0),
+              newStdUtcMs: z.number(),
+              newStaUtcMs: z.number(),
+            }),
+          )
+          .optional(),
       }),
     ),
   })
@@ -454,18 +464,35 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
 
     // Build minimal bulk ops — no ScheduledFlight lookup needed
     const bulkOps: any[] = []
-    for (const { registration, flightIds } of assignments) {
+    for (const { registration, flightIds, delays } of assignments) {
+      // Build delay lookup for this registration group
+      const delayMap = new Map<string, { delayMinutes: number; newStdUtcMs: number; newStaUtcMs: number }>()
+      if (delays) {
+        for (const d of delays) delayMap.set(d.flightId, d)
+      }
+
       for (const id of flightIds) {
         const [sfId, opDate] = id.split('|')
+        const delay = delayMap.get(id)
+
+        const $set: Record<string, unknown> = {
+          'tail.registration': registration,
+          status: delay ? 'delayed' : 'assigned',
+          'syncMeta.updatedAt': Date.now(),
+        }
+
+        // Apply delay times to estimated fields (preserves original schedule for reporting)
+        if (delay) {
+          $set['estimated.etdUtc'] = delay.newStdUtcMs
+          $set['estimated.etaUtc'] = delay.newStaUtcMs
+          $set['delayMinutes'] = delay.delayMinutes
+        }
+
         bulkOps.push({
           updateOne: {
             filter: { _id: id },
             update: {
-              $set: {
-                'tail.registration': registration,
-                status: 'assigned',
-                'syncMeta.updatedAt': Date.now(),
-              },
+              $set,
               $setOnInsert: {
                 operatorId,
                 scheduledFlightId: sfId,
@@ -1295,12 +1322,11 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       const dow = sf.daysOfWeek as string
       const depOffset = (sf.departureDayOffset as number) ?? 1
       const arrOffset = (sf.arrivalDayOffset as number) ?? 1
-      const effFromMs = new Date(
-        ((sf.effectiveFrom as string) ?? '').replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1') + 'T00:00:00Z',
-      ).getTime()
-      const effUntilMs = new Date(
-        ((sf.effectiveUntil as string) ?? '').replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1') + 'T00:00:00Z',
-      ).getTime()
+      const effFrom = (sf.effectiveFrom as string) ?? ''
+      const effUntil = (sf.effectiveUntil as string) ?? ''
+      if (!effFrom || !effUntil) continue
+      const effFromMs = dateToDayMs(effFrom)
+      const effUntilMs = dateToDayMs(effUntil)
       if (isNaN(effFromMs) || isNaN(effUntilMs)) continue
 
       const rangeStart = Math.max(effFromMs, fromMs)

@@ -23,6 +23,8 @@ import {
   Crosshair,
   MessageSquare,
   Radio,
+  SlidersHorizontal,
+  Activity,
 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { colors } from '@skyhub/ui/theme'
@@ -31,6 +33,7 @@ import { RibbonSection, RibbonBtn, RibbonDivider as Divider } from '@/components
 import { useGanttStore } from '@/stores/use-gantt-store'
 import { BulkAssignDialog } from '@/components/network/gantt/bulk-assign-dialog'
 import { RecoveryDialog } from './recovery-dialog'
+import { RecoveryParametersPanel } from './recovery-parameters-panel'
 import { AsmMessageDialog } from './asm-message-dialog'
 import { MvtMessageDialog } from './mvt-message-dialog'
 import { CompareDialog } from '@/components/network/gantt/compare-dialog'
@@ -67,6 +70,9 @@ export function OpsToolbar({
   const setZoom = useGanttStore((s) => s.setZoom)
   const zoomRowIn = useGanttStore((s) => s.zoomRowIn)
   const zoomRowOut = useGanttStore((s) => s.zoomRowOut)
+  const aircraftTypes = useGanttStore((s) => s.aircraftTypes)
+  const utilizationTargets = useGanttStore((s) => s.utilizationTargets)
+  const setUtilizationTargets = useGanttStore((s) => s.setUtilizationTargets)
 
   const scenarioId = useOperatorStore((s) => s.activeScenarioId)
   const operatorId = useOperatorStore((s) => s.operator?._id ?? '')
@@ -85,7 +91,13 @@ export function OpsToolbar({
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [asmOpen, setAsmOpen] = useState(false)
   const [mvtOpen, setMvtOpen] = useState(false)
+  const [paramsOpen, setParamsOpen] = useState(false)
+  const [utilizationOpen, setUtilizationOpen] = useState(false)
   const [compareCount, setCompareCount] = useState(0)
+  const paramsBtnRef = useRef<HTMLButtonElement>(null)
+  const utilizationBtnRef = useRef<HTMLButtonElement>(null)
+  const utilizationDropRef = useRef<HTMLDivElement>(null)
+  const [utilizationPos, setUtilizationPos] = useState({ top: 0, left: 0 })
 
   const formatBtnRef = useRef<HTMLButtonElement>(null)
   const formatDropRef = useRef<HTMLDivElement>(null)
@@ -151,6 +163,29 @@ export function OpsToolbar({
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [alertsOpen])
+
+  // Utilization popover positioning
+  useEffect(() => {
+    if (!utilizationOpen || !utilizationBtnRef.current) return
+    const r = utilizationBtnRef.current.getBoundingClientRect()
+    setUtilizationPos({ top: r.bottom + 6, left: r.left })
+  }, [utilizationOpen])
+
+  // Close utilization on outside click
+  useEffect(() => {
+    if (!utilizationOpen) return
+    const handler = (e: MouseEvent) => {
+      if (
+        utilizationDropRef.current &&
+        !utilizationDropRef.current.contains(e.target as Node) &&
+        !utilizationBtnRef.current?.contains(e.target as Node)
+      ) {
+        setUtilizationOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [utilizationOpen])
 
   const handleCenterTimebar = useCallback(() => {
     const next = !centerTimebar
@@ -353,6 +388,7 @@ export function OpsToolbar({
               {cb(GitBranch, scenarioId ? 'Exit What-If (F9)' : 'What-If (F9)', handleScenarioToggle, {
                 active: !!scenarioId,
               })}
+              {cb(SlidersHorizontal, 'Parameters', () => setParamsOpen((o) => !o), { active: paramsOpen })}
               {cb(Wand2, 'Resolve', () => setOptimizerOpen(true), { disabled: !scenarioId })}
               {cb(BarChart3, 'Compare', () => setCompareOpen(true), { disabled: compareCount === 0 })}
               {cb(CheckCircle, 'Finalize', undefined, { disabled: !scenarioId })}
@@ -363,6 +399,7 @@ export function OpsToolbar({
               {cb(MessageSquare, 'ASM/SSM', () => setAsmOpen(true))}
               {cb(Radio, 'MVT/LDM', () => setMvtOpen(true))}
               {/* Display */}
+              {cb(Activity, 'Utilization', () => setUtilizationOpen((o) => !o), { active: utilizationOpen })}
               {cb(LayoutGrid, 'Format', () => setFormatOpen((o) => !o), { active: formatOpen })}
               {cb(
                 barLabelMode === 'flightNo' ? Binary : Route,
@@ -442,6 +479,17 @@ export function OpsToolbar({
               hoverBg={hoverBg}
               activeBg={activeBg}
               tooltip={scenarioId ? 'Exit What-If mode (F9)' : 'Enter What-If mode (F9)'}
+            />
+            <RibbonBtn
+              ref={paramsBtnRef}
+              icon={SlidersHorizontal}
+              label="Parameters"
+              onClick={() => setParamsOpen((o) => !o)}
+              active={paramsOpen}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Solver constraints, cost model & settings"
             />
             <RibbonBtn
               icon={Wand2}
@@ -533,6 +581,17 @@ export function OpsToolbar({
 
           {/* ── Display ── */}
           <RibbonSection label="Display">
+            <RibbonBtn
+              ref={utilizationBtnRef}
+              icon={Activity}
+              label="Utilization"
+              onClick={() => setUtilizationOpen((o) => !o)}
+              active={utilizationOpen}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Target block hours per aircraft type"
+            />
             <RibbonBtn
               ref={formatBtnRef}
               icon={LayoutGrid}
@@ -799,7 +858,76 @@ export function OpsToolbar({
           document.body,
         )}
 
-      {/* ── Dialogs ── */}
+      {/* ── Utilization Popover ── */}
+      {utilizationOpen &&
+        createPortal(
+          <div
+            ref={utilizationDropRef}
+            className="fixed z-[9999] rounded-xl p-4 select-none"
+            style={{
+              top: utilizationPos.top,
+              left: utilizationPos.left,
+              width: 300,
+              background: panelBg,
+              border: `1px solid ${panelBorder}`,
+              backdropFilter: 'blur(24px)',
+              boxShadow: isDark ? '0 8px 24px rgba(0,0,0,0.5)' : '0 8px 24px rgba(0,0,0,0.12)',
+            }}
+          >
+            <div
+              className="text-[11px] font-semibold uppercase tracking-wider mb-3"
+              style={{ color: palette.textTertiary }}
+            >
+              Target Block Hours / Day
+            </div>
+            <div className="space-y-3">
+              {aircraftTypes.length === 0 && (
+                <div className="text-[13px] py-2" style={{ color: palette.textTertiary }}>
+                  No aircraft types loaded
+                </div>
+              )}
+              {[...aircraftTypes]
+                .sort((a, b) => a.icaoType.localeCompare(b.icaoType))
+                .map((acType) => {
+                  const target = utilizationTargets.get(acType.icaoType) ?? 10
+                  return (
+                    <div key={acType.icaoType}>
+                      <div className="text-[14px] font-semibold mb-1" style={{ color: palette.text }}>
+                        {acType.icaoType}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="range"
+                          min={2}
+                          max={18}
+                          step={0.5}
+                          value={target}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value)
+                            const next = new Map(utilizationTargets)
+                            next.set(acType.icaoType, val)
+                            setUtilizationTargets(next)
+                          }}
+                          className="flex-1 h-1.5"
+                          style={{ accentColor: '#06C270' }}
+                        />
+                        <span
+                          className="text-[14px] font-semibold tabular-nums w-10 text-right"
+                          style={{ color: '#06C270' }}
+                        >
+                          {target}h
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* ── Panels & Dialogs ── */}
+      <RecoveryParametersPanel anchorRef={paramsBtnRef} open={paramsOpen} onClose={() => setParamsOpen(false)} />
       <BulkAssignDialog open={bulkAssignOpen} onClose={() => setBulkAssignOpen(false)} />
       <RecoveryDialog open={optimizerOpen} onClose={() => setOptimizerOpen(false)} />
       <CompareDialog open={compareOpen} onClose={() => setCompareOpen(false)} />

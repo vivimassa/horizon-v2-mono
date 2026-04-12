@@ -55,13 +55,20 @@ const SECTIONS: SectionDef[] = [
       },
       {
         code: '2.1.2',
+        label: 'Aircraft Maintenance',
+        desc: 'Maintenance check configuration & scheduling',
+        icon: Wrench,
+        href: '/flight-ops/control/aircraft-maintenance',
+      },
+      {
+        code: '2.1.3',
         label: 'World Map',
         desc: 'Global fleet positions & tracking',
         icon: Map,
         href: '/flight-ops/control/world-map',
       },
       {
-        code: '2.1.3',
+        code: '2.1.4',
         label: 'Disruption Center',
         desc: 'IROPS management & recovery',
         icon: AlertTriangle,
@@ -116,7 +123,7 @@ const SECTIONS: SectionDef[] = [
         label: 'Check Setup',
         desc: 'Maintenance check configuration',
         icon: ShieldCheck,
-        href: '/flight-ops/aircraft-status/check-setup',
+        href: '/admin/maintenance-checks',
       },
       {
         code: '2.3.3',

@@ -49,6 +49,9 @@ const MOBILE_ROUTE_MAP: Record<string, string> = {
   '/settings/delay-codes': '/admin/delay-codes',
   '/settings/delay-code-detail': '/admin/delay-codes',
   '/settings/delay-code-add': '/admin/delay-codes',
+  '/settings/maintenance-checks': '/admin/maintenance-checks',
+  '/settings/maintenance-check-detail': '/admin/maintenance-checks',
+  '/settings/maintenance-check-add': '/admin/maintenance-checks',
 }
 
 /**

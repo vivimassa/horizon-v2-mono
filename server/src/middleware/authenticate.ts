@@ -11,10 +11,15 @@ declare module 'fastify' {
 const PUBLIC_PATHS = ['/health', '/auth/login', '/auth/refresh', '/auth/set-password']
 const PUBLIC_PREFIXES = ['/uploads/']
 
-function isPublic(url: string): boolean {
+const INTERNAL_PATHS = ['/gantt/seed-oooi']
+
+function isPublic(url: string, request?: FastifyRequest): boolean {
   const path = url.split('?')[0]
   if (PUBLIC_PATHS.includes(path)) return true
-  return PUBLIC_PREFIXES.some((prefix) => path.startsWith(prefix))
+  if (PUBLIC_PREFIXES.some((prefix) => path.startsWith(prefix))) return true
+  // Internal-only paths: allowed only via app.inject (x-internal header)
+  if (request?.headers['x-internal'] === 'true' && INTERNAL_PATHS.includes(path)) return true
+  return false
 }
 
 export function registerAuthMiddleware(app: FastifyInstance) {
@@ -23,7 +28,7 @@ export function registerAuthMiddleware(app: FastifyInstance) {
   app.decorateRequest('userRole', '')
 
   app.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
-    if (isPublic(request.url)) {
+    if (isPublic(request.url, request)) {
       return
     }
 

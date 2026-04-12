@@ -27,7 +27,7 @@ function parseTimeToMs(hhmm: string, _opDate: string, refUtcMs?: number): number
 
 function varianceBadge(actual: number | null, scheduled: number): { text: string; color: string } | null {
   if (!actual) return null
-  const totalMin = Math.round((actual - scheduled) / 60_000)
+  const totalMin = Math.trunc((actual - scheduled) / 60_000)
   if (totalMin === 0) return null
   const sign = totalMin > 0 ? '+' : '-'
   const abs = Math.abs(totalMin)
@@ -102,13 +102,38 @@ export function TimesTab({ data, onUpdate }: TimesTabProps) {
 
   return (
     <div className="grid gap-3" style={{ gridTemplateColumns: '5fr 3.5fr 3.5fr' }}>
-      {/* Left column: OOOI timeline with estimated + actual */}
+      {/* Left column: OOOI timeline with estimated + actual columns */}
       <div className="rounded-2xl p-3" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
         <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] mb-3" style={{ color: accent }}>
           Movement Times
         </h3>
 
-        <div className="space-y-2">
+        {/* Column headers */}
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-5 shrink-0" />
+          <div className="w-[88px] shrink-0" />
+          <span className="w-[80px] text-center text-[13px] font-bold uppercase shrink-0" style={{ color: muted }}>
+            Estimated
+          </span>
+          <span className="w-[80px] text-center text-[13px] font-bold uppercase shrink-0" style={{ color: muted }}>
+            Actual
+          </span>
+          <div className="flex-1" />
+        </div>
+
+        <div className="space-y-2 relative">
+          {/* Vertical connector line through the status dots */}
+          <div
+            className="absolute"
+            style={{
+              left: 10,
+              top: 18,
+              bottom: 18,
+              width: 2,
+              background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+              borderRadius: 1,
+            }}
+          />
           {/* D.CLOSE — actual only */}
           <TimeRow
             label="D.CLOSE"
@@ -129,7 +154,7 @@ export function TimesTab({ data, onUpdate }: TimesTabProps) {
           {/* DEP (OUT) — estimated + actual */}
           <TimeRow
             label="DEP (OUT)"
-            estimatedLabel="ETD"
+            hasEstimated
             estimatedValue={etd}
             onEstimatedChange={(v) => handleEstimatedChange('etdUtc', v)}
             actualValue={data.actual.atdUtc}
@@ -184,7 +209,7 @@ export function TimesTab({ data, onUpdate }: TimesTabProps) {
           {/* ARR (IN) — estimated + actual */}
           <TimeRow
             label="ARR (IN)"
-            estimatedLabel="ETA"
+            hasEstimated
             estimatedValue={eta}
             onEstimatedChange={(v) => handleEstimatedChange('etaUtc', v)}
             actualValue={data.actual.ataUtc}
@@ -483,10 +508,10 @@ function OooiRow({
   )
 }
 
-/** Movement time row — supports optional estimated column + actual column */
+/** Movement time row — two-column grid: Estimated | Actual, uniform styling */
 function TimeRow({
   label,
-  estimatedLabel,
+  hasEstimated,
   estimatedValue,
   onEstimatedChange,
   actualValue,
@@ -504,7 +529,7 @@ function TimeRow({
   inputBorder,
 }: {
   label: string
-  estimatedLabel?: string
+  hasEstimated?: boolean
   estimatedValue?: number | null
   onEstimatedChange?: (v: string) => void
   actualValue: number | null
@@ -521,12 +546,10 @@ function TimeRow({
   inputBg: string
   inputBorder: string
 }) {
-  const hasEstimated = !!estimatedLabel
-
   return (
     <div className="flex items-center gap-2">
-      {/* Status dot */}
-      <div className="w-5 h-5 flex items-center justify-center shrink-0">
+      {/* Status dot — z-10 to sit above connector line */}
+      <div className="w-5 h-5 flex items-center justify-center shrink-0 relative z-10">
         {isComplete ? (
           <div
             className="w-5 h-5 rounded-full flex items-center justify-center"
@@ -558,17 +581,14 @@ function TimeRow({
         )}
       </div>
 
-      {/* Label */}
-      <span className="text-[13px] font-semibold w-[72px] shrink-0" style={{ color: muted }}>
+      {/* Label — matches Origin/Destination: 13px font-bold */}
+      <span className="text-[13px] font-bold uppercase w-[88px] shrink-0" style={{ color: muted }}>
         {label}
       </span>
 
-      {/* Estimated input (only for DEP/ARR) */}
-      {hasEstimated ? (
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] font-semibold uppercase" style={{ color: isDark ? '#5B8DEF' : '#0063F7' }}>
-            {estimatedLabel}
-          </span>
+      {/* Estimated column — same styling as actual (no blue tint) */}
+      <div className="w-[80px] shrink-0 flex justify-center">
+        {hasEstimated ? (
           <TimeInput
             value={estimatedValue ?? null}
             onChange={onEstimatedChange!}
@@ -576,22 +596,15 @@ function TimeRow({
             refUtcMs={refUtcMs}
             isDark={isDark}
             muted={muted}
-            textPrimary={isDark ? '#5B8DEF' : '#0063F7'}
-            inputBg={isDark ? 'rgba(91,141,239,0.08)' : 'rgba(0,99,247,0.05)'}
-            inputBorder={isDark ? 'rgba(91,141,239,0.20)' : 'rgba(0,99,247,0.15)'}
+            textPrimary={textPrimary}
+            inputBg={inputBg}
+            inputBorder={inputBorder}
           />
-        </div>
-      ) : (
-        <div className="w-[90px]" /> /* spacer for alignment */
-      )}
+        ) : null}
+      </div>
 
-      {/* Actual input */}
-      <div className="flex items-center gap-1">
-        {hasEstimated && (
-          <span className="text-[10px] font-semibold uppercase" style={{ color: isComplete ? '#22c55e' : muted }}>
-            ACT
-          </span>
-        )}
+      {/* Actual column */}
+      <div className="w-[80px] shrink-0 flex justify-center">
         <TimeInput
           value={actualValue}
           onChange={onActualChange}
@@ -606,13 +619,15 @@ function TimeRow({
       </div>
 
       {/* Variance badge */}
-      {variance && (
+      {variance ? (
         <span
-          className="px-1.5 py-0.5 rounded-full text-white text-[11px] font-mono font-bold shrink-0"
+          className="px-1.5 py-0.5 rounded-full text-white text-[13px] font-mono font-bold shrink-0"
           style={{ background: variance.color }}
         >
           {variance.text}
         </span>
+      ) : (
+        <div className="flex-1" />
       )}
     </div>
   )
@@ -675,10 +690,11 @@ function TimeInput({
       value={localValue}
       onChange={(e) => handleChange(e.target.value)}
       onBlur={handleBlur}
-      className="w-[64px] h-[32px] text-center rounded-lg text-[14px] font-mono font-bold outline-none"
+      className="w-[72px] h-[36px] text-center rounded-lg text-[15px] font-mono font-bold outline-none"
       style={{
         background: inputBg,
         border: `1px solid ${inputBorder}`,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
         color: value != null || localValue ? textPrimary : `${muted}40`,
       }}
     />

@@ -71,7 +71,21 @@
       "Bash(git -C /c/Users/vivim/horizon-v2-mono diff --staged)",
       "Bash(git -C /c/Users/vivim/horizon-v2-mono diff)",
       "Bash(awk:*)",
-      "Bash(echo \"EXIT: $?\")"
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(pip install:*)",
+      "Bash(where python:*)",
+      "Bash(where py:*)",
+      "Bash(python -m pip --version)",
+      "Bash(py -m pip install -e .)",
+      "Bash(py -m uvicorn app.main:app --port 8080)",
+      "Bash(python -m py_compile app/models.py)",
+      "Bash(python -m py_compile app/solver/pricing.py)",
+      "Bash(python -m py_compile app/solver/cg_engine.py)",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(f'{len\\(data\\)} check types:'\\); [print\\(f'  {d[\\\\\"code\\\\\"]} - {d[\\\\\"name\\\\\"]}'\\) for d in data]\")",
+      "Bash(xargs cat:*)",
+      "Bash(ipconfig)",
+      "Bash(netsh advfirewall:*)",
+      "Bash(npm ls:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

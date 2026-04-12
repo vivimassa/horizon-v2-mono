@@ -2,6 +2,9 @@
 
 Solves a resource-constrained shortest path (SPPRC) per aircraft
 to find new columns (aircraft duties) with negative reduced cost.
+
+Supports: explicit flight retiming, curfew enforcement, block hour limits,
+max swap limits, and proper route-type TAT classification.
 """
 
 from __future__ import annotations
@@ -21,7 +24,11 @@ class Label:
     time: int  # epoch ms — current position time
     cost: float  # accumulated reduced cost
     flights: list[str] = field(default_factory=list)  # flight IDs in this routing
-    delay_minutes: int = 0
+    delay_minutes: int = 0  # total delay across all flights
+    flight_delays: dict[str, int] = field(default_factory=dict)  # flight_id -> delay_min
+    last_route_type: str = "domestic"  # route type of most recent flight (for TAT)
+    block_hours: float = 0.0  # cumulative block hours in path
+    swap_count: int = 0  # flights NOT originally on this aircraft
 
 
 @dataclass
@@ -34,6 +41,7 @@ class Column:
     reduced_cost: float
     delay_minutes: int = 0
     revenue_protected: float = 0.0
+    flight_delays: dict[str, int] = field(default_factory=dict)  # flight_id -> delay_min
 
 
 def solve_pricing(
@@ -47,6 +55,7 @@ def solve_pricing(
     """Find the column with most negative reduced cost for this aircraft.
 
     Uses a label-setting algorithm on the time-space network.
+    Enforces: retiming limits, curfews, block hour limits, swap limits.
     Returns None if no improving column exists (aircraft is optimal).
     """
     # Filter compatible flights sorted by departure
@@ -63,9 +72,15 @@ def solve_pricing(
     if not compatible:
         return None
 
+    # Build flight lookup for revenue computation
+    flight_map = {f.id: f for f in compatible}
+
     # Aircraft starting position
     start_station = aircraft.current_station or aircraft.home_base_icao or ""
     start_time = aircraft.available_from_utc or 0
+
+    max_delay_ms = config.max_delay_per_flight_minutes * 60_000
+    retiming_enabled = config.max_delay_per_flight_minutes > 0
 
     # Initialize with empty label at source
     best_label: Label | None = None
@@ -85,17 +100,53 @@ def solve_pricing(
             if label.station != flight.dep_station:
                 continue
 
-            # TAT check
-            tat_minutes = resolve_tat(ac_type, "domestic", "domestic")
+            # TAT check — use actual route types
+            inbound_type = label.last_route_type
+            outbound_type = flight.route_type
+            tat_minutes = resolve_tat(ac_type, inbound_type, outbound_type)
             min_depart = label.time + tat_minutes * 60_000
-            if flight.std_utc < min_depart:
-                continue
 
-            # Compute delay if connection forces later departure
-            delay_ms = max(0, min_depart - flight.std_utc)
+            # Determine delay needed
+            if flight.std_utc >= min_depart:
+                delay_ms = 0
+            elif retiming_enabled:
+                delay_ms = min_depart - flight.std_utc
+                if delay_ms > max_delay_ms:
+                    continue  # exceeds per-flight delay cap
+            else:
+                continue  # retiming disabled — skip unreachable flights
+
             delay_min = int(delay_ms / 60_000)
 
-            # Arc cost = operational cost - dual value (reduced cost contribution)
+            # Arrival time shifts by same amount as departure (block time preserved)
+            arrival_time = flight.sta_utc + delay_ms
+
+            # ── Constraint checks ──
+
+            # 1. Curfew: arrival must not fall in curfew window
+            if (
+                config.respect_curfews
+                and flight.arr_curfew_start_utc is not None
+                and flight.arr_curfew_end_utc is not None
+            ):
+                if flight.arr_curfew_start_utc <= arrival_time <= flight.arr_curfew_end_utc:
+                    continue  # would violate curfew
+
+            # 2. Block hour limit
+            new_block_hours = label.block_hours + flight.block_minutes / 60.0
+            if config.max_crew_duty_hours > 0 and new_block_hours > config.max_crew_duty_hours:
+                continue  # would exceed duty limit
+
+            # 3. Max swaps: count flights not originally on this aircraft
+            is_foreign = (
+                flight.aircraft_reg is not None
+                and flight.aircraft_reg != aircraft.registration
+            )
+            new_swap_count = label.swap_count + (1 if is_foreign else 0)
+            if config.max_swaps_per_aircraft > 0 and new_swap_count > config.max_swaps_per_aircraft:
+                continue  # too many swaps for this aircraft
+
+            # ── Arc cost ──
             dual = dual_values.get(flight.id, 0.0)
             arc_cost = (
                 flight_delay_cost(delay_min, flight, config)
@@ -109,10 +160,14 @@ def solve_pricing(
 
             new_label = Label(
                 station=flight.arr_station,
-                time=flight.sta_utc,
+                time=arrival_time,
                 cost=label.cost + arc_cost,
                 flights=label.flights + [flight.id],
                 delay_minutes=label.delay_minutes + delay_min,
+                flight_delays={**label.flight_delays, flight.id: delay_min} if delay_min > 0 else label.flight_delays.copy(),
+                last_route_type=flight.route_type,
+                block_hours=new_block_hours,
+                swap_count=new_swap_count,
             )
             new_labels.append(new_label)
 
@@ -125,6 +180,8 @@ def solve_pricing(
         labels.extend(new_labels)
 
         # Dominance pruning: keep only non-dominated labels per station
+        # A dominates B if: A.cost <= B.cost AND A.time <= B.time
+        #   AND A.block_hours <= B.block_hours AND A.swap_count <= B.swap_count
         by_station: dict[str, list[Label]] = {}
         for lbl in labels:
             by_station.setdefault(lbl.station, []).append(lbl)
@@ -133,10 +190,14 @@ def solve_pricing(
             station_labels.sort(key=lambda l: l.cost)
             kept: list[Label] = []
             for lbl in station_labels:
-                # Keep if no dominating label exists
                 dominated = False
                 for k in kept:
-                    if k.cost <= lbl.cost and k.time <= lbl.time:
+                    if (
+                        k.cost <= lbl.cost
+                        and k.time <= lbl.time
+                        and k.block_hours <= lbl.block_hours
+                        and k.swap_count <= lbl.swap_count
+                    ):
                         dominated = True
                         break
                 if not dominated:
@@ -148,7 +209,6 @@ def solve_pricing(
         return None  # No improving column
 
     # Compute revenue protected
-    flight_map = {f.id: f for f in compatible}
     revenue = sum(
         flight_map[fid].estimated_revenue
         for fid in best_label.flights
@@ -162,4 +222,5 @@ def solve_pricing(
         reduced_cost=best_label.cost,
         delay_minutes=best_label.delay_minutes,
         revenue_protected=revenue,
+        flight_delays=best_label.flight_delays,
     )

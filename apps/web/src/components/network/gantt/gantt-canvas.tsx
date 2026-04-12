@@ -109,9 +109,9 @@ export function GanttCanvas() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, vw, vh)
 
-    // Scenario mode: faint yellow background tint
+    // Scenario mode: yellow background tint
     if (scenarioId) {
-      ctx.fillStyle = isDark ? 'rgba(255,170,50,0.08)' : 'rgba(255,170,50,0.10)'
+      ctx.fillStyle = isDark ? 'rgba(255,170,50,0.20)' : 'rgba(255,170,50,0.40)'
       ctx.fillRect(0, 0, vw, vh)
     }
 

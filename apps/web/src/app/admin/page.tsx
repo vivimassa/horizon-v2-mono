@@ -24,6 +24,7 @@ import {
   UsersRound,
   Shield,
   CalendarDays,
+  ClipboardCheck,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -125,6 +126,13 @@ const SECTIONS: SectionDef[] = [
         desc: 'IATA standard & custom codes',
         icon: Timer,
         href: '/admin/delay-codes',
+      },
+      {
+        code: '5.2.4',
+        label: 'Maintenance Checks Setup',
+        desc: 'Check types, thresholds & windows',
+        icon: ClipboardCheck,
+        href: '/admin/maintenance-checks',
       },
     ],
   },

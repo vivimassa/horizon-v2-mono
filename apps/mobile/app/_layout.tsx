@@ -1,13 +1,13 @@
 import '../utils/api-url' // auto-detect API base URL — must be first
 import '../global.css'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Slot } from 'expo-router'
 import { View, ActivityIndicator } from 'react-native'
 import { api, setAuthCallbacks } from '@skyhub/api'
 import { useAuthStore, useTheme, QueryProvider } from '@skyhub/ui'
 import { ThemeProvider, useAppTheme } from '../providers/ThemeProvider'
 import { UserProvider } from '../providers/UserProvider'
-import { tokenStorage } from '../src/lib/token-storage'
+import { tokenStorage, hydrateTokenStorage } from '../src/lib/token-storage'
 import { promptBiometric } from '../src/lib/biometric-gate'
 import LoginScreen from './login'
 
@@ -44,14 +44,14 @@ function AuthGate() {
       },
     })
 
-    // Try to auto-log-in using the stored refresh token.
-    const stored = tokenStorage.getRefreshToken()
-    if (!stored) {
-      useAuthStore.getState().setLoading(false)
-      return
-    }
-
+    // Hydrate token cache from AsyncStorage, then try auto-login.
     const bootstrap = async () => {
+      await hydrateTokenStorage()
+      const stored = tokenStorage.getRefreshToken()
+      if (!stored) {
+        useAuthStore.getState().setLoading(false)
+        return
+      }
       // Biometric gate — only if the user opted in last time. On cancel or
       // failure we fall through to the login screen *without* clearing the
       // stored tokens, so the next password login can re-enable biometrics

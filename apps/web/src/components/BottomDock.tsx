@@ -44,7 +44,7 @@ export function BottomDock() {
 
   useEffect(() => {
     // Auto-collapse on fullscreen-style pages (Gantt, Scheduling XL)
-    const fullscreenPaths = ['/network/schedule/gantt', '/network/schedule/grid']
+    const fullscreenPaths = ['/network/', '/flight-ops/', '/ground-ops/', '/crew-ops/', '/admin/']
     if (fullscreenPaths.some((p) => pathname.startsWith(p))) {
       setCollapsed(true)
       return

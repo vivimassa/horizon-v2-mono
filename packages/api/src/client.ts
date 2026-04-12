@@ -1897,6 +1897,81 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ contractId, operatorCode, homeBase }),
     }),
+
+  // ─── Maintenance Checks ─────────────────────────────────
+
+  getMaintenanceCheckTypes: (operatorId = '') =>
+    request<MaintenanceCheckTypeRef[]>(`/maintenance-check-types?operatorId=${operatorId}`),
+
+  getMaintenanceCheckType: (id: string) => request<MaintenanceCheckTypeRef>(`/maintenance-check-types/${id}`),
+
+  createMaintenanceCheckType: (data: Partial<MaintenanceCheckTypeRef>) =>
+    request<MaintenanceCheckTypeRef>('/maintenance-check-types', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateMaintenanceCheckType: (id: string, data: Partial<MaintenanceCheckTypeRef>) =>
+    request<MaintenanceCheckTypeRef>(`/maintenance-check-types/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteMaintenanceCheckType: (id: string) =>
+    request<{ ok: boolean }>(`/maintenance-check-types/${id}`, {
+      method: 'DELETE',
+    }),
+
+  getMaintenanceWindows: (operatorId = '') =>
+    request<MaintenanceWindowRef[]>(`/maintenance-windows?operatorId=${operatorId}`),
+
+  createMaintenanceWindow: (data: Partial<MaintenanceWindowRef>) =>
+    request<MaintenanceWindowRef>('/maintenance-windows', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  deleteMaintenanceWindow: (id: string) =>
+    request<{ ok: boolean }>(`/maintenance-windows/${id}`, {
+      method: 'DELETE',
+    }),
+}
+
+// ─── Maintenance types ──────────────────────────────────
+
+export interface MaintenanceCheckTypeRef {
+  _id: string
+  operatorId: string
+  code: string
+  name: string
+  description: string | null
+  amosCode: string | null
+  applicableAircraftTypeIds: string[]
+  defaultHoursInterval: number | null
+  defaultCyclesInterval: number | null
+  defaultDaysInterval: number | null
+  defaultDurationHours: number | null
+  defaultStation: string | null
+  requiresGrounding: boolean
+  resetsCheckCodes: string[] | null
+  color: string | null
+  sortOrder: number
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface MaintenanceWindowRef {
+  _id: string
+  operatorId: string
+  base: string
+  windowStartUtc: string
+  windowEndUtc: string
+  windowDurationHours: number
+  isManualOverride: boolean
+  notes: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 // ─── Codeshare types ────────────────────────────────────

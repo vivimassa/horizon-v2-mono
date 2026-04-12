@@ -19,6 +19,8 @@ export interface RecoverySolution {
     fromReg: string | null
     toReg: string
     newStdUtc: number | null
+    newStaUtc: number | null
+    delayMinutes: number
     reason: string
   }>
 }
@@ -89,27 +91,35 @@ export function RecoverySolutionsPanel({
                 {sol.summary}
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <MetricCell
-                  icon={ArrowRight}
-                  label="Changed"
-                  value={String(m.flightsChanged)}
-                  color={m.flightsChanged > 0 ? '#FF8800' : '#06C270'}
-                  muted={muted}
-                />
-                <MetricCell
-                  icon={XCircle}
-                  label="Cancelled"
-                  value={String(m.cancellations)}
-                  color={m.cancellations > 0 ? '#E63535' : '#06C270'}
-                  muted={muted}
-                />
-                <MetricCell
-                  icon={Clock}
-                  label="Delay"
-                  value={`${m.totalDelayMinutes}min`}
-                  color={m.totalDelayMinutes > 60 ? '#FF8800' : '#06C270'}
-                  muted={muted}
-                />
+                {(() => {
+                  const swapped = sol.assignments?.filter((a) => a.fromReg !== a.toReg).length ?? 0
+                  const delayed = sol.assignments?.filter((a) => (a.delayMinutes ?? 0) > 0).length ?? 0
+                  return (
+                    <>
+                      <MetricCell
+                        icon={ArrowRight}
+                        label="Swapped"
+                        value={String(swapped)}
+                        color={swapped > 0 ? '#FF8800' : '#06C270'}
+                        muted={muted}
+                      />
+                      <MetricCell
+                        icon={Clock}
+                        label="Delayed"
+                        value={delayed > 0 ? `${delayed} (+${m.totalDelayMinutes}min)` : '0'}
+                        color={delayed > 0 ? '#FF8800' : '#06C270'}
+                        muted={muted}
+                      />
+                      <MetricCell
+                        icon={XCircle}
+                        label="Cancelled"
+                        value={String(m.cancellations)}
+                        color={m.cancellations > 0 ? '#E63535' : '#06C270'}
+                        muted={muted}
+                      />
+                    </>
+                  )
+                })()}
                 <MetricCell
                   icon={DollarSign}
                   label="Cost"
@@ -149,11 +159,23 @@ export function RecoverySolutionsPanel({
                         <span className="font-mono font-medium" style={{ color: text }}>
                           {a.flightId.split('|')[0]?.slice(-6)}
                         </span>
-                        <span style={{ color: muted }}>{a.fromReg ?? '—'}</span>
-                        <ArrowRight size={10} style={{ color: muted }} />
-                        <span className="font-medium" style={{ color: accent }}>
-                          {a.toReg}
-                        </span>
+                        {a.delayMinutes > 0 && (
+                          <span
+                            className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-semibold"
+                            style={{ background: 'rgba(255,136,0,0.12)', color: '#FF8800' }}
+                          >
+                            <Clock size={10} />+{a.delayMinutes}min
+                          </span>
+                        )}
+                        {a.fromReg !== a.toReg && (
+                          <>
+                            <span style={{ color: muted }}>{a.fromReg ?? '—'}</span>
+                            <ArrowRight size={10} style={{ color: muted }} />
+                            <span className="font-medium" style={{ color: accent }}>
+                              {a.toReg}
+                            </span>
+                          </>
+                        )}
                         <span className="flex-1 text-right truncate" style={{ color: muted }}>
                           {a.reason}
                         </span>
@@ -201,7 +223,7 @@ function MetricCell({
         <div className="text-[13px] font-semibold tabular-nums" style={{ color }}>
           {value}
         </div>
-        <div className="text-[10px]" style={{ color: muted }}>
+        <div className="text-[11px]" style={{ color: muted }}>
           {label}
         </div>
       </div>

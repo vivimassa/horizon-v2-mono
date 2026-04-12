@@ -6,6 +6,7 @@ import { AircraftRegistration } from '../models/AircraftRegistration.js'
 import { AircraftType } from '../models/AircraftType.js'
 import { FlightInstance } from '../models/FlightInstance.js'
 import { CityPair } from '../models/CityPair.js'
+import { Airport } from '../models/Airport.js'
 import { LopaConfig } from '../models/LopaConfig.js'
 import { Operator } from '../models/Operator.js'
 import { RecoveryRun } from '../models/RecoveryRun.js'
@@ -34,7 +35,19 @@ const solveSchema = z.object({
     delayCostPerMinute: z.number().min(0),
     cancelCostPerFlight: z.number().min(0),
     fuelPricePerKg: z.number().min(0),
-    referenceTimeUtc: z.string().optional(), // ISO datetime override for testing
+    referenceTimeUtc: z.string().optional(),
+    maxDelayPerFlightMinutes: z.number().int().min(0).max(180).default(0),
+    // Advanced constraints
+    connectionProtectionMinutes: z.number().int().min(0).max(180).default(0),
+    respectCurfews: z.boolean().default(false),
+    maxCrewDutyHours: z.number().min(0).max(20).default(0),
+    maxSwapsPerAircraft: z.number().int().min(0).max(10).default(0),
+    propagationMultiplier: z.number().min(1.0).max(5.0).default(1.0),
+    minImprovementUsd: z.number().min(0).default(0),
+    objectiveWeights: z
+      .object({ delay: z.number(), cost: z.number(), cancel: z.number(), revenue: z.number() })
+      .nullable()
+      .default(null),
   }),
 })
 
@@ -77,28 +90,37 @@ export async function recoveryRoutes(app: FastifyInstance): Promise<void> {
     console.log('[recovery/solve] period from:', from, 'to:', to)
 
     // ── Parallel data queries ──
-    const [scheduledFlights, registrations, acTypes, instances, cityPairs, lopaConfigs, operator] = await Promise.all([
-      ScheduledFlight.find({ operatorId, isActive: { $ne: false }, status: { $ne: 'cancelled' } }).lean(),
-      AircraftRegistration.find({ operatorId, isActive: true }).lean(),
-      AircraftType.find({ operatorId, isActive: true }).lean(),
-      FlightInstance.find({
-        operatorId,
-        operatingDate: { $gte: from, $lte: to },
-      }).lean(),
-      CityPair.find({ operatorId, isActive: true }).lean(),
-      LopaConfig.find({ operatorId, isActive: true }).lean(),
-      Operator.findById(operatorId).lean(),
-    ])
+    const [scheduledFlights, registrations, acTypes, instances, cityPairs, lopaConfigs, operator, airports] =
+      await Promise.all([
+        ScheduledFlight.find({ operatorId, isActive: { $ne: false }, status: { $ne: 'cancelled' } }).lean(),
+        AircraftRegistration.find({ operatorId, isActive: true }).lean(),
+        AircraftType.find({ operatorId, isActive: true }).lean(),
+        FlightInstance.find({
+          operatorId,
+          operatingDate: { $gte: from, $lte: to },
+        }).lean(),
+        CityPair.find({ operatorId, isActive: true }).lean(),
+        LopaConfig.find({ operatorId, isActive: true }).lean(),
+        Operator.findById(operatorId).lean(),
+        Airport.find({ operatorId, isActive: true }).lean(),
+      ])
 
     // Instance overlay map
     const instanceMap = new Map<string, (typeof instances)[0]>()
     for (const inst of instances) instanceMap.set(inst._id as string, inst)
 
     // CityPair revenue lookup: "IATA1-IATA2" → revenue[]
+    // CityPair route type lookup: "IATA1-IATA2" → "domestic" | "international"
     const revenueMap = new Map<string, (typeof cityPairs)[0]['revenue']>()
+    const routeTypeMap = new Map<string, string>()
     for (const cp of cityPairs) {
       const key = `${cp.station1Iata}-${cp.station2Iata}`
       revenueMap.set(key, cp.revenue ?? [])
+      if ((cp as any).routeType) {
+        routeTypeMap.set(key, (cp as any).routeType)
+        // Also set reverse direction
+        routeTypeMap.set(`${cp.station2Iata}-${cp.station1Iata}`, (cp as any).routeType)
+      }
     }
 
     // LOPA lookup for seat counts
@@ -109,6 +131,41 @@ export async function recoveryRoutes(app: FastifyInstance): Promise<void> {
           (lopa.cabins as Array<{ classCode: string; seats: number }>)?.reduce((s, c) => s + (c.seats ?? 0), 0) ?? 0
         lopaByType.set(lopa.aircraftType as string, totalSeats)
       }
+    }
+
+    // Airport curfew lookup: IATA → { startRelativeMs, endRelativeMs } (relative to midnight UTC)
+    const curfewMap = new Map<string, { startRelativeMs: number; endRelativeMs: number }>()
+    for (const apt of airports) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const a = apt as any
+      if (!a.hasCurfew || !a.curfewStart || !a.curfewEnd) continue
+      const offsetMs = ((a.utcOffsetHours as number) ?? 0) * 3_600_000
+      const startLocalMs = timeStringToMs(a.curfewStart)
+      const endLocalMs = timeStringToMs(a.curfewEnd)
+      curfewMap.set(a.iataCode as string, {
+        startRelativeMs: startLocalMs - offsetMs,
+        endRelativeMs: endLocalMs - offsetMs,
+      })
+    }
+
+    // CityPair average load factor lookup for pax estimation
+    const loadFactorMap = new Map<string, number>()
+    for (const cp of cityPairs) {
+      const key1 = `${cp.station1Iata}-${cp.station2Iata}`
+      const key2 = `${cp.station2Iata}-${cp.station1Iata}`
+      const rev = cp.revenue as Array<{ loadFactor?: number }> | undefined
+      if (rev && rev.length > 0) {
+        const avgLf = rev.reduce((s, r) => s + (r.loadFactor ?? 0.85), 0) / rev.length
+        loadFactorMap.set(key1, avgLf)
+        loadFactorMap.set(key2, avgLf)
+      }
+    }
+
+    // Rotation size lookup: rotationId → total legs count
+    const rotationSizeMap = new Map<string, number>()
+    for (const sf of scheduledFlights) {
+      const rid = sf.rotationId as string | null
+      if (rid) rotationSizeMap.set(rid, (rotationSizeMap.get(rid) ?? 0) + 1)
     }
 
     // ── Expand flights (same logic as gantt.ts) ──
@@ -128,7 +185,14 @@ export async function recoveryRoutes(app: FastifyInstance): Promise<void> {
       aircraft_reg: string | null
       rotation_id: string | null
       rotation_sequence: number | null
+      route_type: string
       estimated_revenue: number
+      pax_count: number
+      connecting_pax: number
+      is_priority: boolean
+      rotation_total_legs: number
+      arr_curfew_start_utc: number | null
+      arr_curfew_end_utc: number | null
     }
 
     const allFlights: ExpandedFlight[] = []
@@ -180,6 +244,34 @@ export async function recoveryRoutes(app: FastifyInstance): Promise<void> {
         // If multiple classes, estimatedRevenue sums them all — divide by class count for avg
         if (revenue.length > 1) estimatedRevenue = estimatedRevenue / revenue.length
 
+        // Resolve route type from CityPair
+        const rtKey = `${depIata}-${arrIata}`
+        const routeType = routeTypeMap.get(rtKey) ?? 'domestic'
+
+        // Pax count: prefer FlightInstance expected pax, fall back to LOPA × load factor
+        const instPax = inst?.pax as
+          | { adultExpected?: number; childExpected?: number; infantExpected?: number }
+          | undefined
+        const expectedPax =
+          (instPax?.adultExpected ?? 0) + (instPax?.childExpected ?? 0) + (instPax?.infantExpected ?? 0)
+        const avgLoadFactor = loadFactorMap.get(rtKey) ?? 0.85
+        const lopaPax = Math.round(totalSeats * avgLoadFactor)
+        const paxCount = expectedPax > 0 ? expectedPax : lopaPax
+
+        // Connecting pax from FlightInstance outgoing connections
+        const instConn = (inst as any)?.connections?.outgoing as Array<{ pax?: number }> | undefined
+        const connectingPax = instConn?.reduce((s: number, c) => s + (c.pax ?? 0), 0) ?? 0
+
+        // Rotation context
+        const rotationId = (sf.rotationId as string) ?? null
+        const rotationTotalLegs = rotationId ? (rotationSizeMap.get(rotationId) ?? 1) : 1
+
+        // Arrival airport curfew (convert to absolute UTC ms for this operating day)
+        const arrCurfew = curfewMap.get(arrIata)
+        const dayBaseMs = dayMs + (arrOffset - 1) * DAY_MS // arrival day base
+        const arrCurfewStartUtc = arrCurfew ? dayBaseMs + arrCurfew.startRelativeMs : null
+        const arrCurfewEndUtc = arrCurfew ? dayBaseMs + arrCurfew.endRelativeMs : null
+
         allFlights.push({
           id: compositeId,
           flight_number: sf.flightNumber as string,
@@ -190,9 +282,16 @@ export async function recoveryRoutes(app: FastifyInstance): Promise<void> {
           block_minutes: (sf.blockMinutes as number) ?? Math.round((staMs - stdMs) / 60_000),
           aircraft_type_icao: acTypeIcao,
           aircraft_reg: aircraftReg,
-          rotation_id: (sf.rotationId as string) ?? null,
+          rotation_id: rotationId,
           rotation_sequence: (sf.rotationSequence as number) ?? null,
+          route_type: routeType,
           estimated_revenue: Math.round(estimatedRevenue * 100) / 100,
+          pax_count: paxCount,
+          connecting_pax: connectingPax,
+          is_priority: false,
+          rotation_total_legs: rotationTotalLegs,
+          arr_curfew_start_utc: arrCurfewStartUtc,
+          arr_curfew_end_utc: arrCurfewEndUtc,
         })
       }
     }
@@ -305,6 +404,14 @@ export async function recoveryRoutes(app: FastifyInstance): Promise<void> {
         delay_cost_per_minute: config.delayCostPerMinute,
         cancel_cost_per_flight: config.cancelCostPerFlight,
         fuel_price_per_kg: config.fuelPricePerKg,
+        max_delay_per_flight_minutes: config.maxDelayPerFlightMinutes,
+        connection_protection_minutes: config.connectionProtectionMinutes,
+        respect_curfews: config.respectCurfews,
+        max_crew_duty_hours: config.maxCrewDutyHours,
+        max_swaps_per_aircraft: config.maxSwapsPerAircraft,
+        propagation_multiplier: config.propagationMultiplier,
+        min_improvement_usd: config.minImprovementUsd,
+        objective_weights: config.objectiveWeights,
       },
     }
 

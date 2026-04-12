@@ -28,6 +28,7 @@ import { slotRoutes } from './routes/slots.js'
 import { codeshareRoutes } from './routes/codeshare.js'
 import { charterRoutes } from './routes/charter.js'
 import { recoveryRoutes } from './routes/recovery.js'
+import { maintenanceCheckRoutes } from './routes/maintenance-checks.js'
 import { loadOurAirportsData, startAutoRefresh } from './data/ourairports-cache.js'
 
 const port = env.PORT
@@ -84,34 +85,44 @@ async function main(): Promise<void> {
   await app.register(codeshareRoutes)
   await app.register(charterRoutes)
   await app.register(recoveryRoutes)
+  await app.register(maintenanceCheckRoutes)
 
   // Start
   await app.listen({ port, host: '0.0.0.0' })
   console.log(`✓ Server listening on port ${port}`)
 
-  // ── OOOI Simulation — seed actual times every 15 minutes ──
+  // ── OOOI Simulation — seed actual times on startup + every 15 minutes ──
   const OOOI_SIM_INTERVAL = 15 * 60_000 // 15 minutes
   const OOOI_SIM_ENABLED = process.env.OOOI_SIM !== 'false' // enabled by default, set OOOI_SIM=false to disable
 
   if (OOOI_SIM_ENABLED) {
-    console.log('✓ OOOI simulation enabled (every 15 min)')
-    setInterval(async () => {
+    const seedOooi = async (from?: string, to?: string) => {
       try {
         const today = new Date().toISOString().slice(0, 10)
         const res = await app.inject({
           method: 'POST',
           url: '/gantt/seed-oooi',
           headers: { 'content-type': 'application/json', 'x-internal': 'true' },
-          payload: JSON.stringify({ operatorId: 'horizon', from: today, to: today, otpTarget: 0.85 }),
+          payload: JSON.stringify({ operatorId: 'horizon', from: from ?? today, to: to ?? today, otpTarget: 0.85 }),
         })
         const result = JSON.parse(res.body)
         if (result.created) {
-          console.log(`  OOOI sim: seeded ${result.created} flights`)
+          console.log(`  OOOI sim: seeded ${result.created} flights (${from ?? today} → ${to ?? today})`)
         }
       } catch (e) {
         console.error('  OOOI sim error:', (e as Error).message)
       }
-    }, OOOI_SIM_INTERVAL)
+    }
+
+    // Seed immediately on startup — backfill last 3 days to catch up after restarts
+    console.log('✓ OOOI simulation enabled (startup + every 15 min)')
+    const now = new Date()
+    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60_000).toISOString().slice(0, 10)
+    const today = now.toISOString().slice(0, 10)
+    await seedOooi(threeDaysAgo, today)
+
+    // Then continue every 15 minutes
+    setInterval(seedOooi, OOOI_SIM_INTERVAL)
   }
 }
 

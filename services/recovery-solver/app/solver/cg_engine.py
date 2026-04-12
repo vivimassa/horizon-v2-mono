@@ -102,7 +102,8 @@ async def solve(request: SolveRequest) -> AsyncGenerator[dict, None]:
             break
 
         # Solve RMP (Restricted Master Problem)
-        sense = LpMaximize if config.objective == Objective.MAX_REVENUE else LpMinimize
+        # Blended mode always minimizes; single-objective MAX_REVENUE maximizes
+        sense = LpMinimize if config.objective_weights else (LpMaximize if config.objective == Objective.MAX_REVENUE else LpMinimize)
         prob = LpProblem("RecoveryRMP", sense)
 
         # Column variables
@@ -225,11 +226,12 @@ async def solve(request: SolveRequest) -> AsyncGenerator[dict, None]:
             if prev_cols:
                 prob += lpSum(x[i] for i in prev_cols) <= len(prev_cols) - 1, f"exclude_{sol_idx}_{len(solutions)}"
 
-        if config.objective == Objective.MAX_REVENUE:
+        if not config.objective_weights and config.objective == Objective.MAX_REVENUE:
             prob += lpSum(x[i] * col.revenue_protected for i, col in enumerate(columns)) - lpSum(
                 cancel_vars[f.id] * flight_cancel_penalty(f, config) for f in request.available_flights
             )
         else:
+            # Minimize cost (column cost + cancellation penalties) — works for both single and blended mode
             prob += lpSum(x[i] * col.total_cost for i, col in enumerate(columns)) + lpSum(
                 cancel_vars[f.id] * flight_cancel_penalty(f, config) for f in request.available_flights
             )
@@ -237,7 +239,7 @@ async def solve(request: SolveRequest) -> AsyncGenerator[dict, None]:
         remaining_time = max(1, int(config.max_solve_seconds - (time.time() * 1000 - start_ms) / 1000))
         prob.solve(PULP_CBC_CMD(msg=0, timeLimit=remaining_time))
 
-        # Extract solution
+        # Extract solution — emit changes for swapped OR delayed flights
         assignments: list[AssignmentChange] = []
         cancelled_ids: set[str] = set()
         revenue_protected = 0.0
@@ -247,21 +249,39 @@ async def solve(request: SolveRequest) -> AsyncGenerator[dict, None]:
             if x[i].varValue and x[i].varValue > 0.5:
                 for fid in col.flight_ids:
                     flight = flight_map.get(fid)
-                    if flight:
-                        from_reg = flight.aircraft_reg
-                        to_reg = col.aircraft_reg
-                        if from_reg != to_reg:
-                            assignments.append(
-                                AssignmentChange(
-                                    flight_id=fid,
-                                    from_reg=from_reg,
-                                    to_reg=to_reg,
-                                    reason=f"Reassigned from {from_reg or 'unassigned'} to {to_reg}",
-                                )
-                            )
-                        revenue_protected += flight.estimated_revenue
+                    if not flight:
+                        continue
 
-                total_delay += col.delay_minutes
+                    from_reg = flight.aircraft_reg
+                    to_reg = col.aircraft_reg
+                    is_swapped = from_reg != to_reg
+                    delay_min = col.flight_delays.get(fid, 0)
+                    is_delayed = delay_min > 0
+
+                    if is_swapped or is_delayed:
+                        # Compute new times if delayed
+                        delay_ms = delay_min * 60_000
+                        new_std = flight.std_utc + delay_ms if is_delayed else None
+                        new_sta = flight.sta_utc + delay_ms if is_delayed else None
+
+                        reason = _build_reason(from_reg, to_reg, is_swapped, is_delayed, delay_min)
+
+                        assignments.append(
+                            AssignmentChange(
+                                flight_id=fid,
+                                from_reg=from_reg,
+                                to_reg=to_reg,
+                                new_std_utc=new_std,
+                                new_sta_utc=new_sta,
+                                delay_minutes=delay_min,
+                                reason=reason,
+                            )
+                        )
+
+                    revenue_protected += flight.estimated_revenue
+
+                # Sum per-flight delays from this column
+                total_delay += sum(col.flight_delays.values())
 
         for f in request.available_flights:
             cv = cancel_vars.get(f.id)
@@ -272,10 +292,13 @@ async def solve(request: SolveRequest) -> AsyncGenerator[dict, None]:
         cancel_cost = cancellations * config.cancel_cost_per_flight
         delay_cost = total_delay * config.delay_cost_per_minute
 
+        delayed_count = sum(1 for a in assignments if a.delay_minutes > 0)
+        swapped_count = sum(1 for a in assignments if a.from_reg != a.to_reg)
+
         solution = Solution(
             id=str(uuid.uuid4()),
             label=labels[sol_idx] if sol_idx < len(labels) else f"Option {sol_idx + 1}",
-            summary=_build_summary(len(assignments), cancellations, total_delay),
+            summary=_build_summary(swapped_count, delayed_count, cancellations, total_delay),
             metrics=SolutionMetrics(
                 total_delay_minutes=total_delay,
                 flights_changed=len(assignments),
@@ -286,6 +309,13 @@ async def solve(request: SolveRequest) -> AsyncGenerator[dict, None]:
             ),
             assignments=assignments,
         )
+
+        # Min improvement filter: skip solutions too similar to previous ones
+        if config.min_improvement_usd > 0 and len(solutions) > 0:
+            prev_cost = abs(solutions[-1].metrics.estimated_cost_impact)
+            this_cost = abs(solution.metrics.estimated_cost_impact)
+            if abs(prev_cost - this_cost) < config.min_improvement_usd:
+                continue  # not different enough — try next
 
         solutions.append(solution)
 
@@ -304,6 +334,7 @@ async def solve(request: SolveRequest) -> AsyncGenerator[dict, None]:
             departed=len(request.locked_flights),
             within_threshold=0,  # counted at Fastify level
             beyond_horizon=len(request.frozen_flights),
+            available=len(request.available_flights),
         ),
         solve_time_ms=int(time.time() * 1000) - start_ms,
     )
@@ -332,14 +363,30 @@ def _progress(
     }
 
 
-def _build_summary(changed: int, cancelled: int, delay: int) -> str:
+def _build_reason(
+    from_reg: str | None,
+    to_reg: str,
+    is_swapped: bool,
+    is_delayed: bool,
+    delay_min: int,
+) -> str:
+    """Build a human-readable reason for an assignment change."""
     parts = []
-    if changed:
-        parts.append(f"{changed} flight{'s' if changed != 1 else ''} reassigned")
+    if is_delayed:
+        parts.append(f"Delayed +{delay_min}min")
+    if is_swapped:
+        parts.append(f"reassigned from {from_reg or 'unassigned'} to {to_reg}")
+    return ", ".join(parts)
+
+
+def _build_summary(swapped: int, delayed: int, cancelled: int, total_delay: int) -> str:
+    parts = []
+    if swapped:
+        parts.append(f"{swapped} reassigned")
+    if delayed:
+        parts.append(f"{delayed} delayed (+{total_delay}min)")
     if cancelled:
         parts.append(f"{cancelled} cancellation{'s' if cancelled != 1 else ''}")
-    if delay:
-        parts.append(f"+{delay}min total delay")
     if not parts:
         return "No changes needed"
     return ", ".join(parts)

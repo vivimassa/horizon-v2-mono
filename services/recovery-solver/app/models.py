@@ -37,8 +37,18 @@ class Flight(BaseModel):
     aircraft_reg: str | None = None  # current assignment
     rotation_id: str | None = None
     rotation_sequence: int | None = None
+    route_type: str = "domestic"  # "domestic" | "international" — from CityPair
     # Revenue estimate (pre-computed by Fastify from CityPair + LOPA)
     estimated_revenue: float = 0.0  # USD
+    # Pax & connections (from FlightInstance + LOPA)
+    pax_count: int = 0  # actual/estimated pax (0 = use fallback 180)
+    connecting_pax: int = 0  # pax with onward connections at arrival
+    is_priority: bool = False  # must-operate flight (10x cancel penalty)
+    # Rotation context (for propagation penalty)
+    rotation_total_legs: int = 1
+    # Arrival airport curfew window (UTC ms) — None if no curfew
+    arr_curfew_start_utc: int | None = None
+    arr_curfew_end_utc: int | None = None
 
 
 class Aircraft(BaseModel):
@@ -62,6 +72,15 @@ class AircraftType(BaseModel):
     fuel_burn_rate_kg_per_hour: float | None = None
 
 
+class ObjectiveWeights(BaseModel):
+    """Weight vector for multi-objective blending. Values should sum to ~1.0."""
+
+    delay: float = 0.25
+    cost: float = 0.25
+    cancel: float = 0.25
+    revenue: float = 0.25
+
+
 class SolveConfig(BaseModel):
     """All parameters — no defaults baked in. Fastify provides everything."""
 
@@ -73,6 +92,15 @@ class SolveConfig(BaseModel):
     delay_cost_per_minute: float  # USD per pax per minute
     cancel_cost_per_flight: float  # USD per cancelled flight
     fuel_price_per_kg: float  # USD per kg
+    max_delay_per_flight_minutes: int = 0  # 0 = retiming disabled (swap-only)
+    # Advanced constraints
+    connection_protection_minutes: int = 0  # MCT for pax connections (0 = disabled)
+    respect_curfews: bool = False  # block arrivals during airport curfew
+    max_crew_duty_hours: float = 0  # max block hours per aircraft duty (0 = unlimited)
+    max_swaps_per_aircraft: int = 0  # max foreign flights per aircraft (0 = unlimited)
+    propagation_multiplier: float = 1.0  # delay cascade penalty (1.0 = no extra)
+    min_improvement_usd: float = 0  # filter solutions below this improvement (0 = show all)
+    objective_weights: ObjectiveWeights | None = None  # null = single objective mode
 
 
 class SolveRequest(BaseModel):
@@ -94,6 +122,8 @@ class AssignmentChange(BaseModel):
     from_reg: str | None = None
     to_reg: str
     new_std_utc: int | None = None  # if retimed
+    new_sta_utc: int | None = None  # if retimed (block time preserved)
+    delay_minutes: int = 0  # how many minutes this flight was delayed
     reason: str  # human-readable explanation
 
 
@@ -118,6 +148,7 @@ class LockedCounts(BaseModel):
     departed: int = 0
     within_threshold: int = 0
     beyond_horizon: int = 0
+    available: int = 0
 
 
 class SolveResult(BaseModel):

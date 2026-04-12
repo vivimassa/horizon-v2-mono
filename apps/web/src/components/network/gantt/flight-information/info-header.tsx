@@ -106,9 +106,14 @@ export function InfoHeader({ data }: { data: FlightDetail }) {
   const ataValue = data.actual.ataUtc ? fmtUtc(data.actual.ataUtc) : fmtUtc(data.staUtc)
   const atdLabel = data.actual.atdUtc ? 'ATD' : 'STD'
   const ataLabel = data.actual.ataUtc ? 'ATA' : 'STA'
-  // Compute delay from OOOI: ATD - STD (departure delay is the primary indicator)
-  const depDelayMs = data.actual.atdUtc ? data.actual.atdUtc - data.stdUtc : 0
-  const delayMin = depDelayMs > 0 ? Math.round(depDelayMs / 60_000) : 0
+  // Compute delay: arrival delay (ATA - STA) when flight completed, else departure delay (ATD - STD)
+  const isCompleted = data.actual.ataUtc != null
+  const delayMs = isCompleted
+    ? data.actual.ataUtc! - data.staUtc
+    : data.actual.atdUtc
+      ? data.actual.atdUtc - data.stdUtc
+      : 0
+  const delayMin = delayMs > 0 ? Math.trunc(delayMs / 60_000) : 0
   const hasDelay = delayMin > 0
   const sColor = statusColor(data.status)
 

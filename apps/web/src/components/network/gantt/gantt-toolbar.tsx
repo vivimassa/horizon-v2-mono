@@ -275,14 +275,6 @@ export function GanttToolbar({
       active: centerTimebar,
     },
     {
-      icon: isFullscreen ? Minimize2 : Maximize2,
-      label: isFullscreen ? 'Exit' : 'Fullscreen',
-      tooltip: isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen',
-      onClick: onFullscreen,
-      active: isFullscreen,
-    },
-    // Settings
-    {
       icon: Activity,
       label: 'Utilization',
       tooltip: 'Set target block hours per AC type',
@@ -290,6 +282,14 @@ export function GanttToolbar({
       ref: utilBtnRef,
       active: utilOpen,
     },
+    {
+      icon: isFullscreen ? Minimize2 : Maximize2,
+      label: isFullscreen ? 'Exit' : 'Fullscreen',
+      tooltip: isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen',
+      onClick: onFullscreen,
+      active: isFullscreen,
+    },
+    // Settings
     {
       icon: GitBranch,
       label: 'Scenario',
@@ -455,6 +455,17 @@ export function GanttToolbar({
           {/* ── Display ── */}
           <RibbonSection label="Display">
             <RibbonBtn
+              ref={utilBtnRef}
+              icon={Activity}
+              label="Utilization"
+              onClick={() => setUtilOpen((o) => !o)}
+              active={utilOpen}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Set target block hours per AC type"
+            />
+            <RibbonBtn
               ref={formatBtnRef}
               icon={LayoutGrid}
               label="Format"
@@ -532,17 +543,6 @@ export function GanttToolbar({
 
           {/* ── Settings ── */}
           <RibbonSection label="Settings">
-            <RibbonBtn
-              ref={utilBtnRef}
-              icon={Activity}
-              label="Utilization"
-              onClick={() => setUtilOpen((o) => !o)}
-              active={utilOpen}
-              isDark={isDark}
-              hoverBg={hoverBg}
-              activeBg={activeBg}
-              tooltip="Set target block hours per AC type"
-            />
             <RibbonBtn
               icon={GitBranch}
               label="Scenario"

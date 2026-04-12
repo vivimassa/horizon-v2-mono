@@ -779,6 +779,16 @@ export const NAV_TREE: NavModuleData[] = [
             group: 'Flight Ops',
             groupIconName: 'Plane',
           },
+          {
+            key: 'maintenance-checks',
+            label: 'Maintenance Checks Setup',
+            num: '5.2.4',
+            route: '/admin/maintenance-checks',
+            iconName: 'ClipboardCheck',
+            desc: 'Check types, thresholds & windows',
+            group: 'Flight Ops',
+            groupIconName: 'Plane',
+          },
           // Crew Ops
           {
             key: 'crew-bases',

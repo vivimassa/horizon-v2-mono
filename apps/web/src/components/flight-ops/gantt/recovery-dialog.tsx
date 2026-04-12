@@ -9,6 +9,7 @@ import { useGanttStore } from '@/stores/use-gantt-store'
 import { useOperatorStore } from '@/stores/use-operator-store'
 import { authedFetch } from '@/lib/authed-fetch'
 import { getApiBaseUrl } from '@skyhub/api'
+import { useRecoveryConfigStore } from '@/stores/use-recovery-config-store'
 import { RecoveryConfigPanel, type RecoveryConfig } from './recovery-config-panel'
 import { RecoverySolutionsPanel, type RecoverySolution } from './recovery-solutions-panel'
 
@@ -38,18 +39,12 @@ export function RecoveryDialog({ open, onClose }: { open: boolean; onClose: () =
   const periodTo = useGanttStore((s) => s.periodTo)
   const operatorId = useOperatorStore((s) => s.operator?._id ?? '')
 
+  const config = useRecoveryConfigStore((s) => s.config)
+  const setConfig = useRecoveryConfigStore((s) => s.setConfig)
+  const configLoaded = useRecoveryConfigStore((s) => s.loaded)
+  const setConfigLoaded = useRecoveryConfigStore((s) => s.setLoaded)
+
   const [phase, setPhase] = useState<Phase>('config')
-  const [config, setConfig] = useState<RecoveryConfig>({
-    objective: 'min_cost',
-    horizonHours: 12,
-    lockThresholdMinutes: 60,
-    maxSolutions: 3,
-    maxSolveSeconds: 60,
-    delayCostPerMinute: 50,
-    cancelCostPerFlight: 50000,
-    fuelPricePerKg: 0.8,
-    referenceTimeUtc: '',
-  })
   const [solving, setSolving] = useState(false)
   const [progress, setProgress] = useState<ProgressState | null>(null)
   const [solutions, setSolutions] = useState<RecoverySolution[]>([])
@@ -59,28 +54,36 @@ export function RecoveryDialog({ open, onClose }: { open: boolean; onClose: () =
   const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
-  // Load operator recovery config defaults on mount
+  // Load operator recovery config defaults once
   useEffect(() => {
-    if (!operatorId) return
+    if (!operatorId || configLoaded) return
     authedFetch(`${getApiBaseUrl()}/operators/${operatorId}`)
       .then((res) => res.json())
       .then((op) => {
         if (op?.recoveryConfig) {
-          setConfig((prev) => ({
-            ...prev,
-            objective: op.recoveryConfig.defaultObjective ?? prev.objective,
-            horizonHours: op.recoveryConfig.horizonHours ?? prev.horizonHours,
-            lockThresholdMinutes: op.recoveryConfig.lockThresholdMinutes ?? prev.lockThresholdMinutes,
-            maxSolutions: op.recoveryConfig.maxSolutions ?? prev.maxSolutions,
-            maxSolveSeconds: op.recoveryConfig.maxSolveSeconds ?? prev.maxSolveSeconds,
-            delayCostPerMinute: op.recoveryConfig.delayCostPerMinute ?? prev.delayCostPerMinute,
-            cancelCostPerFlight: op.recoveryConfig.cancelCostPerFlight ?? prev.cancelCostPerFlight,
-            fuelPricePerKg: op.recoveryConfig.fuelPricePerKg ?? prev.fuelPricePerKg,
-          }))
+          const rc = op.recoveryConfig
+          setConfig({
+            objective: rc.defaultObjective ?? config.objective,
+            horizonHours: rc.horizonHours ?? config.horizonHours,
+            lockThresholdMinutes: rc.lockThresholdMinutes ?? config.lockThresholdMinutes,
+            maxSolutions: rc.maxSolutions ?? config.maxSolutions,
+            maxSolveSeconds: rc.maxSolveSeconds ?? config.maxSolveSeconds,
+            delayCostPerMinute: rc.delayCostPerMinute ?? config.delayCostPerMinute,
+            cancelCostPerFlight: rc.cancelCostPerFlight ?? config.cancelCostPerFlight,
+            fuelPricePerKg: rc.fuelPricePerKg ?? config.fuelPricePerKg,
+            maxDelayPerFlightMinutes: rc.maxDelayPerFlightMinutes ?? config.maxDelayPerFlightMinutes,
+            connectionProtectionMinutes: rc.connectionProtectionMinutes ?? config.connectionProtectionMinutes,
+            respectCurfews: rc.respectCurfews ?? config.respectCurfews,
+            maxCrewDutyHours: rc.maxCrewDutyHours ?? config.maxCrewDutyHours,
+            maxSwapsPerAircraft: rc.maxSwapsPerAircraft ?? config.maxSwapsPerAircraft,
+            propagationMultiplier: rc.propagationMultiplier ?? config.propagationMultiplier,
+            minImprovementUsd: rc.minImprovementUsd ?? config.minImprovementUsd,
+          })
         }
+        setConfigLoaded()
       })
       .catch(() => {})
-  }, [operatorId])
+  }, [operatorId, configLoaded])
 
   const handleSolve = useCallback(async () => {
     if (!operatorId || !periodFrom || !periodTo) return
@@ -145,7 +148,9 @@ export function RecoveryDialog({ open, onClose }: { open: boolean; onClose: () =
                 setLocked(parsed)
               } else if (currentEvent === 'result') {
                 setSolutions(parsed.solutions ?? [])
-                setLocked(parsed.locked ?? null)
+                if (parsed.locked) {
+                  setLocked((prev) => ({ ...prev, ...parsed.locked }))
+                }
               } else if (currentEvent === 'error') {
                 setError(parsed.message ?? 'Unknown solver error')
               }
@@ -180,14 +185,32 @@ export function RecoveryDialog({ open, onClose }: { open: boolean; onClose: () =
 
     setApplying(true)
 
-    // Group assignments by target registration
-    const byReg = new Map<string, string[]>()
+    // Group assignments by target registration, including delay data
+    const byReg = new Map<
+      string,
+      {
+        flightIds: string[]
+        delays: { flightId: string; delayMinutes: number; newStdUtcMs: number; newStaUtcMs: number }[]
+      }
+    >()
     for (const a of sol.assignments) {
-      const list = byReg.get(a.toReg) ?? []
-      list.push(a.flightId)
-      byReg.set(a.toReg, list)
+      const entry = byReg.get(a.toReg) ?? { flightIds: [], delays: [] }
+      entry.flightIds.push(a.flightId)
+      if (a.newStdUtc && a.newStaUtc && a.delayMinutes > 0) {
+        entry.delays.push({
+          flightId: a.flightId,
+          delayMinutes: a.delayMinutes,
+          newStdUtcMs: a.newStdUtc,
+          newStaUtcMs: a.newStaUtc,
+        })
+      }
+      byReg.set(a.toReg, entry)
     }
-    const assignments = [...byReg.entries()].map(([registration, flightIds]) => ({ registration, flightIds }))
+    const assignments = [...byReg.entries()].map(([registration, { flightIds, delays }]) => ({
+      registration,
+      flightIds,
+      ...(delays.length > 0 ? { delays } : {}),
+    }))
 
     try {
       await authedFetch(`${getApiBaseUrl()}/gantt/bulk-assign`, {
@@ -289,7 +312,7 @@ export function RecoveryDialog({ open, onClose }: { open: boolean; onClose: () =
           {phase === 'config' && (
             <RecoveryConfigPanel
               config={config}
-              onChange={(patch) => setConfig((prev) => ({ ...prev, ...patch }))}
+              onChange={setConfig}
               onSolve={handleSolve}
               solving={solving}
               isDark={isDark}

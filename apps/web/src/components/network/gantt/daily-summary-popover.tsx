@@ -223,7 +223,7 @@ export function DailySummaryPopover() {
               Flights
             </span>
             <span className="text-[13px] font-bold text-center" style={{ color: textMuted }}>
-              Block
+              Avg Block
             </span>
             <span className="text-[13px] font-bold text-center" style={{ color: textMuted }}>
               AC
@@ -242,7 +242,7 @@ export function DailySummaryPopover() {
                 {row.flights}
               </span>
               <span className="text-[13px] font-mono text-center" style={{ color: text }}>
-                {row.blockHrs.toFixed(1)}h
+                {row.avgActive.toFixed(1)}h
               </span>
               <span className="text-[13px] font-mono text-center" style={{ color: textSec }}>
                 {row.activeAc}/{row.fleetAc}

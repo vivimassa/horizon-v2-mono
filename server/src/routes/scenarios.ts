@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { Scenario } from '../models/Scenario.js'
 import { ScheduledFlight } from '../models/ScheduledFlight.js'
+import { MovementMessageLog } from '../models/MovementMessageLog.js'
 
 const createSchema = z
   .object({
@@ -296,11 +297,18 @@ export async function scenarioRoutes(app: FastifyInstance): Promise<void> {
       $set: { status: 'published', publishedAt: now, publishedBy: publishedBy || 'system', updatedAt: now },
     })
 
+    // Release held MVT messages for this scenario
+    const mvtRelease = await MovementMessageLog.updateMany(
+      { operatorId, scenarioId: id, status: 'held' },
+      { $set: { status: 'pending', scenarioId: null, updatedAtUtc: now } },
+    )
+
     return {
       added: added.length,
       modified: modified.length,
       deleted: deleted.length,
       unchanged,
+      mvtReleased: mvtRelease.modifiedCount,
       details: { added, modified, deleted },
     }
   })

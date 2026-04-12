@@ -78,12 +78,15 @@ export const SLOT_STATUS_COLORS: Record<string, string> = {
   conditional: '#00CFDE',
 }
 
-/** Utilization risk level colors for corner flags */
+/** Utilization risk level colors for slot lines */
 export const SLOT_RISK_COLORS: Record<string, string> = {
   safe: '#06C270',
   close: '#FF8800',
   at_risk: '#FF3B3B',
 }
+
+/** Color for missing OOOI times corner flags */
+export const MISSING_TIMES_FLAG_COLOR = '#FF8800'
 
 /** Default palette when AircraftType.color is null. */
 export const AC_TYPE_COLOR_PALETTE = [

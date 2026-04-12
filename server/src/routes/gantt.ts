@@ -12,6 +12,9 @@ import { Operator } from '../models/Operator.js'
 import { OptimizerRun } from '../models/OptimizerRun.js'
 import { SlotSeries } from '../models/SlotSeries.js'
 import { SlotDate } from '../models/SlotDate.js'
+import { MovementMessageLog } from '../models/MovementMessageLog.js'
+import { encodeMvtMessage } from '@skyhub/logic/src/iata/mvt-encoder'
+import type { MvtActionCode } from '@skyhub/logic/src/iata/types'
 
 // ── Zod schemas ──
 
@@ -102,7 +105,18 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
               $lte: to,
             },
           },
-          { _id: 1, 'tail.registration': 1, 'tail.icaoType': 1, status: 1 },
+          {
+            _id: 1,
+            'tail.registration': 1,
+            'tail.icaoType': 1,
+            status: 1,
+            'actual.atdUtc': 1,
+            'actual.offUtc': 1,
+            'actual.onUtc': 1,
+            'actual.ataUtc': 1,
+            'estimated.etdUtc': 1,
+            'estimated.etaUtc': 1,
+          },
         ).lean(),
         Operator.findById(operatorId, { countryIso2: 1 }).lean(),
         LopaConfig.find({ operatorId, isActive: true }, { _id: 1, aircraftType: 1, cabins: 1, isDefault: 1 }).lean(),
@@ -111,12 +125,34 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
 
     const operatorCountry = (operator?.countryIso2 as string) ?? null
 
-    // Build instance overlay map: compositeId → { reg, cancelled }
-    const instanceMap = new Map<string, { reg: string | null; cancelled: boolean }>()
+    // Build instance overlay map: compositeId → { reg, cancelled, actual/estimated times }
+    const instanceMap = new Map<
+      string,
+      {
+        reg: string | null
+        cancelled: boolean
+        atdUtc: number | null
+        offUtc: number | null
+        onUtc: number | null
+        ataUtc: number | null
+        etdUtc: number | null
+        etaUtc: number | null
+      }
+    >()
     for (const inst of instances) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const a = (inst as any).actual
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const e = (inst as any).estimated
       instanceMap.set(inst._id as string, {
         reg: inst.tail?.registration ?? null,
         cancelled: inst.status === 'cancelled',
+        atdUtc: a?.atdUtc ?? null,
+        offUtc: a?.offUtc ?? null,
+        onUtc: a?.onUtc ?? null,
+        ataUtc: a?.ataUtc ?? null,
+        etdUtc: e?.etdUtc ?? null,
+        etaUtc: e?.etaUtc ?? null,
       })
     }
 
@@ -193,6 +229,13 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
           rotationId: sf.rotationId ?? null,
           rotationSequence: sf.rotationSequence ?? null,
           rotationLabel: sf.rotationLabel ?? null,
+          // OOOI actual + estimated times from FlightInstance
+          atdUtc: inst?.atdUtc ?? null,
+          offUtc: inst?.offUtc ?? null,
+          onUtc: inst?.onUtc ?? null,
+          ataUtc: inst?.ataUtc ?? null,
+          etdUtc: inst?.etdUtc ?? null,
+          etaUtc: inst?.etaUtc ?? null,
         })
       }
     }
@@ -1095,6 +1138,63 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     }
 
     await FlightInstance.findOneAndUpdate({ _id: compositeId }, { $set: update }, { upsert: true, new: true })
+
+    // ── MVT auto-generation on OOOI change ──
+    const newActual = (body.actual as Record<string, number | null>) ?? {}
+    const prevActual = (existing?.actual as Record<string, number | null>) ?? {}
+
+    // Detect which OOOI event just occurred
+    let mvtAction: MvtActionCode | null = null
+    if ((newActual.onUtc || newActual.ataUtc) && !prevActual.onUtc && !prevActual.ataUtc) {
+      mvtAction = 'AA'
+    } else if ((newActual.atdUtc || newActual.offUtc) && !prevActual.atdUtc && !prevActual.offUtc) {
+      mvtAction = 'AD'
+    }
+
+    if (mvtAction) {
+      const epochToHHMM = (ms: number): string => {
+        const d = new Date(ms)
+        return `${String(d.getUTCHours()).padStart(2, '0')}${String(d.getUTCMinutes()).padStart(2, '0')}`
+      }
+
+      const mvtRaw = encodeMvtMessage({
+        flightId: {
+          airline: flightNumber.slice(0, 2),
+          flightNumber: flightNumber.slice(2),
+          dayOfMonth: operatingDate.slice(-2),
+          registration: (tailReg ?? '').replace(/-/g, ''),
+          station: mvtAction === 'AD' ? depCodes.iata : arrCodes.iata,
+        },
+        actionCode: mvtAction,
+        offBlocks: newActual.atdUtc ? epochToHHMM(newActual.atdUtc) : undefined,
+        airborne: newActual.offUtc ? epochToHHMM(newActual.offUtc) : undefined,
+        touchdown: newActual.onUtc ? epochToHHMM(newActual.onUtc) : undefined,
+        onBlocks: newActual.ataUtc ? epochToHHMM(newActual.ataUtc) : undefined,
+      })
+
+      const activeScenarioId = (body.scenarioId as string) ?? null
+      const now = new Date().toISOString()
+
+      await MovementMessageLog.create({
+        _id: crypto.randomUUID(),
+        operatorId,
+        messageType: 'MVT',
+        actionCode: mvtAction,
+        direction: 'outbound',
+        status: activeScenarioId ? 'held' : 'pending',
+        flightNumber,
+        flightDate: operatingDate,
+        registration: tailReg,
+        depStation: depCodes.iata,
+        arrStation: arrCodes.iata,
+        summary: `MVT ${mvtAction} ${flightNumber} ${operatingDate}`,
+        rawMessage: mvtRaw,
+        scenarioId: activeScenarioId,
+        flightInstanceId: compositeId,
+        createdAtUtc: now,
+        updatedAtUtc: now,
+      })
+    }
 
     return { success: true, id: compositeId }
   })

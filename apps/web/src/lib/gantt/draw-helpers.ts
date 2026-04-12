@@ -1,5 +1,5 @@
 import type { BarLayout, RowLayout, TickMark } from './types'
-import { SLOT_STATUS_COLORS, SLOT_RISK_COLORS } from './colors'
+import { SLOT_RISK_COLORS, MISSING_TIMES_FLAG_COLOR } from './colors'
 
 // ── Helpers ──
 
@@ -480,21 +480,18 @@ export function drawDropTarget(
   ctx.fillRect(sx, row.y, 3, row.height)
 }
 
-// ── Slot Status Indicators ──
+// ── Slot Risk Lines (below flight bars) ──
 
 /**
- * Draw a corner flag in the top-right of flight bars that have a linked slot status.
- * The flag is a filled triangle whose 90-degree corner follows the bar's border radius,
- * creating a seamless "folded corner" effect.
+ * Draw a colored horizontal line below flight bars with slot utilization risk.
+ * Replaces the previous corner-flag approach for slot status.
  *
- *   Bar top-right corner:
- *          ╭──────╮
- *          │  ◣   │  ← colored triangle fills the corner
- *          │      │
- *
- * The curved edge uses an arc matching the bar's 4px radius.
+ *   ╭──────────────╮
+ *   │  flight bar  │
+ *   ╰──────────────╯
+ *   ━━━━━━━━━━━━━━━━  ← risk line (orange for close, red for at_risk)
  */
-export function drawSlotIndicators(
+export function drawSlotLines(
   ctx: CanvasRenderingContext2D,
   bars: BarLayout[],
   sx: number,
@@ -502,52 +499,110 @@ export function drawSlotIndicators(
   vw: number,
   vh: number,
 ) {
-  const BAR_RADIUS = 4
-  const FLAG_SIZE = 12 // triangle leg length
+  const LINE_HEIGHT = 3
+  const LINE_GAP = 2
 
   for (const bar of bars) {
-    const status = bar.flight.slotStatus
-    if (!status) continue
-
-    // Hide "safe" flags to reduce visual noise — only show close / at_risk
     const riskLevel = bar.flight.slotRiskLevel
-    if (riskLevel === 'safe') continue
+    if (!riskLevel || riskLevel === 'safe') continue
 
-    // Use risk-level color if available, otherwise fall back to slot status color
-    const color = riskLevel ? SLOT_RISK_COLORS[riskLevel] : SLOT_STATUS_COLORS[status]
+    const color = SLOT_RISK_COLORS[riskLevel]
     if (!color) continue
 
-    // Skip bars outside viewport
-    // Note: canvas is already translated by (-sx, -sy), so use bar coords directly
-    if (bar.x + bar.width < sx || bar.x > sx + vw || bar.y + bar.height < sy || bar.y > sy + vh) continue
-
-    // Slightly larger flag for at-risk flights, clamped so tiny bars
-    // don't get a flag that overflows the bar
-    const baseFlag = riskLevel === 'at_risk' ? 14 : FLAG_SIZE
-    const flagSize = Math.max(4, Math.min(baseFlag, bar.width, bar.height))
-    const radius = Math.min(BAR_RADIUS, flagSize)
-
-    // Top-right corner of the bar
-    const rx = bar.x + bar.width
-    const ty = bar.y
+    // Viewport culling
+    if (bar.x + bar.width < sx || bar.x > sx + vw) continue
+    const lineY = bar.y + bar.height + LINE_GAP
+    if (lineY + LINE_HEIGHT < sy || bar.y > sy + vh) continue
 
     ctx.save()
 
-    // Pulse animation for at-risk flights
+    // Pulse animation for at_risk
     if (riskLevel === 'at_risk') {
       ctx.globalAlpha = 0.65 + 0.35 * Math.sin(Date.now() / 400)
     }
 
-    ctx.beginPath()
-    ctx.moveTo(rx - flagSize, ty)
-    ctx.lineTo(rx - radius, ty)
-    ctx.arc(rx - radius, ty + radius, radius, -Math.PI / 2, 0)
-    ctx.lineTo(rx, ty + flagSize)
-    ctx.closePath()
-
     ctx.fillStyle = color
+    rr(ctx, bar.x, lineY, bar.width, LINE_HEIGHT, LINE_HEIGHT / 2)
     ctx.fill()
 
     ctx.restore()
+  }
+}
+
+// ── Missing OOOI Times Corner Flags ──
+
+/**
+ * Draw corner flags on flight bars with missing actual times (OOOI).
+ * - Top-LEFT flag: departure missing (ATD or OFF)
+ * - Top-RIGHT flag: arrival missing (ATA or ON)
+ *
+ * Logic ported from V1 operations-gantt.tsx:
+ *   depMissing = now >= min(STD, ETD) + grace && (!ATD || !OFF)
+ *   arrMissing = now >= min(STA, ETA) + grace && (!ATA || !ON)
+ */
+export function drawMissingTimeFlags(
+  ctx: CanvasRenderingContext2D,
+  bars: BarLayout[],
+  sx: number,
+  sy: number,
+  vw: number,
+  vh: number,
+  graceMins: number,
+) {
+  const BAR_RADIUS = 4
+  const FLAG_SIZE = 12
+  const now = Date.now()
+  const graceMs = graceMins * 60_000
+
+  for (const bar of bars) {
+    const f = bar.flight
+
+    // Viewport culling
+    if (bar.x + bar.width < sx || bar.x > sx + vw) continue
+    if (bar.y + bar.height < sy || bar.y > sy + vh) continue
+
+    // Departure missing: now >= min(STD, ETD) + grace AND (no ATD OR no OFF)
+    const etdVal = f.etdUtc ?? Infinity
+    const depThreshold = Math.min(f.stdUtc, etdVal) + graceMs
+    const depMissing = now >= depThreshold && (!f.atdUtc || !f.offUtc)
+
+    // Arrival missing: now >= min(STA, ETA) + grace AND (no ATA OR no ON)
+    const etaVal = f.etaUtc ?? Infinity
+    const arrThreshold = Math.min(f.staUtc, etaVal) + graceMs
+    const arrMissing = now >= arrThreshold && (!f.ataUtc || !f.onUtc)
+
+    if (!depMissing && !arrMissing) continue
+
+    // Clamp flag size; /2 prevents left+right overlap on narrow bars
+    const flagSize = Math.max(4, Math.min(FLAG_SIZE, bar.width / 2, bar.height))
+    const radius = Math.min(BAR_RADIUS, flagSize)
+
+    ctx.fillStyle = MISSING_TIMES_FLAG_COLOR
+
+    // Top-LEFT flag: departure missing
+    if (depMissing) {
+      const lx = bar.x
+      const ty = bar.y
+      ctx.beginPath()
+      ctx.moveTo(lx + flagSize, ty)
+      ctx.lineTo(lx + radius, ty)
+      ctx.arc(lx + radius, ty + radius, radius, -Math.PI / 2, Math.PI, true)
+      ctx.lineTo(lx, ty + flagSize)
+      ctx.closePath()
+      ctx.fill()
+    }
+
+    // Top-RIGHT flag: arrival missing
+    if (arrMissing) {
+      const rx = bar.x + bar.width
+      const ty = bar.y
+      ctx.beginPath()
+      ctx.moveTo(rx - flagSize, ty)
+      ctx.lineTo(rx - radius, ty)
+      ctx.arc(rx - radius, ty + radius, radius, -Math.PI / 2, 0)
+      ctx.lineTo(rx, ty + flagSize)
+      ctx.closePath()
+      ctx.fill()
+    }
   }
 }

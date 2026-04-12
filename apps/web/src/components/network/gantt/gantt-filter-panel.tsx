@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { ChevronLeft, ChevronRight, ChevronDown, Filter, Search, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Filter, Search, Loader2, MessageSquare, Radio } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { useGanttStore } from '@/stores/use-gantt-store'
@@ -15,7 +15,15 @@ const SCHEDULE_STATUSES = [
   { key: 'cancelled', label: 'Cancelled', color: '#FF3B3B' },
 ] as const
 
-export function GanttFilterPanel({ forceCollapsed = false, onGo }: { forceCollapsed?: boolean; onGo?: () => void }) {
+export function GanttFilterPanel({
+  forceCollapsed = false,
+  onGo,
+  mode = 'network',
+}: {
+  forceCollapsed?: boolean
+  onGo?: () => void
+  mode?: 'network' | 'ops'
+}) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
@@ -219,6 +227,48 @@ export function GanttFilterPanel({ forceCollapsed = false, onGo }: { forceCollap
               ))}
             </div>
           </FilterSection>
+
+          {/* Communication — ops mode only */}
+          {mode === 'ops' && (
+            <FilterSection label="Communication">
+              <div className="flex flex-col gap-2">
+                <button
+                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150"
+                  style={{
+                    background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
+                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+                    color: isDark ? '#F5F2FD' : '#1C1C28',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = isDark ? 'rgba(91,141,239,0.3)' : 'rgba(30,64,175,0.2)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
+                  }}
+                >
+                  <MessageSquare size={15} style={{ color: isDark ? '#5B8DEF' : '#1e40af' }} />
+                  ASM / SSM
+                </button>
+                <button
+                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150"
+                  style={{
+                    background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
+                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+                    color: isDark ? '#F5F2FD' : '#1C1C28',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = isDark ? 'rgba(91,141,239,0.3)' : 'rgba(30,64,175,0.2)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
+                  }}
+                >
+                  <Radio size={15} style={{ color: isDark ? '#5B8DEF' : '#1e40af' }} />
+                  MVT / LDM
+                </button>
+              </div>
+            </FilterSection>
+          )}
         </div>
 
         {/* Go Button */}

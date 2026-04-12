@@ -20,6 +20,7 @@ import {
   XCircle,
   AlertTriangle,
   Fuel,
+  DollarSign,
 } from 'lucide-react'
 
 function fmtBlock(min: number): string {
@@ -52,6 +53,7 @@ const TABS = [
   { key: 'general', label: 'General', icon: Info },
   { key: 'block-hours', label: 'Block Hours', icon: Clock },
   { key: 'fuel', label: 'Fuel', icon: Fuel },
+  { key: 'revenue', label: 'Revenue', icon: DollarSign },
 ] as const
 
 type TabKey = (typeof TABS)[number]['key']
@@ -599,6 +601,7 @@ export function CityPairDetail({ cityPair, onSave, onDelete, onCreate, onRefresh
         )}
         {activeTab === 'block-hours' && <BlockHoursTab cityPair={cityPair} onRefresh={onRefresh} mode="block" />}
         {activeTab === 'fuel' && <BlockHoursTab cityPair={cityPair} onRefresh={onRefresh} mode="fuel" />}
+        {activeTab === 'revenue' && <RevenueTab cityPair={cityPair} onRefresh={onRefresh} />}
       </div>
     </div>
   )
@@ -1025,6 +1028,293 @@ function BlockHourFormFields({
             />
           </div>
         </div>
+      )}
+    </>
+  )
+}
+
+/* ── Revenue Tab ── */
+function RevenueTab({ cityPair, onRefresh }: { cityPair: CityPairRef; onRefresh?: () => void }) {
+  const [adding, setAdding] = useState(false)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({
+    classCode: 'Y',
+    dir1Yield: '',
+    dir2Yield: '',
+    loadFactor: '0.85',
+    currency: 'USD',
+    notes: '',
+  })
+
+  const resetForm = () => {
+    setForm({ classCode: 'Y', dir1Yield: '', dir2Yield: '', loadFactor: '0.85', currency: 'USD', notes: '' })
+    setAdding(false)
+    setEditId(null)
+  }
+
+  const handleSave = async () => {
+    const d1 = parseFloat(form.dir1Yield)
+    const d2 = parseFloat(form.dir2Yield)
+    const lf = parseFloat(form.loadFactor)
+    if (isNaN(d1) || isNaN(d2) || d1 < 0 || d2 < 0) return
+    setSaving(true)
+    try {
+      const data = {
+        classCode: form.classCode,
+        dir1YieldPerPax: d1,
+        dir2YieldPerPax: d2,
+        loadFactor: isNaN(lf) ? 0.85 : lf,
+        currency: form.currency || 'USD',
+        notes: form.notes || null,
+      }
+      if (editId) {
+        await api.updateRevenue(cityPair._id, editId, data)
+      } else {
+        await api.addRevenue(cityPair._id, data)
+      }
+      onRefresh?.()
+      resetForm()
+    } catch (e) {
+      console.error('Revenue save failed:', e)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleEdit = (rev: CityPairRef['revenue'][number]) => {
+    setEditId(rev._id)
+    setAdding(true)
+    setForm({
+      classCode: rev.classCode,
+      dir1Yield: String(rev.dir1YieldPerPax),
+      dir2Yield: String(rev.dir2YieldPerPax),
+      loadFactor: String(rev.loadFactor),
+      currency: rev.currency,
+      notes: rev.notes ?? '',
+    })
+  }
+
+  const handleDelete = async (revId: string) => {
+    await api.deleteRevenue(cityPair._id, revId)
+    onRefresh?.()
+  }
+
+  const entries = cityPair.revenue ?? []
+  const s1 = cityPair.station1Iata ?? cityPair.station1Icao
+  const s2 = cityPair.station2Iata ?? cityPair.station2Icao
+
+  const inputClass =
+    'h-9 px-3 rounded-lg text-[14px] bg-hz-card border border-hz-border outline-none focus:border-module-accent transition-colors w-full'
+  const labelClass = 'text-[12px] font-medium text-hz-text-secondary mb-1'
+
+  return (
+    <>
+      {/* Existing entries — desktop table */}
+      {entries.length > 0 && (
+        <div className="mb-4">
+          {/* Desktop: table layout */}
+          <div className="hidden sm:block">
+            <table className="w-full">
+              <thead>
+                <tr className="text-[11px] font-semibold uppercase tracking-wider text-hz-text-tertiary">
+                  <th className="text-left px-3 py-2 w-16">Class</th>
+                  <th className="text-right px-3 py-2">
+                    {s1}→{s2}
+                  </th>
+                  <th className="text-right px-3 py-2">
+                    {s2}→{s1}
+                  </th>
+                  <th className="text-right px-3 py-2 w-20">Load %</th>
+                  <th className="text-center px-3 py-2 w-14">Ccy</th>
+                  <th className="w-20" />
+                </tr>
+              </thead>
+              <tbody className="text-[14px]">
+                {entries.map((rev) => (
+                  <tr key={rev._id} className="border-t border-hz-border hover:bg-hz-hover/50 transition-colors">
+                    <td className="px-3 py-2.5 font-semibold">{rev.classCode}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">${rev.dir1YieldPerPax.toFixed(2)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">${rev.dir2YieldPerPax.toFixed(2)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">{(rev.loadFactor * 100).toFixed(0)}%</td>
+                    <td className="px-3 py-2.5 text-center text-[13px] text-hz-text-secondary">{rev.currency}</td>
+                    <td className="px-2 py-2.5">
+                      <div className="flex gap-1 justify-end">
+                        <button
+                          onClick={() => handleEdit(rev)}
+                          className="w-7 h-7 rounded-md flex items-center justify-center text-hz-text-tertiary hover:text-module-accent hover:bg-hz-hover transition-colors"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(rev._id)}
+                          className="w-7 h-7 rounded-md flex items-center justify-center text-hz-text-tertiary hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile: card layout */}
+          <div className="sm:hidden space-y-2">
+            {entries.map((rev) => (
+              <div key={rev._id} className="rounded-lg bg-hz-card border border-hz-border p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[15px] font-semibold">{rev.classCode}</span>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => handleEdit(rev)}
+                      className="w-7 h-7 rounded-md flex items-center justify-center text-hz-text-tertiary hover:text-module-accent hover:bg-hz-hover transition-colors"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(rev._id)}
+                      className="w-7 h-7 rounded-md flex items-center justify-center text-hz-text-tertiary hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-y-1.5 text-[13px]">
+                  <span className="text-hz-text-tertiary">
+                    {s1}→{s2}
+                  </span>
+                  <span className="text-right tabular-nums font-medium">${rev.dir1YieldPerPax.toFixed(2)}</span>
+                  <span className="text-hz-text-tertiary">
+                    {s2}→{s1}
+                  </span>
+                  <span className="text-right tabular-nums font-medium">${rev.dir2YieldPerPax.toFixed(2)}</span>
+                  <span className="text-hz-text-tertiary">Load Factor</span>
+                  <span className="text-right tabular-nums">{(rev.loadFactor * 100).toFixed(0)}%</span>
+                  <span className="text-hz-text-tertiary">Currency</span>
+                  <span className="text-right">{rev.currency}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {entries.length === 0 && !adding && (
+        <div className="text-center py-8 text-[13px] text-hz-text-tertiary">
+          No revenue data — using network defaults
+        </div>
+      )}
+
+      {/* Add / Edit form */}
+      {adding ? (
+        <div className="rounded-xl border border-hz-border bg-hz-card p-4 space-y-3">
+          <div className="text-[13px] font-semibold text-hz-text">
+            {editId ? 'Edit Revenue Entry' : 'Add Revenue Entry'}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className={labelClass}>Cabin Class</div>
+              <select
+                value={form.classCode}
+                onChange={(e) => setForm((p) => ({ ...p, classCode: e.target.value }))}
+                className={inputClass}
+              >
+                <option value="Y">Y — Economy</option>
+                <option value="J">J — Business</option>
+                <option value="F">F — First</option>
+                <option value="W">W — Premium Economy</option>
+              </select>
+            </div>
+            <div>
+              <div className={labelClass}>Currency</div>
+              <select
+                value={form.currency}
+                onChange={(e) => setForm((p) => ({ ...p, currency: e.target.value }))}
+                className={inputClass}
+              >
+                <option value="USD">USD</option>
+                <option value="VND">VND</option>
+                <option value="EUR">EUR</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <div className={labelClass}>
+                Yield {s1}→{s2} (per pax)
+              </div>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={form.dir1Yield}
+                onChange={(e) => setForm((p) => ({ ...p, dir1Yield: e.target.value }))}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <div className={labelClass}>
+                Yield {s2}→{s1} (per pax)
+              </div>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={form.dir2Yield}
+                onChange={(e) => setForm((p) => ({ ...p, dir2Yield: e.target.value }))}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <div className={labelClass}>Load Factor</div>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="1"
+                placeholder="0.85"
+                value={form.loadFactor}
+                onChange={(e) => setForm((p) => ({ ...p, loadFactor: e.target.value }))}
+                className={inputClass}
+              />
+            </div>
+          </div>
+          <div>
+            <div className={labelClass}>Notes</div>
+            <input
+              value={form.notes}
+              onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+              placeholder="Optional"
+              className={inputClass}
+            />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={handleSave}
+              disabled={saving || !form.dir1Yield || !form.dir2Yield}
+              className="h-8 px-4 rounded-lg text-[13px] font-semibold text-white bg-module-accent hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center gap-1.5"
+            >
+              <Check size={14} /> {editId ? 'Update' : 'Add'}
+            </button>
+            <button
+              onClick={resetForm}
+              className="h-8 px-4 rounded-lg text-[13px] font-medium text-hz-text-secondary border border-hz-border hover:bg-hz-hover transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setAdding(true)}
+          className="w-full h-10 rounded-xl border border-dashed border-hz-border text-[13px] font-medium text-hz-text-tertiary hover:text-module-accent hover:border-module-accent transition-colors flex items-center justify-center gap-2"
+        >
+          <Plus size={14} /> Add Revenue Entry
+        </button>
       )}
     </>
   )

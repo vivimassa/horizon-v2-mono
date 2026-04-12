@@ -47,6 +47,18 @@ interface GanttState {
   fleetSortOrder: FleetSortOrder
   showTat: boolean
   showSlots: boolean
+  showMissingTimes: boolean
+  oooiGraceMins: number
+  // Ops-specific (2.1.1 Movement Control)
+  showAlerts: boolean
+  alertCategories: {
+    missingTimes: boolean
+    considerableDelay: boolean
+    curfew: boolean
+    crewFtl: boolean
+    depArrIncompat: boolean
+  }
+  optimizerObjective: 'revenue' | 'cost'
   containerWidth: number
 
   // Utilization targets (acTypeIcao → target block hours per day)
@@ -116,6 +128,11 @@ interface GanttState {
   setFleetSortOrder: (order: FleetSortOrder) => void
   toggleTat: () => void
   toggleSlots: () => void
+  toggleMissingTimes: () => void
+  setOooiGraceMins: (mins: number) => void
+  toggleAlerts: () => void
+  toggleAlertCategory: (key: keyof GanttState['alertCategories']) => void
+  setOptimizerObjective: (obj: 'revenue' | 'cost') => void
   setUtilizationTargets: (targets: Map<string, number>) => void
   selectFlight: (id: string, multi?: boolean) => void
   clearSelection: () => void
@@ -286,6 +303,17 @@ export const useGanttStore = create<GanttState>((set, get) => {
     fleetSortOrder: 'type' as FleetSortOrder,
     showTat: true,
     showSlots: true,
+    showMissingTimes: true,
+    oooiGraceMins: 15,
+    showAlerts: false,
+    alertCategories: {
+      missingTimes: true,
+      considerableDelay: false,
+      curfew: false,
+      crewFtl: false,
+      depArrIncompat: false,
+    },
+    optimizerObjective: 'revenue' as const,
     utilizationTargets: new Map(),
     _forcedPlacements: null,
     containerWidth: 1200,
@@ -378,6 +406,23 @@ export const useGanttStore = create<GanttState>((set, get) => {
 
     toggleTat: () => set({ showTat: !get().showTat }),
     toggleSlots: () => set({ showSlots: !get().showSlots }),
+    toggleMissingTimes: () => set({ showMissingTimes: !get().showMissingTimes }),
+    toggleAlerts: () => set({ showAlerts: !get().showAlerts }),
+    toggleAlertCategory: (key) => {
+      const cats = { ...get().alertCategories }
+      cats[key] = !cats[key]
+      const anyOn = Object.values(cats).some(Boolean)
+      const patch: Partial<GanttState> = { alertCategories: cats, showAlerts: anyOn }
+      // Sync canvas flags: missingTimes controls showMissingTimes
+      if (key === 'missingTimes') patch.showMissingTimes = cats.missingTimes
+      set(patch)
+    },
+    setOptimizerObjective: (obj) => set({ optimizerObjective: obj }),
+    setOooiGraceMins: (mins) => {
+      const clamped = Math.max(1, Math.min(60, mins))
+      set({ oooiGraceMins: clamped })
+      localStorage.setItem('gantt.oooiGraceMins', String(clamped))
+    },
 
     selectFlight: (id, multi = false) => {
       const sel = multi ? new Set(get().selectedFlightIds) : new Set<string>()
@@ -634,6 +679,8 @@ export const useGanttStore = create<GanttState>((set, get) => {
       const from = localStorage.getItem('gantt.periodFrom') ?? ''
       const to = localStorage.getItem('gantt.periodTo') ?? ''
       if (from && to) set({ periodFrom: from, periodTo: to })
+      const savedGrace = localStorage.getItem('gantt.oooiGraceMins')
+      if (savedGrace) set({ oooiGraceMins: parseInt(savedGrace, 10) || 15 })
       try {
         const raw = localStorage.getItem('gantt.utilizationTargets')
         if (raw) set({ utilizationTargets: new Map(JSON.parse(raw)) })

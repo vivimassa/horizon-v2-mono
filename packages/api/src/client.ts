@@ -659,7 +659,18 @@ export interface CityPairRef {
   etopsDiversionTimeMinutes: number | null
   isOverwater: boolean
   blockHours: BlockHourData[]
+  revenue: RevenueEntryData[]
   isActive: boolean
+  notes: string | null
+}
+
+export interface RevenueEntryData {
+  _id: string
+  classCode: string
+  dir1YieldPerPax: number
+  dir2YieldPerPax: number
+  loadFactor: number
+  currency: string
   notes: string | null
 }
 
@@ -1019,6 +1030,31 @@ export const api = {
   deleteBlockHour: (cityPairId: string, bhId: string) =>
     request<CityPairRef>(`/city-pairs/${cityPairId}/block-hours/${bhId}`, {
       method: 'DELETE',
+    }),
+
+  // ─── Revenue ──────────────────────────────────────────────
+
+  addRevenue: (cityPairId: string, data: Omit<RevenueEntryData, '_id'>) =>
+    request<CityPairRef>(`/city-pairs/${cityPairId}/revenue`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateRevenue: (cityPairId: string, revId: string, data: Partial<Omit<RevenueEntryData, '_id'>>) =>
+    request<CityPairRef>(`/city-pairs/${cityPairId}/revenue/${revId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteRevenue: (cityPairId: string, revId: string) =>
+    request<CityPairRef>(`/city-pairs/${cityPairId}/revenue/${revId}`, {
+      method: 'DELETE',
+    }),
+
+  seedRevenue: (operatorId: string, removeB787 = false) =>
+    request<{ seeded: number; total: number }>('/city-pairs/seed-revenue', {
+      method: 'POST',
+      body: JSON.stringify({ operatorId, removeB787 }),
     }),
 
   // ─── Activity Code Groups ────────────────────────────────
@@ -1390,6 +1426,39 @@ export const api = {
     request<{ ok: boolean; instancesUpdated: number }>('/schedule-messages/apply-inbound', {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+
+  // ─── Movement Messages (MVT/LDM) ─────────────────────────
+
+  getMovementMessages: (params: MovementMessageQuery) => {
+    const p = new URLSearchParams({ operatorId: params.operatorId })
+    if (params.direction) p.set('direction', params.direction)
+    if (params.actionCodes) p.set('actionCodes', params.actionCodes.join(','))
+    if (params.status) p.set('status', params.status)
+    if (params.flightNumber) p.set('flightNumber', params.flightNumber)
+    if (params.flightDateFrom) p.set('flightDateFrom', params.flightDateFrom)
+    if (params.flightDateTo) p.set('flightDateTo', params.flightDateTo)
+    if (params.limit) p.set('limit', String(params.limit))
+    if (params.offset) p.set('offset', String(params.offset))
+    return request<{ messages: MovementMessageRef[]; total: number }>(`/movement-messages?${p.toString()}`)
+  },
+
+  getMovementMessageStats: (operatorId: string) =>
+    request<MovementMessageStats>(`/movement-messages/stats?operatorId=${operatorId}`),
+
+  getHeldMovementMessages: (operatorId: string) =>
+    request<{ messages: MovementMessageRef[] }>(`/movement-messages/held?operatorId=${operatorId}`),
+
+  releaseMovementMessages: (messageIds: string[]) =>
+    request<{ released: number }>('/movement-messages/release', {
+      method: 'POST',
+      body: JSON.stringify({ messageIds }),
+    }),
+
+  discardMovementMessages: (messageIds: string[]) =>
+    request<{ discarded: number }>('/movement-messages/discard', {
+      method: 'POST',
+      body: JSON.stringify({ messageIds }),
     }),
 
   // ─── FDTL ───────────────────────────────────────────────
@@ -2239,6 +2308,47 @@ export interface ScheduleMessageStats {
   applied: number
   rejected: number
   thisWeek: number
+}
+
+// ─── Movement Messages ─────────────────────────────────────
+
+export interface MovementMessageRef {
+  _id: string
+  operatorId: string
+  messageType: 'MVT' | 'LDM'
+  actionCode: string
+  direction: 'inbound' | 'outbound'
+  status: 'held' | 'pending' | 'sent' | 'applied' | 'rejected' | 'discarded'
+  flightNumber: string | null
+  flightDate: string | null
+  registration: string | null
+  depStation: string | null
+  arrStation: string | null
+  summary: string | null
+  rawMessage: string | null
+  scenarioId: string | null
+  flightInstanceId: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export interface MovementMessageQuery {
+  operatorId: string
+  direction?: 'inbound' | 'outbound'
+  actionCodes?: string[]
+  status?: string
+  flightNumber?: string
+  flightDateFrom?: string
+  flightDateTo?: string
+  limit?: number
+  offset?: number
+}
+
+export interface MovementMessageStats {
+  total: number
+  held: number
+  pending: number
+  sent: number
 }
 
 export interface ScheduleMessageSnapshot {

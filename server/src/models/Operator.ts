@@ -24,6 +24,21 @@ const operatorSchema = new Schema(
     enabledModules: [{ type: String }],
     accentColor: { type: String, default: '#1e40af' },
     logoUrl: { type: String, default: null },
+    // Recovery solver defaults (all configurable by admin, no hard-coded values)
+    recoveryConfig: {
+      defaultObjective: {
+        type: String,
+        enum: ['min_delay', 'min_cancel', 'min_cost', 'max_revenue'],
+        default: 'min_cost',
+      },
+      horizonHours: { type: Number, default: 12 },
+      lockThresholdMinutes: { type: Number, default: 60 },
+      maxSolutions: { type: Number, default: 3 },
+      maxSolveSeconds: { type: Number, default: 60 },
+      delayCostPerMinute: { type: Number, default: 50.0 },
+      cancelCostPerFlight: { type: Number, default: 50000.0 },
+      fuelPricePerKg: { type: Number, default: 0.8 },
+    },
     isActive: { type: Boolean, default: true },
     createdAt: { type: String, default: null },
     updatedAt: { type: String, default: null },

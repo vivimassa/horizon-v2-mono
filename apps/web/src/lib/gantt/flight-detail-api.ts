@@ -30,6 +30,7 @@ export async function saveFlightInstance(data: {
   delays?: FlightDetail['delays']
   memos?: FlightDetail['memos']
   connections?: FlightDetail['connections']
+  scenarioId?: string | null
 }): Promise<{ success: boolean; id: string }> {
   const res = await authedFetch(`${getApiBaseUrl()}/gantt/flight-instance`, {
     method: 'PUT',

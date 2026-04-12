@@ -107,6 +107,7 @@ export function FlightInformationDialog() {
         delays: draft.delays,
         memos: draft.memos,
         connections: draft.connections,
+        scenarioId: useOperatorStore.getState().activeScenarioId ?? undefined,
       })
       setData(structuredClone(draft))
       setDirty(false)

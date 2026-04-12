@@ -233,23 +233,23 @@ export const NAV_TREE: NavModuleData[] = [
     ],
   },
 
-  // ── 3. Flight Ops ──
+  // ── 2. Flight Ops ──
   {
     key: 'flightops',
     label: 'Flight Ops',
-    num: '3',
+    num: '2',
     iconName: 'Plane',
     sections: [
       {
         key: 'control',
         label: 'Ops Control',
-        num: '3.1',
+        num: '2.1',
         iconName: 'Radar',
         pages: [
           {
             key: 'movement-control',
             label: 'Movement Control',
-            num: '3.1.1',
+            num: '2.1.1',
             route: '/flight-ops/control/movement-control',
             iconName: 'Radar',
             desc: 'Live flight tracking & OOOI',
@@ -257,7 +257,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'world-map',
             label: 'World Map',
-            num: '3.1.2',
+            num: '2.1.2',
             route: '/flight-ops/control/world-map',
             iconName: 'Map',
             desc: 'Global fleet positions',
@@ -265,7 +265,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'disruption-center',
             label: 'Disruption Center',
-            num: '3.1.3',
+            num: '2.1.3',
             route: '/flight-ops/control/disruption-center',
             iconName: 'AlertTriangle',
             desc: 'IROPS & recovery',
@@ -275,13 +275,13 @@ export const NAV_TREE: NavModuleData[] = [
       {
         key: 'tools',
         label: 'Tools',
-        num: '3.2',
+        num: '2.2',
         iconName: 'Wrench',
         pages: [
           {
             key: 'flight-info',
             label: 'Flight Info',
-            num: '3.2.1',
+            num: '2.2.1',
             route: '/flight-ops/tools/flight-info',
             iconName: 'Info',
             desc: 'Detailed flight view',
@@ -289,7 +289,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'messages',
             label: 'Messages',
-            num: '3.2.2',
+            num: '2.2.2',
             route: '/flight-ops/tools/messages',
             iconName: 'MessageSquare',
             desc: 'MVT/LDM messages',
@@ -297,7 +297,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'movement-log',
             label: 'Movement Log',
-            num: '3.2.3',
+            num: '2.2.3',
             route: '/flight-ops/tools/movement-log',
             iconName: 'FileText',
             desc: 'Historical movements',
@@ -307,13 +307,13 @@ export const NAV_TREE: NavModuleData[] = [
       {
         key: 'aircraft-status',
         label: 'Aircraft Status',
-        num: '3.3',
+        num: '2.3',
         iconName: 'ShieldCheck',
         pages: [
           {
             key: 'health-dashboard',
             label: 'Health Dashboard',
-            num: '3.3.1',
+            num: '2.3.1',
             route: '/flight-ops/aircraft-status/health-dashboard',
             iconName: 'BarChart3',
             desc: 'Aircraft health overview',
@@ -321,7 +321,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'check-setup',
             label: 'Check Setup',
-            num: '3.3.2',
+            num: '2.3.2',
             route: '/flight-ops/aircraft-status/check-setup',
             iconName: 'ShieldCheck',
             desc: 'Maintenance check config',
@@ -329,7 +329,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'event-schedule',
             label: 'Event Schedule',
-            num: '3.3.3',
+            num: '2.3.3',
             route: '/flight-ops/aircraft-status/event-schedule',
             iconName: 'CalendarDays',
             desc: 'Schedule maintenance events',

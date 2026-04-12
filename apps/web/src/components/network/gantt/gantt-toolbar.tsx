@@ -23,6 +23,7 @@ import {
   GitBranch,
   Plus,
   Clock,
+  AlertTriangle,
 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { colors } from '@skyhub/ui/theme'
@@ -56,6 +57,8 @@ export function GanttToolbar({
   const toggleTat = useGanttStore((s) => s.toggleTat)
   const showSlots = useGanttStore((s) => s.showSlots)
   const toggleSlots = useGanttStore((s) => s.toggleSlots)
+  const showMissingTimes = useGanttStore((s) => s.showMissingTimes)
+  const toggleMissingTimes = useGanttStore((s) => s.toggleMissingTimes)
   const setZoom = useGanttStore((s) => s.setZoom)
   const zoomRowIn = useGanttStore((s) => s.zoomRowIn)
   const zoomRowOut = useGanttStore((s) => s.zoomRowOut)
@@ -253,9 +256,16 @@ export function GanttToolbar({
     {
       icon: Clock,
       label: 'Slot',
-      tooltip: showSlots ? 'Hide slot status flags' : 'Show slot status flags',
+      tooltip: showSlots ? 'Hide slot risk lines' : 'Show slot risk lines',
       onClick: toggleSlots,
       active: showSlots,
+    },
+    {
+      icon: AlertTriangle,
+      label: 'OOOI',
+      tooltip: showMissingTimes ? 'Hide missing OOOI flags' : 'Show missing OOOI flags',
+      onClick: toggleMissingTimes,
+      active: showMissingTimes,
     },
     {
       icon: Crosshair,
@@ -485,7 +495,17 @@ export function GanttToolbar({
               isDark={isDark}
               hoverBg={hoverBg}
               activeBg={activeBg}
-              tooltip={showSlots ? 'Hide slot status flags' : 'Show slot status flags'}
+              tooltip={showSlots ? 'Hide slot risk lines' : 'Show slot risk lines'}
+            />
+            <RibbonBtn
+              icon={AlertTriangle}
+              label="OOOI"
+              onClick={toggleMissingTimes}
+              active={showMissingTimes}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip={showMissingTimes ? 'Hide missing OOOI flags' : 'Show missing OOOI flags'}
             />
             <RibbonBtn
               icon={Crosshair}
@@ -776,73 +796,6 @@ export function GanttToolbar({
   )
 }
 
-// ── Ribbon primitives (matching 1.1.1 pattern) ──
-
-function RibbonSection({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col items-center self-stretch justify-between pt-5 pb-3 px-3">
-      <div className="flex items-center justify-center gap-2 flex-1">{children}</div>
-      <div className="w-full text-center border-t border-hz-border/20 pt-1 mt-1">
-        <span className="text-[11px] text-hz-text-tertiary/50 font-medium leading-none whitespace-nowrap">{label}</span>
-      </div>
-    </div>
-  )
-}
-
-import { forwardRef } from 'react'
-
-const RibbonBtn = forwardRef<
-  HTMLButtonElement,
-  {
-    icon: typeof Wand2
-    label: string
-    onClick?: () => void
-    disabled?: boolean
-    active?: boolean
-    tooltip?: string
-    isDark: boolean
-    hoverBg: string
-    activeBg: string
-  }
->(({ icon: Icon, label, onClick, disabled, active, tooltip, isDark, hoverBg, activeBg }, ref) => {
-  const btn = (
-    <button
-      ref={ref}
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex flex-col items-center justify-center gap-1.5 rounded-lg transition-all duration-150 ${
-        disabled ? 'opacity-30 pointer-events-none' : ''
-      }`}
-      style={{
-        width: 72,
-        height: 72,
-        background: active ? activeBg : undefined,
-        color: active ? (isDark ? '#5B8DEF' : '#1e40af') : undefined,
-      }}
-      onMouseEnter={(e) => {
-        if (!active && !disabled) e.currentTarget.style.background = hoverBg
-      }}
-      onMouseLeave={(e) => {
-        if (!active) e.currentTarget.style.background = active ? activeBg : 'transparent'
-      }}
-    >
-      <Icon size={26} strokeWidth={1.4} />
-      <span className="text-[12px] font-medium leading-none">{label}</span>
-    </button>
-  )
-
-  if (tooltip) {
-    return <Tooltip content={tooltip}>{btn}</Tooltip>
-  }
-  return btn
-})
-
-RibbonBtn.displayName = 'RibbonBtn'
-
-function Divider({ isDark }: { isDark: boolean }) {
-  return (
-    <div className="shrink-0 flex items-center" style={{ height: 72, alignSelf: 'center' }}>
-      <div style={{ width: 1, height: '100%', background: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)' }} />
-    </div>
-  )
-}
+// ── Ribbon primitives (shared with OpsToolbar) ──
+// Re-export from shared location for backwards compat within this file
+import { RibbonSection, RibbonBtn, RibbonDivider as Divider } from '@/components/ui/ribbon-primitives'

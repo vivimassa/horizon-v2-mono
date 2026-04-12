@@ -183,30 +183,30 @@ export const NAV_TREE: NavModule[] = [
     ],
   },
 
-  // ── 3. Flight Ops ──
+  // ── 2. Flight Ops ──
   {
     key: 'flightops',
     label: 'Flight Ops',
-    num: '3',
+    num: '2',
     sections: [
       {
         key: 'control',
         label: 'Ops Control',
-        num: '3.1',
+        num: '2.1',
         icon: Radar,
         pages: [
           {
             key: 'movement-control',
             label: 'Movement Control',
-            num: '3.1.1',
+            num: '2.1.1',
             route: '/flight-ops/control/movement-control',
             icon: Radar,
           },
-          { key: 'world-map', label: 'World Map', num: '3.1.2', route: '/flight-ops/control/world-map', icon: Map },
+          { key: 'world-map', label: 'World Map', num: '2.1.2', route: '/flight-ops/control/world-map', icon: Map },
           {
             key: 'disruption-center',
             label: 'Disruption Center',
-            num: '3.1.3',
+            num: '2.1.3',
             route: '/flight-ops/control/disruption-center',
             icon: AlertTriangle,
           },
@@ -215,27 +215,27 @@ export const NAV_TREE: NavModule[] = [
       {
         key: 'tools',
         label: 'Tools',
-        num: '3.2',
+        num: '2.2',
         icon: Wrench,
         pages: [
           {
             key: 'flight-info',
             label: 'Flight Info',
-            num: '3.2.1',
+            num: '2.2.1',
             route: '/flight-ops/tools/flight-info',
             icon: Info,
           },
           {
             key: 'messages',
             label: 'Messages',
-            num: '3.2.2',
+            num: '2.2.2',
             route: '/flight-ops/tools/messages',
             icon: MessageSquare,
           },
           {
             key: 'movement-log',
             label: 'Movement Log',
-            num: '3.2.3',
+            num: '2.2.3',
             route: '/flight-ops/tools/movement-log',
             icon: FileText,
           },
@@ -244,27 +244,27 @@ export const NAV_TREE: NavModule[] = [
       {
         key: 'aircraft-status',
         label: 'Aircraft Status',
-        num: '3.3',
+        num: '2.3',
         icon: ShieldCheck,
         pages: [
           {
             key: 'health-dashboard',
             label: 'Health Dashboard',
-            num: '3.3.1',
+            num: '2.3.1',
             route: '/flight-ops/aircraft-status/health-dashboard',
             icon: BarChart3,
           },
           {
             key: 'check-setup',
             label: 'Check Setup',
-            num: '3.3.2',
+            num: '2.3.2',
             route: '/flight-ops/aircraft-status/check-setup',
             icon: ShieldCheck,
           },
           {
             key: 'event-schedule',
             label: 'Event Schedule',
-            num: '3.3.3',
+            num: '2.3.3',
             route: '/flight-ops/aircraft-status/event-schedule',
             icon: CalendarDays,
           },

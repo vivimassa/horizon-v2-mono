@@ -19,7 +19,8 @@ import {
   drawDraggedBars,
   drawDropTarget,
   buildBarsByRow,
-  drawSlotIndicators,
+  drawSlotLines,
+  drawMissingTimeFlags,
 } from '@/lib/gantt/draw-helpers'
 import { FlightTooltip } from './gantt-flight-tooltip'
 import { GanttContextMenu } from './gantt-context-menu'
@@ -66,6 +67,8 @@ export function GanttCanvas() {
   const swapMode = useGanttStore((s) => s.swapMode)
   const showTat = useGanttStore((s) => s.showTat)
   const showSlots = useGanttStore((s) => s.showSlots)
+  const showMissingTimes = useGanttStore((s) => s.showMissingTimes)
+  const oooiGraceMins = useGanttStore((s) => s.oooiGraceMins)
   const scenarioId = useGanttStore((s) => s.scenarioId)
   const periodFrom = useGanttStore((s) => s.periodFrom)
   const periodTo = useGanttStore((s) => s.periodTo)
@@ -119,7 +122,8 @@ export function GanttCanvas() {
     drawGroupHeaders(ctx, layout.rows, sx, sy, vw, vh, isDark)
     const swapSourceIds = swapMode ? new Set(swapMode.sourceFlightIds) : undefined
     drawBars(ctx, layout.bars, selectedFlightIds, hoveredFlightId, sx, sy, vw, vh, swapSourceIds)
-    if (showSlots) drawSlotIndicators(ctx, layout.bars, sx, sy, vw, vh)
+    if (showSlots) drawSlotLines(ctx, layout.bars, sx, sy, vw, vh)
+    if (showMissingTimes) drawMissingTimeFlags(ctx, layout.bars, sx, sy, vw, vh, oooiGraceMins)
     if (showTat) drawTatLabels(ctx, barsByRowRef.current, sx, sy, vw, vh, isDark)
     drawNightstopLabels(ctx, barsByRowRef.current, sx, sy, vw, vh, isDark)
 
@@ -163,6 +167,8 @@ export function GanttCanvas() {
     dragActive,
     showTat,
     showSlots,
+    showMissingTimes,
+    oooiGraceMins,
     scenarioId,
   ])
 
@@ -527,7 +533,7 @@ export function GanttCanvas() {
   useEffect(() => {
     cancelAnimationFrame(rafId.current)
     rafId.current = requestAnimationFrame(() => drawRef.current())
-  }, [layout, selectedFlightIds, isDark, showTat, showSlots])
+  }, [layout, selectedFlightIds, isDark, showTat, showSlots, showMissingTimes, oooiGraceMins])
 
   // Now-line timer
   useEffect(() => {

@@ -221,4 +221,142 @@ export async function cityPairRoutes(app: FastifyInstance): Promise<void> {
     if (!doc) return reply.code(404).send({ error: 'City pair not found' })
     return doc
   })
+
+  // ─── Revenue CRUD ─────────────────────────────────
+
+  const revenueSchema = z.object({
+    classCode: z.string().min(1).max(3),
+    dir1YieldPerPax: z.number().min(0),
+    dir2YieldPerPax: z.number().min(0),
+    loadFactor: z.number().min(0).max(1).optional().default(0.85),
+    currency: z.string().min(1).max(5).optional().default('USD'),
+    notes: z.string().nullable().optional(),
+  })
+
+  app.post('/city-pairs/:id/revenue', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const parsed = revenueSchema.safeParse(req.body)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+
+    const entry = { _id: crypto.randomUUID(), ...parsed.data }
+    const doc = await CityPair.findByIdAndUpdate(id, { $push: { revenue: entry } }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'City pair not found' })
+    return doc
+  })
+
+  app.patch('/city-pairs/:id/revenue/:revId', async (req, reply) => {
+    const { id, revId } = req.params as { id: string; revId: string }
+    const parsed = revenueSchema.partial().safeParse(req.body)
+    if (!parsed.success) {
+      const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
+      return reply.code(400).send({ error: 'Validation failed', details: errors })
+    }
+
+    const setFields: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(parsed.data)) {
+      setFields[`revenue.$.${k}`] = v
+    }
+
+    const doc = await CityPair.findOneAndUpdate(
+      { _id: id, 'revenue._id': revId },
+      { $set: setFields },
+      { new: true },
+    ).lean()
+    if (!doc) return reply.code(404).send({ error: 'City pair or revenue entry not found' })
+    return doc
+  })
+
+  app.delete('/city-pairs/:id/revenue/:revId', async (req, reply) => {
+    const { id, revId } = req.params as { id: string; revId: string }
+    const doc = await CityPair.findByIdAndUpdate(id, { $pull: { revenue: { _id: revId } } }, { new: true }).lean()
+    if (!doc) return reply.code(404).send({ error: 'City pair not found' })
+    return doc
+  })
+
+  // ─── Bulk seed revenue for all city pairs ─────────────────
+
+  app.post('/city-pairs/seed-revenue', async (req, reply) => {
+    const body = req.body as { operatorId: string; removeB787?: boolean }
+    if (!body.operatorId) return reply.code(400).send({ error: 'operatorId required' })
+
+    const pairs = await CityPair.find({ operatorId: body.operatorId, isActive: true }).lean()
+
+    // Optionally remove B787/B788/B789 block hour entries
+    if (body.removeB787) {
+      const b787Types = ['B787', 'B788', 'B789']
+      for (const cp of pairs) {
+        const hasB787 = cp.blockHours?.some((bh) => b787Types.includes(bh.aircraftTypeIcao as string))
+        if (hasB787) {
+          await CityPair.findByIdAndUpdate(cp._id, {
+            $pull: { blockHours: { aircraftTypeIcao: { $in: b787Types } } },
+          })
+        }
+      }
+    }
+
+    // Yield per pax estimation based on distance
+    // Industry averages for Vietnam LCC market (VietJet reference)
+    function estimateYield(distanceKm: number, classCode: string): number {
+      // Base yield per km by cabin class
+      const baseYieldPerKm: Record<string, number> = {
+        Y: 0.055, // Economy
+        W: 0.09, // Premium Economy (~1.6x Y)
+        C: 0.16, // Business (~3x Y)
+        F: 0.28, // First (~5x Y)
+      }
+      const base = baseYieldPerKm[classCode] ?? 0.055
+      // Short-haul premium, long-haul discount (yield per km decreases with distance)
+      let multiplier: number
+      if (distanceKm < 500) multiplier = 1.4
+      else if (distanceKm < 1000) multiplier = 1.15
+      else if (distanceKm < 2000) multiplier = 1.0
+      else if (distanceKm < 4000) multiplier = 0.85
+      else multiplier = 0.75
+      return Math.round(distanceKm * base * multiplier * 100) / 100
+    }
+
+    function estimateLoadFactor(routeType: string, classCode: string): number {
+      const factors: Record<string, Record<string, number>> = {
+        Y: { domestic: 0.88, regional: 0.85, international: 0.82 },
+        W: { domestic: 0.78, regional: 0.75, international: 0.72 },
+        C: { domestic: 0.55, regional: 0.6, international: 0.65 },
+        F: { domestic: 0.45, regional: 0.48, international: 0.52 },
+      }
+      const classFactor = factors[classCode] ?? factors.Y
+      return classFactor[routeType] ?? classFactor.international ?? 0.8
+    }
+
+    // Cabin classes for this operator
+    const classDefinitions = [
+      { code: 'Y', label: 'Economy' },
+      { code: 'W', label: 'Premium Economy' },
+      { code: 'C', label: 'Business' },
+      { code: 'F', label: 'First' },
+    ]
+
+    let seeded = 0
+    for (const cp of pairs) {
+      const distKm = cp.distanceKm ?? 0
+      if (distKm <= 0) continue
+
+      const rt = cp.routeType ?? 'unknown'
+      const entries = classDefinitions.map((cls) => ({
+        _id: crypto.randomUUID(),
+        classCode: cls.code,
+        dir1YieldPerPax: estimateYield(distKm, cls.code),
+        dir2YieldPerPax: estimateYield(distKm, cls.code),
+        loadFactor: estimateLoadFactor(rt, cls.code),
+        currency: 'USD',
+        notes: 'Auto-seeded from distance model',
+      }))
+
+      await CityPair.findByIdAndUpdate(cp._id, { $set: { revenue: entries } })
+      seeded++
+    }
+
+    return { seeded, total: pairs.length }
+  })
 }

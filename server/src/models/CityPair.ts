@@ -16,6 +16,19 @@ const blockHourSchema = new Schema(
   { _id: false, timestamps: false },
 )
 
+const revenueEntrySchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    classCode: { type: String, required: true }, // Y, J, F, etc.
+    dir1YieldPerPax: { type: Number, required: true }, // avg revenue per pax, station1→station2
+    dir2YieldPerPax: { type: Number, required: true }, // avg revenue per pax, station2→station1
+    loadFactor: { type: Number, default: 0.85 }, // 0.0–1.0
+    currency: { type: String, default: 'USD' },
+    notes: { type: String, default: null },
+  },
+  { _id: false, timestamps: false },
+)
+
 const cityPairSchema = new Schema(
   {
     _id: { type: String, required: true },
@@ -52,6 +65,9 @@ const cityPairSchema = new Schema(
 
     // Block hours by aircraft type
     blockHours: { type: [blockHourSchema], default: [] },
+
+    // Revenue per cabin class
+    revenue: { type: [revenueEntrySchema], default: [] },
 
     // Status
     isActive: { type: Boolean, default: true },

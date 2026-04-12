@@ -10,6 +10,18 @@ export interface GanttFlight {
   stdUtc: number
   staUtc: number
   blockMinutes: number
+  /** Actual departure time (OUT) from FlightInstance */
+  atdUtc?: number | null
+  /** Actual takeoff time (OFF) from FlightInstance */
+  offUtc?: number | null
+  /** Actual landing time (ON) from FlightInstance */
+  onUtc?: number | null
+  /** Actual arrival time (IN) from FlightInstance */
+  ataUtc?: number | null
+  /** Estimated departure from FlightInstance */
+  etdUtc?: number | null
+  /** Estimated arrival from FlightInstance */
+  etaUtc?: number | null
   operatingDate: string
   aircraftTypeIcao: string | null
   aircraftReg: string | null

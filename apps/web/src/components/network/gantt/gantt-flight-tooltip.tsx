@@ -8,7 +8,7 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { GanttFlight } from '@/lib/gantt/types'
-import { SLOT_STATUS_COLORS, SLOT_RISK_COLORS } from '@/lib/gantt/colors'
+import { SLOT_STATUS_COLORS, SLOT_RISK_COLORS, MISSING_TIMES_FLAG_COLOR } from '@/lib/gantt/colors'
 import { useGanttStore } from '@/stores/use-gantt-store'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -121,12 +121,21 @@ export const FlightTooltip = memo(function FlightTooltip({ flight, mousePosRef, 
   const hasOverlay = typeof document !== 'undefined' && document.querySelector('[data-gantt-overlay]') !== null
   const swapMode = useGanttStore((s) => s.swapMode)
   const stationUtcOffsetMap = useGanttStore((s) => s.stationUtcOffsetMap)
+  const oooiGraceMins = useGanttStore((s) => s.oooiGraceMins)
   if (!mounted || !flight || swapMode || hasOverlay) return null
 
   const status = getStatusStyle(flight.status, isDark)
   const blockMs = flight.staUtc - flight.stdUtc
   const depOffset = stationUtcOffsetMap[flight.depStation] ?? null
   const arrOffset = stationUtcOffsetMap[flight.arrStation] ?? null
+
+  // Missing OOOI logic (same as draw-helpers)
+  const now = Date.now()
+  const graceMs = oooiGraceMins * 60_000
+  const depThreshold = Math.min(flight.stdUtc, flight.etdUtc ?? Infinity) + graceMs
+  const depMissing = now >= depThreshold && (!flight.atdUtc || !flight.offUtc)
+  const arrThreshold = Math.min(flight.staUtc, flight.etaUtc ?? Infinity) + graceMs
+  const arrMissing = now >= arrThreshold && (!flight.ataUtc || !flight.onUtc)
 
   // Inverted glass: dark bg in light mode, light bg in dark mode
   const bg = isDark ? 'rgba(244,244,245,0.92)' : 'rgba(24,24,27,0.88)'
@@ -217,6 +226,54 @@ export const FlightTooltip = memo(function FlightTooltip({ flight, mousePosRef, 
               <span className="tabular-nums text-[13px]" style={{ color: body }}>
                 {fmtLocal(flight.staUtc, arrOffset)}{' '}
                 <span style={{ color: muted, fontSize: 10 }}>UTC{fmtOffset(arrOffset)}</span>
+              </span>
+            </div>
+          )}
+          {flight.atdUtc != null && (
+            <div className="flex justify-between">
+              <span style={{ color: muted }}>ATD</span>
+              <span className="tabular-nums font-normal text-[13px]" style={{ color: heading }}>
+                {fmtUtc(flight.atdUtc)}z
+              </span>
+            </div>
+          )}
+          {flight.ataUtc != null && (
+            <div className="flex justify-between">
+              <span style={{ color: muted }}>ATA</span>
+              <span className="tabular-nums font-normal text-[13px]" style={{ color: heading }}>
+                {fmtUtc(flight.ataUtc)}z
+              </span>
+            </div>
+          )}
+          {depMissing && (
+            <div className="flex justify-between">
+              <span style={{ color: muted }}>Dep Times</span>
+              <span
+                className="font-medium"
+                style={{
+                  padding: '1px 6px',
+                  borderRadius: 4,
+                  background: 'rgba(255,136,0,0.15)',
+                  color: MISSING_TIMES_FLAG_COLOR,
+                }}
+              >
+                MISSING
+              </span>
+            </div>
+          )}
+          {arrMissing && (
+            <div className="flex justify-between">
+              <span style={{ color: muted }}>Arr Times</span>
+              <span
+                className="font-medium"
+                style={{
+                  padding: '1px 6px',
+                  borderRadius: 4,
+                  background: 'rgba(255,136,0,0.15)',
+                  color: MISSING_TIMES_FLAG_COLOR,
+                }}
+              >
+                MISSING
               </span>
             </div>
           )}

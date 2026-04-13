@@ -17,6 +17,18 @@ const runwaySchema = new Schema(
   { _id: false, timestamps: false },
 )
 
+const curfewSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    startTime: { type: String, required: true }, // "HH:MM" local time
+    endTime: { type: String, required: true }, // "HH:MM" local time
+    effectiveFrom: { type: String, default: null }, // "YYYY-MM-DD" or null = always
+    effectiveUntil: { type: String, default: null }, // "YYYY-MM-DD" or null = ongoing
+    remarks: { type: String, default: null },
+  },
+  { _id: false, timestamps: false },
+)
+
 const airportSchema = new Schema(
   {
     _id: { type: String, required: true }, // Supabase UUID preserved
@@ -55,10 +67,8 @@ const airportSchema = new Schema(
     // Fire & rescue category
     fireCategory: { type: Number, default: null },
 
-    // Curfew
-    hasCurfew: { type: Boolean, default: false },
-    curfewStart: { type: String, default: null },
-    curfewEnd: { type: String, default: null },
+    // Curfews — multiple time windows with effective dates
+    curfews: { type: [curfewSchema], default: [] },
 
     // Slot control
     isSlotControlled: { type: Boolean, default: false },

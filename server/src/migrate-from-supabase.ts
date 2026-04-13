@@ -164,9 +164,19 @@ async function migrateAirports() {
       hasFuelAvailable: r.has_fuel_available ?? false,
       hasCrewFacilities: r.has_crew_facilities ?? false,
       fireCategory: r.fire_category ?? null,
-      hasCurfew: r.has_curfew ?? false,
-      curfewStart: r.curfew_start ?? null,
-      curfewEnd: r.curfew_end ?? null,
+      curfews:
+        r.has_curfew && r.curfew_start && r.curfew_end
+          ? [
+              {
+                _id: crypto.randomUUID(),
+                startTime: r.curfew_start,
+                endTime: r.curfew_end,
+                effectiveFrom: null,
+                effectiveUntil: null,
+                remarks: 'Migrated from legacy',
+              },
+            ]
+          : [],
       isSlotControlled: r.is_slot_controlled ?? false,
       weatherMonitored: r.weather_monitored ?? false,
       weatherStation: r.weather_station ?? null,

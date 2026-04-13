@@ -35,6 +35,16 @@ export interface LayoutInput {
   forcedPlacements?: Map<string, string>
 }
 
+/**
+ * Best-known departure and arrival times for a flight.
+ * Cascade: actual (OOOI) > estimated > scheduled.
+ */
+export function getDisplayTimes(f: GanttFlight): { depMs: number; arrMs: number } {
+  const depMs = f.atdUtc ?? f.etdUtc ?? f.stdUtc
+  const arrMs = f.ataUtc ?? f.etaUtc ?? f.staUtc
+  return { depMs, arrMs }
+}
+
 const GROUP_HEADER_HEIGHT = 28
 const AIRLINE_PREFIX_RE = /^[A-Z]{2}\s?-?/
 const TAT_MS = 30 * 60_000 // 30 min default turnaround
@@ -140,12 +150,16 @@ function computeVirtualPlacements(
     // Init slots from already-assigned flights
     const slots: AircraftSlot[] = acList.map((ac) => {
       const real = assignedByReg.get(ac.registration) ?? []
-      const windows = real.map((f) => ({ start: f.stdUtc, end: f.staUtc }))
+      const windows = real.map((f) => {
+        const { depMs, arrMs } = getDisplayTimes(f)
+        return { start: depMs, end: arrMs }
+      })
       let lastArr: string | null = null
       let lastEnd = 0
       for (const f of real) {
-        if (f.staUtc > lastEnd) {
-          lastEnd = f.staUtc
+        const arr = getDisplayTimes(f).arrMs
+        if (arr > lastEnd) {
+          lastEnd = arr
           lastArr = f.arrStation
         }
       }
@@ -164,7 +178,8 @@ function computeVirtualPlacements(
         // ALL flights in the block must fit without overlap
         let blockFits = true
         for (const f of block.flights) {
-          const hasOverlap = s.windows.some((w) => f.stdUtc < w.end + TAT_MS && w.start < f.staUtc + TAT_MS)
+          const { depMs, arrMs } = getDisplayTimes(f)
+          const hasOverlap = s.windows.some((w) => depMs < w.end + TAT_MS && w.start < arrMs + TAT_MS)
           if (hasOverlap) {
             blockFits = false
             break
@@ -201,12 +216,13 @@ function computeVirtualPlacements(
         const s = slots[bestIdx]
         for (const f of block.flights) {
           placements.set(f.id, s.registration)
-          s.windows.push({ start: f.stdUtc, end: f.staUtc })
+          const { depMs, arrMs } = getDisplayTimes(f)
+          s.windows.push({ start: depMs, end: arrMs })
         }
         // Update slot tracking from the last flight in the block
         const lastFlight = block.flights[block.flights.length - 1]
         s.lastArr = lastFlight.arrStation
-        s.lastEnd = lastFlight.staUtc
+        s.lastEnd = getDisplayTimes(lastFlight).arrMs
       }
     }
   }
@@ -365,8 +381,9 @@ export function computeLayout(input: LayoutInput): LayoutResult {
 
       const acFlights = flightsByReg.get(ac.registration) ?? []
       for (const f of acFlights) {
-        const x = utcToX(f.stdUtc, startMs, pph)
-        const xEnd = utcToX(f.staUtc, startMs, pph)
+        const { depMs, arrMs } = getDisplayTimes(f)
+        const x = utcToX(depMs, startMs, pph)
+        const xEnd = utcToX(arrMs, startMs, pph)
         const width = Math.max(2, xEnd - x)
         const { bg, text } = getBarColor(f, colorMode, acTypeColorMap, isDark)
         const label =
@@ -398,8 +415,9 @@ export function computeLayout(input: LayoutInput): LayoutResult {
 
     for (const f of overflow) {
       rows.push({ type: 'unassigned', label: f.flightNumber, y, height: rowH })
-      const x = utcToX(f.stdUtc, startMs, pph)
-      const xEnd = utcToX(f.staUtc, startMs, pph)
+      const { depMs, arrMs } = getDisplayTimes(f)
+      const x = utcToX(depMs, startMs, pph)
+      const xEnd = utcToX(arrMs, startMs, pph)
       const width = Math.max(2, xEnd - x)
       const { bg, text } = getBarColor(f, colorMode, acTypeColorMap, isDark)
       const label =

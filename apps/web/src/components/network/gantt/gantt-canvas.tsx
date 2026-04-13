@@ -21,6 +21,7 @@ import {
   buildBarsByRow,
   drawSlotLines,
   drawMissingTimeFlags,
+  drawOverlapFlags,
 } from '@/lib/gantt/draw-helpers'
 import { FlightTooltip } from './gantt-flight-tooltip'
 import { GanttContextMenu } from './gantt-context-menu'
@@ -68,6 +69,8 @@ export function GanttCanvas() {
   const showTat = useGanttStore((s) => s.showTat)
   const showSlots = useGanttStore((s) => s.showSlots)
   const showMissingTimes = useGanttStore((s) => s.showMissingTimes)
+  const showDelays = useGanttStore((s) => s.showDelays)
+  const showOverlaps = useGanttStore((s) => s.alertCategories.overlappingFlights)
   const oooiGraceMins = useGanttStore((s) => s.oooiGraceMins)
   const scenarioId = useGanttStore((s) => s.scenarioId)
   const periodFrom = useGanttStore((s) => s.periodFrom)
@@ -124,6 +127,7 @@ export function GanttCanvas() {
     drawBars(ctx, layout.bars, selectedFlightIds, hoveredFlightId, sx, sy, vw, vh, swapSourceIds)
     if (showSlots) drawSlotLines(ctx, layout.bars, sx, sy, vw, vh)
     if (showMissingTimes) drawMissingTimeFlags(ctx, layout.bars, sx, sy, vw, vh, oooiGraceMins)
+    if (showOverlaps) drawOverlapFlags(ctx, barsByRowRef.current, sx, sy, vw, vh)
     if (showTat) drawTatLabels(ctx, barsByRowRef.current, sx, sy, vw, vh, isDark)
     drawNightstopLabels(ctx, barsByRowRef.current, sx, sy, vw, vh, isDark)
 
@@ -168,6 +172,7 @@ export function GanttCanvas() {
     showTat,
     showSlots,
     showMissingTimes,
+    showDelays,
     oooiGraceMins,
     scenarioId,
   ])
@@ -533,7 +538,7 @@ export function GanttCanvas() {
   useEffect(() => {
     cancelAnimationFrame(rafId.current)
     rafId.current = requestAnimationFrame(() => drawRef.current())
-  }, [layout, selectedFlightIds, isDark, showTat, showSlots, showMissingTimes, oooiGraceMins])
+  }, [layout, selectedFlightIds, isDark, showTat, showSlots, showMissingTimes, showOverlaps, oooiGraceMins])
 
   // Now-line timer
   useEffect(() => {

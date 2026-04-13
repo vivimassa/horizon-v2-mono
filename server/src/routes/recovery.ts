@@ -134,14 +134,29 @@ export async function recoveryRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Airport curfew lookup: IATA → { startRelativeMs, endRelativeMs } (relative to midnight UTC)
+    // Uses first currently-effective curfew entry from the curfews array
     const curfewMap = new Map<string, { startRelativeMs: number; endRelativeMs: number }>()
+    const todayStr = new Date().toISOString().slice(0, 10)
     for (const apt of airports) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const a = apt as any
-      if (!a.hasCurfew || !a.curfewStart || !a.curfewEnd) continue
+      const curfews =
+        (a.curfews as Array<{
+          startTime: string
+          endTime: string
+          effectiveFrom?: string | null
+          effectiveUntil?: string | null
+        }>) ?? []
+      // Find first curfew effective today
+      const active = curfews.find((c) => {
+        if (c.effectiveFrom && todayStr < c.effectiveFrom) return false
+        if (c.effectiveUntil && todayStr > c.effectiveUntil) return false
+        return true
+      })
+      if (!active) continue
       const offsetMs = ((a.utcOffsetHours as number) ?? 0) * 3_600_000
-      const startLocalMs = timeStringToMs(a.curfewStart)
-      const endLocalMs = timeStringToMs(a.curfewEnd)
+      const startLocalMs = timeStringToMs(active.startTime)
+      const endLocalMs = timeStringToMs(active.endTime)
       curfewMap.set(a.iataCode as string, {
         startRelativeMs: startLocalMs - offsetMs,
         endRelativeMs: endLocalMs - offsetMs,
@@ -288,7 +303,7 @@ export async function recoveryRoutes(app: FastifyInstance): Promise<void> {
           estimated_revenue: Math.round(estimatedRevenue * 100) / 100,
           pax_count: paxCount,
           connecting_pax: connectingPax,
-          is_priority: false,
+          is_priority: !!(inst as any)?.isProtected,
           rotation_total_legs: rotationTotalLegs,
           arr_curfew_start_utc: arrCurfewStartUtc,
           arr_curfew_end_utc: arrCurfewEndUtc,
@@ -305,6 +320,8 @@ export async function recoveryRoutes(app: FastifyInstance): Promise<void> {
     let departedCount = 0
     let thresholdCount = 0
 
+    let protectedCount = 0
+
     for (const flight of allFlights) {
       const inst = instanceMap.get(flight.id)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -318,6 +335,10 @@ export async function recoveryRoutes(app: FastifyInstance): Promise<void> {
       if (hasOOOI) {
         locked.push(flight)
         departedCount++
+      } else if (flight.is_priority) {
+        // Protected flights are truly untouchable — solver cannot delay/cancel/swap them
+        locked.push(flight)
+        protectedCount++
       } else if (flight.std_utc <= nowMs + lockMs) {
         locked.push(flight)
         thresholdCount++
@@ -333,6 +354,8 @@ export async function recoveryRoutes(app: FastifyInstance): Promise<void> {
       allFlights.length,
       'departed:',
       departedCount,
+      'protected:',
+      protectedCount,
       'threshold:',
       thresholdCount,
       'frozen:',
@@ -438,7 +461,7 @@ export async function recoveryRoutes(app: FastifyInstance): Promise<void> {
 
       // Inject locked counts as first event
       reply.raw.write(
-        `event: locked\ndata: ${JSON.stringify({ departed: departedCount, within_threshold: thresholdCount, beyond_horizon: frozen.length, available: available.length })}\n\n`,
+        `event: locked\ndata: ${JSON.stringify({ departed: departedCount, protected: protectedCount, within_threshold: thresholdCount, beyond_horizon: frozen.length, available: available.length })}\n\n`,
       )
 
       const reader = solverRes.body?.getReader()

@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Info, Link, Unlink, ArrowLeftRight, Trash2, ChevronRight, Clock } from 'lucide-react'
+import { Info, Link, Unlink, ArrowLeftRight, Trash2, ChevronRight, Clock, ShieldCheck, ShieldOff } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { useGanttStore } from '@/stores/use-gantt-store'
 
@@ -67,6 +67,7 @@ export function GanttContextMenu() {
   const acType = selectedFlts[0]?.aircraftTypeIcao ?? ''
   const hasAssigned = selectedFlts.some((f) => f.aircraftReg)
   const isSingle = selectedFlightIds.size === 1
+  const allProtected = selectedFlts.length > 0 && selectedFlts.every((f) => f.isProtected)
 
   // Find which aircraft row the right-clicked flight is on
   const ctxBar = layout?.bars.find((b) => b.flightId === ctx.flightId)
@@ -188,6 +189,17 @@ export function GanttContextMenu() {
           onClick={() => {
             useGanttStore.getState().enterSwapMode()
             closeContextMenu()
+          }}
+          textColor={textColor}
+          textMuted={textMuted}
+          hoverBg={hoverBg}
+        />
+        <Divider color={dividerColor} />
+        <MenuItem
+          icon={allProtected ? ShieldOff : ShieldCheck}
+          label={allProtected ? 'Remove Protection' : 'Protect Flight'}
+          onClick={() => {
+            useGanttStore.getState().toggleProtection(flightIds, !allProtected)
           }}
           textColor={textColor}
           textMuted={textMuted}

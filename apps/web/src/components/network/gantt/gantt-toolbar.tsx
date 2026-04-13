@@ -24,6 +24,7 @@ import {
   Plus,
   Clock,
   AlertTriangle,
+  Hourglass,
 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { colors } from '@skyhub/ui/theme'
@@ -59,6 +60,8 @@ export function GanttToolbar({
   const toggleSlots = useGanttStore((s) => s.toggleSlots)
   const showMissingTimes = useGanttStore((s) => s.showMissingTimes)
   const toggleMissingTimes = useGanttStore((s) => s.toggleMissingTimes)
+  const showDelays = useGanttStore((s) => s.showDelays)
+  const toggleDelays = useGanttStore((s) => s.toggleDelays)
   const setZoom = useGanttStore((s) => s.setZoom)
   const zoomRowIn = useGanttStore((s) => s.zoomRowIn)
   const zoomRowOut = useGanttStore((s) => s.zoomRowOut)
@@ -266,6 +269,13 @@ export function GanttToolbar({
       tooltip: showMissingTimes ? 'Hide missing OOOI flags' : 'Show missing OOOI flags',
       onClick: toggleMissingTimes,
       active: showMissingTimes,
+    },
+    {
+      icon: Hourglass,
+      label: 'Actual',
+      tooltip: showDelays ? 'Hide scheduled position markers' : 'Show scheduled position markers',
+      onClick: toggleDelays,
+      active: showDelays,
     },
     {
       icon: Crosshair,
@@ -517,6 +527,16 @@ export function GanttToolbar({
               hoverBg={hoverBg}
               activeBg={activeBg}
               tooltip={showMissingTimes ? 'Hide missing OOOI flags' : 'Show missing OOOI flags'}
+            />
+            <RibbonBtn
+              icon={Hourglass}
+              label="Actual"
+              onClick={toggleDelays}
+              active={showDelays}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip={showDelays ? 'Hide scheduled position markers' : 'Show scheduled position markers'}
             />
             <RibbonBtn
               icon={Crosshair}

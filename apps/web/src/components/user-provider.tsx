@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { userApi, type UserData } from '@/lib/api'
+import { useAuth } from './auth-provider'
 
 interface UserContextValue {
   user: UserData | null
@@ -22,6 +23,7 @@ export function useUser() {
 }
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth()
   const [user, setUser] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -39,9 +41,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // Fetch (or re-fetch) when auth state changes
   useEffect(() => {
-    refetch()
-  }, [refetch])
+    if (isAuthenticated) refetch()
+    else setUser(null)
+  }, [isAuthenticated, refetch])
 
   return <UserCtx.Provider value={{ user, loading, error, refetch }}>{children}</UserCtx.Provider>
 }

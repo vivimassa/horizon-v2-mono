@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   ChevronUp,
   ChevronDown,
+  ChevronRight,
   Timer,
   Binary,
   Route,
@@ -25,6 +26,7 @@ import {
   Radio,
   SlidersHorizontal,
   Activity,
+  Hourglass,
 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { colors } from '@skyhub/ui/theme'
@@ -58,11 +60,15 @@ export function OpsToolbar({
   const barLabelMode = useGanttStore((s) => s.barLabelMode)
   const showTat = useGanttStore((s) => s.showTat)
   const toggleTat = useGanttStore((s) => s.toggleTat)
+  const showDelays = useGanttStore((s) => s.showDelays)
+  const toggleDelays = useGanttStore((s) => s.toggleDelays)
   // showMissingTimes removed from Display — controlled by alertCategories.missingTimes
   const showAlerts = useGanttStore((s) => s.showAlerts)
   const toggleAlerts = useGanttStore((s) => s.toggleAlerts)
   const alertCategories = useGanttStore((s) => s.alertCategories)
   const toggleAlertCategory = useGanttStore((s) => s.toggleAlertCategory)
+  const considerableDelayMins = useGanttStore((s) => s.considerableDelayMins)
+  const setConsiderableDelayMins = useGanttStore((s) => s.setConsiderableDelayMins)
   const goToToday = useGanttStore((s) => s.goToToday)
   const setBarLabelMode = useGanttStore((s) => s.setBarLabelMode)
   const rowHeightLevel = useGanttStore((s) => s.rowHeightLevel)
@@ -331,6 +337,108 @@ export function OpsToolbar({
     return count
   })()
 
+  // Overlap count — flights on the same row where next departs before previous arrives
+  // Uses layout bars (includes virtual placements) and actual/estimated/scheduled times
+  const layout = useGanttStore((s) => s.layout)
+  const overlapCount = (() => {
+    if (!layout) return 0
+    // Group bars by row index
+    const byRow = new Map<number, typeof layout.bars>()
+    for (const bar of layout.bars) {
+      const list = byRow.get(bar.row) ?? []
+      list.push(bar)
+      byRow.set(bar.row, list)
+    }
+    const seen = new Set<string>()
+    for (const [, rowBars] of byRow) {
+      if (rowBars.length < 2) continue
+      // Sort by display departure time (actual > estimated > scheduled)
+      const sorted = [...rowBars].sort((a, b) => {
+        const aDep = a.flight.atdUtc ?? a.flight.etdUtc ?? a.flight.stdUtc
+        const bDep = b.flight.atdUtc ?? b.flight.etdUtc ?? b.flight.stdUtc
+        return aDep - bDep
+      })
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const curr = sorted[i].flight
+        const next = sorted[i + 1].flight
+        // Current arrival: actual > estimated > scheduled
+        const currArr = curr.ataUtc ?? curr.etaUtc ?? curr.staUtc
+        // Next departure: actual > estimated > scheduled
+        const nextDep = next.atdUtc ?? next.etdUtc ?? next.stdUtc
+        if (nextDep < currArr) {
+          seen.add(curr.id)
+          seen.add(next.id)
+        }
+      }
+    }
+    return seen.size
+  })()
+
+  // Considerable delay count — flights delayed beyond the configured threshold
+  const considerableDelayCount = (() => {
+    const thresholdMs = considerableDelayMins * 60_000
+    let count = 0
+    for (const f of flights) {
+      const depRef = f.atdUtc ?? f.etdUtc
+      if (depRef != null && depRef - f.stdUtc > thresholdMs) count++
+    }
+    return count
+  })()
+
+  // Curfew violation count — flights arriving during a curfew window at the arrival airport
+  const stationCurfewMap = useGanttStore((s) => s.stationCurfewMap)
+  const stationUtcOffsetMap = useGanttStore((s) => s.stationUtcOffsetMap)
+  const curfewCount = (() => {
+    if (!stationCurfewMap || Object.keys(stationCurfewMap).length === 0) return 0
+    let count = 0
+    for (const f of flights) {
+      const arrStation = f.arrStation
+      const curfews = stationCurfewMap[arrStation]
+      if (!curfews || curfews.length === 0) continue
+
+      // Get arrival time (actual > estimated > scheduled)
+      const arrUtc = f.ataUtc ?? f.etaUtc ?? f.staUtc
+      const opDate = f.operatingDate // "YYYY-MM-DD"
+
+      // Check if any curfew is effective and violated
+      for (const c of curfews) {
+        if (c.effectiveFrom && opDate < c.effectiveFrom) continue
+        if (c.effectiveUntil && opDate > c.effectiveUntil) continue
+
+        // Convert curfew local times to UTC for comparison
+        const offsetHrs = stationUtcOffsetMap[arrStation] ?? 0
+        const offsetMs = offsetHrs * 3_600_000
+
+        // Parse HH:MM to ms from midnight
+        const parseHHMM = (t: string) => {
+          const [hh, mm] = t.split(':').map(Number)
+          return (hh * 60 + mm) * 60_000
+        }
+        const startLocalMs = parseHHMM(c.startTime)
+        const endLocalMs = parseHHMM(c.endTime)
+
+        // Get arrival's local time-of-day
+        const arrLocalMs = arrUtc + offsetMs
+        const arrTimeOfDay = ((arrLocalMs % 86_400_000) + 86_400_000) % 86_400_000
+
+        // Check if arrival falls within curfew window (handles overnight like 23:00-06:00)
+        const inCurfew =
+          startLocalMs <= endLocalMs
+            ? arrTimeOfDay >= startLocalMs && arrTimeOfDay < endLocalMs
+            : arrTimeOfDay >= startLocalMs || arrTimeOfDay < endLocalMs
+
+        if (inCurfew) {
+          count++
+          break // only count this flight once even if multiple curfews match
+        }
+      }
+    }
+    return count
+  })()
+
+  // Expandable state for considerable delay config
+  const [delayConfigOpen, setDelayConfigOpen] = useState(false)
+
   return (
     <div className="select-none" style={{ color: palette.text }}>
       {/* ── Collapsed: icon-only strip ── */}
@@ -382,7 +490,7 @@ export function OpsToolbar({
               {/* Issues */}
               {cb(AlertTriangle, 'Configure alerts', () => setAlertsOpen((o) => !o), {
                 active: alertsOpen || showAlerts,
-                badge: alertCount,
+                badge: alertCount + overlapCount + considerableDelayCount + curfewCount,
               })}
               {/* Disruption Recovery */}
               {cb(GitBranch, scenarioId ? 'Exit What-If (F9)' : 'What-If (F9)', handleScenarioToggle, {
@@ -407,6 +515,7 @@ export function OpsToolbar({
                 () => setBarLabelMode(barLabelMode === 'flightNo' ? 'sector' : 'flightNo'),
               )}
               {cb(Timer, showTat ? 'Hide TAT' : 'Show TAT', toggleTat, { active: showTat })}
+              {cb(Hourglass, showDelays ? 'Hide delays' : 'Show delays', toggleDelays, { active: showDelays })}
               {cb(Crosshair, centerTimebar ? 'Center on' : 'Center off', handleCenterTimebar, {
                 active: centerTimebar,
               })}
@@ -456,12 +565,12 @@ export function OpsToolbar({
                 activeBg={activeBg}
                 tooltip="Configure alert types"
               />
-              {alertCount > 0 && (
+              {alertCount + overlapCount + considerableDelayCount + curfewCount > 0 && (
                 <div
                   className="absolute top-2 right-1 min-w-[16px] h-[16px] rounded-full flex items-center justify-center px-0.5"
                   style={{ background: '#FF8800', color: '#fff', fontSize: 10, fontWeight: 700, lineHeight: 1 }}
                 >
-                  {alertCount}
+                  {alertCount + overlapCount + considerableDelayCount + curfewCount}
                 </div>
               )}
             </div>
@@ -626,6 +735,16 @@ export function OpsToolbar({
               tooltip={showTat ? 'Hide turnaround times' : 'Show turnaround times'}
             />
             <RibbonBtn
+              icon={Hourglass}
+              label="Actual"
+              onClick={toggleDelays}
+              active={showDelays}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip={showDelays ? 'Hide scheduled position markers' : 'Show scheduled position markers'}
+            />
+            <RibbonBtn
               icon={Crosshair}
               label="Center"
               onClick={handleCenterTimebar}
@@ -692,79 +811,124 @@ export function OpsToolbar({
 
       {/* ── Format Popover ── */}
       {formatOpen &&
-        createPortal(
-          <div
-            ref={formatDropRef}
-            className="fixed z-[9999] rounded-xl p-3 select-none space-y-3"
-            style={{
-              top: formatPos.top,
-              left: formatPos.left,
-              width: 200,
-              background: panelBg,
-              border: `1px solid ${panelBorder}`,
-              backdropFilter: 'blur(24px)',
-              boxShadow: isDark ? '0 8px 24px rgba(0,0,0,0.5)' : '0 8px 24px rgba(0,0,0,0.12)',
-            }}
-          >
-            <div>
-              <div
-                className="text-[11px] font-semibold uppercase tracking-wider mb-1.5"
-                style={{ color: palette.textTertiary }}
-              >
-                Row Height
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={zoomRowOut}
-                  className="w-7 h-7 rounded-md flex items-center justify-center text-[14px] font-bold"
-                  style={{ background: hoverBg, color: palette.textSecondary }}
-                >
-                  −
-                </button>
-                <span className="flex-1 text-center text-[13px] font-medium capitalize">
-                  {ROW_HEIGHT_LEVELS[rowHeightLevel].label}
-                </span>
-                <button
-                  onClick={zoomRowIn}
-                  className="w-7 h-7 rounded-md flex items-center justify-center text-[14px] font-bold"
-                  style={{ background: hoverBg, color: palette.textSecondary }}
-                >
-                  +
-                </button>
-              </div>
-            </div>
-            <div>
-              <div
-                className="text-[11px] font-semibold uppercase tracking-wider mb-1.5"
-                style={{ color: palette.textTertiary }}
-              >
-                Range
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {(['1D', '2D', '3D', '4D', '5D', '6D', '7D'] as ZoomLevel[]).map((z) => (
+        (() => {
+          const rowH = ROW_HEIGHT_LEVELS[rowHeightLevel].rowH
+          const OPS_ZOOMS: ZoomLevel[] = ['1D', '2D', '3D', '4D', '5D', '6D', '7D']
+          const zoomIdx = OPS_ZOOMS.indexOf(zoomLevel)
+          const zoomPrev = () => {
+            if (zoomIdx > 0) setZoom(OPS_ZOOMS[zoomIdx - 1])
+          }
+          const zoomNext = () => {
+            if (zoomIdx < OPS_ZOOMS.length - 1) setZoom(OPS_ZOOMS[zoomIdx + 1])
+          }
+          return createPortal(
+            <div
+              ref={formatDropRef}
+              className="fixed z-[9999] rounded-xl p-3 select-none space-y-3"
+              style={{
+                top: formatPos.top,
+                left: formatPos.left,
+                width: 200,
+                background: panelBg,
+                border: `1px solid ${panelBorder}`,
+                boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 32px rgba(96,97,112,0.14)',
+              }}
+            >
+              {/* Row Height */}
+              <div>
+                <div className="text-[13px] font-medium text-hz-text-secondary mb-2 text-center">Row Height</div>
+                <div className="flex items-center justify-center">
                   <button
-                    key={z}
-                    onClick={() => setZoom(z)}
-                    className="px-2 py-1 rounded-md text-[12px] font-medium transition-colors"
-                    style={{
-                      background: zoomLevel === z ? activeBg : 'transparent',
-                      color: zoomLevel === z ? (isDark ? '#5B8DEF' : '#1e40af') : palette.textSecondary,
-                    }}
+                    onClick={zoomRowOut}
+                    disabled={rowHeightLevel <= 0}
+                    className="flex items-center justify-center rounded-l-lg text-[14px] font-bold transition-colors disabled:opacity-30"
+                    style={{ width: 40, height: 36, border: `1px solid ${panelBorder}` }}
                     onMouseEnter={(e) => {
-                      if (zoomLevel !== z) e.currentTarget.style.background = hoverBg
+                      e.currentTarget.style.background = hoverBg
                     }}
                     onMouseLeave={(e) => {
-                      if (zoomLevel !== z) e.currentTarget.style.background = 'transparent'
+                      e.currentTarget.style.background = 'transparent'
                     }}
                   >
-                    {z}
+                    −
                   </button>
-                ))}
+                  <div
+                    className="flex items-center justify-center text-[13px] font-mono font-medium text-hz-text"
+                    style={{
+                      width: 56,
+                      height: 36,
+                      borderTop: `1px solid ${panelBorder}`,
+                      borderBottom: `1px solid ${panelBorder}`,
+                    }}
+                  >
+                    {rowH}
+                  </div>
+                  <button
+                    onClick={zoomRowIn}
+                    disabled={rowHeightLevel >= ROW_HEIGHT_LEVELS.length - 1}
+                    className="flex items-center justify-center rounded-r-lg text-[14px] font-bold transition-colors disabled:opacity-30"
+                    style={{ width: 40, height: 36, border: `1px solid ${panelBorder}` }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = hoverBg
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent'
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
               </div>
-            </div>
-          </div>,
-          document.body,
-        )}
+
+              {/* Range (Zoom) */}
+              <div>
+                <div className="text-[13px] font-medium text-hz-text-secondary mb-2 text-center">Range</div>
+                <div className="flex items-center justify-center">
+                  <button
+                    onClick={zoomPrev}
+                    disabled={zoomIdx <= 0}
+                    className="flex items-center justify-center rounded-l-lg text-[14px] font-bold transition-colors disabled:opacity-30"
+                    style={{ width: 40, height: 36, border: `1px solid ${panelBorder}` }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = hoverBg
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent'
+                    }}
+                  >
+                    −
+                  </button>
+                  <div
+                    className="flex items-center justify-center text-[13px] font-mono font-medium text-hz-text"
+                    style={{
+                      width: 56,
+                      height: 36,
+                      borderTop: `1px solid ${panelBorder}`,
+                      borderBottom: `1px solid ${panelBorder}`,
+                    }}
+                  >
+                    {zoomLevel}
+                  </div>
+                  <button
+                    onClick={zoomNext}
+                    disabled={zoomIdx >= OPS_ZOOMS.length - 1}
+                    className="flex items-center justify-center rounded-r-lg text-[14px] font-bold transition-colors disabled:opacity-30"
+                    style={{ width: 40, height: 36, border: `1px solid ${panelBorder}` }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = hoverBg
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent'
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        })()}
 
       {/* ── Alerts Popover ── */}
       {alertsOpen &&
@@ -775,7 +939,7 @@ export function OpsToolbar({
             style={{
               top: alertsPos.top,
               left: alertsPos.left,
-              width: 300,
+              width: 360,
               background: panelBg,
               border: `1px solid ${panelBorder}`,
               backdropFilter: 'blur(24px)',
@@ -791,67 +955,146 @@ export function OpsToolbar({
             <div className="flex flex-col gap-1">
               {[
                 { key: 'missingTimes' as const, label: 'Actual Times Missing', count: alertCount, enabled: true },
-                { key: 'considerableDelay' as const, label: 'Considerable Delay', count: null, enabled: false },
-                { key: 'curfew' as const, label: 'Curfew Violation', count: null, enabled: false },
-                { key: 'crewFtl' as const, label: 'Crew FTL Legality', count: null, enabled: false },
-                { key: 'depArrIncompat' as const, label: 'DEP/ARR Incompatibility', count: null, enabled: false },
+                {
+                  key: 'overlappingFlights' as const,
+                  label: 'Overlapping Flights',
+                  count: overlapCount,
+                  enabled: true,
+                },
+                {
+                  key: 'considerableDelay' as const,
+                  label: 'Considerable Delay',
+                  count: considerableDelayCount,
+                  enabled: true,
+                  expandable: true,
+                },
+                { key: 'curfew' as const, label: 'Curfew Violation', count: curfewCount, enabled: true },
+                { key: 'crewFtl' as const, label: 'Crew FTL Legality', count: null as number | null, enabled: false },
+                {
+                  key: 'depArrIncompat' as const,
+                  label: 'DEP/ARR Incompatibility',
+                  count: null as number | null,
+                  enabled: false,
+                },
               ].map((item) => (
-                <button
-                  key={item.key}
-                  onClick={() => item.enabled && toggleAlertCategory(item.key)}
-                  disabled={!item.enabled}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 text-left ${!item.enabled ? 'opacity-40' : ''}`}
-                  style={{
-                    background: alertCategories[item.key]
-                      ? isDark
-                        ? 'rgba(255,136,0,0.10)'
-                        : 'rgba(255,136,0,0.08)'
-                      : 'transparent',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (item.enabled && !alertCategories[item.key]) e.currentTarget.style.background = hoverBg
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!alertCategories[item.key]) e.currentTarget.style.background = 'transparent'
-                  }}
-                >
-                  {/* iOS-style toggle switch */}
-                  <div
-                    className="shrink-0 rounded-full relative transition-colors duration-200"
+                <div key={item.key}>
+                  <button
+                    onClick={() => item.enabled && toggleAlertCategory(item.key)}
+                    disabled={!item.enabled}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 text-left ${!item.enabled ? 'opacity-40' : ''}`}
                     style={{
-                      width: 32,
-                      height: 18,
                       background: alertCategories[item.key]
-                        ? '#FF8800'
-                        : isDark
-                          ? 'rgba(255,255,255,0.15)'
-                          : 'rgba(0,0,0,0.12)',
+                        ? isDark
+                          ? 'rgba(255,136,0,0.10)'
+                          : 'rgba(255,136,0,0.08)'
+                        : 'transparent',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (item.enabled && !alertCategories[item.key]) e.currentTarget.style.background = hoverBg
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!alertCategories[item.key]) e.currentTarget.style.background = 'transparent'
                     }}
                   >
+                    {/* iOS-style toggle switch */}
                     <div
-                      className="absolute top-[2px] rounded-full bg-white transition-all duration-200"
+                      className="shrink-0 rounded-full relative transition-colors duration-200"
                       style={{
-                        width: 14,
-                        height: 14,
-                        left: alertCategories[item.key] ? 16 : 2,
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                        width: 32,
+                        height: 18,
+                        background: alertCategories[item.key]
+                          ? '#FF8800'
+                          : isDark
+                            ? 'rgba(255,255,255,0.15)'
+                            : 'rgba(0,0,0,0.12)',
                       }}
-                    />
-                  </div>
-                  {/* Label */}
-                  <span className="flex-1 text-[13px] font-medium" style={{ color: palette.text }}>
-                    {item.label}
-                  </span>
-                  {/* Count */}
-                  <span
-                    className="text-[12px] font-semibold tabular-nums"
-                    style={{
-                      color: item.count != null && item.count > 0 ? '#FF8800' : palette.textTertiary,
-                    }}
-                  >
-                    {item.count != null ? `${item.count}` : '—'}
-                  </span>
-                </button>
+                    >
+                      <div
+                        className="absolute top-[2px] rounded-full bg-white transition-all duration-200"
+                        style={{
+                          width: 14,
+                          height: 14,
+                          left: alertCategories[item.key] ? 16 : 2,
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                        }}
+                      />
+                    </div>
+                    {/* Label */}
+                    <span className="flex-1 text-[13px] font-medium" style={{ color: palette.text }}>
+                      {item.label}
+                    </span>
+                    {/* Count — fixed width for column alignment */}
+                    <span
+                      className="text-[12px] font-semibold tabular-nums text-right shrink-0"
+                      style={{
+                        width: 36,
+                        color: item.count != null && item.count > 0 ? '#FF8800' : palette.textTertiary,
+                      }}
+                    >
+                      {item.count != null ? `${item.count}` : '—'}
+                    </span>
+                    {/* Chevron slot — fixed width so count stays aligned whether chevron is present or not */}
+                    <span className="shrink-0" style={{ width: 20 }}>
+                      {'expandable' in item && item.expandable && item.enabled && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setDelayConfigOpen((o) => !o)
+                          }}
+                          className="p-0.5 rounded transition-colors"
+                          style={{ color: palette.textTertiary }}
+                        >
+                          {delayConfigOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        </button>
+                      )}
+                    </span>
+                  </button>
+                  {/* Expandable config for Considerable Delay */}
+                  {'expandable' in item && item.expandable && delayConfigOpen && (
+                    <div
+                      className="mx-3 mt-1 mb-1 px-3 py-2.5 rounded-lg"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-[12px]" style={{ color: palette.textSecondary }}>
+                          Exceeding
+                        </span>
+                        <input
+                          type="text"
+                          placeholder="HH:MM"
+                          defaultValue={`${String(Math.floor(considerableDelayMins / 60)).padStart(2, '0')}:${String(considerableDelayMins % 60).padStart(2, '0')}`}
+                          onBlur={(e) => {
+                            const raw = e.target.value.trim().replace(/[^0-9:]/g, '')
+                            let mins = 0
+                            if (raw.includes(':')) {
+                              const [hh, mm] = raw.split(':')
+                              mins = (parseInt(hh) || 0) * 60 + (parseInt(mm) || 0)
+                            } else if (raw.length <= 2) {
+                              mins = (parseInt(raw) || 0) * 60
+                            } else {
+                              const hh = raw.slice(0, -2)
+                              const mm = raw.slice(-2)
+                              mins = (parseInt(hh) || 0) * 60 + (parseInt(mm) || 0)
+                            }
+                            if (mins > 0) setConsiderableDelayMins(mins)
+                            const final = mins > 0 ? Math.max(15, Math.min(360, mins)) : considerableDelayMins
+                            e.target.value = `${String(Math.floor(final / 60)).padStart(2, '0')}:${String(final % 60).padStart(2, '0')}`
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.currentTarget.blur()
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-[52px] text-center text-[12px] font-semibold rounded px-1.5 py-1 outline-none"
+                          style={{
+                            background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                            color: palette.text,
+                            border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)'}`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           </div>,

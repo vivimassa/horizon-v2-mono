@@ -2,6 +2,7 @@ export const moduleColors: Record<string, { bg: string; text: string; hsl: strin
   network: { bg: 'bg-yellow-500/15', text: 'text-yellow-600 dark:text-yellow-400', hsl: '45 93% 47%' },
   operations: { bg: 'bg-red-500/15', text: 'text-red-600 dark:text-red-400', hsl: '0 84% 60%' },
   workforce: { bg: 'bg-green-500/15', text: 'text-green-600 dark:text-green-400', hsl: '142 71% 45%' },
+  ground: { bg: 'bg-cyan-500/15', text: 'text-cyan-600 dark:text-cyan-400', hsl: '188 86% 53%' },
   admin: {
     bg: 'bg-slate-500/15',
     text: 'text-slate-600 dark:text-slate-400',
@@ -20,6 +21,7 @@ const codeToModule: Record<string, string> = {
   '2': 'operations',
   '3': 'workforce',
   '4': 'admin',
+  '5': 'ground',
 }
 
 /** Derive module color from a hierarchical code like "1.1.3" */

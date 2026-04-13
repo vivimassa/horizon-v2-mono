@@ -23,6 +23,8 @@ const userSchema = new Schema(
     // ── Security ──
     security: {
       passwordHash: { type: String, default: '' },
+      passwordResetToken: { type: String, default: '' },
+      passwordResetExpiry: { type: String, default: '' },
       twoFactorEnabled: { type: Boolean, default: false },
       biometricEnabled: { type: Boolean, default: false },
       lastPasswordChange: { type: String, default: '' },

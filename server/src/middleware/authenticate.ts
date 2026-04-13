@@ -8,7 +8,14 @@ declare module 'fastify' {
   }
 }
 
-const PUBLIC_PATHS = ['/health', '/auth/login', '/auth/refresh', '/auth/set-password']
+const PUBLIC_PATHS = [
+  '/health',
+  '/auth/login',
+  '/auth/refresh',
+  '/auth/set-password',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+]
 const PUBLIC_PREFIXES = ['/uploads/']
 
 const INTERNAL_PATHS = ['/gantt/seed-oooi']

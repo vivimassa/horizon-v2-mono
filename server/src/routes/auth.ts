@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import crypto from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { User } from '../models/User.js'
 import { getServerEnv } from '@skyhub/env/server'
@@ -14,6 +15,15 @@ interface RefreshBody {
 
 interface SetPasswordBody {
   userId: string
+  password: string
+}
+
+interface ForgotPasswordBody {
+  email: string
+}
+
+interface ResetPasswordBody {
+  token: string
   password: string
 }
 
@@ -149,6 +159,81 @@ export async function authRoutes(app: FastifyInstance) {
     if (result.matchedCount === 0) {
       return reply.code(404).send({ error: 'User not found' })
     }
+
+    return { success: true }
+  })
+
+  // ── POST /auth/forgot-password ──
+  app.post<{ Body: ForgotPasswordBody }>('/auth/forgot-password', async (req, reply) => {
+    const { email } = req.body ?? ({} as ForgotPasswordBody)
+    if (!email) return reply.code(400).send({ error: 'Email is required' })
+
+    const normalizedEmail = email.toLowerCase().trim()
+    const user = await User.findOne({ 'profile.email': normalizedEmail })
+
+    // Always return success to prevent email enumeration
+    if (!user) return { success: true }
+
+    // Generate a 48-byte random token, store its SHA-256 hash (not the raw token)
+    const rawToken = crypto.randomBytes(48).toString('hex')
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex')
+    const expiry = new Date(Date.now() + 60 * 60 * 1000).toISOString() // 1 hour
+
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          'security.passwordResetToken': tokenHash,
+          'security.passwordResetExpiry': expiry,
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    )
+
+    // ── TODO: Replace with actual email delivery (Resend, SendGrid, SES, etc.) ──
+    const resetUrl = `${env.CLIENT_URL ?? 'http://localhost:3000'}/login/reset-password?token=${rawToken}`
+    console.log('\n╔══════════════════════════════════════════════════════════════╗')
+    console.log('║  PASSWORD RESET LINK (dev mode — wire email service later)  ║')
+    console.log('╠══════════════════════════════════════════════════════════════╣')
+    console.log(`║  ${normalizedEmail}`)
+    console.log(`║  ${resetUrl}`)
+    console.log('║  Expires in 1 hour')
+    console.log('╚══════════════════════════════════════════════════════════════╝\n')
+
+    return { success: true }
+  })
+
+  // ── POST /auth/reset-password ──
+  app.post<{ Body: ResetPasswordBody }>('/auth/reset-password', async (req, reply) => {
+    const { token, password } = req.body ?? ({} as ResetPasswordBody)
+
+    if (!token || !password || password.length < 8) {
+      return reply.code(400).send({ error: 'Token and password (min 8 chars) are required' })
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
+    const user = await User.findOne({
+      'security.passwordResetToken': tokenHash,
+      'security.passwordResetExpiry': { $gt: new Date().toISOString() },
+    })
+
+    if (!user) {
+      return reply.code(400).send({ error: 'Invalid or expired reset link. Please request a new one.' })
+    }
+
+    const hash = await bcrypt.hash(password, 12)
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          'security.passwordHash': hash,
+          'security.passwordResetToken': '',
+          'security.passwordResetExpiry': '',
+          'security.lastPasswordChange': new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    )
 
     return { success: true }
   })

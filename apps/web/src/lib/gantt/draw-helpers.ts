@@ -1,5 +1,6 @@
 import type { BarLayout, RowLayout, TickMark } from './types'
 import { SLOT_RISK_COLORS, MISSING_TIMES_FLAG_COLOR } from './colors'
+import { getDisplayTimes } from './layout-engine'
 
 // ── Helpers ──
 
@@ -138,6 +139,24 @@ export function drawBars(
     rr(ctx, bar.x, bar.y, bar.width, bar.height, 4)
     ctx.fill()
 
+    // Delay overlay — red portion proportional to departure delay vs scheduled block
+    const f = bar.flight
+    const delayRef = f.atdUtc ?? f.etdUtc
+    if (delayRef != null) {
+      const delayMs = delayRef - f.stdUtc
+      if (delayMs > 0) {
+        const blockMs = f.staUtc - f.stdUtc
+        const ratio = Math.min(delayMs / blockMs, 1)
+        const delayW = bar.width * ratio
+        ctx.save()
+        rr(ctx, bar.x, bar.y, bar.width, bar.height, 4)
+        ctx.clip()
+        ctx.fillStyle = 'rgba(239,68,68,0.55)'
+        ctx.fillRect(bar.x, bar.y, delayW, bar.height)
+        ctx.restore()
+      }
+    }
+
     // Top highlight
     ctx.fillStyle = 'rgba(255,255,255,0.06)'
     ctx.fillRect(bar.x + 1, bar.y + 1, bar.width - 2, bar.height * 0.4)
@@ -196,6 +215,26 @@ export function drawBars(
       ctx.font = `700 ${fs}px "JetBrains Mono", ui-monospace, monospace`
       ctx.fillText(bar.label, bar.x + 6, bar.y + bar.height / 2)
     }
+
+    // Protected flight — "no entry" sign (red circle + white bar)
+    if (bar.flight.isProtected) {
+      const r = Math.min(bar.height * 0.22, 7) // radius, max 7px → 14px diameter
+      const cx = bar.x + bar.width - r - 4
+      const cy = bar.y + r + 3
+
+      ctx.save()
+      // Red circle
+      ctx.beginPath()
+      ctx.arc(cx, cy, r, 0, Math.PI * 2)
+      ctx.fillStyle = '#FF3B3B'
+      ctx.fill()
+      // White horizontal bar
+      const barW = r * 1.2
+      const barH = r * 0.4
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(cx - barW / 2, cy - barH / 2, barW, barH)
+      ctx.restore()
+    }
   }
 }
 
@@ -246,7 +285,7 @@ export function drawTatLabels(
       if (gap < 25) continue
       if (next.x < sx || curr.x + curr.width > sx + vw) continue
 
-      const tatMs = next.flight.stdUtc - curr.flight.staUtc
+      const tatMs = getDisplayTimes(next.flight).depMs - getDisplayTimes(curr.flight).arrMs
       if (tatMs <= 0) continue
       const tatMin = Math.round(tatMs / 60_000)
       if (tatMin >= 180) continue
@@ -304,7 +343,7 @@ export function drawNightstopLabels(
       const curr = rowBars[i]
       const next = rowBars[i + 1]
 
-      const gapMs = next.flight.stdUtc - curr.flight.staUtc
+      const gapMs = getDisplayTimes(next.flight).depMs - getDisplayTimes(curr.flight).arrMs
       const gapMin = Math.round(gapMs / 60_000)
       if (gapMin < NIGHTSTOP_MIN_GAP) continue
 
@@ -530,6 +569,55 @@ export function drawSlotLines(
 }
 
 // ── Missing OOOI Times Corner Flags ──
+
+// ── Overlap flags — orange bottom border on bars that overlap with adjacent flight on same row ──
+
+export function drawOverlapFlags(
+  ctx: CanvasRenderingContext2D,
+  barsByRow: Map<number, BarLayout[]>,
+  sx: number,
+  sy: number,
+  vw: number,
+  vh: number,
+) {
+  ctx.save()
+  ctx.strokeStyle = '#FF8800'
+  ctx.lineWidth = 3
+
+  for (const rowBars of barsByRow.values()) {
+    if (rowBars.length < 2) continue
+    const firstY = rowBars[0].y
+    if (firstY + rowBars[0].height < sy || firstY > sy + vh) continue
+
+    for (let i = 0; i < rowBars.length - 1; i++) {
+      const curr = rowBars[i]
+      const next = rowBars[i + 1]
+      const currArr = getDisplayTimes(curr.flight).arrMs
+      const nextDep = getDisplayTimes(next.flight).depMs
+
+      if (nextDep < currArr) {
+        // Draw orange bottom border on both overlapping bars
+        const bottomY = curr.y + curr.height - 1.5
+        // Current bar
+        if (curr.x + curr.width >= sx && curr.x <= sx + vw) {
+          ctx.beginPath()
+          ctx.moveTo(curr.x, bottomY)
+          ctx.lineTo(curr.x + curr.width, bottomY)
+          ctx.stroke()
+        }
+        // Next bar
+        if (next.x + next.width >= sx && next.x <= sx + vw) {
+          ctx.beginPath()
+          ctx.moveTo(next.x, next.y + next.height - 1.5)
+          ctx.lineTo(next.x + next.width, next.y + next.height - 1.5)
+          ctx.stroke()
+        }
+      }
+    }
+  }
+
+  ctx.restore()
+}
 
 /**
  * Draw corner flags on flight bars with missing actual times (OOOI).

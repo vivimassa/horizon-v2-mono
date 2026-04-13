@@ -33,8 +33,14 @@ export function GanttFilterPanel({
   )
   const [enabledTypes, setEnabledTypes] = useState<Set<string> | null>(null)
 
-  const periodFrom = useGanttStore((s) => s.periodFrom)
-  const periodTo = useGanttStore((s) => s.periodTo)
+  // Draft period — local state, only pushed to store on Go
+  const storePeriodFrom = useGanttStore((s) => s.periodFrom)
+  const storePeriodTo = useGanttStore((s) => s.periodTo)
+  const [draftFrom, setDraftFrom] = useState(storePeriodFrom)
+  const [draftTo, setDraftTo] = useState(storePeriodTo)
+  const periodFrom = draftFrom
+  const periodTo = draftTo
+
   const loading = useGanttStore((s) => s.loading)
   const aircraft = useGanttStore((s) => s.aircraft)
   const colorMode = useGanttStore((s) => s.colorMode)
@@ -151,10 +157,10 @@ export function GanttFilterPanel({
           {/* Period */}
           <FilterSection label="Period">
             <DateRangePicker
-              from={periodFrom}
-              to={periodTo}
-              onChangeFrom={(v) => setPeriod(v, useGanttStore.getState().periodTo)}
-              onChangeTo={(v) => setPeriod(useGanttStore.getState().periodFrom, v)}
+              from={draftFrom}
+              to={draftTo}
+              onChangeFrom={(v) => setDraftFrom(v)}
+              onChangeTo={(v) => setDraftTo(v)}
               inline
             />
           </FilterSection>
@@ -233,15 +239,19 @@ export function GanttFilterPanel({
         <div className="px-5 py-4 shrink-0" style={{ borderTop: `1px solid ${sectionBorder}` }}>
           <button
             onClick={() => {
-              // Sync filters to store before fetching
+              // Sync draft period + filters to store before fetching
+              setPeriod(draftFrom, draftTo)
               setAcTypeFilter(enabledTypes ? Array.from(enabledTypes) : null)
               const allStatuses = SCHEDULE_STATUSES.map((s) => s.key)
               const allSelected = allStatuses.every((k) => enabledStatuses.has(k))
               setStatusFilter(allSelected ? null : Array.from(enabledStatuses))
-              ;(onGo ?? commitPeriod)()
+              // Use setTimeout to let store update before commit
+              setTimeout(() => {
+                ;(onGo ?? commitPeriod)()
+              }, 0)
               setCollapsed(true)
             }}
-            disabled={loading || !periodFrom || !periodTo}
+            disabled={loading || !draftFrom || !draftTo}
             className="w-full h-9 flex items-center justify-center gap-2 rounded-xl text-[13px] font-semibold text-white bg-module-accent hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}

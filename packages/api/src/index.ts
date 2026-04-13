@@ -4,6 +4,7 @@ export type {
   Flight,
   AirportRef,
   AirportLookupResult,
+  CurfewEntry,
   RunwayData,
   CityPairRef,
   BlockHourData,
@@ -72,6 +73,13 @@ export type {
   SlotFleetAirportStats,
   MaintenanceCheckTypeRef,
   MaintenanceWindowRef,
+  MaintenanceEventRef,
+  MxEventRow,
+  MxForecastMarker,
+  MxGanttAircraftRow,
+  MxSchedulingStats,
+  MxFilterOptions,
+  MxEventDetail,
 } from './client'
 
 // ─── React Query layer ───

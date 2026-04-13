@@ -12,7 +12,14 @@ import type {
   LayoutResult,
 } from '@/lib/gantt/types'
 import { ROW_HEIGHT_LEVELS, ZOOM_CONFIG } from '@/lib/gantt/types'
-import { fetchGanttFlights, assignFlights, unassignFlights, swapFlights, cancelFlights } from '@/lib/gantt/api'
+import {
+  fetchGanttFlights,
+  assignFlights,
+  unassignFlights,
+  swapFlights,
+  cancelFlights,
+  protectFlights,
+} from '@/lib/gantt/api'
 import { computePixelsPerHour } from '@/lib/gantt/time-axis'
 import { computeLayout } from '@/lib/gantt/layout-engine'
 import { useOperatorStore } from './use-operator-store'
@@ -25,6 +32,10 @@ interface GanttState {
   operatorCountry: string | null
   stationCountryMap: Record<string, string>
   stationUtcOffsetMap: Record<string, number>
+  stationCurfewMap: Record<
+    string,
+    Array<{ startTime: string; endTime: string; effectiveFrom: string | null; effectiveUntil: string | null }>
+  >
   loading: boolean
   error: string | null
 
@@ -48,11 +59,14 @@ interface GanttState {
   showTat: boolean
   showSlots: boolean
   showMissingTimes: boolean
+  showDelays: boolean
   oooiGraceMins: number
+  considerableDelayMins: number
   // Ops-specific (2.1.1 Movement Control)
   showAlerts: boolean
   alertCategories: {
     missingTimes: boolean
+    overlappingFlights: boolean
     considerableDelay: boolean
     curfew: boolean
     crewFtl: boolean
@@ -129,7 +143,9 @@ interface GanttState {
   toggleTat: () => void
   toggleSlots: () => void
   toggleMissingTimes: () => void
+  toggleDelays: () => void
   setOooiGraceMins: (mins: number) => void
+  setConsiderableDelayMins: (mins: number) => void
   toggleAlerts: () => void
   toggleAlertCategory: (key: keyof GanttState['alertCategories']) => void
   setOptimizerObjective: (obj: 'revenue' | 'cost') => void
@@ -160,6 +176,7 @@ interface GanttState {
   closeAssignPopover: () => void
   assignToAircraft: (flightIds: string[], registration: string) => Promise<void>
   unassignFromAircraft: (flightIds: string[]) => Promise<void>
+  toggleProtection: (flightIds: string[], isProtected: boolean) => Promise<void>
   openCancelDialog: (flightIds: string[]) => void
   closeCancelDialog: () => void
   confirmCancel: () => Promise<void>
@@ -270,6 +287,7 @@ export const useGanttStore = create<GanttState>((set, get) => {
         operatorCountry: data.operatorCountry ?? null,
         stationCountryMap: data.stationCountryMap ?? {},
         stationUtcOffsetMap: data.stationUtcOffsetMap ?? {},
+        stationCurfewMap: data.stationCurfewMap ?? {},
         loading: false,
       })
       recompute()
@@ -285,6 +303,7 @@ export const useGanttStore = create<GanttState>((set, get) => {
     operatorCountry: null,
     stationCountryMap: {},
     stationUtcOffsetMap: {},
+    stationCurfewMap: {},
     loading: false,
     error: null,
 
@@ -304,10 +323,13 @@ export const useGanttStore = create<GanttState>((set, get) => {
     showTat: true,
     showSlots: true,
     showMissingTimes: true,
+    showDelays: true,
     oooiGraceMins: 15,
+    considerableDelayMins: 60,
     showAlerts: false,
     alertCategories: {
       missingTimes: true,
+      overlappingFlights: true,
       considerableDelay: false,
       curfew: false,
       crewFtl: false,
@@ -407,6 +429,7 @@ export const useGanttStore = create<GanttState>((set, get) => {
     toggleTat: () => set({ showTat: !get().showTat }),
     toggleSlots: () => set({ showSlots: !get().showSlots }),
     toggleMissingTimes: () => set({ showMissingTimes: !get().showMissingTimes }),
+    toggleDelays: () => set({ showDelays: !get().showDelays }),
     toggleAlerts: () => set({ showAlerts: !get().showAlerts }),
     toggleAlertCategory: (key) => {
       const cats = { ...get().alertCategories }
@@ -418,6 +441,10 @@ export const useGanttStore = create<GanttState>((set, get) => {
       set(patch)
     },
     setOptimizerObjective: (obj) => set({ optimizerObjective: obj }),
+    setConsiderableDelayMins: (mins: number) => {
+      const clamped = Math.max(15, Math.min(360, mins))
+      set({ considerableDelayMins: clamped })
+    },
     setOooiGraceMins: (mins) => {
       const clamped = Math.max(1, Math.min(60, mins))
       set({ oooiGraceMins: clamped })
@@ -500,6 +527,20 @@ export const useGanttStore = create<GanttState>((set, get) => {
         await unassignFlights(operatorId, flightIds)
       } catch (e) {
         console.error('Unassign failed, refetching:', e)
+        await fetchFlights()
+      }
+    },
+
+    toggleProtection: async (flightIds, isProtected) => {
+      const operatorId = useOperatorStore.getState().operator?._id ?? ''
+      // Optimistic: update local state immediately
+      const flights = get().flights.map((f) => (flightIds.includes(f.id) ? { ...f, isProtected } : f))
+      set({ flights, contextMenu: null })
+      recompute()
+      try {
+        await protectFlights(operatorId, flightIds, isProtected)
+      } catch (e) {
+        console.error('Protect toggle failed, refetching:', e)
         await fetchFlights()
       }
     },

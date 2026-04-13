@@ -116,6 +116,7 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
             'actual.ataUtc': 1,
             'estimated.etdUtc': 1,
             'estimated.etaUtc': 1,
+            isProtected: 1,
           },
         ).lean(),
         Operator.findById(operatorId, { countryIso2: 1 }).lean(),
@@ -137,6 +138,7 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
         ataUtc: number | null
         etdUtc: number | null
         etaUtc: number | null
+        isProtected: boolean
       }
     >()
     for (const inst of instances) {
@@ -153,6 +155,7 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
         ataUtc: a?.ataUtc ?? null,
         etdUtc: e?.etdUtc ?? null,
         etaUtc: e?.etaUtc ?? null,
+        isProtected: !!(inst as any).isProtected,
       })
     }
 
@@ -236,6 +239,7 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
           ataUtc: inst?.ataUtc ?? null,
           etdUtc: inst?.etdUtc ?? null,
           etaUtc: inst?.etaUtc ?? null,
+          isProtected: inst?.isProtected ?? false,
         })
       }
     }
@@ -363,16 +367,37 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     }
     const airports = await Airport.find(
       { $or: [{ icaoCode: { $in: [...allStations] } }, { iataCode: { $in: [...allStations] } }] },
-      { icaoCode: 1, iataCode: 1, countryIso2: 1, utcOffsetHours: 1 },
+      { icaoCode: 1, iataCode: 1, countryIso2: 1, utcOffsetHours: 1, curfews: 1 },
     ).lean()
     const stationCountryMap: Record<string, string> = {}
     const stationUtcOffsetMap: Record<string, number> = {}
+    // Curfew map: station code → array of { startTime, endTime, effectiveFrom, effectiveUntil }
+    const stationCurfewMap: Record<
+      string,
+      Array<{ startTime: string; endTime: string; effectiveFrom: string | null; effectiveUntil: string | null }>
+    > = {}
     for (const ap of airports) {
       if (ap.icaoCode && ap.countryIso2) stationCountryMap[ap.icaoCode] = ap.countryIso2 as string
       if (ap.iataCode && ap.countryIso2) stationCountryMap[ap.iataCode as string] = ap.countryIso2 as string
       if (ap.utcOffsetHours != null) {
         if (ap.icaoCode) stationUtcOffsetMap[ap.icaoCode] = ap.utcOffsetHours as number
         if (ap.iataCode) stationUtcOffsetMap[ap.iataCode as string] = ap.utcOffsetHours as number
+      }
+      const curfews = ((ap as any).curfews ?? []) as Array<{
+        startTime: string
+        endTime: string
+        effectiveFrom?: string | null
+        effectiveUntil?: string | null
+      }>
+      if (curfews.length > 0) {
+        const entries = curfews.map((c) => ({
+          startTime: c.startTime,
+          endTime: c.endTime,
+          effectiveFrom: c.effectiveFrom ?? null,
+          effectiveUntil: c.effectiveUntil ?? null,
+        }))
+        if (ap.icaoCode) stationCurfewMap[ap.icaoCode] = entries
+        if (ap.iataCode) stationCurfewMap[ap.iataCode as string] = entries
       }
     }
 
@@ -383,6 +408,7 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       operatorCountry,
       stationCountryMap,
       stationUtcOffsetMap,
+      stationCurfewMap,
       meta: { from, to, totalFlights: flights.length, totalAircraft: aircraft.length, expandedAt: Date.now() },
     }
   })
@@ -1282,6 +1308,29 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     }
   })
 
+  // ── PATCH /gantt/protect — Toggle isProtected on flight instances ──
+  app.patch('/gantt/protect', async (req) => {
+    const body = req.body as { operatorId: string; flightIds: string[]; isProtected: boolean }
+    const { operatorId, flightIds, isProtected } = body
+    if (!operatorId || !flightIds?.length) return { error: 'operatorId, flightIds required' }
+
+    // Upsert: for flights that don't have a FlightInstance yet, create a minimal one
+    let updated = 0
+    for (const fid of flightIds) {
+      await FlightInstance.findOneAndUpdate(
+        { _id: fid },
+        {
+          $set: { isProtected, 'syncMeta.updatedAt': Date.now() },
+          $setOnInsert: { operatorId, flightNumber: '', operatingDate: fid.split('|')[1] ?? '' },
+          $inc: { 'syncMeta.version': 1 },
+        },
+        { upsert: true },
+      )
+      updated++
+    }
+    return { updated, isProtected }
+  })
+
   // ── DELETE /gantt/flight-instances — Clear all flight instances for operator ──
   app.delete('/gantt/flight-instances', async (req) => {
     const q = req.query as Record<string, string>
@@ -1290,13 +1339,14 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     return { deleted: result.deletedCount }
   })
 
-  // ── POST /gantt/seed-oooi — Seed realistic OOOI data for a date range ──
+  // ── POST /gantt/seed-oooi — Seed realistic OOOI data with delay-ripple cascading ──
   app.post('/gantt/seed-oooi', async (req, reply) => {
     const body = req.body as Record<string, unknown>
     const operatorId = body.operatorId as string
     const fromDate = body.from as string // YYYY-MM-DD
     const toDate = body.to as string // YYYY-MM-DD
-    const otpTarget = (body.otpTarget as number) ?? 0.85 // 85% on-time
+    const otpTarget = (body.otpTarget as number) ?? 0.85 // 85% on-time (primary delay probability)
+    const forceReseed = !!(body.forceReseed ?? false) // clear existing OOOI first
 
     if (!operatorId || !fromDate || !toDate) {
       return reply.code(400).send({ error: 'operatorId, from, to required' })
@@ -1308,15 +1358,60 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       status: { $ne: 'cancelled' },
     }).lean()
 
-    const registrations = await AircraftRegistration.find({ operatorId, isActive: true }).lean()
-    const regList = registrations.map((r) => r.registration as string)
+    if (scheduledFlights.length === 0) {
+      console.warn(`  OOOI seed: 0 scheduled flights for operator "${operatorId}" — nothing to seed`)
+      return { created: 0, skipped: 0, alreadySeeded: 0, repaired: 0, otpTarget, scheduledFlightCount: 0 }
+    }
+
+    // Force reseed: clear all existing instances so we can re-roll with ripple
+    let cleared = 0
+    if (forceReseed) {
+      const result = await FlightInstance.deleteMany({
+        operatorId,
+        operatingDate: { $gte: fromDate, $lte: toDate },
+      })
+      cleared = result.deletedCount ?? 0
+    }
+
+    // Fetch existing instances that already have OOOI to avoid re-rolling
+    const existingInstances = forceReseed
+      ? []
+      : await FlightInstance.find(
+          { operatorId, operatingDate: { $gte: fromDate, $lte: toDate }, 'actual.atdUtc': { $ne: null } },
+          { _id: 1 },
+        ).lean()
+    const alreadySeededIds = new Set(existingInstances.map((i) => i._id as string))
 
     const fromMs = new Date(fromDate + 'T00:00:00Z').getTime()
     const toMs = new Date(toDate + 'T00:00:00Z').getTime()
     const nowMs = Date.now()
+    const DEFAULT_TAT_MS = 30 * 60_000 // fallback if AC type has no TAT configured
 
-    let created = 0
+    // Build TAT lookup by ICAO type (e.g. A320 → 25 min, A321 → 30 min)
+    const acTypes = await AircraftType.find({ operatorId }, { icaoType: 1, 'tat.defaultMinutes': 1 }).lean()
+    const tatByType = new Map<string, number>()
+    for (const t of acTypes) {
+      const tatMin = (t.tat as { defaultMinutes?: number | null })?.defaultMinutes
+      if (tatMin) tatByType.set(t.icaoType as string, tatMin * 60_000)
+    }
+
+    // ── Phase 1: Expand all scheduled flights into per-date instances ──
+    interface ExpandedFlight {
+      compositeId: string
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      sf: any
+      opDate: string
+      stdMs: number
+      staMs: number
+      blockMin: number
+      aircraftReg: string | null
+      icaoType: string | null
+    }
+
+    const allFlights: ExpandedFlight[] = []
     let skipped = 0
+    let alreadySeeded = 0
+    let dateSkipped = 0
 
     for (const sf of scheduledFlights) {
       const dow = sf.daysOfWeek as string
@@ -1324,10 +1419,16 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       const arrOffset = (sf.arrivalDayOffset as number) ?? 1
       const effFrom = (sf.effectiveFrom as string) ?? ''
       const effUntil = (sf.effectiveUntil as string) ?? ''
-      if (!effFrom || !effUntil) continue
+      if (!effFrom || !effUntil) {
+        dateSkipped++
+        continue
+      }
       const effFromMs = dateToDayMs(effFrom)
       const effUntilMs = dateToDayMs(effUntil)
-      if (isNaN(effFromMs) || isNaN(effUntilMs)) continue
+      if (isNaN(effFromMs) || isNaN(effUntilMs)) {
+        dateSkipped++
+        continue
+      }
 
       const rangeStart = Math.max(effFromMs, fromMs)
       const rangeEnd = Math.min(effUntilMs, toMs)
@@ -1341,81 +1442,234 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
         const stdMs = dayMs + (depOffset - 1) * DAY_MS + timeStringToMs(sf.stdUtc as string)
         const staMs = dayMs + (arrOffset - 1) * DAY_MS + timeStringToMs(sf.staUtc as string)
 
-        // Only seed past flights (already should have departed)
         if (stdMs > nowMs) {
           skipped++
           continue
         }
 
         const compositeId = `${sf._id}|${opDate}`
-
-        // Determine if on-time or delayed
-        const isOnTime = Math.random() < otpTarget
-        let delayMinutes = 0
-        const delays: Array<{ code: string; minutes: number; reason: string; category: string }> = []
-
-        if (!isOnTime) {
-          // Random delay: 16-180 minutes (weighted toward shorter delays)
-          const r = Math.random()
-          if (r < 0.5)
-            delayMinutes = 16 + Math.floor(Math.random() * 30) // 16-45 min
-          else if (r < 0.8)
-            delayMinutes = 45 + Math.floor(Math.random() * 45) // 45-90 min
-          else if (r < 0.95)
-            delayMinutes = 90 + Math.floor(Math.random() * 60) // 90-150 min
-          else delayMinutes = 150 + Math.floor(Math.random() * 30) // 150-180 min
-
-          // Random delay code
-          const delayCodes = [
-            { code: '81', reason: 'ATC restrictions', category: 'ATFM' },
-            { code: '87', reason: 'Airport facility issues', category: 'ATFM' },
-            { code: '41', reason: 'Technical defect', category: 'Technical' },
-            { code: '61', reason: 'Late inbound aircraft', category: 'Reactionary' },
-            { code: '63', reason: 'Rotation late', category: 'Reactionary' },
-            { code: '93', reason: 'Weather', category: 'Weather' },
-            { code: '15', reason: 'Late boarding', category: 'Passenger' },
-            { code: '33', reason: 'Cargo loading', category: 'Cargo' },
-          ]
-          const dc = delayCodes[Math.floor(Math.random() * delayCodes.length)]
-          delays.push({ code: dc.code, minutes: delayMinutes, reason: dc.reason, category: dc.category })
+        if (alreadySeededIds.has(compositeId)) {
+          alreadySeeded++
+          continue
         }
 
-        const delayMs = delayMinutes * 60_000
-        // Small random variance even for on-time flights (±5 min)
-        const onTimeVariance = isOnTime ? (Math.random() * 10 - 5) * 60_000 : 0
-
-        // OOOI times
-        const doorCloseUtc = stdMs + delayMs + onTimeVariance - 5 * 60_000 // 5 min before push
-        const atdUtc = stdMs + delayMs + onTimeVariance // push back
-        const offUtc = atdUtc + (8 + Math.floor(Math.random() * 7)) * 60_000 // 8-15 min taxi
         const blockMin = (sf.blockMinutes as number) ?? Math.round((staMs - stdMs) / 60_000)
-        const flightTimeMs = (blockMin - 12) * 60_000 // block minus avg taxi
-        const onUtc = offUtc + flightTimeMs + Math.floor((Math.random() * 6 - 3) * 60_000) // ±3 min
-        const ataUtc = onUtc + (5 + Math.floor(Math.random() * 8)) * 60_000 // 5-12 min taxi in
+        allFlights.push({
+          compositeId,
+          sf,
+          opDate,
+          stdMs,
+          staMs,
+          blockMin,
+          aircraftReg: (sf.aircraftReg as string) ?? null,
+          icaoType: (sf.aircraftTypeIcao as string) ?? null,
+        })
+      }
+    }
 
-        // Generate realistic pax
-        const totalSeats = 180
-        const loadFactor = 0.75 + Math.random() * 0.2 // 75-95%
-        const totalPax = Math.floor(totalSeats * loadFactor)
-        const children = Math.floor(totalPax * 0.05)
-        const infants = Math.floor(totalPax * 0.02)
-        const adults = totalPax - children - infants
+    // ── Phase 2: Group by aircraft and sort chronologically ──
+    const byAircraft = new Map<string, ExpandedFlight[]>()
+    const noAircraft: ExpandedFlight[] = []
 
-        // Only set OOOI, pax, delays — NEVER touch tail on existing instances
-        // $setOnInsert ensures new instances get the pattern tail assignment
-        await FlightInstance.findOneAndUpdate(
-          { _id: compositeId },
-          {
+    for (const f of allFlights) {
+      if (f.aircraftReg) {
+        const list = byAircraft.get(f.aircraftReg) ?? []
+        list.push(f)
+        byAircraft.set(f.aircraftReg, list)
+      } else {
+        noAircraft.push(f)
+      }
+    }
+
+    for (const [, flights] of byAircraft) {
+      flights.sort((a, b) => a.stdMs - b.stdMs)
+    }
+
+    // ── Phase 3: Walk each aircraft sequentially with delay ripple ──
+    // Primary delay codes (root-cause delays)
+    const primaryDelayCodes = [
+      { code: '81', reason: 'ATC restrictions', category: 'ATFM' },
+      { code: '87', reason: 'Airport facility issues', category: 'ATFM' },
+      { code: '41', reason: 'Technical defect', category: 'Technical' },
+      { code: '93', reason: 'Weather', category: 'Weather' },
+      { code: '15', reason: 'Late boarding', category: 'Passenger' },
+      { code: '33', reason: 'Cargo loading', category: 'Cargo' },
+    ]
+    // Reactionary delay code (cascaded from previous flight)
+    const reactDelay = { code: '93', reason: 'Reactionary — late inbound aircraft', category: 'Reactionary' }
+
+    interface SeedResult {
+      compositeId: string
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      sf: any
+      opDate: string
+      stdMs: number
+      staMs: number
+      blockMin: number
+      atdUtc: number
+      offUtc: number
+      onUtc: number
+      ataUtc: number
+      doorCloseUtc: number
+      delayMinutes: number
+      delays: Array<{ code: string; minutes: number; reason: string; category: string }>
+    }
+
+    function generateRandomPrimaryDelay(): number {
+      const r = Math.random()
+      if (r < 0.5) return 20 + Math.floor(Math.random() * 25) // 20-45 min
+      if (r < 0.8) return 45 + Math.floor(Math.random() * 45) // 45-90 min
+      if (r < 0.95) return 90 + Math.floor(Math.random() * 60) // 90-150 min
+      return 150 + Math.floor(Math.random() * 30) // 150-180 min
+    }
+
+    function computeOooi(f: ExpandedFlight, prevAta: number): SeedResult {
+      // Reactionary delay: can't depart until previous flight arrives + turnaround
+      const tatMs = (f.icaoType ? tatByType.get(f.icaoType) : null) ?? DEFAULT_TAT_MS
+      const earliestDep = prevAta > 0 ? prevAta + tatMs : 0
+      const reactDelayMs = Math.max(0, earliestDep - f.stdMs)
+
+      // Primary delay: independent root-cause (weather, technical, etc.)
+      let primaryDelayMs = 0
+      const hasPrimaryDelay = Math.random() >= otpTarget
+      if (hasPrimaryDelay) {
+        primaryDelayMs = generateRandomPrimaryDelay() * 60_000
+      }
+
+      // Actual departure = latest of (schedule + primary, turnaround constraint)
+      const atdUtc = Math.max(f.stdMs + primaryDelayMs, f.stdMs + reactDelayMs)
+      const totalDelayMs = atdUtc - f.stdMs
+      const delayMinutes = Math.round(totalDelayMs / 60_000)
+
+      // Build delay code array
+      const delays: Array<{ code: string; minutes: number; reason: string; category: string }> = []
+      const reactMinutes = Math.round(reactDelayMs / 60_000)
+      const primaryMinutes = Math.round(primaryDelayMs / 60_000)
+
+      if (reactMinutes > 0 && reactDelayMs >= primaryDelayMs) {
+        // Reactionary is the dominant delay
+        delays.push({ ...reactDelay, minutes: reactMinutes })
+        if (primaryMinutes > 0) {
+          const dc = primaryDelayCodes[Math.floor(Math.random() * primaryDelayCodes.length)]
+          delays.push({ ...dc, minutes: primaryMinutes })
+        }
+      } else if (primaryMinutes > 0) {
+        const dc = primaryDelayCodes[Math.floor(Math.random() * primaryDelayCodes.length)]
+        delays.push({ ...dc, minutes: primaryMinutes })
+        if (reactMinutes > 0) {
+          delays.push({ ...reactDelay, minutes: reactMinutes })
+        }
+      }
+
+      // Small on-time variance (±3 min) only when no delay at all
+      const variance = delayMinutes === 0 ? Math.floor(Math.random() * 6 - 3) * 60_000 : 0
+      const finalAtd = atdUtc + variance
+
+      // OOOI chain
+      const doorCloseUtc = finalAtd - 5 * 60_000
+      const offUtc = finalAtd + (8 + Math.floor(Math.random() * 7)) * 60_000
+      const flightTimeMs = Math.max((f.blockMin - 12) * 60_000, 30 * 60_000)
+      const onUtc = offUtc + flightTimeMs + Math.floor((Math.random() * 6 - 3) * 60_000)
+      const ataUtc = onUtc + (5 + Math.floor(Math.random() * 8)) * 60_000
+
+      return {
+        compositeId: f.compositeId,
+        sf: f.sf,
+        opDate: f.opDate,
+        stdMs: f.stdMs,
+        staMs: f.staMs,
+        blockMin: f.blockMin,
+        atdUtc: finalAtd,
+        offUtc,
+        onUtc,
+        ataUtc,
+        doorCloseUtc,
+        delayMinutes,
+        delays,
+      }
+    }
+
+    // Process aircraft groups — delay ripples through each aircraft's rotation
+    const allResults: SeedResult[] = []
+
+    for (const [, flights] of byAircraft) {
+      let prevAta = 0
+      for (const f of flights) {
+        const result = computeOooi(f, prevAta)
+        allResults.push(result)
+        prevAta = result.ataUtc // carry forward — this is the ripple
+      }
+    }
+
+    // Process unassigned flights (no aircraft = no ripple, just random primary delays)
+    for (const f of noAircraft) {
+      allResults.push(computeOooi(f, 0))
+    }
+
+    // ── Phase 4: Bulk upsert all FlightInstances ──
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const bulkOps: any[] = []
+
+    for (const r of allResults) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const actual: Record<string, any> = {
+        doorCloseUtc: null,
+        atdUtc: null,
+        offUtc: null,
+        onUtc: null,
+        ataUtc: null,
+      }
+      let status: string
+
+      if (nowMs >= r.ataUtc) {
+        actual.doorCloseUtc = r.doorCloseUtc
+        actual.atdUtc = r.atdUtc
+        actual.offUtc = r.offUtc
+        actual.onUtc = r.onUtc
+        actual.ataUtc = r.ataUtc
+        status = 'completed'
+      } else if (nowMs >= r.onUtc) {
+        actual.doorCloseUtc = r.doorCloseUtc
+        actual.atdUtc = r.atdUtc
+        actual.offUtc = r.offUtc
+        actual.onUtc = r.onUtc
+        status = 'arrived'
+      } else if (nowMs >= r.offUtc) {
+        actual.doorCloseUtc = r.doorCloseUtc
+        actual.atdUtc = r.atdUtc
+        actual.offUtc = r.offUtc
+        status = 'departed'
+      } else if (nowMs >= r.atdUtc) {
+        actual.doorCloseUtc = r.doorCloseUtc
+        actual.atdUtc = r.atdUtc
+        status = 'departed'
+      } else {
+        actual.doorCloseUtc = r.doorCloseUtc
+        status = r.delayMinutes > 0 ? 'delayed' : 'assigned'
+      }
+
+      const totalDelayMs = r.delayMinutes * 60_000
+      const totalSeats = 180
+      const loadFactor = 0.75 + Math.random() * 0.2
+      const totalPax = Math.floor(totalSeats * loadFactor)
+      const children = Math.floor(totalPax * 0.05)
+      const infants = Math.floor(totalPax * 0.02)
+      const adults = totalPax - children - infants
+
+      bulkOps.push({
+        updateOne: {
+          filter: { _id: r.compositeId },
+          update: {
             $set: {
               operatorId,
-              scheduledFlightId: sf._id,
-              flightNumber: sf.flightNumber,
-              operatingDate: opDate,
-              dep: { icao: sf.depStation, iata: sf.depStation },
-              arr: { icao: sf.arrStation, iata: sf.arrStation },
-              schedule: { stdUtc: stdMs, staUtc: staMs },
-              estimated: { etdUtc: stdMs + delayMs, etaUtc: staMs + delayMs },
-              actual: { doorCloseUtc, atdUtc, offUtc, onUtc, ataUtc },
+              scheduledFlightId: r.sf._id,
+              flightNumber: r.sf.flightNumber,
+              operatingDate: r.opDate,
+              dep: { icao: r.sf.depStation, iata: r.sf.depStation },
+              arr: { icao: r.sf.arrStation, iata: r.sf.arrStation },
+              schedule: { stdUtc: r.stdMs, staUtc: r.staMs },
+              estimated: { etdUtc: r.stdMs + totalDelayMs, etaUtc: r.staMs + totalDelayMs },
+              actual,
               pax: {
                 adultExpected: adults,
                 adultActual: adults,
@@ -1424,21 +1678,28 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
                 infantExpected: infants,
                 infantActual: infants,
               },
-              delays,
-              status: delayMinutes > 0 ? 'delayed' : 'completed',
+              delays: r.delays,
+              status,
               syncMeta: { updatedAt: Date.now(), version: 1 },
             },
             $setOnInsert: {
               tail: {
-                registration: (sf.aircraftReg as string) ?? null,
-                icaoType: (sf.aircraftTypeIcao as string) ?? null,
+                registration: (r.sf.aircraftReg as string) ?? null,
+                icaoType: (r.sf.aircraftTypeIcao as string) ?? null,
               },
             },
           },
-          { upsert: true },
-        )
-        created++
-      }
+          upsert: true,
+        },
+      })
+    }
+
+    // Execute in batches of 1000
+    let created = 0
+    for (let i = 0; i < bulkOps.length; i += 1000) {
+      const batch = bulkOps.slice(i, i + 1000)
+      const result = await FlightInstance.bulkWrite(batch, { ordered: false })
+      created += (result.upsertedCount ?? 0) + (result.modifiedCount ?? 0)
     }
 
     // Repair: fix any FlightInstances with null tail by restoring from ScheduledFlight
@@ -1463,6 +1724,15 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    return { created, skipped, repaired, otpTarget }
+    return {
+      created,
+      skipped,
+      alreadySeeded,
+      dateSkipped,
+      cleared,
+      repaired,
+      otpTarget,
+      scheduledFlightCount: scheduledFlights.length,
+    }
   })
 }

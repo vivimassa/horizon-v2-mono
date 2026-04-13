@@ -77,17 +77,19 @@ const airportCreateSchema = z
     hasFuelAvailable: z.boolean().optional().default(false),
     hasCrewFacilities: z.boolean().optional().default(false),
     fireCategory: z.number().int().min(1).max(10).nullable().optional(),
-    hasCurfew: z.boolean().optional().default(false),
-    curfewStart: z
-      .string()
-      .regex(/^\d{2}:\d{2}$/, 'Format: HH:MM')
-      .nullable()
-      .optional(),
-    curfewEnd: z
-      .string()
-      .regex(/^\d{2}:\d{2}$/, 'Format: HH:MM')
-      .nullable()
-      .optional(),
+    curfews: z
+      .array(
+        z.object({
+          _id: z.string(),
+          startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Format: HH:MM'),
+          endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Format: HH:MM'),
+          effectiveFrom: z.string().nullable().optional().default(null),
+          effectiveUntil: z.string().nullable().optional().default(null),
+          remarks: z.string().nullable().optional().default(null),
+        }),
+      )
+      .optional()
+      .default([]),
     isSlotControlled: z.boolean().optional().default(false),
     weatherMonitored: z.boolean().optional().default(false),
     weatherStation: z.string().nullable().optional(),

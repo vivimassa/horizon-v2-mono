@@ -1,2 +1,2 @@
-export { validateServerEnv, getServerEnv, type ServerEnv } from './server.js'
-export { validateClientEnv, getClientEnv, type ClientEnv } from './client.js'
+export { validateServerEnv, getServerEnv, type ServerEnv } from './server'
+export { validateClientEnv, getClientEnv, type ClientEnv } from './client'

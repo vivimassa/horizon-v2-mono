@@ -2,7 +2,7 @@
 // Vietnam Aviation Regulations Part 15, revised per Circular 03/2016/TT-BGTVT
 // and Circular 21/2017/TT-BGTVT. EASA-derived with Vietnam-specific values.
 
-import type { RuleTemplate, FDPTableTemplate, AugmentedTemplate } from './icao.js'
+import type { RuleTemplate, FDPTableTemplate, AugmentedTemplate } from './icao'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

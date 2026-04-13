@@ -2,7 +2,7 @@
 // Overrides ICAO baseline and adds EASA-specific rules.
 // Numeric values are PLACEHOLDER — verify against ORO.FTL and CS FTL.1 before production.
 
-import type { RuleOverride, RuleTemplate, FDPTableTemplate, AugmentedTemplate } from './icao.js'
+import type { RuleOverride, RuleTemplate, FDPTableTemplate, AugmentedTemplate } from './icao'
 
 // ─── Rule Overrides ─────────────────────────────────────────────────────────
 

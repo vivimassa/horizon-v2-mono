@@ -84,6 +84,22 @@ export async function cancelFlights(operatorId: string, flightIds: string[]): Pr
   return res.json()
 }
 
+// ── Flight protection ──
+
+export async function protectFlights(
+  operatorId: string,
+  flightIds: string[],
+  isProtected: boolean,
+): Promise<{ updated: number; isProtected: boolean }> {
+  const res = await authedFetch(`${API_BASE}/gantt/protect`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ operatorId, flightIds, isProtected }),
+  })
+  if (!res.ok) throw new Error(`Protect API ${res.status}`)
+  return res.json()
+}
+
 // ── Slot cancel impact ──
 
 export interface SlotCancelImpact {

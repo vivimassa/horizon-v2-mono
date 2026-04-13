@@ -16,7 +16,7 @@ interface ThemeContextValue {
 }
 
 const ThemeCtx = createContext<ThemeContextValue>({
-  theme: 'light',
+  theme: 'dark',
   toggle: () => {},
   moduleKey: null,
   moduleTheme: null,
@@ -27,7 +27,7 @@ export function useTheme() {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light')
+  const [theme, setTheme] = useState<Theme>('dark')
   const pathname = usePathname()
 
   // Resolve current module

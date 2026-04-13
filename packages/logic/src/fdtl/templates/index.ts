@@ -1,11 +1,11 @@
 // Central export for all FDTL framework templates.
 
-import type { RuleTemplate, FDPTableTemplate, AugmentedTemplate } from './icao.js'
-import { ICAO_RULES, ICAO_FDP_TABLE, ICAO_FDP_TABLES, ICAO_AUGMENTED } from './icao.js'
-import { FAA_P117_OVERRIDES, FAA_TABLE_B, FAA_AUGMENTED } from './faa-p117.js'
-import { EASA_OVERRIDES, EASA_SPECIFIC, EASA_TABLE_2, EASA_AUGMENTED } from './easa-oro-ftl.js'
-import { TC_CAR700_OVERRIDES, TC_CAR700_FDP_TABLES, TC_CAR700_AUGMENTED } from './tc-car700.js'
-import { CAAV_RULES, CAAV_FDP_TABLES, CAAV_AUGMENTED } from './caav-var15.js'
+import type { RuleTemplate, FDPTableTemplate, AugmentedTemplate } from './icao'
+import { ICAO_RULES, ICAO_FDP_TABLE, ICAO_FDP_TABLES, ICAO_AUGMENTED } from './icao'
+import { FAA_P117_OVERRIDES, FAA_TABLE_B, FAA_AUGMENTED } from './faa-p117'
+import { EASA_OVERRIDES, EASA_SPECIFIC, EASA_TABLE_2, EASA_AUGMENTED } from './easa-oro-ftl'
+import { TC_CAR700_OVERRIDES, TC_CAR700_FDP_TABLES, TC_CAR700_AUGMENTED } from './tc-car700'
+import { CAAV_RULES, CAAV_FDP_TABLES, CAAV_AUGMENTED } from './caav-var15'
 
 export type { RuleTemplate, FDPTableTemplate, AugmentedTemplate }
 export type RuleOverride = { rule_code: string } & Partial<Omit<RuleTemplate, 'rule_code'>>

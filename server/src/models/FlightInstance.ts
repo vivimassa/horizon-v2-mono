@@ -141,6 +141,9 @@ const flightInstanceSchema = new Schema(
       index: true,
     },
 
+    /** Flight protected from disruption solver — solver will never delay/cancel/swap this flight */
+    isProtected: { type: Boolean, default: false },
+
     /** Fields manually overridden — protected from re-materialization from ScheduledFlight pattern */
     lockedFields: [{ type: String }],
 

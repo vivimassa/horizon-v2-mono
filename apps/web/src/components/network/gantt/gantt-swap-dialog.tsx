@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { ArrowLeftRight, AlertTriangle, X, Loader2, Shuffle, Clock, Timer } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { useGanttStore } from '@/stores/use-gantt-store'
+import { getDisplayTimes } from '@/lib/gantt/layout-engine'
 
 interface ValidationWarning {
   aircraft: string
@@ -116,8 +117,10 @@ export function GanttSwapDialog() {
           })
         }
 
-        // Time overlap
-        if (next.stdUtc < curr.staUtc) {
+        // Time overlap (use actual times when available)
+        const currArr = getDisplayTimes(curr).arrMs
+        const nextDep = getDisplayTimes(next).depMs
+        if (nextDep < currArr) {
           warnings.push({
             aircraft: reg,
             type: 'time_overlap',
@@ -126,7 +129,7 @@ export function GanttSwapDialog() {
         }
 
         // TAT violation
-        const gapMin = (next.stdUtc - curr.staUtc) / 60_000
+        const gapMin = (nextDep - currArr) / 60_000
         const acType = aircraftTypes.find((t) => t.icaoType === (next.aircraftTypeIcao ?? curr.aircraftTypeIcao))
         const minTat = acType?.tatDefaultMinutes ?? 30
         if (gapMin > 0 && gapMin < minTat) {

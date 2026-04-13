@@ -2,7 +2,7 @@
 // Overrides ICAO baseline with Canada-specific values.
 // Numeric values are PLACEHOLDER — verify against CAR 700 before production.
 
-import type { RuleOverride, RuleTemplate, FDPTableTemplate, AugmentedTemplate } from './icao.js'
+import type { RuleOverride, RuleTemplate, FDPTableTemplate, AugmentedTemplate } from './icao'
 
 // ─── Rule Overrides ─────────────────────────────────────────────────────────
 

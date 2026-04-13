@@ -39,6 +39,8 @@ export interface GanttFlight {
   slotRiskLevel?: 'safe' | 'close' | 'at_risk' | null
   /** SlotSeries ID for cancel-impact lookup */
   slotSeriesId?: string | null
+  /** Flight protected from disruption solver — will never be delayed/cancelled/swapped */
+  isProtected?: boolean
 }
 
 export interface GanttAircraft {
@@ -77,6 +79,13 @@ export interface GanttMeta {
   expandedAt: number
 }
 
+export interface StationCurfew {
+  startTime: string // "HH:MM" local
+  endTime: string // "HH:MM" local
+  effectiveFrom: string | null
+  effectiveUntil: string | null
+}
+
 export interface GanttApiResponse {
   flights: GanttFlight[]
   aircraft: GanttAircraft[]
@@ -84,6 +93,7 @@ export interface GanttApiResponse {
   operatorCountry: string | null
   stationCountryMap: Record<string, string>
   stationUtcOffsetMap: Record<string, number>
+  stationCurfewMap: Record<string, StationCurfew[]>
   meta: GanttMeta
 }
 

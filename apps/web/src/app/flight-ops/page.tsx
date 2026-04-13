@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { useTheme } from '@/components/theme-provider'
 import { colors, accentTint, type Palette as PaletteType } from '@skyhub/ui/theme'
@@ -15,11 +16,19 @@ import {
   ShieldCheck,
   BarChart3,
   CalendarDays,
+  CalendarClock,
   ChevronRight,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 /* ── Types ── */
+
+interface SubPageDef {
+  code: string
+  label: string
+  href: string
+  icon: LucideIcon
+}
 
 interface CardDef {
   code: string
@@ -27,6 +36,7 @@ interface CardDef {
   desc: string
   icon: LucideIcon
   href: string
+  subPages?: SubPageDef[]
 }
 
 interface SectionDef {
@@ -59,6 +69,20 @@ const SECTIONS: SectionDef[] = [
         desc: 'Maintenance check configuration & scheduling',
         icon: Wrench,
         href: '/flight-ops/control/aircraft-maintenance',
+        subPages: [
+          {
+            code: '2.1.2.1',
+            label: 'Maintenance Planning',
+            href: '/flight-ops/control/aircraft-maintenance/planning',
+            icon: CalendarClock,
+          },
+          {
+            code: '2.1.2.2',
+            label: 'Status Board',
+            href: '/flight-ops/control/aircraft-maintenance/status-board',
+            icon: BarChart3,
+          },
+        ],
       },
       {
         code: '2.1.3',
@@ -214,54 +238,122 @@ function EntityCard({
   isDark: boolean
 }) {
   const Icon = card.icon
-  return (
-    <Link href={card.href}>
+  const [expanded, setExpanded] = useState(false)
+  const hasSubPages = card.subPages && card.subPages.length > 0
+
+  const cardBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)'
+  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
+  const shadow = isDark ? '0 1px 3px rgba(0,0,0,0.3)' : '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)'
+  const hoverShadow = isDark ? '0 4px 12px rgba(0,0,0,0.4)' : '0 4px 12px rgba(0,0,0,0.08)'
+
+  const header = (
+    <div className="flex items-center gap-3">
       <div
-        className="group rounded-xl px-4 py-4 transition-all duration-150 cursor-pointer"
-        style={{
-          background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
-          boxShadow: isDark ? '0 1px 3px rgba(0,0,0,0.3)' : '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.boxShadow = isDark ? '0 4px 12px rgba(0,0,0,0.4)' : '0 4px 12px rgba(0,0,0,0.08)'
-          e.currentTarget.style.borderColor = accentTint(sectionColor, isDark ? 0.3 : 0.2)
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.boxShadow = isDark
-            ? '0 1px 3px rgba(0,0,0,0.3)'
-            : '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)'
-          e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
-        }}
+        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+        style={{ background: accentTint(sectionColor, isDark ? 0.15 : 0.1) }}
       >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: accentTint(sectionColor, isDark ? 0.15 : 0.1) }}
-          >
-            <Icon size={16} color={sectionColor} strokeWidth={1.8} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-semibold leading-tight" style={{ color: palette.text }}>
-              {card.label}
-            </div>
-            <div className="text-[13px] leading-snug mt-0.5 truncate" style={{ color: palette.textTertiary }}>
-              {card.desc}
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="font-mono text-[13px] font-semibold" style={{ color: palette.textTertiary }}>
-              {card.code}
-            </span>
-            <ChevronRight
-              size={13}
-              strokeWidth={1.8}
-              className="transition-transform duration-150 group-hover:translate-x-0.5"
-              style={{ color: palette.textTertiary }}
-            />
-          </div>
+        <Icon size={16} color={sectionColor} strokeWidth={1.8} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] font-semibold leading-tight" style={{ color: palette.text }}>
+          {card.label}
+        </div>
+        <div className="text-[13px] leading-snug mt-0.5 truncate" style={{ color: palette.textTertiary }}>
+          {hasSubPages ? `${card.subPages!.length} pages` : card.desc}
         </div>
       </div>
-    </Link>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <span className="font-mono text-[13px] font-semibold" style={{ color: palette.textTertiary }}>
+          {card.code}
+        </span>
+        <ChevronRight
+          size={13}
+          strokeWidth={1.8}
+          className="transition-transform duration-150"
+          style={{
+            color: palette.textTertiary,
+            transform: hasSubPages && expanded ? 'rotate(90deg)' : undefined,
+          }}
+        />
+      </div>
+    </div>
+  )
+
+  if (!hasSubPages) {
+    return (
+      <Link href={card.href}>
+        <div
+          className="group rounded-xl px-4 py-4 transition-all duration-150 cursor-pointer"
+          style={{ background: cardBg, border: `1px solid ${cardBorder}`, boxShadow: shadow }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.boxShadow = hoverShadow
+            e.currentTarget.style.borderColor = accentTint(sectionColor, isDark ? 0.3 : 0.2)
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = shadow
+            e.currentTarget.style.borderColor = cardBorder
+          }}
+        >
+          {header}
+        </div>
+      </Link>
+    )
+  }
+
+  return (
+    <div
+      className="rounded-xl overflow-hidden transition-all duration-150"
+      style={{ background: cardBg, border: `1px solid ${cardBorder}`, boxShadow: shadow }}
+    >
+      {/* Expandable header */}
+      <div
+        className="px-4 py-4 cursor-pointer transition-colors"
+        onClick={() => setExpanded((v) => !v)}
+        onMouseEnter={(e) => {
+          e.currentTarget.parentElement!.style.boxShadow = hoverShadow
+          e.currentTarget.parentElement!.style.borderColor = accentTint(sectionColor, isDark ? 0.3 : 0.2)
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.parentElement!.style.boxShadow = shadow
+          e.currentTarget.parentElement!.style.borderColor = cardBorder
+        }}
+      >
+        {header}
+      </div>
+
+      {/* Sub-pages */}
+      {expanded && (
+        <div style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'}` }}>
+          {card.subPages!.map((sub) => {
+            const SubIcon = sub.icon
+            return (
+              <Link key={sub.code} href={sub.href}>
+                <div
+                  className="flex items-center gap-3 px-4 py-3 transition-colors cursor-pointer"
+                  style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'}` }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = ''
+                  }}
+                >
+                  <SubIcon size={14} color={sectionColor} strokeWidth={1.8} className="ml-3" />
+                  <span className="flex-1 text-[13px] font-medium" style={{ color: palette.text }}>
+                    {sub.label}
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="font-mono text-[13px] font-semibold" style={{ color: palette.textTertiary }}>
+                      {sub.code}
+                    </span>
+                    <ChevronRight size={13} strokeWidth={1.8} style={{ color: palette.textTertiary }} />
+                  </div>
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }

@@ -25,6 +25,26 @@ export function getBarColor(
 function getStatusColor(flight: GanttFlight, isDark: boolean): BarColor {
   const isAssigned = !!flight.aircraftReg
 
+  // ── OOOI-based colors take priority ──
+
+  // Completed — all OOOI received (has ataUtc = on blocks). Always gray.
+  if (flight.ataUtc) {
+    return {
+      bg: isDark ? '#6b7280' : '#9ca3af',
+      text: isDark ? 'rgba(255,255,255,0.85)' : '#ffffff',
+    }
+  }
+
+  // Airborne / departed — has atdUtc (out) but not ataUtc (in)
+  if (flight.atdUtc) {
+    return {
+      bg: isDark ? '#22c55e' : '#16a34a',
+      text: '#ffffff',
+    }
+  }
+
+  // ── Schedule status fallback (no OOOI yet) ──
+
   if (flight.status === 'cancelled') {
     return {
       bg: isDark ? '#7f1d1d' : '#dc2626',

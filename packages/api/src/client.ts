@@ -140,6 +140,15 @@ export interface RunwayData {
   notes: string | null
 }
 
+export interface CurfewEntry {
+  _id: string
+  startTime: string // "HH:MM" local
+  endTime: string // "HH:MM" local
+  effectiveFrom: string | null // "YYYY-MM-DD" or null = always
+  effectiveUntil: string | null // "YYYY-MM-DD" or null = ongoing
+  remarks: string | null
+}
+
 export interface AirportRef {
   _id: string
   icaoCode: string
@@ -167,9 +176,7 @@ export interface AirportRef {
   hasFuelAvailable: boolean
   hasCrewFacilities: boolean
   fireCategory: number | null
-  hasCurfew: boolean
-  curfewStart: string | null
-  curfewEnd: string | null
+  curfews: CurfewEntry[]
   isSlotControlled: boolean
   weatherMonitored: boolean
   weatherStation: string | null
@@ -841,6 +848,18 @@ export const api = {
     request<{ success: boolean }>('/auth/set-password', {
       method: 'POST',
       body: JSON.stringify({ userId, password }),
+    }),
+
+  forgotPassword: (email: string) =>
+    request<{ success: boolean }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  resetPassword: (token: string, password: string) =>
+    request<{ success: boolean }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
     }),
 
   getMe: () => request<UserData>('/users/me'),
@@ -1935,6 +1954,79 @@ export const api = {
     request<{ ok: boolean }>(`/maintenance-windows/${id}`, {
       method: 'DELETE',
     }),
+
+  // ─── Maintenance Events (Planning) ─────────────────────
+
+  getMaintenanceEvents: (params: {
+    operatorId: string
+    dateFrom: string
+    dateTo: string
+    aircraftTypeId?: string
+    base?: string
+    checkTypeId?: string
+    status?: string
+    sortBy?: string
+  }) => {
+    const sp = new URLSearchParams()
+    sp.set('operatorId', params.operatorId)
+    sp.set('dateFrom', params.dateFrom)
+    sp.set('dateTo', params.dateTo)
+    if (params.aircraftTypeId) sp.set('aircraftTypeId', params.aircraftTypeId)
+    if (params.base) sp.set('base', params.base)
+    if (params.checkTypeId) sp.set('checkTypeId', params.checkTypeId)
+    if (params.status) sp.set('status', params.status)
+    if (params.sortBy) sp.set('sortBy', params.sortBy)
+    return request<{ rows: MxGanttAircraftRow[]; stats: MxSchedulingStats }>(`/maintenance-events?${sp.toString()}`)
+  },
+
+  getMaintenanceEvent: (id: string) => request<MxEventDetail>(`/maintenance-events/${id}`),
+
+  getMaintenanceFilterOptions: (operatorId = '') =>
+    request<MxFilterOptions>(`/maintenance-events/filter-options?operatorId=${operatorId}`),
+
+  createMaintenanceEvent: (data: {
+    operatorId: string
+    aircraftId: string
+    checkTypeId: string
+    plannedStartUtc: string
+    plannedEndUtc?: string | null
+    station: string
+    hangar?: string | null
+    notes?: string | null
+  }) =>
+    request<MaintenanceEventRef>('/maintenance-events', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateMaintenanceEvent: (id: string, data: Partial<MaintenanceEventRef>) =>
+    request<MaintenanceEventRef>(`/maintenance-events/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteMaintenanceEvent: (id: string) =>
+    request<{ ok: boolean }>(`/maintenance-events/${id}`, {
+      method: 'DELETE',
+    }),
+
+  acceptAllProposedEvents: (operatorId: string) =>
+    request<{ count: number }>('/maintenance-events/accept-all', {
+      method: 'POST',
+      body: JSON.stringify({ operatorId }),
+    }),
+
+  rejectAllProposedEvents: (operatorId: string) =>
+    request<{ count: number }>('/maintenance-events/reject-all', {
+      method: 'POST',
+      body: JSON.stringify({ operatorId }),
+    }),
+
+  runMaintenanceForecast: (data: { operatorId: string; dateFrom: string; dateTo: string }) =>
+    request<{ totalAircraftAnalyzed: number; totalProposedEvents: number }>('/maintenance-events/forecast', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 }
 
 // ─── Maintenance types ──────────────────────────────────
@@ -1972,6 +2064,99 @@ export interface MaintenanceWindowRef {
   notes: string | null
   createdAt: string
   updatedAt: string
+}
+
+// ─── Maintenance Event types ───────────────────────────
+
+export interface MaintenanceEventRef {
+  _id: string
+  operatorId: string
+  aircraftId: string
+  checkTypeId: string
+  plannedStartUtc: string
+  plannedEndUtc: string | null
+  actualStartUtc: string | null
+  actualEndUtc: string | null
+  station: string
+  hangar: string | null
+  status: string
+  phase: string
+  source: string
+  notes: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface MxEventRow {
+  id: string
+  aircraftId: string
+  registration: string
+  icaoType: string
+  base: string
+  checkTypeId: string
+  checkCode: string
+  checkName: string
+  checkColor: string
+  plannedStart: string
+  plannedEnd: string | null
+  actualStart: string | null
+  actualEnd: string | null
+  station: string
+  hangar: string | null
+  status: string
+  phase: string
+  source: string
+  notes: string | null
+}
+
+export interface MxForecastMarker {
+  checkCode: string
+  checkName: string
+  trigger: 'hours' | 'cycles' | 'calendar'
+  dueDate: string
+  remaining: number
+  tier: 1 | 2
+}
+
+export interface MxGanttAircraftRow {
+  aircraftId: string
+  registration: string
+  icaoType: string
+  acTypeColor: string
+  base: string
+  events: MxEventRow[]
+  forecasts: MxForecastMarker[]
+}
+
+export interface MxSchedulingStats {
+  total: number
+  proposed: number
+  planned: number
+  confirmed: number
+  inProgress: number
+}
+
+export interface MxFilterOptions {
+  aircraftTypes: { id: string; icaoType: string; name: string }[]
+  bases: { icao: string }[]
+  checkTypes: { id: string; code: string; name: string }[]
+}
+
+export interface MxEventDetail {
+  event: MxEventRow
+  forecast: {
+    triggerAxis: string
+    remainingHours: number | null
+    remainingCycles: number | null
+    remainingDays: number | null
+    hoursUsed: number
+    hoursLimit: number
+    cyclesUsed: number
+    cyclesLimit: number
+    daysUsed: number
+    daysLimit: number
+    bufferDays: number
+  }
 }
 
 // ─── Codeshare types ────────────────────────────────────

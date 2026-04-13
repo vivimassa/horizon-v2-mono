@@ -2,7 +2,7 @@
 // Overrides ICAO baseline and adds FAA-specific rules.
 // Numeric values are PLACEHOLDER — verify against 14 CFR Part 117 before production.
 
-import type { RuleOverride, RuleTemplate, FDPTableTemplate, AugmentedTemplate } from './icao.js'
+import type { RuleOverride, RuleTemplate, FDPTableTemplate, AugmentedTemplate } from './icao'
 
 // ─── Rule Overrides ─────────────────────────────────────────────────────────
 

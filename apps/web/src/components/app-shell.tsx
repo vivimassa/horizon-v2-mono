@@ -1,5 +1,6 @@
 'use client'
 
+import { usePathname } from 'next/navigation'
 import { useAuth } from './auth-provider'
 import { AnimatedBodyBg } from './AnimatedBodyBg'
 import { Breadcrumb } from './Breadcrumb'
@@ -7,6 +8,8 @@ import { SpotlightDock } from './SpotlightDock'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
+  const pathname = usePathname()
+  const isHome = pathname === '/'
 
   if (!isAuthenticated) {
     return (
@@ -20,8 +23,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <AnimatedBodyBg />
-      <Breadcrumb />
-      <main className="flex-1 overflow-y-auto pb-22 -mt-1">{children}</main>
+      {!isHome && <Breadcrumb />}
+      <main className={`flex-1 overflow-y-auto pb-22 ${isHome ? '' : '-mt-1'}`}>{children}</main>
       <SpotlightDock />
     </>
   )

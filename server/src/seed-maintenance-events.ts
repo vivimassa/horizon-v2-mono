@@ -183,8 +183,298 @@ async function seed() {
     console.log('  AircraftCheckStatus already seeded')
   }
 
+  // ── Seed MaintenanceEvent documents ──
+  // Strategically place grounding events so 3-4 aircraft are unavailable daily
+  await seedMaintenanceEvents(aircraft, checkTypes)
+
   console.log('Done.')
   process.exit(0)
+}
+
+/**
+ * Seed MaintenanceEvent documents with strategic placement:
+ * On any given day, 3-4 aircraft out of 100 are grounded for maintenance.
+ *
+ * Strategy:
+ * - 180-day window: 90 days past → 90 days future from today
+ * - Day-by-day fill algorithm: if grounded count < target, start a new event
+ * - Realistic check type mix weighted by frequency
+ * - Events distributed across 4 Vietnamese bases (VVTS primary)
+ * - Past events → completed, current → in_progress, future → planned/confirmed
+ */
+async function seedMaintenanceEvents(
+  aircraft: Array<{ _id: unknown; registration: unknown }>,
+  allCheckTypes: Array<{
+    _id: unknown
+    code: string
+    defaultDurationHours: number
+    requiresGrounding: boolean
+    defaultStation?: string | null
+  }>,
+) {
+  if (doReset) {
+    await MaintenanceEvent.deleteMany({ operatorId: OPERATOR_ID })
+    console.log('  Cleared existing MaintenanceEvent documents')
+  }
+
+  const existing = await MaintenanceEvent.countDocuments({ operatorId: OPERATOR_ID })
+  if (existing > 0 && !doReset) {
+    console.log(`  MaintenanceEvents already seeded (${existing} docs) — skipping`)
+    return
+  }
+
+  const NOW = Date.now()
+  const DAY_MS = 86_400_000
+  const WINDOW_PAST_DAYS = 90
+  const WINDOW_FUTURE_DAYS = 90
+  const TOTAL_DAYS = WINDOW_PAST_DAYS + WINDOW_FUTURE_DAYS
+  const windowStartMs = NOW - WINDOW_PAST_DAYS * DAY_MS
+
+  // Target: 3-4 grounded per day → average 3.5
+  const TARGET_MIN = 3
+  const TARGET_MAX = 4
+
+  // Only grounding checks, exclude line checks (TR/DY/WK) and non-grounding (EWW/BSI)
+  const groundingChecks = allCheckTypes.filter((ct) => ct.requiresGrounding && !['TR', 'DY', 'WK'].includes(ct.code))
+
+  // Weighted check type selection — more frequent short checks, rare heavy checks
+  // This produces a realistic maintenance schedule
+  const checkWeights: Array<{ code: string; weight: number; durationDays: number }> = [
+    { code: '1A', weight: 40, durationDays: 1 }, // A1: 24h = 1 day, very frequent
+    { code: '2A', weight: 20, durationDays: 2 }, // A2: 48h = 2 days
+    { code: '4A', weight: 10, durationDays: 3 }, // A4: 72h = 3 days
+    { code: '1C', weight: 5, durationDays: 7 }, // C1: 168h = 7 days
+    { code: '2C', weight: 2, durationDays: 14 }, // C2: 336h = 14 days
+    { code: 'LG', weight: 3, durationDays: 10 }, // Landing gear: 10 days
+    { code: 'APU', weight: 3, durationDays: 20 }, // APU: 20 days
+    { code: 'CSI', weight: 2, durationDays: 2 }, // Composite: 2 days (A350/A380 only)
+    { code: 'ENG', weight: 2, durationDays: 30 }, // Engine shop visit: 30 days
+  ]
+
+  // Build lookup: code → check type doc
+  const checkByCode = new Map(groundingChecks.map((ct) => [ct.code, ct]))
+
+  // Filter to only codes that exist in the database
+  const availableWeights = checkWeights.filter((w) => checkByCode.has(w.code))
+  const totalWeight = availableWeights.reduce((sum, w) => sum + w.weight, 0)
+
+  // Bases with realistic distribution (SGN is primary MRO hub)
+  const BASES = [
+    { icao: 'VVTS', weight: 50 }, // Ho Chi Minh City — main MRO
+    { icao: 'VVNB', weight: 30 }, // Hanoi — secondary
+    { icao: 'VVDN', weight: 12 }, // Da Nang — light maintenance
+    { icao: 'VVCR', weight: 8 }, // Cam Ranh — light maintenance
+  ]
+  const totalBaseWeight = BASES.reduce((sum, b) => sum + b.weight, 0)
+
+  // Seeded PRNG for reproducible results
+  let prngState = 42
+  function nextRandom(): number {
+    prngState = (prngState * 1664525 + 1013904223) & 0x7fffffff
+    return prngState / 0x7fffffff
+  }
+
+  function pickWeighted<T extends { weight: number }>(items: T[]): T {
+    const total = items.reduce((s, i) => s + i.weight, 0)
+    let r = nextRandom() * total
+    for (const item of items) {
+      r -= item.weight
+      if (r <= 0) return item
+    }
+    return items[items.length - 1]
+  }
+
+  // Track which aircraft are grounded on which days
+  // grounded[dayIndex] = Set of aircraft indices currently grounded
+  const aircraftEvents: Array<{ startDay: number; endDay: number; acIdx: number }> = []
+
+  function groundedOnDay(day: number): number {
+    let count = 0
+    for (const ev of aircraftEvents) {
+      if (day >= ev.startDay && day < ev.endDay) count++
+    }
+    return count
+  }
+
+  function isAircraftGroundedOnDay(acIdx: number, day: number): boolean {
+    for (const ev of aircraftEvents) {
+      if (ev.acIdx === acIdx && day >= ev.startDay && day < ev.endDay) return true
+    }
+    return false
+  }
+
+  // Fill algorithm: iterate each day, maintain 3-4 grounded
+  const events: Array<{
+    acIdx: number
+    startDay: number
+    durationDays: number
+    checkCode: string
+    base: string
+  }> = []
+
+  for (let day = 0; day < TOTAL_DAYS; day++) {
+    const currentGrounded = groundedOnDay(day)
+
+    // Oscillate target between 3 and 4 to create natural variation
+    const target = day % 7 < 4 ? TARGET_MAX : TARGET_MIN
+
+    if (currentGrounded < target) {
+      const needed = target - currentGrounded
+
+      for (let n = 0; n < needed; n++) {
+        // Pick a check type
+        const checkInfo = pickWeighted(availableWeights)
+        const durationDays = checkInfo.durationDays
+
+        // Don't start events that extend too far beyond the window
+        if (day + durationDays > TOTAL_DAYS + 30) continue
+
+        // Pick an aircraft that's not already grounded
+        const startIdx = Math.floor(nextRandom() * aircraft.length)
+        let acIdx = -1
+        for (let attempt = 0; attempt < aircraft.length; attempt++) {
+          const candidate = (startIdx + attempt) % aircraft.length
+          if (!isAircraftGroundedOnDay(candidate, day)) {
+            acIdx = candidate
+            break
+          }
+        }
+        if (acIdx === -1) continue // all grounded (shouldn't happen with 100 aircraft)
+
+        // Pick a base (heavy checks → VVTS, lighter → distributed)
+        let base: string
+        if (['1C', '2C', '4C', '6Y', '12Y', 'ENG', 'APU'].includes(checkInfo.code)) {
+          base = 'VVTS' // Heavy maintenance always at SGN
+        } else {
+          base = pickWeighted(BASES).icao
+        }
+
+        aircraftEvents.push({ startDay: day, endDay: day + durationDays, acIdx })
+        events.push({ acIdx, startDay: day, durationDays, checkCode: checkInfo.code, base })
+      }
+    }
+  }
+
+  // Convert to MaintenanceEvent documents
+  const eventDocs = []
+  const today = new Date()
+  today.setUTCHours(0, 0, 0, 0)
+  const todayMs = today.getTime()
+
+  for (const ev of events) {
+    const ac = aircraft[ev.acIdx]
+    const ct = checkByCode.get(ev.checkCode)
+    if (!ct) continue
+
+    const startMs = windowStartMs + ev.startDay * DAY_MS
+    // Start at a realistic time: 18:00 UTC (01:00 local Vietnam) for overnight
+    const startDate = new Date(startMs)
+    startDate.setUTCHours(18, 0, 0, 0)
+    const plannedStartUtc = startDate.toISOString()
+
+    const endDate = new Date(startMs + ev.durationDays * DAY_MS)
+    endDate.setUTCHours(6, 0, 0, 0) // End at 06:00 UTC (13:00 local)
+    const plannedEndUtc = endDate.toISOString()
+
+    // Determine status based on timing relative to today
+    const startDayMs = startDate.getTime()
+    const endDayMs = endDate.getTime()
+    let status: string
+    let phase: string
+    let actualStartUtc: string | null = null
+    let actualEndUtc: string | null = null
+
+    if (endDayMs < todayMs) {
+      // Fully in the past → completed
+      status = 'completed'
+      phase = 'return_to_flight'
+      actualStartUtc = plannedStartUtc
+      // Actual end: slight variation from planned (-6h to +12h)
+      const variance = Math.floor((nextRandom() - 0.3) * 12 * 3600000)
+      actualEndUtc = new Date(endDayMs + variance).toISOString()
+    } else if (startDayMs <= todayMs && endDayMs >= todayMs) {
+      // Currently active → in_progress
+      status = 'in_progress'
+      // Phase depends on how far through we are
+      const elapsed = (todayMs - startDayMs) / (endDayMs - startDayMs)
+      if (elapsed < 0.15) phase = 'arrived'
+      else if (elapsed < 0.3) phase = 'inducted'
+      else if (elapsed < 0.75) phase = 'in_work'
+      else if (elapsed < 0.9) phase = 'qa'
+      else phase = 'released'
+      actualStartUtc = plannedStartUtc
+    } else if (startDayMs - todayMs < 14 * DAY_MS) {
+      // Within 2 weeks → confirmed
+      status = 'confirmed'
+      phase = 'planned'
+    } else {
+      // Further out → planned
+      status = 'planned'
+      phase = 'planned'
+    }
+
+    eventDocs.push({
+      _id: crypto.randomUUID(),
+      operatorId: OPERATOR_ID,
+      aircraftId: ac._id,
+      checkTypeId: ct._id,
+      plannedStartUtc,
+      plannedEndUtc,
+      actualStartUtc,
+      actualEndUtc,
+      station: ev.base,
+      hangar: status === 'in_progress' || status === 'completed' ? `H${Math.floor(nextRandom() * 4) + 1}` : null,
+      status,
+      phase,
+      phaseUpdatedAtUtc: status !== 'planned' ? new Date(startMs).toISOString() : null,
+      source: 'manual',
+      completionHours:
+        status === 'completed' ? Math.round(ev.durationDays * 12 + nextRandom() * ev.durationDays * 6) : null,
+      completionCycles: null,
+      workItems: null,
+      notes: null,
+      createdBy: 'seed',
+      createdAt: new Date(startMs - 7 * DAY_MS).toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
+  }
+
+  // Insert in batches
+  if (eventDocs.length > 0) {
+    for (let i = 0; i < eventDocs.length; i += 500) {
+      await MaintenanceEvent.insertMany(eventDocs.slice(i, i + 500))
+    }
+  }
+
+  // Print daily grounding stats
+  const dailyCounts: number[] = []
+  for (let day = 0; day < TOTAL_DAYS; day++) {
+    dailyCounts.push(groundedOnDay(day))
+  }
+  const avg = dailyCounts.reduce((s, c) => s + c, 0) / dailyCounts.length
+  const min = Math.min(...dailyCounts)
+  const max = Math.max(...dailyCounts)
+
+  console.log(`  Inserted ${eventDocs.length} MaintenanceEvent documents`)
+  console.log(`  Daily grounding stats over ${TOTAL_DAYS} days:`)
+  console.log(`    Average: ${avg.toFixed(1)} aircraft/day`)
+  console.log(`    Min: ${min}, Max: ${max}`)
+  console.log(`    Target: ${TARGET_MIN}-${TARGET_MAX} (3-4% of 100 fleet)`)
+
+  // Show today's snapshot
+  const todayDay = WINDOW_PAST_DAYS
+  const todayGrounded = events
+    .filter((ev) => todayDay >= ev.startDay && todayDay < ev.startDay + ev.durationDays)
+    .map((ev) => ({
+      reg: (aircraft[ev.acIdx] as Record<string, unknown>).registration,
+      check: ev.checkCode,
+      base: ev.base,
+      daysLeft: ev.startDay + ev.durationDays - todayDay,
+    }))
+  console.log(`  Today's grounded aircraft (${todayGrounded.length}):`)
+  for (const g of todayGrounded) {
+    console.log(`    ${g.reg} — ${g.check} at ${g.base} (${g.daysLeft} day(s) remaining)`)
+  }
 }
 
 seed().catch((err) => {

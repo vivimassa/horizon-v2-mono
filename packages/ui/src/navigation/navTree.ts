@@ -77,37 +77,37 @@ export const NAV_TREE: NavModule[] = [
     ],
   },
 
-  // ── 2. Network ──
+  // ── 1. Network ──
   {
     key: 'network',
     label: 'Network',
-    num: '2',
+    num: '1',
     sections: [
       {
         key: 'schedule',
         label: 'Schedule',
-        num: '2.1',
+        num: '1.1',
         icon: Calendar,
         pages: [
           {
             key: 'text-schedule',
             label: 'Text Schedule',
-            num: '2.1.1',
+            num: '1.1.1',
             route: '/network/schedule/text-schedule',
             icon: FileText,
           },
-          { key: 'gantt', label: 'Gantt View', num: '2.1.2', route: '/network/schedule/gantt', icon: GanttChart },
+          { key: 'gantt', label: 'Gantt View', num: '1.1.2', route: '/network/schedule/gantt', icon: GanttChart },
           {
             key: 'flight-patterns',
             label: 'Flight Patterns',
-            num: '2.1.3',
+            num: '1.1.3',
             route: '/network/schedule/flight-patterns',
             icon: Repeat,
           },
           {
             key: 'schedule-messaging',
             label: 'Schedule Messaging',
-            num: '2.1.4',
+            num: '1.1.4',
             route: '/network/control/schedule-messaging',
             icon: MessageSquare,
           },
@@ -116,20 +116,20 @@ export const NAV_TREE: NavModule[] = [
       {
         key: 'slots',
         label: 'Slot Management',
-        num: '2.2',
+        num: '1.2',
         icon: Clock,
         pages: [
           {
             key: 'slot-manager',
             label: 'Slot Manager',
-            num: '2.2.1',
+            num: '1.2.1',
             route: '/network/slots/slot-manager',
             icon: Clock,
           },
           {
             key: 'slot-requests',
             label: 'Slot Requests',
-            num: '2.2.2',
+            num: '1.2.2',
             route: '/network/slots/slot-requests',
             icon: Send,
           },
@@ -138,27 +138,27 @@ export const NAV_TREE: NavModule[] = [
       {
         key: 'commercial',
         label: 'Commercial',
-        num: '2.3',
+        num: '1.3',
         icon: Handshake,
         pages: [
           {
             key: 'codeshare',
             label: 'Codeshare',
-            num: '2.3.1',
+            num: '1.3.1',
             route: '/network/commercial/codeshare',
             icon: Handshake,
           },
           {
             key: 'charter-manager',
             label: 'Charter Manager',
-            num: '2.3.2',
+            num: '1.3.2',
             route: '/network/control/charter-manager',
             icon: PlaneTakeoff,
           },
           {
             key: 'aircraft-routes',
             label: 'Aircraft Routes',
-            num: '2.3.3',
+            num: '1.3.3',
             route: '/network/commercial/aircraft-routes',
             icon: Globe,
           },
@@ -167,14 +167,14 @@ export const NAV_TREE: NavModule[] = [
       {
         key: 'distribution',
         label: 'Distribution',
-        num: '2.4',
+        num: '1.4',
         icon: Send,
         pages: [
-          { key: 'publish', label: 'Publish', num: '2.4.1', route: '/network/distribution/publish', icon: Send },
+          { key: 'publish', label: 'Publish', num: '1.4.1', route: '/network/distribution/publish', icon: Send },
           {
             key: 'ssim-messaging',
             label: 'SSIM Messaging',
-            num: '2.4.2',
+            num: '1.4.2',
             route: '/network/distribution/ssim-messaging',
             icon: MessageSquare,
           },
@@ -273,36 +273,36 @@ export const NAV_TREE: NavModule[] = [
     ],
   },
 
-  // ── 4. Ground Ops ──
+  // ── 3. Ground Ops ──
   {
     key: 'groundops',
     label: 'Ground Ops',
-    num: '4',
+    num: '3',
     sections: [
       {
         key: 'handling',
         label: 'Handling',
-        num: '4.1',
+        num: '3.1',
         icon: Dock,
         pages: [
           {
             key: 'turnaround',
             label: 'Turnaround',
-            num: '4.1.1',
+            num: '3.1.1',
             route: '/ground-ops/handling/turnaround',
             icon: Repeat,
           },
           {
             key: 'gate-management',
             label: 'Gate Management',
-            num: '4.1.2',
+            num: '3.1.2',
             route: '/ground-ops/handling/gate-management',
             icon: DoorOpen,
           },
           {
             key: 'ground-handling',
             label: 'Ground Handling',
-            num: '4.1.3',
+            num: '3.1.3',
             route: '/ground-ops/handling/ground-handling',
             icon: LayoutGrid,
           },
@@ -311,36 +311,36 @@ export const NAV_TREE: NavModule[] = [
     ],
   },
 
-  // ── 5. Crew Ops ──
+  // ── 4. Crew Ops ──
   {
     key: 'crewops',
     label: 'Crew Ops',
-    num: '5',
+    num: '4',
     sections: [
       {
         key: 'planning',
         label: 'Planning',
-        num: '5.1',
+        num: '4.1',
         icon: CalendarDays,
         pages: [
           {
             key: 'crew-pairing',
             label: 'Crew Pairing',
-            num: '5.1.1',
+            num: '4.1.1',
             route: '/crew-ops/planning/crew-pairing',
             icon: Users,
           },
           {
             key: 'auto-assignment',
             label: 'Auto Assignment',
-            num: '5.1.2',
+            num: '4.1.2',
             route: '/crew-ops/planning/auto-assignment',
             icon: Plane,
           },
           {
             key: 'roster-view',
             label: 'Roster View',
-            num: '5.1.3',
+            num: '4.1.3',
             route: '/crew-ops/planning/roster-view',
             icon: CalendarDays,
           },
@@ -349,13 +349,13 @@ export const NAV_TREE: NavModule[] = [
       {
         key: 'visualization',
         label: 'Visualization',
-        num: '5.2',
+        num: '4.2',
         icon: BarChart3,
         pages: [
           {
             key: 'gcs-gantt',
             label: 'GCS Gantt',
-            num: '5.2.1',
+            num: '4.2.1',
             route: '/crew-ops/visualization/gcs-gantt',
             icon: GanttChart,
           },
@@ -364,21 +364,21 @@ export const NAV_TREE: NavModule[] = [
       {
         key: 'crew-data',
         label: 'Crew Data',
-        num: '5.3',
+        num: '4.3',
         icon: Database,
         pages: [
-          { key: 'crew-list', label: 'Crew List', num: '5.3.1', route: '/crew-ops/crew-data/crew-list', icon: Users },
+          { key: 'crew-list', label: 'Crew List', num: '4.3.1', route: '/crew-ops/crew-data/crew-list', icon: Users },
           {
             key: 'qualifications',
             label: 'Qualifications',
-            num: '5.3.2',
+            num: '4.3.2',
             route: '/crew-ops/crew-data/qualifications',
             icon: ShieldCheck,
           },
           {
             key: 'documents',
             label: 'Documents',
-            num: '5.3.3',
+            num: '4.3.3',
             route: '/crew-ops/crew-data/documents',
             icon: FileText,
           },

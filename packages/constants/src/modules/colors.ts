@@ -19,9 +19,9 @@ export function getModuleColor(moduleId: string) {
 const codeToModule: Record<string, string> = {
   '1': 'network',
   '2': 'operations',
-  '3': 'workforce',
-  '4': 'admin',
-  '5': 'ground',
+  '3': 'ground',
+  '4': 'workforce',
+  '5': 'admin',
 }
 
 /** Derive module color from a hierarchical code like "1.1.3" */

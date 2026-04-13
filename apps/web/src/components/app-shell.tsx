@@ -24,8 +24,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <>
       <AnimatedBodyBg />
       {!isHome && <Breadcrumb />}
-      <main className={`flex-1 overflow-y-auto pb-22 ${isHome ? '' : '-mt-1'}`}>{children}</main>
-      <SpotlightDock />
+      <main className={`flex-1 overflow-y-auto ${isHome ? '' : 'pb-22 -mt-1'}`}>{children}</main>
+      {!isHome && <SpotlightDock />}
     </>
   )
 }

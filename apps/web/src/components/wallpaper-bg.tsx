@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react'
 
-// ── Curated aviation wallpapers (Unsplash, free commercial use) ──
+// ── Curated dark aviation wallpapers (Unsplash, free commercial use) ──
 const WALLPAPERS = [
-  'https://images.unsplash.com/photo-1551963838-0598cc18d5e4?w=1920&q=80&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1488085061387-422e29b40080?w=1920&q=80&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1570970580763-7993ca30d726?w=1920&q=80&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1698306559032-a9e4c7601e78?w=1920&q=80&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1741309695546-44b2a66fca8a?w=1920&q=80&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1751698158488-9faa95a179f8?w=1920&q=80&auto=format&fit=crop', // Wing on tarmac at night — Dubai
+  'https://images.unsplash.com/photo-1510505216937-86d3219fa1fd?w=1920&q=80&auto=format&fit=crop', // Cockpit view at night — city bokeh
+  'https://images.unsplash.com/photo-1689414871831-a395df32941e?w=1920&q=80&auto=format&fit=crop', // Foggy night airport — Incheon
+  'https://images.unsplash.com/photo-1758473788156-e6b2ae00c77d?w=1920&q=80&auto=format&fit=crop', // Airplane in dark night sky
+  'https://images.unsplash.com/photo-1695775147307-690ce4b1ee97?w=1920&q=80&auto=format&fit=crop', // Plane through cloudy sky at night
 ]
 
 const DEFAULT_INTERVAL = 8000
@@ -89,7 +89,7 @@ export function WallpaperBg({
         className="fixed inset-0"
         style={{
           background: lightOverlay
-            ? 'linear-gradient(135deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.30) 40%, rgba(255,255,255,0.45) 100%)'
+            ? 'linear-gradient(135deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.18) 40%, rgba(0,0,0,0.30) 100%)'
             : 'linear-gradient(135deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.35) 40%, rgba(0,0,0,0.55) 100%)',
           zIndex: 1,
         }}
@@ -99,7 +99,7 @@ export function WallpaperBg({
         className="fixed inset-0"
         style={{
           background: lightOverlay
-            ? 'radial-gradient(ellipse at center, transparent 50%, rgba(255,255,255,0.3) 100%)'
+            ? 'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.2) 100%)'
             : 'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.4) 100%)',
           zIndex: 1,
         }}

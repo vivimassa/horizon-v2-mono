@@ -360,23 +360,23 @@ export const NAV_TREE: NavModuleData[] = [
     ],
   },
 
-  // ── 4. Ground Ops ──
+  // ── 3. Ground Ops ──
   {
     key: 'groundops',
     label: 'Ground Ops',
-    num: '4',
+    num: '3',
     iconName: 'Truck',
     sections: [
       {
         key: 'planning',
         label: 'Planning',
-        num: '4.1',
+        num: '3.1',
         iconName: 'ClipboardList',
         pages: [
           {
             key: 'cargo-acceptance',
             label: 'Cargo Acceptance',
-            num: '4.1.1',
+            num: '3.1.1',
             route: '/ground-ops/planning/cargo-acceptance',
             iconName: 'PackageCheck',
             desc: 'Review booked cargo, weigh, screen',
@@ -384,7 +384,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'dangerous-goods',
             label: 'Dangerous Goods',
-            num: '4.1.2',
+            num: '3.1.2',
             route: '/ground-ops/planning/dangerous-goods',
             iconName: 'AlertTriangle',
             desc: 'DG verification & NOTOC generation',
@@ -392,7 +392,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'loading-plan',
             label: 'Loading Plan',
-            num: '4.1.3',
+            num: '3.1.3',
             route: '/ground-ops/cargo/cargo-manifest',
             iconName: 'Package',
             desc: 'Assign cargo to compartments (LIR)',
@@ -400,7 +400,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'seat-plan',
             label: 'Seat Plan',
-            num: '4.1.4',
+            num: '3.1.4',
             route: '/ground-ops/planning/seat-plan',
             iconName: 'Armchair',
             desc: 'Pax seating distribution for W&B zones',
@@ -410,13 +410,13 @@ export const NAV_TREE: NavModuleData[] = [
       {
         key: 'loading',
         label: 'Live Loading',
-        num: '4.2',
+        num: '3.2',
         iconName: 'Loader',
         pages: [
           {
             key: 'skyhub-go',
             label: 'SkyHub GO',
-            num: '4.2.1',
+            num: '3.2.1',
             route: '/ground-ops/loading/skyhub-go',
             iconName: 'Truck',
             desc: 'Station board, KPIs & flight ops',
@@ -424,7 +424,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'flight-loading',
             label: 'Flight Loading',
-            num: '4.2.2',
+            num: '3.2.2',
             route: '/ground-ops/loading/flight-loading',
             iconName: 'Plane',
             desc: 'Unified cargo + pax live view',
@@ -432,7 +432,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'handler-view',
             label: 'Handler View',
-            num: '4.2.3',
+            num: '3.2.3',
             route: '/ground-ops/loading/handler-view',
             iconName: 'Smartphone',
             desc: 'Ground handler confirmation (SkyHub)',
@@ -442,13 +442,13 @@ export const NAV_TREE: NavModuleData[] = [
       {
         key: 'load-control',
         label: 'Load Control',
-        num: '4.3',
+        num: '3.3',
         iconName: 'Scale',
         pages: [
           {
             key: 'load-summary',
             label: 'Load Summary',
-            num: '4.3.1',
+            num: '3.3.1',
             route: '/ground-ops/load-control/load-summary',
             iconName: 'BarChart3',
             desc: 'Combined pax + cargo + bags dashboard',
@@ -456,7 +456,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'messages',
             label: 'Messages',
-            num: '4.3.2',
+            num: '3.3.2',
             route: '/ground-ops/load-control/messages',
             iconName: 'MessageSquare',
             desc: 'Generate LDM, CPM, NOTOC',
@@ -464,7 +464,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'loadsheet',
             label: 'Loadsheet',
-            num: '4.3.3',
+            num: '3.3.3',
             route: '/ground-ops/load-control/loadsheet',
             iconName: 'FileBarChart',
             desc: 'Weight & Balance',
@@ -472,7 +472,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'lmc',
             label: 'Last Minute Changes',
-            num: '4.3.4',
+            num: '3.3.4',
             route: '/ground-ops/load-control/lmc',
             iconName: 'PenLine',
             desc: 'Recalculate after late changes',
@@ -480,7 +480,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'captain-acceptance',
             label: 'Captain Acceptance',
-            num: '4.3.5',
+            num: '3.3.5',
             route: '/ground-ops/load-control/captain-acceptance',
             iconName: 'BadgeCheck',
             desc: 'Digital sign-off, push to EFB',
@@ -490,13 +490,13 @@ export const NAV_TREE: NavModuleData[] = [
       {
         key: 'reports',
         label: 'Reports',
-        num: '4.4',
+        num: '3.4',
         iconName: 'BarChart3',
         pages: [
           {
             key: 'loading-history',
             label: 'Loading History',
-            num: '4.4.1',
+            num: '3.4.1',
             route: '/ground-ops/reports/loading-history',
             iconName: 'History',
             desc: 'Archived loadsheets & messages',
@@ -504,7 +504,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'ground-performance',
             label: 'Ground Performance',
-            num: '4.4.2',
+            num: '3.4.2',
             route: '/ground-ops/reports/ground-performance',
             iconName: 'TrendingUp',
             desc: 'Turnaround times & load factors',
@@ -512,7 +512,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'dg-log',
             label: 'DG Log',
-            num: '4.4.3',
+            num: '3.4.3',
             route: '/ground-ops/reports/dg-log',
             iconName: 'ShieldAlert',
             desc: 'Dangerous goods audit trail',
@@ -522,23 +522,23 @@ export const NAV_TREE: NavModuleData[] = [
     ],
   },
 
-  // ── 5. Crew Ops ──
+  // ── 4. Crew Ops ──
   {
     key: 'crewops',
     label: 'Crew Ops',
-    num: '5',
+    num: '4',
     iconName: 'Users',
     sections: [
       {
         key: 'planning',
         label: 'Planning',
-        num: '5.1',
+        num: '4.1',
         iconName: 'CalendarDays',
         pages: [
           {
             key: 'crew-pairing',
             label: 'Crew Pairing',
-            num: '5.1.1',
+            num: '4.1.1',
             route: '/crew-ops/planning/crew-pairing',
             iconName: 'Users',
             desc: 'Build pairings from flights',
@@ -546,7 +546,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'auto-assignment',
             label: 'Auto Assignment',
-            num: '5.1.2',
+            num: '4.1.2',
             route: '/crew-ops/planning/auto-assignment',
             iconName: 'Plane',
             desc: 'Automated crew assignment',
@@ -554,7 +554,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'roster-view',
             label: 'Roster View',
-            num: '5.1.3',
+            num: '4.1.3',
             route: '/crew-ops/planning/roster-view',
             iconName: 'CalendarDays',
             desc: 'Crew schedule view',
@@ -564,13 +564,13 @@ export const NAV_TREE: NavModuleData[] = [
       {
         key: 'visualization',
         label: 'Visualization',
-        num: '5.2',
+        num: '4.2',
         iconName: 'BarChart3',
         pages: [
           {
             key: 'gcs-gantt',
             label: 'GCS Gantt',
-            num: '5.2.1',
+            num: '4.2.1',
             route: '/crew-ops/visualization/gcs-gantt',
             iconName: 'GanttChart',
             desc: 'Crew schedule visualization',
@@ -580,13 +580,13 @@ export const NAV_TREE: NavModuleData[] = [
       {
         key: 'crew-data',
         label: 'Crew Data',
-        num: '5.3',
+        num: '4.3',
         iconName: 'Database',
         pages: [
           {
             key: 'crew-list',
             label: 'Crew List',
-            num: '5.3.1',
+            num: '4.3.1',
             route: '/crew-ops/crew-data/crew-list',
             iconName: 'Users',
             desc: 'Crew records & qualifications',
@@ -594,7 +594,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'qualifications',
             label: 'Qualifications',
-            num: '5.3.2',
+            num: '4.3.2',
             route: '/crew-ops/crew-data/qualifications',
             iconName: 'ShieldCheck',
             desc: 'License & rating tracking',
@@ -602,7 +602,7 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'documents',
             label: 'Documents',
-            num: '5.3.3',
+            num: '4.3.3',
             route: '/crew-ops/crew-data/documents',
             iconName: 'FileText',
             desc: 'Crew document management',

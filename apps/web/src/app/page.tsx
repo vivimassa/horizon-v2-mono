@@ -1,568 +1,715 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
-import Link from 'next/link'
 import * as LucideIcons from 'lucide-react'
-import { MODULE_REGISTRY, type ModuleEntry } from '@skyhub/constants'
+import { MODULE_REGISTRY, MODULE_THEMES, type ModuleEntry } from '@skyhub/constants'
 import { useRouter } from 'next/navigation'
 import { WallpaperBg } from '@/components/wallpaper-bg'
 import { useUser } from '@/components/user-provider'
 import { useAuth } from '@/components/auth-provider'
 import { useTheme } from '@/components/theme-provider'
 
-// ── Domain colors ──
+/* ═══════════════════════════════════════════════
+   Data
+   ═══════════════════════════════════════════════ */
 
-const DOMAIN_COLORS: Record<string, string> = {
-  network: '#eab308',
-  operations: '#ef4444',
-  workforce: '#22c55e',
-  ground: '#06b6d4',
-  admin: '#64748b',
+interface DomainCard {
+  key: string
+  label: string
+  description: string
+  icon: string
+  href: string
+  module: string
+  image: string
 }
 
-// ── Theme-aware glass palette ──
+const DOMAINS: DomainCard[] = [
+  {
+    key: 'network',
+    label: 'Network',
+    description: 'Routes, schedules, fleet planning & slot management',
+    icon: 'Route',
+    href: '/network',
+    module: 'network',
+    image: 'https://images.unsplash.com/photo-1533456307239-052e029c1362?w=1920&q=80&auto=format&fit=crop',
+  },
+  {
+    key: 'flightops',
+    label: 'Flight Ops',
+    description: 'Movement control, OOOI tracking & daily operations',
+    icon: 'Plane',
+    href: '/flight-ops',
+    module: 'operations',
+    image: '/assets/domains/flight-ops.png',
+  },
+  {
+    key: 'groundops',
+    label: 'Ground Ops',
+    description: 'Cargo, turnaround, fueling & ramp coordination',
+    icon: 'Truck',
+    href: '/ground-ops',
+    module: 'ground',
+    image: 'https://images.unsplash.com/photo-1464037866556-6812c9d1c72e?w=1920&q=80&auto=format&fit=crop',
+  },
+  {
+    key: 'crewops',
+    label: 'Crew Ops',
+    description: 'Rostering, pairing, FDTL & crew tracking',
+    icon: 'Users',
+    href: '/crew-ops',
+    module: 'workforce',
+    image: 'https://images.unsplash.com/photo-1503468120394-03d29a34a0bf?w=1920&q=80&auto=format&fit=crop',
+  },
+  {
+    key: 'settings',
+    label: 'Settings',
+    description: 'Master data, users, roles & operator config',
+    icon: 'Settings',
+    href: '/settings',
+    module: 'admin',
+    image: '/assets/domains/settings.png',
+  },
+]
 
-function useGlass() {
-  const { theme } = useTheme()
-  const d = theme === 'dark'
-  return useMemo(
-    () => ({
-      isDark: d,
-      card: d ? 'rgba(15,15,25,0.45)' : 'rgba(255,255,255,0.55)',
-      cardHover: d ? 'rgba(25,25,40,0.55)' : 'rgba(255,255,255,0.72)',
-      border: d ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-      borderHov: d ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.14)',
-      text: d ? 'rgba(255,255,255,0.90)' : 'rgba(0,0,0,0.85)',
-      textSec: d ? 'rgba(255,255,255,0.50)' : 'rgba(0,0,0,0.45)',
-      textMuted: d ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.30)',
-      textFaint: d ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
-      input: d ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.50)',
-      inputBdr: d ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)',
-      menuBg: d ? 'rgba(15,15,25,0.92)' : 'rgba(255,255,255,0.92)',
-      menuBdr: d ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)',
-      menuHover: d ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-      menuSep: d ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-      menuText: d ? 'rgba(255,255,255,0.80)' : 'rgba(0,0,0,0.70)',
-      addBg: d ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
-      addBdr: d ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)',
-      addBdrHov: d ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.20)',
-      addBgHov: d ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-      gripBg: d ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-      gripBdr: d ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)',
-      gripIcon: d ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)',
-      logoFilter: d
-        ? 'brightness(0) invert(1) drop-shadow(0 1px 8px rgba(0,0,0,0.4))'
-        : 'drop-shadow(0 1px 8px rgba(0,0,0,0.15))',
-    }),
-    [d],
-  )
+interface SectionGroup {
+  section: ModuleEntry
+  children: ModuleEntry[]
 }
 
-// ── Icon resolution ──
+function buildTree(mod: string): SectionGroup[] {
+  return MODULE_REGISTRY.filter((m) => m.module === mod && m.level === 1)
+    .map((s) => ({ section: s, children: MODULE_REGISTRY.filter((m) => m.parent_code === s.code && m.level === 2) }))
+    .filter((g) => g.children.length > 0)
+}
+
+const TREES = Object.fromEntries(DOMAINS.map((d) => [d.key, buildTree(d.module)]))
 
 const iconMap = LucideIcons as unknown as Record<string, LucideIcons.LucideIcon>
 function getIcon(name: string): LucideIcons.LucideIcon {
   return iconMap[name] ?? LucideIcons.Box
 }
 
-// ── Module data ──
-
-const SKIP = new Set(['home', 'settings', 'integration'])
-const ALL_MODULES = MODULE_REGISTRY.filter((m) => m.level === 2 && !SKIP.has(m.module))
-const MODULE_MAP = new Map(ALL_MODULES.map((m) => [m.code, m]))
-
-const DEFAULT_CODES = [
-  '1.1.1',
-  '1.1.2',
-  '1.2.1',
-  '1.3.1',
-  '1.3.5',
-  '2.1.1',
-  '2.1.2',
-  '2.1.6',
-  '2.3.2',
-  '3.1.6',
-  '3.1.7',
-  '3.1.5',
-  '5.1.1',
-  '4.2.2',
-  '4.2.3',
-]
-
-const STORAGE_KEY = 'skyhub.dashboard.shortcuts'
-
-function loadShortcuts(): string[] {
-  if (typeof window === 'undefined') return DEFAULT_CODES
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as string[]
-      const valid = parsed.filter((c) => MODULE_MAP.has(c))
-      if (valid.length > 0) return valid
-    }
-  } catch {
-    /* ignore */
-  }
-  return DEFAULT_CODES
-}
-
-function saveShortcuts(codes: string[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(codes))
-}
-
-// ── Page ──
+/* ═══════════════════════════════════════════════
+   Page
+   ═══════════════════════════════════════════════ */
 
 export default function HomePage() {
   const router = useRouter()
   const { theme, toggle: toggleTheme } = useTheme()
-  const g = useGlass()
+  const isDark = theme === 'dark'
   const { user } = useUser()
   const { logout } = useAuth()
   const initials = user ? `${user.profile.firstName[0]}${user.profile.lastName[0]}` : ''
   const fullName = user ? `${user.profile.firstName} ${user.profile.lastName}` : ''
   const userRole = user?.role ?? ''
   const userEmail = user?.profile.email ?? ''
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const userMenuRef = useRef<HTMLDivElement>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
 
+  /* ── carousel ── */
+  const [cur, setCur] = useState(0)
+  const [sel, setSel] = useState<number | null>(null) // selected / opened
+  const isOpen = sel !== null
+
+  function next() {
+    if (!isOpen) setCur((c) => (c + 1) % DOMAINS.length)
+  }
+  function prev() {
+    if (!isOpen) setCur((c) => (c - 1 + DOMAINS.length) % DOMAINS.length)
+  }
+  function select(i: number) {
+    if (i === cur) setSel(i)
+    else setCur(i)
+  }
+  function close() {
+    setSel(null)
+  }
+
+  /* ── transition ── */
+  const [leaving, setLeaving] = useState<string | null>(null)
+  function go(href: string, accent: string) {
+    setLeaving(accent)
+    setTimeout(() => router.push(href), 450)
+  }
+
+  /* keyboard */
   useEffect(() => {
-    if (!userMenuOpen) return
-    const handler = (e: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setUserMenuOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [userMenuOpen])
-
-  const [codes, setCodes] = useState(loadShortcuts)
-  const [search, setSearch] = useState('')
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const [pickerSearch, setPickerSearch] = useState('')
-  const [dragIdx, setDragIdx] = useState<number | null>(null)
-  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
-  const dragNode = useRef<HTMLDivElement | null>(null)
-
-  const allModules = codes.map((c) => MODULE_MAP.get(c)).filter(Boolean) as ModuleEntry[]
-  const modules = search.trim()
-    ? allModules.filter((m) => {
-        const q = search.trim().toLowerCase()
-        return m.name.toLowerCase().includes(q) || m.code.includes(q) || m.description.toLowerCase().includes(q)
-      })
-    : allModules
-
-  const update = useCallback((next: string[]) => {
-    setCodes(next)
-    saveShortcuts(next)
-  }, [])
-  const remove = useCallback(
-    (code: string) => {
-      update(codes.filter((c) => c !== code))
-    },
-    [codes, update],
-  )
-  const add = useCallback(
-    (code: string) => {
-      if (!codes.includes(code)) update([...codes, code])
-      setPickerOpen(false)
-      setPickerSearch('')
-    },
-    [codes, update],
-  )
-
-  // ── Drag & drop ──
-  const handleDragStart = useCallback((idx: number, e: React.DragEvent) => {
-    setDragIdx(idx)
-    dragNode.current = e.currentTarget as HTMLDivElement
-    e.dataTransfer.effectAllowed = 'move'
-    if (dragNode.current)
-      setTimeout(() => {
-        if (dragNode.current) dragNode.current.style.opacity = '0.4'
-      }, 0)
-  }, [])
-  const handleDragEnd = useCallback(() => {
-    if (dragNode.current) dragNode.current.style.opacity = '1'
-    if (dragIdx !== null && dragOverIdx !== null && dragIdx !== dragOverIdx) {
-      const next = [...codes]
-      const [moved] = next.splice(dragIdx, 1)
-      next.splice(dragOverIdx, 0, moved)
-      update(next)
-    }
-    setDragIdx(null)
-    setDragOverIdx(null)
-    dragNode.current = null
-  }, [dragIdx, dragOverIdx, codes, update])
-  const handleDragOver = useCallback((idx: number, e: React.DragEvent) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setDragOverIdx(idx)
-  }, [])
-
-  const codesSet = new Set(codes)
-  const available = ALL_MODULES.filter((m) => !codesSet.has(m.code))
-  const filteredAvailable = pickerSearch.trim()
-    ? available.filter((m) => {
-        const q = pickerSearch.trim().toLowerCase()
-        return m.name.toLowerCase().includes(q) || m.code.includes(q)
-      })
-    : available
-
-  const pickerRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!pickerOpen) return
-    const handler = (e: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
-        setPickerOpen(false)
-        setPickerSearch('')
+    function handler(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        close()
+        return
       }
+      if (e.key === 'ArrowRight') next()
+      if (e.key === 'ArrowLeft') prev()
+      if (e.key === 'Enter' && !isOpen) select(cur)
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [pickerOpen])
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  })
 
-  const backdrop = {
-    backdropFilter: 'blur(40px) saturate(1.4)',
-    WebkitBackdropFilter: 'blur(40px) saturate(1.4)',
-  } as const
+  /* wheel */
+  const wc = useRef(false)
+  useEffect(() => {
+    function handler(e: WheelEvent) {
+      if (isOpen || wc.current) return
+      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY
+      if (Math.abs(d) < 30) return
+      wc.current = true
+      if (d > 0) next()
+      else prev()
+      setTimeout(() => {
+        wc.current = false
+      }, 500)
+    }
+    window.addEventListener('wheel', handler, { passive: true })
+    return () => window.removeEventListener('wheel', handler)
+  })
+
+  /* close menu */
+  useEffect(() => {
+    if (!menuOpen) return
+    const h = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [menuOpen])
+
+  const selDomain = sel !== null ? DOMAINS[sel] : null
+  const selAccent = selDomain ? (MODULE_THEMES[selDomain.module]?.accent ?? '#64748b') : '#64748b'
+  const selTreeRaw = selDomain ? (TREES[selDomain.key] ?? []) : []
+  const [panelSearch, setPanelSearch] = useState('')
+
+  // Reset search when domain changes
+  useEffect(() => {
+    setPanelSearch('')
+  }, [sel])
+
+  // Filter tree by search
+  const selTree = panelSearch.trim()
+    ? selTreeRaw
+        .map((g) => ({
+          ...g,
+          children: g.children.filter((c) => {
+            const q = panelSearch.trim().toLowerCase()
+            return c.name.toLowerCase().includes(q) || c.description.toLowerCase().includes(q) || c.code.includes(q)
+          }),
+        }))
+        .filter((g) => g.children.length > 0)
+    : selTreeRaw
+  const selCount = selDomain ? MODULE_REGISTRY.filter((m) => m.module === selDomain.module && m.level === 2).length : 0
+
+  const bk = { backdropFilter: 'blur(48px) saturate(1.5)', WebkitBackdropFilter: 'blur(48px) saturate(1.5)' } as const
+  const logoFilter = 'brightness(0) invert(1) drop-shadow(0 1px 8px rgba(0,0,0,0.4))'
 
   return (
-    <div className="relative min-h-full">
-      <WallpaperBg blur={g.isDark ? 6 : 16} lightOverlay={!g.isDark} />
+    <div
+      className="relative h-screen overflow-hidden"
+      style={leaving ? { animation: 'hzOut 450ms ease-in-out forwards' } : undefined}
+    >
+      {/* keyframes */}
+      <style>{`
+        @keyframes hzOut{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.06);filter:blur(6px)}}
+        @keyframes hzFade{0%{opacity:0}100%{opacity:1}}
+        @keyframes hzSlide{0%{opacity:0;transform:translateY(14px)}100%{opacity:1;transform:translateY(0)}}
+        @keyframes hzBgIn{0%{opacity:0;transform:scale(1.08)}100%{opacity:1;transform:scale(1)}}
+        @keyframes hzGlow{0%,100%{opacity:.4}50%{opacity:.8}}
+      `}</style>
 
-      <div className="relative z-10 px-5 pt-1">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <img src="/skyhub-logo.png" alt="SkyHub" style={{ height: 55, filter: g.logoFilter }} />
-          <div ref={userMenuRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setUserMenuOpen((v) => !v)}
-              className="flex items-center gap-3 rounded-xl px-2 py-1 transition-opacity hover:opacity-90 active:opacity-80 focus:outline-none"
+      {/* ── BG: wallpaper or domain image ── */}
+      {isOpen && selDomain ? (
+        <div className="fixed inset-0 z-0" style={{ animation: 'hzBgIn 600ms ease-out both' }}>
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url(${selDomain.image})`, filter: 'blur(8px)', transform: 'scale(1.05)' }}
+          />
+          <div
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(90deg, rgba(0,0,0,.75) 0%, rgba(0,0,0,.35) 50%, rgba(0,0,0,.70) 100%)',
+            }}
+          />
+        </div>
+      ) : (
+        <WallpaperBg blur={isDark ? 8 : 8} lightOverlay={!isDark} />
+      )}
+
+      {/* ── Header ── */}
+      <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-5 pt-3 pb-1">
+        <img
+          src="/skyhub-logo.png"
+          alt="SkyHub"
+          style={{
+            height: 48,
+            filter: isOpen ? 'brightness(0) invert(1) drop-shadow(0 1px 8px rgba(0,0,0,.4))' : logoFilter,
+          }}
+        />
+        <div ref={menuRef} className="relative">
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            className="flex items-center gap-3 rounded-xl px-2 py-1 hover:opacity-90 focus:outline-none"
+          >
+            <div className="text-right">
+              <div className="text-[15px] font-bold leading-tight uppercase tracking-wide text-white/90">
+                {fullName}
+              </div>
+              <div className="text-[13px] leading-tight capitalize text-white/55">{userRole}</div>
+            </div>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-[#1e40af]">
+              <span className="text-[14px] font-bold text-white">{initials}</span>
+            </div>
+          </button>
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-[calc(100%+8px)] z-50 w-64 rounded-xl overflow-hidden"
+              style={{
+                background: isDark ? 'rgba(15,15,25,.92)' : 'rgba(255,255,255,.92)',
+                ...bk,
+                border: `1px solid ${isDark ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.10)'}`,
+                boxShadow: '0 12px 32px rgba(0,0,0,.4)',
+              }}
             >
-              <div className="text-right">
-                <div className="text-[16px] font-bold leading-tight uppercase tracking-wide" style={{ color: g.text }}>
+              <div
+                className="px-4 py-3"
+                style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.06)'}` }}
+              >
+                <div
+                  className="text-[14px] font-semibold"
+                  style={{ color: isDark ? 'rgba(255,255,255,.8)' : 'rgba(0,0,0,.7)' }}
+                >
                   {fullName}
                 </div>
-                <div className="text-[13px] leading-tight capitalize" style={{ color: g.textSec }}>
-                  {userRole}
-                </div>
-              </div>
-              <div
-                className="w-11 h-11 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: '#1e40af' }}
-              >
-                <span className="text-[15px] font-bold text-white">{initials}</span>
-              </div>
-            </button>
-
-            {userMenuOpen && (
-              <div
-                role="menu"
-                className="absolute right-0 top-[calc(100%+8px)] z-50 w-64 rounded-xl overflow-hidden"
-                style={{
-                  background: g.menuBg,
-                  ...backdrop,
-                  border: `1px solid ${g.menuBdr}`,
-                  boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
-                }}
-              >
-                <div className="px-4 py-3" style={{ borderBottom: `1px solid ${g.menuSep}` }}>
-                  <div className="text-[14px] font-semibold" style={{ color: g.text }}>
-                    {fullName}
+                {userEmail && (
+                  <div className="text-[13px] mt-0.5 truncate" style={{ color: 'rgba(128,128,128,.7)' }}>
+                    {userEmail}
                   </div>
-                  {userEmail && (
-                    <div className="text-[13px] mt-0.5 truncate" style={{ color: g.textMuted }}>
-                      {userEmail}
-                    </div>
-                  )}
-                </div>
-                {/* Theme toggle */}
-                <MenuItem
-                  icon={theme === 'dark' ? LucideIcons.Sun : LucideIcons.Moon}
-                  label={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-                  color={g.menuText}
-                  hoverBg={g.menuHover}
-                  onClick={toggleTheme}
-                />
-                <MenuItem
-                  icon={LucideIcons.UserCircle}
-                  label="Open User Profile"
-                  color={g.menuText}
-                  hoverBg={g.menuHover}
+                )}
+              </div>
+              <MBtn
+                icon={theme === 'dark' ? LucideIcons.Sun : LucideIcons.Moon}
+                label={theme === 'dark' ? 'Light' : 'Dark'}
+                onClick={toggleTheme}
+              />
+              <MBtn
+                icon={LucideIcons.UserCircle}
+                label="Profile"
+                onClick={() => {
+                  setMenuOpen(false)
+                  router.push('/settings/account/profile')
+                }}
+              />
+              <div style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.06)'}` }}>
+                <MBtn
+                  icon={LucideIcons.LogOut}
+                  label="Log out"
+                  color="#dc2626"
                   onClick={() => {
-                    setUserMenuOpen(false)
-                    router.push('/settings/account/profile')
+                    setMenuOpen(false)
+                    logout()
                   }}
                 />
-                <MenuItem
-                  icon={LucideIcons.Lock}
-                  label="Change Password"
-                  color={g.menuText}
-                  hoverBg={g.menuHover}
-                  onClick={() => {
-                    setUserMenuOpen(false)
-                    router.push('/settings/account/security')
-                  }}
-                />
-                <div style={{ borderTop: `1px solid ${g.menuSep}` }}>
-                  <MenuItem
-                    icon={LucideIcons.LogOut}
-                    label="Log out"
-                    color="#dc2626"
-                    hoverBg="rgba(220,38,38,0.12)"
-                    onClick={() => {
-                      setUserMenuOpen(false)
-                      logout()
-                    }}
-                  />
-                </div>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Search bar */}
-        <div className="mb-6">
-          <div
-            className="flex items-center gap-3 rounded-xl px-4"
-            style={{ height: 48, background: g.input, border: `1px solid ${g.inputBdr}`, ...backdrop }}
-          >
-            <LucideIcons.Search size={18} style={{ color: g.textMuted }} />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search module or type code (e.g. Gantt or 2.1.2)..."
-              className="flex-1 bg-transparent outline-none text-[14px]"
-              style={{ color: g.text }}
-            />
-            {search && (
-              <button onClick={() => setSearch('')} style={{ color: g.textMuted }}>
-                <LucideIcons.X size={16} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Shortcuts grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {modules.map((entry, idx) => {
-            const color = DOMAIN_COLORS[entry.module] ?? '#64748b'
-            const Icon = getIcon(entry.icon)
-            const isDragOver = dragOverIdx === idx && dragIdx !== idx
-            return (
-              <div
-                key={entry.code}
-                draggable
-                onDragStart={(e) => handleDragStart(idx, e)}
-                onDragEnd={handleDragEnd}
-                onDragOver={(e) => handleDragOver(idx, e)}
-                className="group relative"
-                style={{
-                  borderLeft: isDragOver ? '3px solid rgba(91,141,239,0.6)' : '3px solid transparent',
-                  transition: 'border-color 150ms ease',
-                }}
-              >
-                <Link href={entry.route || '#'} className="no-underline block">
-                  <div
-                    className="relative flex flex-col items-center justify-center gap-3 rounded-[14px] p-5 overflow-hidden transition-all duration-200"
-                    style={{ background: g.card, ...backdrop, border: `1px solid ${g.border}`, minHeight: 140 }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = g.cardHover
-                      e.currentTarget.style.borderColor = g.borderHov
-                      e.currentTarget.style.boxShadow = `0 8px 32px ${color}18`
-                      e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = g.card
-                      e.currentTarget.style.borderColor = g.border
-                      e.currentTarget.style.boxShadow = 'none'
-                      e.currentTarget.style.transform = 'translateY(0) scale(1)'
-                    }}
-                  >
-                    <span
-                      className="absolute select-none pointer-events-none font-mono"
-                      style={{
-                        right: 8,
-                        bottom: 4,
-                        fontSize: 38,
-                        lineHeight: 1,
-                        color: g.textFaint,
-                        letterSpacing: '-0.02em',
-                      }}
-                    >
-                      {entry.code}
-                    </span>
-                    <div
-                      className="flex items-center justify-center rounded-xl"
-                      style={{ width: 48, height: 48, background: `${color}20` }}
-                    >
-                      <Icon size={24} strokeWidth={1.8} style={{ color }} />
-                    </div>
-                    <div className="text-[14px] font-semibold leading-tight text-center" style={{ color: g.text }}>
-                      {entry.name}
-                    </div>
-                  </div>
-                </Link>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    remove(entry.code)
-                  }}
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex items-center justify-center rounded-lg"
-                  style={{
-                    width: 28,
-                    height: 28,
-                    background: 'rgba(239,68,68,0.15)',
-                    border: '1px solid rgba(239,68,68,0.25)',
-                    cursor: 'pointer',
-                    zIndex: 5,
-                  }}
-                >
-                  <LucideIcons.X size={14} style={{ color: '#ef4444' }} />
-                </button>
-                <div
-                  className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex items-center justify-center rounded-lg cursor-grab active:cursor-grabbing"
-                  style={{ width: 28, height: 28, background: g.gripBg, border: `1px solid ${g.gripBdr}`, zIndex: 5 }}
-                >
-                  <LucideIcons.GripVertical size={14} style={{ color: g.gripIcon }} />
-                </div>
-              </div>
-            )
-          })}
-
-          {/* Add shortcut */}
-          <div className="relative" ref={pickerRef}>
-            <button
-              onClick={() => setPickerOpen((o) => !o)}
-              className="flex flex-col items-center justify-center gap-2 rounded-[14px] w-full transition-all duration-200"
-              style={{
-                border: `1px dashed ${g.addBdr}`,
-                background: pickerOpen ? g.addBgHov : g.addBg,
-                cursor: 'pointer',
-                minHeight: 140,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = g.addBdrHov
-                e.currentTarget.style.background = g.addBgHov
-              }}
-              onMouseLeave={(e) => {
-                if (!pickerOpen) {
-                  e.currentTarget.style.borderColor = g.addBdr
-                  e.currentTarget.style.background = g.addBg
-                }
-              }}
-            >
-              <LucideIcons.Plus size={24} style={{ color: g.textMuted }} />
-              <span className="text-[13px] font-medium" style={{ color: g.textMuted }}>
-                Add shortcut
-              </span>
-            </button>
-
-            {pickerOpen && (
-              <div
-                className="absolute top-full left-0 mt-2 rounded-xl overflow-hidden"
-                style={{
-                  width: 320,
-                  maxHeight: 400,
-                  background: g.menuBg,
-                  ...backdrop,
-                  border: `1px solid ${g.menuBdr}`,
-                  boxShadow: '0 16px 48px rgba(0,0,0,0.4)',
-                  zIndex: 50,
-                }}
-              >
-                <div className="p-3" style={{ borderBottom: `1px solid ${g.menuSep}` }}>
-                  <div className="flex items-center gap-2 px-3 rounded-lg" style={{ height: 36, background: g.input }}>
-                    <LucideIcons.Search size={14} style={{ color: g.textMuted }} />
-                    <input
-                      type="text"
-                      value={pickerSearch}
-                      onChange={(e) => setPickerSearch(e.target.value)}
-                      placeholder="Search modules..."
-                      autoFocus
-                      className="flex-1 bg-transparent outline-none text-[13px]"
-                      style={{ color: g.text }}
-                    />
-                  </div>
-                </div>
-                <div className="overflow-y-auto" style={{ maxHeight: 340 }}>
-                  {filteredAvailable.length === 0 && (
-                    <div className="px-4 py-6 text-center text-[13px]" style={{ color: g.textMuted }}>
-                      {available.length === 0 ? 'All modules added' : 'No match'}
-                    </div>
-                  )}
-                  {filteredAvailable.map((m) => {
-                    const color = DOMAIN_COLORS[m.module] ?? '#64748b'
-                    const Icon = getIcon(m.icon)
-                    return (
-                      <button
-                        key={m.code}
-                        onClick={() => add(m.code)}
-                        className="flex items-center gap-3 w-full px-4 py-2.5 text-left transition-colors"
-                        style={{ cursor: 'pointer' }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = g.menuHover
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'transparent'
-                        }}
-                      >
-                        <div
-                          className="flex items-center justify-center rounded-lg shrink-0"
-                          style={{ width: 32, height: 32, background: `${color}18` }}
-                        >
-                          <Icon size={16} strokeWidth={1.8} style={{ color }} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[13px] font-semibold truncate" style={{ color: g.text }}>
-                            {m.name}
-                          </div>
-                          <div className="text-[11px] font-mono" style={{ color: g.textMuted }}>
-                            {m.code}
-                          </div>
-                        </div>
-                        <LucideIcons.Plus size={14} style={{ color: g.textMuted }} />
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ═════════════════════════════════════
+         CAROUSEL + PANEL LAYOUT
+         ═════════════════════════════════════ */}
+      <div className="relative z-10 h-full flex">
+        {/* ── LEFT: Carousel ── */}
+        <div
+          className="flex items-center justify-center transition-all duration-500 ease-[cubic-bezier(.4,0,.2,1)] relative"
+          style={{ width: isOpen ? '42%' : '100%', minWidth: isOpen ? '42%' : undefined }}
+        >
+          {/* Cards container with perspective */}
+          <div className="relative" style={{ width: 440, height: 600, perspective: 1200 }}>
+            {DOMAINS.map((domain, i) => {
+              const accent = MODULE_THEMES[domain.module]?.accent ?? '#64748b'
+              const Icon = getIcon(domain.icon)
+              const count = MODULE_REGISTRY.filter((m) => m.module === domain.module && m.level === 2).length
+
+              let offset = i - cur
+              if (offset > 2) offset -= DOMAINS.length
+              if (offset < -2) offset += DOMAINS.length
+              const isCenter = offset === 0
+              const abs = Math.abs(offset)
+
+              // Compute transform
+              let tx: number, sc: number, ry: number, op: number, bl: number
+              if (isOpen) {
+                // When open: center card stays, others gone
+                if (i === sel) {
+                  tx = 0
+                  sc = 1.12
+                  ry = 0
+                  op = 1
+                  bl = 0
+                } else {
+                  tx = 0
+                  sc = 0.7
+                  ry = 0
+                  op = 0
+                  bl = 0
+                }
+              } else if (abs > 2) {
+                tx = offset * 400
+                sc = 0.5
+                ry = 0
+                op = 0
+                bl = 5
+              } else {
+                tx = offset * 370
+                sc = isCenter ? 1 : abs === 1 ? 0.85 : 0.68
+                ry = isCenter ? 0 : offset > 0 ? -8 : 8
+                op = isCenter ? 1 : abs === 1 ? 0.5 : 0.2
+                bl = isCenter ? 0 : abs === 1 ? 2 : 5
+              }
+
+              return (
+                <button
+                  key={domain.key}
+                  type="button"
+                  className="absolute inset-0 rounded-[20px] overflow-hidden focus:outline-none"
+                  style={{
+                    transform: `translateX(${tx}px) scale(${sc}) rotateY(${ry}deg)`,
+                    opacity: op,
+                    filter: bl ? `blur(${bl}px) brightness(.65)` : 'none',
+                    zIndex: isCenter ? 10 : 10 - abs,
+                    transition: 'all 500ms cubic-bezier(.4,0,.2,1)',
+                    transformStyle: 'preserve-3d',
+                    border: isCenter ? `1px solid ${accent}40` : '1px solid rgba(255,255,255,.06)',
+                    boxShadow: isCenter
+                      ? `0 20px 60px rgba(0,0,0,.4), 0 0 60px ${accent}12`
+                      : '0 8px 32px rgba(0,0,0,.3)',
+                    cursor: isCenter ? 'pointer' : 'pointer',
+                    pointerEvents: (abs > 2 && !isOpen) || (isOpen && i !== sel) ? 'none' : 'auto',
+                  }}
+                  onClick={() => select(i)}
+                >
+                  {/* BG image */}
+                  <div
+                    className="absolute inset-0 bg-cover bg-center"
+                    style={{
+                      backgroundImage: `url(${domain.image})`,
+                      transform: isCenter ? 'scale(1.05)' : 'scale(1)',
+                      transition: 'transform 700ms ease',
+                    }}
+                  />
+                  {/* Darken */}
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background: isCenter
+                        ? 'linear-gradient(180deg, rgba(0,0,0,.08) 0%, rgba(0,0,0,.25) 50%, rgba(0,0,0,.80) 100%)'
+                        : 'linear-gradient(180deg, rgba(0,0,0,.30) 0%, rgba(0,0,0,.70) 100%)',
+                    }}
+                  />
+                  {/* Glow */}
+                  {isCenter && (
+                    <div
+                      className="absolute bottom-0 left-0 right-0 h-40"
+                      style={{
+                        background: `linear-gradient(0deg, ${accent}20 0%, transparent 100%)`,
+                        animation: 'hzGlow 4s ease-in-out infinite',
+                      }}
+                    />
+                  )}
+                  {/* Top line */}
+                  {isCenter && (
+                    <div
+                      className="absolute top-0 left-0 right-0 h-[2px]"
+                      style={{ background: `linear-gradient(90deg, transparent 5%, ${accent} 50%, transparent 95%)` }}
+                    />
+                  )}
+
+                  {/* Content — all inside the button */}
+                  <div className="absolute inset-0 flex flex-col p-5">
+                    {/* Top */}
+                    <div className="flex items-start justify-between">
+                      <div
+                        className="flex items-center justify-center rounded-full text-[14px] font-bold"
+                        style={{
+                          width: 36,
+                          height: 36,
+                          background: isCenter ? accent : 'rgba(255,255,255,.10)',
+                          color: '#fff',
+                          boxShadow: isCenter ? `0 4px 20px ${accent}50` : 'none',
+                          transition: 'all 500ms ease',
+                        }}
+                      >
+                        {String(i + 1).padStart(2, '0')}
+                      </div>
+                      <div
+                        className="flex items-center justify-center rounded-xl"
+                        style={{
+                          width: 42,
+                          height: 42,
+                          background: 'rgba(0,0,0,.25)',
+                          backdropFilter: 'blur(12px)',
+                          border: isCenter ? `1px solid ${accent}40` : '1px solid rgba(255,255,255,.08)',
+                        }}
+                      >
+                        <Icon size={20} strokeWidth={1.5} color="#fff" />
+                      </div>
+                    </div>
+
+                    <div className="flex-1" />
+
+                    {/* Bottom */}
+                    <div className="text-left">
+                      <div className="text-[22px] font-bold tracking-tight text-white mb-1.5 drop-shadow-lg">
+                        {domain.label}
+                      </div>
+                      {isCenter && (
+                        <div className="text-[13px] leading-[1.5] text-white/55 mb-3">{domain.description}</div>
+                      )}
+                      {isCenter && (
+                        <div className="flex items-center gap-3">
+                          <span
+                            className="text-[12px] font-semibold px-3 py-1 rounded-full"
+                            style={{ background: `${accent}25`, color: '#fff', border: `1px solid ${accent}30` }}
+                          >
+                            {count} modules
+                          </span>
+                          <span className="text-[12px] text-white/30">Click to explore</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Nav arrows — only when not open */}
+          {!isOpen && (
+            <>
+              <button
+                onClick={prev}
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
+                style={{
+                  background: 'rgba(0,0,0,.25)',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255,255,255,.08)',
+                }}
+              >
+                <LucideIcons.ChevronLeft size={20} color="rgba(255,255,255,.6)" />
+              </button>
+              <button
+                onClick={next}
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
+                style={{
+                  background: 'rgba(0,0,0,.25)',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255,255,255,.08)',
+                }}
+              >
+                <LucideIcons.ChevronRight size={20} color="rgba(255,255,255,.6)" />
+              </button>
+            </>
+          )}
+
+          {/* Dots — only when not open */}
+          {!isOpen && (
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+              {DOMAINS.map((d, i) => {
+                const ac = MODULE_THEMES[d.module]?.accent ?? '#64748b'
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setCur(i)}
+                    className="rounded-full transition-all duration-500"
+                    style={{
+                      width: i === cur ? 28 : 8,
+                      height: 8,
+                      background: i === cur ? ac : 'rgba(255,255,255,.20)',
+                      boxShadow: i === cur ? `0 0 12px ${ac}60` : 'none',
+                    }}
+                  />
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── RIGHT: Sub-module panel ── */}
+        {isOpen && selDomain && (
+          <div
+            className="flex-1 min-w-0 flex flex-col py-20 pr-5 pl-2"
+            style={{ animation: 'hzSlide 400ms cubic-bezier(.4,0,.2,1) both' }}
+          >
+            {/* Back button */}
+            <button onClick={close} className="flex items-center gap-2 mb-4 hover:opacity-70 transition-opacity">
+              <LucideIcons.ArrowLeft size={16} color="rgba(255,255,255,.6)" />
+              <span className="text-[13px] font-medium text-white/50">Back</span>
+            </button>
+
+            {/* Panel header */}
+            <div className="flex items-center gap-3 mb-5">
+              <div
+                className="flex items-center justify-center rounded-xl"
+                style={{
+                  width: 40,
+                  height: 40,
+                  background: 'rgba(255,255,255,.08)',
+                  border: '1px solid rgba(255,255,255,.12)',
+                }}
+              >
+                {(() => {
+                  const I = getIcon(selDomain.icon)
+                  return <I size={20} strokeWidth={1.5} color="rgba(255,255,255,.7)" />
+                })()}
+              </div>
+              <div>
+                <div className="text-[20px] font-bold text-white tracking-tight">{selDomain.label}</div>
+                <div className="text-[13px] text-white/45">{selCount} modules</div>
+              </div>
+            </div>
+
+            {/* Glass panel with modules */}
+            <div
+              className="flex-1 rounded-2xl overflow-hidden"
+              style={{
+                background: isDark ? 'rgba(10,10,18,.75)' : 'rgba(15,15,25,.65)',
+                ...bk,
+                border: '1px solid rgba(255,255,255,.08)',
+                boxShadow: '0 24px 80px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.06) inset',
+              }}
+            >
+              {/* Search */}
+              <div className="px-3 pt-3 pb-2">
+                <div
+                  className="flex items-center gap-2.5 px-3 rounded-xl"
+                  style={{ height: 40, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.08)' }}
+                >
+                  <LucideIcons.Search size={15} color="rgba(255,255,255,.30)" />
+                  <input
+                    type="text"
+                    value={panelSearch}
+                    onChange={(e) => setPanelSearch(e.target.value)}
+                    placeholder="Search modules..."
+                    className="flex-1 bg-transparent outline-none text-[13px] text-white/90 placeholder:text-white/25"
+                  />
+                  {panelSearch && (
+                    <button onClick={() => setPanelSearch('')} className="hover:opacity-70">
+                      <LucideIcons.X size={14} color="rgba(255,255,255,.30)" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div
+                className="overflow-y-auto px-2 pt-2 pb-3"
+                style={{
+                  maxHeight: 'calc(100% - 56px)',
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: 'rgba(255,255,255,.15) transparent',
+                }}
+              >
+                {selTree.map((group, gi) => {
+                  const SIcon = getIcon(group.section.icon)
+                  return (
+                    <div
+                      key={group.section.code}
+                      className={gi > 0 ? 'mt-4' : ''}
+                      style={{ animation: `hzSlide 350ms ease-out ${gi * 60}ms both` }}
+                    >
+                      {/* Section header */}
+                      <div className="flex items-center gap-2 px-3 mb-1.5">
+                        <div className="w-[3px] h-[14px] rounded-full" style={{ background: selAccent }} />
+                        <SIcon size={13} strokeWidth={2} color="rgba(255,255,255,.45)" />
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-white/50">
+                          {group.section.name}
+                        </span>
+                        <div className="flex-1 h-px ml-2" style={{ background: 'rgba(255,255,255,.06)' }} />
+                      </div>
+
+                      {/* Items */}
+                      {group.children.map((child, ci) => {
+                        const CI = getIcon(child.icon)
+                        return (
+                          <button
+                            key={child.code}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left group transition-colors duration-150"
+                            style={{ animation: `hzSlide 300ms ease-out ${gi * 60 + (ci + 1) * 40}ms both` }}
+                            onClick={() => go(child.route, selAccent)}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(255,255,255,.06)'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'transparent'
+                            }}
+                          >
+                            <div
+                              className="flex items-center justify-center rounded-lg shrink-0"
+                              style={{
+                                width: 34,
+                                height: 34,
+                                background: 'rgba(255,255,255,.06)',
+                                border: '1px solid rgba(255,255,255,.08)',
+                              }}
+                            >
+                              <CI size={16} strokeWidth={1.8} color="rgba(255,255,255,.55)" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[14px] font-medium truncate text-white/90">{child.name}</span>
+                                <span className="text-[11px] font-medium text-white/25 shrink-0">{child.code}</span>
+                              </div>
+                              <div className="text-[12px] mt-0.5 truncate text-white/35">{child.description}</div>
+                            </div>
+                            <LucideIcons.ChevronRight
+                              size={14}
+                              color="rgba(255,255,255,.3)"
+                              className="shrink-0 opacity-0 group-hover:opacity-60 transition-opacity"
+                            />
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Transition overlay ── */}
+      {leaving && (
+        <div
+          className="fixed inset-0 z-50 pointer-events-none"
+          style={{
+            background: `radial-gradient(ellipse at center, ${leaving}20 0%, rgba(10,10,18,.95) 70%)`,
+            animation: 'hzFade 450ms ease-out forwards',
+          }}
+        />
+      )}
     </div>
   )
 }
 
-// ── Menu item helper ──
+/* ── Menu button ── */
 
-function MenuItem({
+function MBtn({
   icon: Icon,
   label,
   color,
-  hoverBg,
   onClick,
 }: {
   icon: LucideIcons.LucideIcon
   label: string
-  color: string
-  hoverBg: string
+  color?: string
   onClick: () => void
 }) {
   return (
     <button
-      role="menuitem"
       onClick={onClick}
-      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-colors"
-      style={{ color }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = hoverBg
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent'
-      }}
+      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+      style={{ color: color ?? 'inherit' }}
     >
       <Icon size={16} strokeWidth={1.8} />
       <span className="text-[14px] font-medium">{label}</span>

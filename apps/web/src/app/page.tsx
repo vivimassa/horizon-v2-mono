@@ -602,11 +602,14 @@ export default function HomePage() {
                       className={gi > 0 ? 'mt-4' : ''}
                       style={{ animation: `hzSlide 350ms ease-out ${gi * 60}ms both` }}
                     >
-                      {/* Section header */}
+                      {/* Section header — code prefix then name */}
                       <div className="flex items-center gap-2 px-3 mb-1.5">
                         <div className="w-[3px] h-[14px] rounded-full" style={{ background: selAccent }} />
                         <SIcon size={13} strokeWidth={2} color="rgba(255,255,255,.45)" />
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-white/50">
+                        <span className="text-[11px] font-mono font-semibold text-white/50 tracking-wide">
+                          {group.section.code}
+                        </span>
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-white/60">
                           {group.section.name}
                         </span>
                         <div className="flex-1 h-px ml-2" style={{ background: 'rgba(255,255,255,.06)' }} />
@@ -650,12 +653,20 @@ export default function HomePage() {
                             >
                               <CI size={16} strokeWidth={1.8} color="rgba(255,255,255,.55)" />
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[14px] font-medium truncate text-white/90">{child.name}</span>
-                                <span className="text-[11px] font-medium text-white/25 shrink-0">{child.code}</span>
+                            <div className="flex-1 min-w-0 flex items-start gap-3">
+                              {/* Fixed-width mono code column — all leaf codes
+                                 align vertically so names line up in a clean
+                                 left-aligned column. */}
+                              <span
+                                className="text-[12px] font-mono font-semibold tracking-wide text-white/55 shrink-0 w-12 tabular-nums"
+                                style={{ paddingTop: 2 }}
+                              >
+                                {child.code}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-[14px] font-medium truncate text-white/90">{child.name}</div>
+                                <div className="text-[12px] mt-0.5 truncate text-white/35">{child.description}</div>
                               </div>
-                              <div className="text-[12px] mt-0.5 truncate text-white/35">{child.description}</div>
                             </div>
                             <LucideIcons.ChevronRight
                               size={14}

@@ -45,8 +45,13 @@ export * as OpsTailAssignment from './utils/ops-tail-assignment'
 export * as OpsTailAssignmentSA from './utils/ops-tail-assignment-sa'
 export * from './utils/ssim-generator'
 export * from './utils/ssim-parser'
-export * from './utils/rotation-builder'
-export * from './utils/airport-lookup'
+// NOTE: utils/rotation-builder and utils/airport-lookup are intentionally
+// NOT re-exported here. They depend on Node built-ins (node:crypto,
+// node:fs, node:path) and are server-only. Re-exporting from this
+// universal barrel would pull them into client bundles via any browser
+// code that touches @skyhub/logic. Server code imports them directly:
+//   from '@skyhub/logic/src/utils/rotation-builder'
+//   from '@skyhub/logic/src/utils/airport-lookup'
 export * from './utils/schedule-rule-evaluator'
 export * from './utils/virtual-placement'
 export * from './utils/solver-stream'

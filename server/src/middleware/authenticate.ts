@@ -15,6 +15,7 @@ const PUBLIC_PATHS = [
   '/auth/set-password',
   '/auth/forgot-password',
   '/auth/reset-password',
+  '/contact-submissions',
 ]
 const PUBLIC_PREFIXES = ['/uploads/']
 

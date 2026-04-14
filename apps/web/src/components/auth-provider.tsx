@@ -68,7 +68,8 @@ function clearTokens() {
   } catch {}
 }
 
-const PUBLIC_PATHS = ['/login']
+const PUBLIC_PATHS = ['/login', '/products', '/services', '/about', '/contact']
+const MARKETING_ROOT = '/'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -171,22 +172,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })()
   }, [loadMe])
 
-  // Redirect unauthenticated users to /login (unless already on a public path)
+  // Redirect unauthenticated users to /login (unless already on a public/marketing path)
   useEffect(() => {
     if (isLoading) return
-    const onPublic = PUBLIC_PATHS.some((p) => pathname?.startsWith(p))
+    const onPublic = pathname === MARKETING_ROOT || PUBLIC_PATHS.some((p) => pathname?.startsWith(p))
     if (!isAuthenticated && !onPublic) {
       router.replace('/login')
     }
     if (isAuthenticated && pathname === '/login') {
-      router.replace('/')
+      router.replace('/hub')
     }
   }, [isLoading, isAuthenticated, pathname, router])
 
   // Gate children on auth state: don't render protected routes until bootstrap
   // finishes. Prevents shell components from mounting and firing api.xxx()
   // calls in the brief window between page load and /auth/refresh resolving.
-  const onPublicPath = PUBLIC_PATHS.some((p) => pathname?.startsWith(p))
+  const onPublicPath = pathname === MARKETING_ROOT || PUBLIC_PATHS.some((p) => pathname?.startsWith(p))
 
   if (isLoading) {
     return <div className="h-screen w-screen bg-hz-bg" />

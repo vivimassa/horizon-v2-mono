@@ -32,6 +32,7 @@ import { recoveryRoutes } from './routes/recovery.js'
 import { maintenanceCheckRoutes } from './routes/maintenance-checks.js'
 import { maintenanceEventRoutes } from './routes/maintenance-events.js'
 import { aircraftStatusBoardRoutes } from './routes/aircraft-status-board.js'
+import { contactSubmissionRoutes } from './routes/contact-submissions.js'
 import { loadOurAirportsData, startAutoRefresh } from './data/ourairports-cache.js'
 
 const port = env.PORT
@@ -92,6 +93,7 @@ async function main(): Promise<void> {
   await app.register(maintenanceCheckRoutes)
   await app.register(maintenanceEventRoutes)
   await app.register(aircraftStatusBoardRoutes)
+  await app.register(contactSubmissionRoutes)
 
   // Start
   await app.listen({ port, host: '0.0.0.0' })

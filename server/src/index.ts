@@ -19,6 +19,7 @@ import { cityPairRoutes } from './routes/city-pairs.js'
 import { fdtlRoutes } from './routes/fdtl.js'
 import { scheduledFlightRoutes } from './routes/scheduled-flights.js'
 import { ssimRoutes } from './routes/ssim.js'
+import { ssimImportRoutes } from './routes/ssim-import.js'
 import { scenarioRoutes } from './routes/scenarios.js'
 import { scheduleMessageRoutes } from './routes/schedule-messages.js'
 import { movementMessageRoutes } from './routes/movement-messages.js'
@@ -78,6 +79,7 @@ async function main(): Promise<void> {
   await app.register(fdtlRoutes)
   await app.register(scheduledFlightRoutes)
   await app.register(ssimRoutes)
+  await app.register(ssimImportRoutes)
   await app.register(scenarioRoutes)
   await app.register(scheduleMessageRoutes)
   await app.register(movementMessageRoutes)

@@ -8,3 +8,4 @@ export {
   FilterGoButton,
   type MultiSelectOption,
 } from './fields'
+export { FileField } from './file-field'

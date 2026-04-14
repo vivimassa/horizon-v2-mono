@@ -206,6 +206,23 @@ export function ScheduleGrid({
               onApplyColorFilter={handleApplyColorFilter}
             />
             <tbody>
+              {/* Top spacer — absorbs the offset of items scrolled off the top.
+                 Required for TanStack Virtual on a <table>: the tbody's actual
+                 height must equal the virtualizer's total size so the scroll
+                 container's scrollHeight matches what the virtualizer believes.
+                 Without this, the rendered chunk's height lags the virtual
+                 total near the tail and scroll feedback loops (old-TV jitter). */}
+              {(() => {
+                const items = virtualizer.getVirtualItems()
+                if (items.length === 0) return null
+                const topPad = items[0].start
+                if (topPad <= 0) return null
+                return (
+                  <tr aria-hidden style={{ height: topPad }}>
+                    <td colSpan={totalColSpan} style={{ padding: 0, border: 'none' }} />
+                  </tr>
+                )
+              })()}
               {virtualizer.getVirtualItems().map((vRow) => {
                 const item = virtualItems[vRow.index]
                 if (!item) return null
@@ -264,6 +281,21 @@ export function ScheduleGrid({
                   />
                 )
               })}
+              {/* Bottom spacer — absorbs the virtual distance below the last
+                 rendered item. Together with the top spacer this makes the
+                 tbody's pixel height equal the virtualizer's total size. */}
+              {(() => {
+                const items = virtualizer.getVirtualItems()
+                if (items.length === 0) return null
+                const last = items[items.length - 1]
+                const bottomPad = virtualizer.getTotalSize() - last.end
+                if (bottomPad <= 0) return null
+                return (
+                  <tr aria-hidden style={{ height: bottomPad }}>
+                    <td colSpan={totalColSpan} style={{ padding: 0, border: 'none' }} />
+                  </tr>
+                )
+              })()}
             </tbody>
           </table>
         </div>

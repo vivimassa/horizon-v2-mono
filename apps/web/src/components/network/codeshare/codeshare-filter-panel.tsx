@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, Filter, Search, Loader2 } from 
 import { useTheme } from '@/components/theme-provider'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { Dropdown } from '@/components/ui/dropdown'
+import { collapseDock } from '@/lib/dock-store'
 
 export interface CodeshareFilterState {
   dateFrom: string
@@ -60,6 +61,7 @@ export function CodeshareFilterPanel({ forceCollapsed = false, loading = false, 
 
   function handleGo() {
     if (periodMissing) return
+    collapseDock()
     onGo({ dateFrom, dateTo, status, agreementType })
     setCollapsed(true)
   }

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, ChevronDown, Filter, Search, Loader2 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
+import { collapseDock } from '@/lib/dock-store'
 import { useStatusBoardStore } from '@/stores/use-status-board-store'
 
 const HEALTH_OPTIONS = [
@@ -193,6 +194,7 @@ export function StatusBoardFilterPanel({
         <div className="px-5 py-4 shrink-0" style={{ borderTop: `1px solid ${sectionBorder}` }}>
           <button
             onClick={() => {
+              collapseDock()
               ;(onGo ?? useStatusBoardStore.getState().loadData)()
               setCollapsed(true)
             }}

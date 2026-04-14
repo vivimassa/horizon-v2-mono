@@ -6,7 +6,8 @@ import { ArrowLeft, Sun, Moon, Check, Palette, Sparkles, Monitor, Eye, Layers, T
 import { colors, accentTint, type Palette as PaletteType } from '@skyhub/ui/theme'
 import { useTheme } from '@/components/theme-provider'
 import { useDisplay } from '@/components/display-provider'
-import { ToggleTheme } from '@/components/ui/toggle-theme'
+import { ThemeToggleButton } from '@/components/ui/theme-toggle-button'
+import { AnimatedThemeIcon } from '@/components/ui/animated-theme-icon'
 import { TEXT_SCALE_OPTIONS, type TextScale } from '@/lib/fonts'
 
 const ACCENT = '#1e40af'
@@ -115,17 +116,13 @@ export default function AppearancePage() {
           <div className="px-5 py-5 flex-1">
             {/* Theme indicator */}
             <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
-                {isDark ? (
-                  <Moon size={16} style={{ color: selectedAccent }} />
-                ) : (
-                  <Sun size={16} style={{ color: selectedAccent }} />
-                )}
+              <div className="flex items-center gap-2" style={{ color: selectedAccent }}>
+                <AnimatedThemeIcon isDark={isDark} size={16} />
                 <span className="text-[13px] font-semibold" style={{ color: palette.text }}>
                   {isDark ? 'Dark Mode' : 'Light Mode'}
                 </span>
               </div>
-              <ToggleTheme />
+              <ThemeToggleButton size={36} iconSize={18} />
             </div>
 
             {/* Accent preview */}

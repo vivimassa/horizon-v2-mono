@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, ChevronDown, Filter, Search, Loader2 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
+import { collapseDock } from '@/lib/dock-store'
 import { useScheduleRefStore } from '@/stores/use-schedule-ref-store'
 import { useOperatorStore } from '@/stores/use-operator-store'
 import { api } from '@skyhub/api'
@@ -107,6 +108,7 @@ export function SlotFilterPanel({ forceCollapsed = false, loading = false, onGo 
     : 0
 
   function handleGo() {
+    collapseDock()
     onGo({
       periodFrom,
       periodTo,

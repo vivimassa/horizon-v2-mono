@@ -72,7 +72,7 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
     name: 'Gantt Chart',
     description: 'Aircraft rotation timeline showing fleet utilization and tail assignment',
     icon: 'GanttChart',
-    route: '/network/control/schedule-gantt',
+    route: '/network/schedule/gantt',
     parent_code: '1.1',
     module: 'network',
     level: 2,

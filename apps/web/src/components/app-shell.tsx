@@ -3,8 +3,8 @@
 import { usePathname } from 'next/navigation'
 import { useAuth } from './auth-provider'
 import { AnimatedBodyBg } from './AnimatedBodyBg'
-import { Breadcrumb } from './Breadcrumb'
 import { SpotlightDock } from './SpotlightDock'
+import { TopProgressBar } from './top-progress-bar'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
@@ -23,8 +23,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <AnimatedBodyBg />
-      {!isHome && <Breadcrumb />}
-      <main className={`flex-1 overflow-y-auto ${isHome ? '' : 'pb-22 -mt-1'}`}>{children}</main>
+      <TopProgressBar />
+      <main className={`flex-1 overflow-y-auto ${isHome ? '' : 'pt-3'}`}>{children}</main>
       {!isHome && <SpotlightDock />}
     </>
   )

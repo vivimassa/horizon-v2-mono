@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ChevronLeft, ChevronRight, ChevronDown, Filter, Search, Loader2 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
+import { collapseDock } from '@/lib/dock-store'
 import { CONTRACT_TYPE_LABELS } from './charter-types'
 import type { ContractType } from './charter-types'
 
@@ -58,6 +59,7 @@ export function CharterFilterPanel({ loading = false, onGo }: CharterFilterPanel
     (periodFrom && periodTo ? 1 : 0) + (selectedTypes !== null ? 1 : 0) + (selectedCatering !== null ? 1 : 0)
 
   function handleGo() {
+    collapseDock()
     onGo({
       periodFrom,
       periodTo,

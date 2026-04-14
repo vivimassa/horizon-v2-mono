@@ -3,11 +3,11 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import * as LucideIcons from 'lucide-react'
 import { MODULE_REGISTRY, MODULE_THEMES, type ModuleEntry } from '@skyhub/constants'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { WallpaperBg } from '@/components/wallpaper-bg'
-import { useUser } from '@/components/user-provider'
-import { useAuth } from '@/components/auth-provider'
 import { useTheme } from '@/components/theme-provider'
+import { UserMenu } from '@/components/UserMenu'
+import { revealNavigate, supportsViewTransitions } from '@/lib/nav-transition'
 
 /* ═══════════════════════════════════════════════
    Data
@@ -95,20 +95,18 @@ function getIcon(name: string): LucideIcons.LucideIcon {
 
 export default function HomePage() {
   const router = useRouter()
-  const { theme, toggle: toggleTheme } = useTheme()
+  const searchParams = useSearchParams()
+  const { theme } = useTheme()
   const isDark = theme === 'dark'
-  const { user } = useUser()
-  const { logout } = useAuth()
-  const initials = user ? `${user.profile.firstName[0]}${user.profile.lastName[0]}` : ''
-  const fullName = user ? `${user.profile.firstName} ${user.profile.lastName}` : ''
-  const userRole = user?.role ?? ''
-  const userEmail = user?.profile.email ?? ''
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
 
-  /* ── carousel ── */
-  const [cur, setCur] = useState(0)
-  const [sel, setSel] = useState<number | null>(null) // selected / opened
+  /* ── carousel ──
+     If the user lands on Home with ?domain=<key> in the URL (e.g. from the
+     bottom dock's "Flight Ops" tab), snap the carousel to that domain and
+     auto-open its module panel — same view as clicking the card on Home. */
+  const initialDomain = searchParams?.get('domain') ?? null
+  const initialIdx = initialDomain !== null ? DOMAINS.findIndex((d) => d.key === initialDomain) : -1
+  const [cur, setCur] = useState(initialIdx >= 0 ? initialIdx : 0)
+  const [sel, setSel] = useState<number | null>(initialIdx >= 0 ? initialIdx : null)
   const isOpen = sel !== null
 
   function next() {
@@ -127,9 +125,52 @@ export default function HomePage() {
 
   /* ── transition ── */
   const [leaving, setLeaving] = useState<string | null>(null)
-  function go(href: string, accent: string) {
-    setLeaving(accent)
-    setTimeout(() => router.push(href), 450)
+  const [pendingCode, setPendingCode] = useState<string | null>(null)
+  const [pendingAccent, setPendingAccent] = useState<string>('#1e40af')
+  const pendingTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  /**
+   * Minimum "charging" window before the zoom fires. Even prefetched routes
+   * wait this long so the border-light animation on the clicked item always
+   * registers. Not a mandatory theater-wait — just enough to read.
+   */
+  const CHARGING_MIN_MS = 600
+
+  function go(href: string, accent: string, origin?: { x: number; y: number }, code?: string) {
+    if (pendingTimer.current) clearTimeout(pendingTimer.current)
+    if (code) setPendingCode(code)
+    setPendingAccent(accent)
+
+    // Warm the route in the background while the charging border plays.
+    try {
+      router.prefetch(href)
+    } catch {
+      /* best-effort */
+    }
+
+    if (supportsViewTransitions()) {
+      pendingTimer.current = setTimeout(() => {
+        revealNavigate(router, href, { origin, accent, direction: 'in' })
+      }, CHARGING_MIN_MS)
+    } else {
+      // Fallback for browsers without View Transitions API (Firefox today).
+      setLeaving(accent)
+      pendingTimer.current = setTimeout(() => router.push(href), CHARGING_MIN_MS)
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      if (pendingTimer.current) clearTimeout(pendingTimer.current)
+    }
+  }, [])
+
+  function prefetch(href: string) {
+    try {
+      router.prefetch(href)
+    } catch {
+      // prefetch is best-effort
+    }
   }
 
   /* keyboard */
@@ -165,16 +206,6 @@ export default function HomePage() {
     return () => window.removeEventListener('wheel', handler)
   })
 
-  /* close menu */
-  useEffect(() => {
-    if (!menuOpen) return
-    const h = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
-    }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [menuOpen])
-
   const selDomain = sel !== null ? DOMAINS[sel] : null
   const selAccent = selDomain ? (MODULE_THEMES[selDomain.module]?.accent ?? '#64748b') : '#64748b'
   const selTreeRaw = selDomain ? (TREES[selDomain.key] ?? []) : []
@@ -200,7 +231,9 @@ export default function HomePage() {
   const selCount = selDomain ? MODULE_REGISTRY.filter((m) => m.module === selDomain.module && m.level === 2).length : 0
 
   const bk = { backdropFilter: 'blur(48px) saturate(1.5)', WebkitBackdropFilter: 'blur(48px) saturate(1.5)' } as const
-  const logoFilter = 'brightness(0) invert(1) drop-shadow(0 1px 8px rgba(0,0,0,0.4))'
+  const logoFilter = isDark
+    ? 'brightness(0) invert(1) drop-shadow(0 1px 8px rgba(0,0,0,0.4))'
+    : 'brightness(0) drop-shadow(0 1px 8px rgba(255,255,255,0.6))'
 
   return (
     <div
@@ -231,7 +264,7 @@ export default function HomePage() {
           />
         </div>
       ) : (
-        <WallpaperBg blur={isDark ? 8 : 8} lightOverlay={!isDark} />
+        <WallpaperBg blur={8} variant={isDark ? 'dark' : 'light'} />
       )}
 
       {/* ── Header ── */}
@@ -240,79 +273,11 @@ export default function HomePage() {
           src="/skyhub-logo.png"
           alt="SkyHub"
           style={{
-            height: 48,
+            height: 52,
             filter: isOpen ? 'brightness(0) invert(1) drop-shadow(0 1px 8px rgba(0,0,0,.4))' : logoFilter,
           }}
         />
-        <div ref={menuRef} className="relative">
-          <button
-            onClick={() => setMenuOpen((v) => !v)}
-            className="flex items-center gap-3 rounded-xl px-2 py-1 hover:opacity-90 focus:outline-none"
-          >
-            <div className="text-right">
-              <div className="text-[15px] font-bold leading-tight uppercase tracking-wide text-white/90">
-                {fullName}
-              </div>
-              <div className="text-[13px] leading-tight capitalize text-white/55">{userRole}</div>
-            </div>
-            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-[#1e40af]">
-              <span className="text-[14px] font-bold text-white">{initials}</span>
-            </div>
-          </button>
-          {menuOpen && (
-            <div
-              role="menu"
-              className="absolute right-0 top-[calc(100%+8px)] z-50 w-64 rounded-xl overflow-hidden"
-              style={{
-                background: isDark ? 'rgba(15,15,25,.92)' : 'rgba(255,255,255,.92)',
-                ...bk,
-                border: `1px solid ${isDark ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.10)'}`,
-                boxShadow: '0 12px 32px rgba(0,0,0,.4)',
-              }}
-            >
-              <div
-                className="px-4 py-3"
-                style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.06)'}` }}
-              >
-                <div
-                  className="text-[14px] font-semibold"
-                  style={{ color: isDark ? 'rgba(255,255,255,.8)' : 'rgba(0,0,0,.7)' }}
-                >
-                  {fullName}
-                </div>
-                {userEmail && (
-                  <div className="text-[13px] mt-0.5 truncate" style={{ color: 'rgba(128,128,128,.7)' }}>
-                    {userEmail}
-                  </div>
-                )}
-              </div>
-              <MBtn
-                icon={theme === 'dark' ? LucideIcons.Sun : LucideIcons.Moon}
-                label={theme === 'dark' ? 'Light' : 'Dark'}
-                onClick={toggleTheme}
-              />
-              <MBtn
-                icon={LucideIcons.UserCircle}
-                label="Profile"
-                onClick={() => {
-                  setMenuOpen(false)
-                  router.push('/settings/account/profile')
-                }}
-              />
-              <div style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.06)'}` }}>
-                <MBtn
-                  icon={LucideIcons.LogOut}
-                  label="Log out"
-                  color="#dc2626"
-                  onClick={() => {
-                    setMenuOpen(false)
-                    logout()
-                  }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
+        <UserMenu tone={isDark || isOpen ? 'overlay' : 'palette'} align="right" />
       </div>
 
       {/* ═════════════════════════════════════
@@ -491,30 +456,31 @@ export default function HomePage() {
                 onClick={prev}
                 className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
                 style={{
-                  background: 'rgba(0,0,0,.25)',
+                  background: isDark ? 'rgba(0,0,0,.25)' : 'rgba(255,255,255,.55)',
                   backdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(255,255,255,.08)',
+                  border: `1px solid ${isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'}`,
                 }}
               >
-                <LucideIcons.ChevronLeft size={20} color="rgba(255,255,255,.6)" />
+                <LucideIcons.ChevronLeft size={20} color={isDark ? 'rgba(255,255,255,.6)' : 'rgba(15,23,42,.65)'} />
               </button>
               <button
                 onClick={next}
                 className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
                 style={{
-                  background: 'rgba(0,0,0,.25)',
+                  background: isDark ? 'rgba(0,0,0,.25)' : 'rgba(255,255,255,.55)',
                   backdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(255,255,255,.08)',
+                  border: `1px solid ${isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'}`,
                 }}
               >
-                <LucideIcons.ChevronRight size={20} color="rgba(255,255,255,.6)" />
+                <LucideIcons.ChevronRight size={20} color={isDark ? 'rgba(255,255,255,.6)' : 'rgba(15,23,42,.65)'} />
               </button>
             </>
           )}
 
-          {/* Dots — only when not open */}
+          {/* Dots — only when not open. Lifted off the bottom edge so a
+             small copyright line can sit comfortably below them. */}
           {!isOpen && (
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+            <div className="absolute bottom-14 left-1/2 -translate-x-1/2 z-20 flex gap-2">
               {DOMAINS.map((d, i) => {
                 const ac = MODULE_THEMES[d.module]?.accent ?? '#64748b'
                 return (
@@ -525,7 +491,7 @@ export default function HomePage() {
                     style={{
                       width: i === cur ? 28 : 8,
                       height: 8,
-                      background: i === cur ? ac : 'rgba(255,255,255,.20)',
+                      background: i === cur ? ac : isDark ? 'rgba(255,255,255,.20)' : 'rgba(15,23,42,.25)',
                       boxShadow: i === cur ? `0 0 12px ${ac}60` : 'none',
                     }}
                   />
@@ -541,10 +507,29 @@ export default function HomePage() {
             className="flex-1 min-w-0 flex flex-col py-20 pr-5 pl-2"
             style={{ animation: 'hzSlide 400ms cubic-bezier(.4,0,.2,1) both' }}
           >
-            {/* Back button */}
-            <button onClick={close} className="flex items-center gap-2 mb-4 hover:opacity-70 transition-opacity">
-              <LucideIcons.ArrowLeft size={16} color="rgba(255,255,255,.6)" />
-              <span className="text-[13px] font-medium text-white/50">Back</span>
+            {/* Back button — neutral glass chip */}
+            <button
+              onClick={close}
+              className="inline-flex items-center gap-2 mb-4 px-3.5 py-2 rounded-full transition-all duration-150 hover:scale-[1.03] active:scale-[0.97] focus:outline-none w-fit"
+              style={{
+                background: 'rgba(255,255,255,0.10)',
+                border: '1px solid rgba(255,255,255,0.18)',
+                backdropFilter: 'blur(16px) saturate(160%)',
+                WebkitBackdropFilter: 'blur(16px) saturate(160%)',
+                boxShadow: '0 4px 14px rgba(0,0,0,0.22)',
+                color: '#fff',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.16)'
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.10)'
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)'
+              }}
+            >
+              <LucideIcons.ArrowLeft size={14} strokeWidth={2.4} />
+              <span className="text-[13px] font-semibold tracking-wide">Back</span>
             </button>
 
             {/* Panel header */}
@@ -633,12 +618,23 @@ export default function HomePage() {
                         return (
                           <button
                             key={child.code}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left group transition-colors duration-150"
-                            style={{ animation: `hzSlide 300ms ease-out ${gi * 60 + (ci + 1) * 40}ms both` }}
-                            onClick={() => go(child.route, selAccent)}
+                            data-nav-loading={pendingCode === child.code ? 'true' : undefined}
+                            className="relative isolate w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left group transition-all duration-150 active:scale-[0.985]"
+                            style={
+                              {
+                                animation: `hzSlide 300ms ease-out ${gi * 60 + (ci + 1) * 40}ms both`,
+                                '--loading-accent': selAccent,
+                              } as React.CSSProperties
+                            }
+                            disabled={pendingCode !== null}
+                            onClick={(e) => go(child.route, selAccent, { x: e.clientX, y: e.clientY }, child.code)}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.background = 'rgba(255,255,255,.06)'
+                              if (pendingCode !== child.code) {
+                                e.currentTarget.style.background = 'rgba(255,255,255,.06)'
+                              }
+                              prefetch(child.route)
                             }}
+                            onFocus={() => prefetch(child.route)}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.background = 'transparent'
                             }}
@@ -678,41 +674,33 @@ export default function HomePage() {
         )}
       </div>
 
+      {/* ── Copyright footer — only when not in cinematic focus state ── */}
+      {!isOpen && (
+        <div
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none select-none"
+          style={{
+            color: isDark ? 'rgba(255,255,255,0.32)' : 'rgba(15,23,42,0.42)',
+            textShadow: isDark ? '0 1px 4px rgba(0,0,0,0.5)' : '0 1px 2px rgba(255,255,255,0.6)',
+          }}
+        >
+          <span className="text-[12px]">
+            © {new Date().getFullYear()} SkyHub · Aviation Management System · All rights reserved
+          </span>
+        </div>
+      )}
+
       {/* ── Transition overlay ── */}
       {leaving && (
         <div
           className="fixed inset-0 z-50 pointer-events-none"
           style={{
-            background: `radial-gradient(ellipse at center, ${leaving}20 0%, rgba(10,10,18,.95) 70%)`,
+            background: `radial-gradient(ellipse at center, ${leaving}20 0%, ${
+              isDark ? 'rgba(10,10,18,.95)' : 'rgba(245,247,252,.96)'
+            } 70%)`,
             animation: 'hzFade 450ms ease-out forwards',
           }}
         />
       )}
     </div>
-  )
-}
-
-/* ── Menu button ── */
-
-function MBtn({
-  icon: Icon,
-  label,
-  color,
-  onClick,
-}: {
-  icon: LucideIcons.LucideIcon
-  label: string
-  color?: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-      style={{ color: color ?? 'inherit' }}
-    >
-      <Icon size={16} strokeWidth={1.8} />
-      <span className="text-[14px] font-medium">{label}</span>
-    </button>
   )
 }

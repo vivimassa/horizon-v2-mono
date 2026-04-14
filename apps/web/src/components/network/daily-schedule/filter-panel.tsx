@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, Filter, Search, Loader2 } from 
 import { useTheme } from '@/components/theme-provider'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { Dropdown } from '@/components/ui/dropdown'
+import { collapseDock } from '@/lib/dock-store'
 import { useScheduleRefStore } from '@/stores/use-schedule-ref-store'
 import { useOperatorStore, getOperatorId } from '@/stores/use-operator-store'
 import { useDailyScheduleStore, type TimeMode, type SortSequence } from '@/stores/use-daily-schedule-store'
@@ -98,6 +99,7 @@ export function FilterPanel({ onGo, loading }: FilterPanelProps) {
 
   const handleGo = useCallback(() => {
     if (periodMissing) return
+    collapseDock()
     onGo(dateFrom, dateTo)
     setCollapsed(true)
   }, [periodMissing, dateFrom, dateTo, onGo])

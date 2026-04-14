@@ -69,9 +69,25 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const toggle = () => {
     const next = theme === 'light' ? 'dark' : 'light'
-    setTheme(next)
-    localStorage.setItem('hz-theme', next)
-    document.documentElement.classList.toggle('dark', next === 'dark')
+    const apply = () => {
+      setTheme(next)
+      localStorage.setItem('hz-theme', next)
+      document.documentElement.classList.toggle('dark', next === 'dark')
+    }
+
+    // Browsers with the View Transitions API (Chromium, Safari 18+) get a
+    // native cross-fade of the entire page. Others fall back to an instant swap.
+    const doc = document as Document & {
+      startViewTransition?: (cb: () => void) => { finished: Promise<void> }
+    }
+    if (typeof doc.startViewTransition === 'function' && !prefersReducedMotion()) {
+      const t = doc.startViewTransition(apply)
+      // Swallow AbortError/TimeoutError from slow hardware — the theme
+      // still switches, we just skip the animation on that turn.
+      t.finished.catch(() => {})
+    } else {
+      apply()
+    }
   }
 
   return <ThemeCtx.Provider value={{ theme, toggle, moduleKey, moduleTheme }}>{children}</ThemeCtx.Provider>
@@ -83,4 +99,9 @@ function hexToRgba(hex: string, alpha: number): string {
   const g = parseInt(hex.slice(3, 5), 16)
   const b = parseInt(hex.slice(5, 7), 16)
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined' || !window.matchMedia) return false
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }

@@ -2,35 +2,44 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Home, Globe, Plane, Truck, Users, Settings, ChevronUp, ChevronDown } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTheme } from './theme-provider'
-import { resolveNavPath } from '@skyhub/ui/navigation'
+import { revealNavigate } from '@/lib/nav-transition'
+import { useDockStore } from '@/lib/dock-store'
 
 const ACCENT_DEFAULT = '#1e40af'
 
+/**
+ * Dock tabs route back to the Home hub rather than standalone module
+ * landing pages — clicking "Flight Ops" in the dock opens the Flight Ops
+ * panel on Home (same view as clicking the Flight Ops card on Home). The
+ * Home page reads `?domain=<key>` on mount to auto-open the relevant
+ * panel. `pathMatch` is what we use to light up the active tab when the
+ * user is on a module page under that domain. */
 interface Tab {
   key: string
   label: string
   icon: LucideIcon
   href: string
+  pathMatch?: string
 }
 
 const TABS: Tab[] = [
   { key: 'home', label: 'Home', icon: Home, href: '/' },
-  { key: 'network', label: 'Network', icon: Globe, href: '/network' },
-  { key: 'flightops', label: 'Flight Ops', icon: Plane, href: '/flight-ops' },
-  { key: 'groundops', label: 'Ground Ops', icon: Truck, href: '/ground-ops' },
-  { key: 'crewops', label: 'Crew Ops', icon: Users, href: '/crew-ops' },
-  { key: 'settings', label: 'Settings', icon: Settings, href: '/settings' },
+  { key: 'network', label: 'Network', icon: Globe, href: '/?domain=network', pathMatch: '/network' },
+  { key: 'flightops', label: 'Flight Ops', icon: Plane, href: '/?domain=flightops', pathMatch: '/flight-ops' },
+  { key: 'groundops', label: 'Ground Ops', icon: Truck, href: '/?domain=groundops', pathMatch: '/ground-ops' },
+  { key: 'crewops', label: 'Crew Ops', icon: Users, href: '/?domain=crewops', pathMatch: '/crew-ops' },
+  { key: 'settings', label: 'Settings', icon: Settings, href: '/?domain=settings', pathMatch: '/settings' },
 ]
 
 function getActiveIndex(pathname: string): number {
   if (pathname === '/') return 0
-  // Also match /admin routes to settings
+  // Admin routes light up the Settings tab.
   if (pathname.startsWith('/admin')) return 5
-  const idx = TABS.findIndex((t) => t.href !== '/' && pathname.startsWith(t.href))
+  const idx = TABS.findIndex((t) => t.pathMatch && pathname.startsWith(t.pathMatch))
   return idx >= 0 ? idx : 0
 }
 
@@ -54,45 +63,41 @@ function useIsDesktop() {
 
 export function SpotlightDock() {
   const pathname = usePathname()
+  const router = useRouter()
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const accent = ACCENT_DEFAULT
   const activeIndex = getActiveIndex(pathname)
   const isDesktop = useIsDesktop()
-  const [collapsed, setCollapsed] = useState(false)
 
-  // Routes that act as full-screen workspaces (should collapse dock even though they're module-level)
-  const isFullscreenRoute = pathname === '/ground-ops'
+  // Collapse state is now driven by a global store — any component on any
+  // page can fold the dock via collapseDock() (typical use: page-level "Go"
+  // CTAs that take the user into a focus workspace). The dock auto-expands
+  // on every pathname change so fresh navigations always show nav chrome.
+  const collapsed = useDockStore((s) => s.collapsed)
+  const setCollapsed = useDockStore((s) => s.setCollapsed)
+  const expand = useDockStore((s) => s.expand)
 
-  // Auto-collapse on page-level routes or fullscreen workspaces (but not home)
   const isHome = pathname === '/'
-  useEffect(() => {
-    if (!isDesktop) return
-    if (isHome) {
-      setCollapsed(false)
-      return
-    }
-    const nav = resolveNavPath(pathname)
-    if (nav?.page || isFullscreenRoute) {
-      setCollapsed(true)
-    } else {
-      setCollapsed(false)
-    }
-  }, [pathname, isDesktop, isFullscreenRoute, isHome])
 
-  // Reclaim bottom space when dock should be collapsed
+  // Auto-expand whenever the user navigates to a new page.
+  useEffect(() => {
+    expand()
+  }, [pathname, expand])
+
+  // Mirror the collapse state onto <body> so CSS can reclaim bottom padding
+  // on collapse. The dock is always visible on non-home pages; the padding
+  // is only removed when the dock is folded away.
   useEffect(() => {
     if (isHome) {
       document.body.classList.remove('dock-collapsed')
       return
     }
-    const nav = resolveNavPath(pathname)
-    const shouldCollapse = !!nav?.page || isFullscreenRoute
-    document.body.classList.toggle('dock-collapsed', shouldCollapse && isDesktop)
+    document.body.classList.toggle('dock-collapsed', collapsed && isDesktop)
     return () => document.body.classList.remove('dock-collapsed')
-  }, [pathname, isDesktop, isFullscreenRoute])
+  }, [collapsed, isDesktop, isHome])
 
-  const toggleCollapsed = useCallback(() => setCollapsed((c) => !c), [])
+  const toggleCollapsed = useCallback(() => setCollapsed(!collapsed), [collapsed, setCollapsed])
 
   const indicatorColor = isDark ? '#ffffff' : accent
   const glowColor = isDark ? 'rgba(255,255,255,0.25)' : hexToRgba(accent, 0.2)
@@ -231,6 +236,20 @@ export function SpotlightDock() {
             <Link
               key={tab.key}
               href={tab.href}
+              onClick={(e) => {
+                if (active) return // clicking the already-active tab = no-op
+                e.preventDefault()
+                const rect = e.currentTarget.getBoundingClientRect()
+                const origin = {
+                  x: rect.left + rect.width / 2,
+                  y: rect.top + rect.height / 2,
+                }
+                // Every dock tab now routes back to the Home hub (pure Home
+                // for the Home tab, Home with ?domain=<key> for the others),
+                // so the transition is always a radial close toward the
+                // clicked tab — the module page collapses into the tab.
+                revealNavigate(router, tab.href, { origin, accent, direction: 'out' })
+              }}
               className="relative flex flex-col items-center justify-center overflow-hidden"
               style={{
                 width: btnWidth,

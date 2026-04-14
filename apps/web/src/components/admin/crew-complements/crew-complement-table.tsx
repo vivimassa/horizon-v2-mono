@@ -4,7 +4,30 @@ import React, { useState, useCallback, useRef, useEffect } from 'react'
 import type { AircraftTypeRef, CrewComplementRef, CrewPositionRef } from '@skyhub/api'
 import { COMPLEMENT_TEMPLATES, POSITION_DEFAULT_COLORS } from '@skyhub/logic'
 import { BedDouble, AlertTriangle, ChevronRight, Gauge, Star, Plus, Trash2, Sparkles, Info } from 'lucide-react'
+import { useTheme } from '@/components/theme-provider'
 import { ACCENT } from './crew-complements-shell'
+
+/** Column-group zone colors for Flight Deck (blue) and Cabin Crew (amber).
+ *  Hand-picked so both modes read as subtle column grouping rather than
+ *  opaque cards. Previously relied on Tailwind `dark:bg-blue-500/5`, but
+ *  the combined 40%-opacity light-mode `bg-blue-50/40` was visually much
+ *  heavier than the 5% dark-mode counterpart — so in dark mode the group
+ *  looked like a muddy gray rectangle. These explicit RGBAs guarantee a
+ *  matched visual weight in both modes. */
+const ZONE = {
+  light: {
+    flightDeck: { bg: 'rgba(219, 234, 254, 0.40)', border: 'rgba(191, 219, 254, 0.60)' },
+    cabinCrew: { bg: 'rgba(254, 243, 199, 0.40)', border: 'rgba(253, 230, 138, 0.60)' },
+    labelFlightDeck: '#2563eb',
+    labelCabinCrew: '#d97706',
+  },
+  dark: {
+    flightDeck: { bg: 'rgba(59, 130, 246, 0.08)', border: 'rgba(59, 130, 246, 0.22)' },
+    cabinCrew: { bg: 'rgba(251, 191, 36, 0.07)', border: 'rgba(251, 191, 36, 0.22)' },
+    labelFlightDeck: '#60a5fa',
+    labelCabinCrew: '#fbbf24',
+  },
+}
 
 // ── Helpers ──
 
@@ -61,6 +84,10 @@ export function CrewComplementTable({
   onAddRow,
   onDeleteRow,
 }: Props) {
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
+  const zone = isDark ? ZONE.dark : ZONE.light
+
   const allPositions = [...cockpitPositions, ...cabinPositions]
   const hasRest = aircraftType.crewRest?.cockpitClass != null || aircraftType.crewRest?.cabinClass != null
 
@@ -116,11 +143,21 @@ export function CrewComplementTable({
               {cockpitPositions.length > 0 && (
                 <th
                   colSpan={cockpitPositions.length}
-                  className="pt-1 pb-1 text-center border-t border-l border-r border-blue-200/60 dark:border-blue-500/20 bg-blue-50/40 dark:bg-blue-500/5"
-                  style={{ borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
+                  className="pt-1 pb-1 text-center"
+                  style={{
+                    background: zone.flightDeck.bg,
+                    borderTop: `1px solid ${zone.flightDeck.border}`,
+                    borderLeft: `1px solid ${zone.flightDeck.border}`,
+                    borderRight: `1px solid ${zone.flightDeck.border}`,
+                    borderTopLeftRadius: 12,
+                    borderTopRightRadius: 12,
+                  }}
                 >
                   <div className="flex items-center justify-center py-1">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                    <span
+                      className="text-[11px] font-semibold uppercase tracking-wider"
+                      style={{ color: zone.labelFlightDeck }}
+                    >
                       Flight Deck
                     </span>
                   </div>
@@ -134,11 +171,21 @@ export function CrewComplementTable({
               {cabinPositions.length > 0 && (
                 <th
                   colSpan={cabinPositions.length}
-                  className="pt-1 pb-1 text-center border-t border-l border-r border-amber-200/60 dark:border-amber-500/20 bg-amber-50/40 dark:bg-amber-500/5"
-                  style={{ borderTopLeftRadius: 12, borderTopRightRadius: 12 }}
+                  className="pt-1 pb-1 text-center"
+                  style={{
+                    background: zone.cabinCrew.bg,
+                    borderTop: `1px solid ${zone.cabinCrew.border}`,
+                    borderLeft: `1px solid ${zone.cabinCrew.border}`,
+                    borderRight: `1px solid ${zone.cabinCrew.border}`,
+                    borderTopLeftRadius: 12,
+                    borderTopRightRadius: 12,
+                  }}
                 >
                   <div className="flex items-center justify-center py-1">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                    <span
+                      className="text-[11px] font-semibold uppercase tracking-wider"
+                      style={{ color: zone.labelCabinCrew }}
+                    >
                       Cabin Crew
                     </span>
                   </div>
@@ -164,24 +211,30 @@ export function CrewComplementTable({
                 const isCockpit = i < cockpitPositions.length
                 const isFirst = isCockpit ? i === 0 : i === cockpitPositions.length
                 const isLast = isCockpit ? i === cockpitPositions.length - 1 : i === allPositions.length - 1
+                const z = isCockpit ? zone.flightDeck : zone.cabinCrew
+                const borderRadiusStyle: React.CSSProperties = {}
+                if (isFirst) borderRadiusStyle.borderBottomLeftRadius = 12
+                if (isLast) borderRadiusStyle.borderBottomRightRadius = 12
                 return (
                   <th
                     key={pos.code}
-                    className={`text-center pt-2 pb-3 px-0 ${
-                      isCockpit
-                        ? 'border-blue-200/60 dark:border-blue-500/20 bg-blue-50/40 dark:bg-blue-500/5'
-                        : 'border-amber-200/60 dark:border-amber-500/20 bg-amber-50/40 dark:bg-amber-500/5'
-                    } border-b ${isFirst ? 'border-l' : ''} ${isLast ? 'border-r' : ''}`}
+                    className="text-center pt-2 pb-3 px-0"
                     style={{
                       width: 70,
-                      ...(isLast ? { borderBottomLeftRadius: isFirst ? 12 : 0, borderBottomRightRadius: 12 } : {}),
-                      ...(isFirst ? { borderBottomLeftRadius: 12, borderBottomRightRadius: isLast ? 12 : 0 } : {}),
+                      background: z.bg,
+                      borderBottom: `1px solid ${z.border}`,
+                      borderLeft: isFirst ? `1px solid ${z.border}` : undefined,
+                      borderRight: isLast ? `1px solid ${z.border}` : undefined,
+                      ...borderRadiusStyle,
                     }}
                   >
                     <div className="flex justify-center">
                       <span
-                        className="inline-flex items-center justify-center h-8 px-2 min-w-[42px] rounded-lg text-[12px] font-bold font-mono text-white dark:[filter:saturate(0.60)]"
-                        style={{ backgroundColor: posColor(pos) }}
+                        className="inline-flex items-center justify-center h-8 px-2 min-w-[42px] rounded-lg text-[12px] font-bold font-mono text-white"
+                        style={{
+                          backgroundColor: posColor(pos),
+                          filter: isDark ? 'saturate(0.75)' : undefined,
+                        }}
                         title={pos.name}
                       >
                         {pos.code}

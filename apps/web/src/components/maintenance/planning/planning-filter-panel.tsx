@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import { ChevronLeft, ChevronRight, ChevronDown, Filter, Search, Loader2 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
+import { collapseDock } from '@/lib/dock-store'
 import { useMaintenancePlanningStore } from '@/stores/use-maintenance-planning-store'
 
 const EVENT_STATUSES = [
@@ -47,6 +48,7 @@ export function PlanningFilterPanel({ forceCollapsed = false, onGo }: { forceCol
     (statusFilter ? 1 : 0)
 
   const handleGo = useCallback(() => {
+    collapseDock()
     ;(onGo ?? commitPeriod)()
     setCollapsed(true)
   }, [onGo, commitPeriod])

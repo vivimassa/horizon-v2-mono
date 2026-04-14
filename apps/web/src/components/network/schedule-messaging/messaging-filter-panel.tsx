@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, ChevronDown, Filter, Loader2 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
+import { collapseDock } from '@/lib/dock-store'
 import { useScheduleMessagingStore } from '@/stores/use-schedule-messaging-store'
 
 const DIRECTIONS = [
@@ -63,6 +64,7 @@ export function MessagingFilterPanel({ forceCollapsed = false, loading = false, 
   const activeCount = mounted ? [dateFrom, dateTo, direction, msgType, status, flightNumber].filter(Boolean).length : 0
 
   function handleGo() {
+    collapseDock()
     if (direction) setFilter('direction', direction as 'inbound' | 'outbound')
     else setFilter('direction', undefined)
     if (msgType) setFilter('messageTypes', [msgType])

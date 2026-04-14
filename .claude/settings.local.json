@@ -98,7 +98,13 @@
       "Bash(python3 -c \" import sys, json d = json.load\\(sys.stdin\\) for r in d: raw = r.get\\('urls',{}\\).get\\('raw',''\\) desc = r.get\\('alt_description',''\\) or r.get\\('description',''\\) print\\(r['id'], '-', raw[40:80], '-', desc[:50]\\) if '1542296332' in raw: print\\('*** FOUND ***'\\) \")",
       "Bash(python3 -m json.tool)",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('token:', d.get\\('accessToken',''\\)[:50]+'...'\\); print\\('user:', json.dumps\\({k:d['user'][k] for k in ['email','operatorId','role'] if k in d.get\\('user',{}\\)}, indent=2\\)\\)\")",
-      "Bash(python3 -c ':*)"
+      "Bash(python3 -c ':*)",
+      "WebFetch(domain:www.google.com)",
+      "WebFetch(domain:duckduckgo.com)",
+      "WebFetch(domain:html.duckduckgo.com)",
+      "WebFetch(domain:r.jina.ai)",
+      "Bash(pnpm --filter @skyhub/web exec tsc --noEmit)",
+      "Bash(npx --no-install tsc --noEmit)"
     ]
   },
   "enableAllProjectMcpServers": true,

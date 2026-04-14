@@ -14,6 +14,65 @@ Airline operations management platform replacing legacy systems (AIMS). Built fo
 - **Monorepo:** Turborepo — `apps/mobile`, `apps/web`, `server`, `packages/*`
 - **Repo:** `vivimassa/horizon-v2-mono`
 
+## Behavioral Contract — How You Work
+
+These rules govern your behavior as an agent. Violating them is worse than a bug — it wastes human time.
+
+### Think Before Coding
+
+Don't assume. Don't hide confusion. Surface tradeoffs.
+
+- **State assumptions explicitly** before implementing. If the request has multiple valid interpretations, list them and ask — never pick silently.
+- **If something is unclear, stop.** Name what's confusing. Ask. A 30-second clarification saves a 30-minute redo.
+- **If a simpler approach exists, say so.** Push back when the requested approach is overcomplicated. You are allowed to disagree — but explain why.
+- **Surface tradeoffs.** "This approach is faster to build but harder to extend" is more useful than silently choosing one.
+
+### Simplicity First
+
+Minimum code that solves the problem. Nothing speculative.
+
+- No features beyond what was asked. No "flexibility" or "configurability" that wasn't requested.
+- No abstractions for single-use code. No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it before presenting.
+- **The test:** Would a senior engineer say this is overcomplicated? If yes, simplify.
+- This reinforces Rule 11 (400-line limit) — but applies to every function, not just components.
+
+### Surgical Changes
+
+Touch only what you must. Clean up only your own mess.
+
+- **Don't "improve" adjacent code**, comments, or formatting that wasn't part of the request.
+- **Don't refactor things that aren't broken.** Match existing style, even if you'd do it differently.
+- **If you notice unrelated issues** (dead code, missing types, style inconsistencies), mention them in your response — don't silently fix them.
+- **When YOUR changes create orphans** (unused imports, dead variables), remove them. Don't remove pre-existing dead code unless asked.
+- **The test:** Every changed line should trace directly to the user's request.
+
+### Goal-Driven Execution
+
+Define success criteria. Loop until verified.
+
+- Transform vague tasks into verifiable goals before starting:
+  - "Add validation" → "Define Zod schema, write test for invalid input, make it pass"
+  - "Fix the bug" → "Write test that reproduces it, then make it pass"
+  - "Build the screen" → "Render with mock data, verify dark mode, verify accent color, check 13px minimum"
+- **For multi-step tasks, state a brief plan:**
+  ```
+  1. [Step] → verify: [check]
+  2. [Step] → verify: [check]
+  3. [Step] → verify: [check]
+  ```
+- Strong success criteria let you loop independently. Weak criteria ("make it work") cause rework.
+- This is the CLAUDE.md-level principle behind the `verification-loop` skill — apply it to every task, not just PR gates.
+
+### These rules are working if:
+
+- Diffs contain only requested changes — no drive-by improvements
+- Clarifying questions come before implementation, not after mistakes
+- Code is simpler than expected, not more complex
+- Plans have explicit verify steps, not just "implement X"
+
+---
+
 ## Critical Rules — Read Every Session
 
 ### 1. Design System: Core Design System + Stitch Glass
@@ -22,7 +81,7 @@ SkyHub's visual identity is built on three merged layers:
 
 - **Core Design System (XD)** — gray scale, semantic colors, 6-level elevation, button/badge sizing, typography weights
 - **Stitch Glass Aesthetic** — glass panels (`variant="glass"`), radial glows, accent glow shadows, section accent bars
-- **SkyHub Overrides** — 11px text minimum, 12px card radius, system fonts, Lucide icons
+- **SkyHub Overrides** — 13px text minimum, 12px card radius, system fonts, Lucide icons
 
 **Every component MUST conform to the design tokens in `packages/ui/src/theme/`.** The skill file `.claude/skills/horizon-frontend/SKILL.md` is the canonical reference. Read it before writing ANY UI code.
 
@@ -55,7 +114,7 @@ Import from `packages/ui/src/theme/shadows.ts`. A card without shadow looks like
 - **Medium (500):** Labels, buttons, card titles, nav items
 - **Regular (400):** Body text, captions, descriptions
 
-Minimum text size: **11px**. The XD system uses 10px for badges — we override to 11px for accessibility. All tokens in `packages/ui/src/theme/typography.ts`.
+Minimum text size: **13px**. The XD system uses 10px for badges — we override to 13px for accessibility. All tokens in `packages/ui/src/theme/typography.ts`.
 
 ### 5. Component Dimensions (Core Design System)
 
@@ -98,7 +157,7 @@ Flag at 300 lines. Split at 400. Maximum 8 useState hooks — use Zustand beyond
 
 ### 12. Styling: NativeWind className ONLY
 
-Use NativeWind `className` for all styling. NO `StyleSheet.create()` in component files. NO inline `style={}` except for dynamic runtime values (accentColor, status colors, shadows). All colors from `useTheme()`. Minimum text size 11px. Dark mode mandatory.
+Use NativeWind `className` for all styling. NO `StyleSheet.create()` in component files. NO inline `style={}` except for dynamic runtime values (accentColor, status colors, shadows). All colors from `useTheme()`. Minimum text size 13px. Dark mode mandatory.
 
 ### 13. Offline-First Architecture
 
@@ -324,7 +383,7 @@ Standard (Gluestack Select), Tabbed (with tab switcher inside), Search/auto-sugg
 - [ ] All icons via `<Icon>` wrapper, zero emoji
 - [ ] Status chips use vibrant XD colors from `colors.status`
 - [ ] Dark mode tested — no invisible borders, no hardcoded colors
-- [ ] No text below 11px — check badges, tab labels, timestamps
+- [ ] No text below 13px — check badges, tab labels, timestamps
 - [ ] Button heights follow scale: 24/32/40/48px
 - [ ] Buttons use `bg-module-accent`, NEVER hardcoded `#1e40af`
 - [ ] Active/Inactive badges use XD semantic RGBA colors, NEVER Tailwind `bg-green-*`/`bg-red-*`

@@ -8,3 +8,15 @@ dist
 .env.local
 .env.*.local
 !.env.example
+
+# Python build artifacts (recovery-solver service)
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OurAirports lookup cache (downloaded at runtime by SSIM Import)
+.cache/

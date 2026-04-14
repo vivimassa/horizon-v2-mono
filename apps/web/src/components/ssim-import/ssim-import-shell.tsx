@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect } from 'react'
-import { FileUp, AlertTriangle } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { RunwayLoadingPanel } from '@/components/ui/runway-loading-panel'
+import { EmptyPanel } from '@/components/ui/empty-panel'
 import { useSsimImportStore } from '@/stores/use-ssim-import-store'
 import { SsimSetupPanel } from './ssim-setup-panel'
 import { ParsedPreview } from './parsed-preview'
@@ -44,7 +45,9 @@ export function SsimImportShell() {
 
       {/* Right column — workspace */}
       <div className="flex-1 min-w-0 h-full flex flex-col">
-        {stage === 'idle' && <IdleEmptyState isDark={isDark} />}
+        {stage === 'idle' && (
+          <EmptyPanel message="Drop a Chapter-7 SSIM file on the left, set the import period, and click Parse." />
+        )}
         {stage === 'error' && <ErrorState message={errorMessage} isDark={isDark} />}
         {stage === 'parsing' && <RunwayLoadingPanel percent={30} label={stepLabel || 'Parsing…'} />}
         {stage === 'importing' && (
@@ -52,34 +55,6 @@ export function SsimImportShell() {
         )}
         {stage === 'parsed' && parseResult && <ParsedPreview result={parseResult} />}
         {stage === 'done' && importResult && <ImportResults result={importResult} mode={mode} />}
-      </div>
-    </div>
-  )
-}
-
-function IdleEmptyState({ isDark }: { isDark: boolean }) {
-  return (
-    <div className="flex-1 flex items-center justify-center">
-      <div
-        className="max-w-md w-full text-center rounded-2xl p-8 flex flex-col items-center gap-3"
-        style={{
-          background: isDark ? 'rgba(25,25,33,0.55)' : 'rgba(255,255,255,0.55)',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
-          backdropFilter: 'blur(18px) saturate(150%)',
-          WebkitBackdropFilter: 'blur(18px) saturate(150%)',
-        }}
-      >
-        <div
-          className="w-14 h-14 rounded-2xl flex items-center justify-center"
-          style={{ background: 'color-mix(in srgb, var(--module-accent, #1e40af) 18%, transparent)' }}
-        >
-          <FileUp size={22} strokeWidth={1.8} className="text-module-accent" />
-        </div>
-        <h2 className="text-[16px] font-bold text-hz-text">Drop a Chapter-7 SSIM file to begin</h2>
-        <p className="text-[13px] text-hz-text-secondary leading-relaxed">
-          Pick the file, the import period, and your rotation preference on the left. Preview mode parses and validates
-          without writing anything to the database.
-        </p>
       </div>
     </div>
   )

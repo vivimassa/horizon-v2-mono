@@ -56,3 +56,6 @@ export * from './utils/schedule-rule-evaluator'
 export * from './utils/virtual-placement'
 export * from './utils/solver-stream'
 export * from './utils/advisor-summary-builder'
+
+// Disruption Center — signal detectors + adapter interface
+export * from './disruption'

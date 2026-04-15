@@ -1,5 +1,5 @@
-import { ComingSoon } from '@/components/coming-soon'
+import { redirect } from 'next/navigation'
 
-export default function Page() {
-  return <ComingSoon />
+export default function DisruptionCenterPage() {
+  redirect('/flight-ops/control/disruption-center/disruption-management')
 }

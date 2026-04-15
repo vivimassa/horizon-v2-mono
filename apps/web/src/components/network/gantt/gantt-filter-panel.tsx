@@ -5,6 +5,7 @@ import {
   FilterPanel,
   FilterSection,
   PeriodField,
+  RollingPeriodField,
   MultiSelectField,
   SegmentedField,
   FilterGoButton,
@@ -49,7 +50,11 @@ interface GanttFilterPanelProps {
  * Status, Fleet Sort Order, Color Mode. Go button is wired through
  * FilterGoButton which auto-collapses the dock.
  */
-export function GanttFilterPanel({ forceCollapsed: _forceCollapsed = false, onGo }: GanttFilterPanelProps) {
+export function GanttFilterPanel({
+  forceCollapsed: _forceCollapsed = false,
+  onGo,
+  mode = 'network',
+}: GanttFilterPanelProps) {
   /* ── Store bindings ── */
   const storePeriodFrom = useGanttStore((s) => s.periodFrom)
   const storePeriodTo = useGanttStore((s) => s.periodTo)
@@ -57,12 +62,17 @@ export function GanttFilterPanel({ forceCollapsed: _forceCollapsed = false, onGo
   const aircraft = useGanttStore((s) => s.aircraft)
   const colorMode = useGanttStore((s) => s.colorMode)
   const fleetSortOrder = useGanttStore((s) => s.fleetSortOrder)
+  const rollingPeriodDays = useGanttStore((s) => s.rollingPeriodDays)
+  const setRollingPeriod = useGanttStore((s) => s.setRollingPeriod)
   const setPeriod = useGanttStore((s) => s.setPeriod)
   const commitPeriod = useGanttStore((s) => s.commitPeriod)
   const setColorMode = useGanttStore((s) => s.setColorMode)
   const setFleetSortOrder = useGanttStore((s) => s.setFleetSortOrder)
   const setAcTypeFilter = useGanttStore((s) => s.setAcTypeFilter)
   const setStatusFilter = useGanttStore((s) => s.setStatusFilter)
+
+  const isOps = mode === 'ops'
+  const rollingActive = isOps && rollingPeriodDays !== null
 
   /* ── AC types from ref store — loaded independently of flights ── */
   const refAcTypes = useScheduleRefStore((s) => s.aircraftTypes)
@@ -86,6 +96,14 @@ export function GanttFilterPanel({ forceCollapsed: _forceCollapsed = false, onGo
   /* ── Draft state (period + multi-selects) — pushed to store on Go ── */
   const [draftFrom, setDraftFrom] = useState(storePeriodFrom)
   const [draftTo, setDraftTo] = useState(storePeriodTo)
+
+  // When rolling period is active, the store drives the dates — mirror them.
+  useEffect(() => {
+    if (rollingActive) {
+      setDraftFrom(storePeriodFrom)
+      setDraftTo(storePeriodTo)
+    }
+  }, [rollingActive, storePeriodFrom, storePeriodTo])
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(SCHEDULE_STATUS_KEYS)
   const [selectedTypes, setSelectedTypes] = useState<string[] | null>(null) // null = all
 
@@ -120,8 +138,21 @@ export function GanttFilterPanel({ forceCollapsed: _forceCollapsed = false, onGo
       footer={<FilterGoButton onClick={handleGo} loading={loading} disabled={!draftFrom || !draftTo} />}
     >
       <FilterSection label="Period">
-        <PeriodField from={draftFrom} to={draftTo} onChangeFrom={setDraftFrom} onChangeTo={setDraftTo} />
+        <div
+          style={{
+            opacity: rollingActive ? 0.4 : 1,
+            pointerEvents: rollingActive ? 'none' : 'auto',
+          }}
+        >
+          <PeriodField from={draftFrom} to={draftTo} onChangeFrom={setDraftFrom} onChangeTo={setDraftTo} />
+        </div>
       </FilterSection>
+
+      {isOps && (
+        <FilterSection label="Rolling Period">
+          <RollingPeriodField value={rollingPeriodDays} onChange={setRollingPeriod} />
+        </FilterSection>
+      )}
 
       <FilterSection label="Aircraft Type">
         <MultiSelectField

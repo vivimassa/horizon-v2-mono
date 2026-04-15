@@ -9,6 +9,22 @@ import { parseSsimExcel, type ParsedFlight } from '../utils/ssim-parser.js'
 import { generateSsimExcel } from '../utils/ssim-exporter.js'
 import { generateSSIM, type SSIMFlightRecord, type SSIMExportOptions } from '@skyhub/logic/src/utils/ssim-generator'
 
+// ── Normalize any of our date-string flavours to ISO YYYY-MM-DD ──────────
+// ScheduledFlight rows store effectiveFrom / effectiveUntil inconsistently
+// (DD/MM/YYYY in the legacy import path, YYYY-MM-DD in newer writers). We
+// can't lexically compare DD/MM/YYYY, so callers normalise both sides with
+// this helper before comparing. Returns '' when the input doesn't match a
+// known shape, which the caller treats as "exclude from filter result".
+function toIsoDate(s: string | null | undefined): string {
+  if (!s) return ''
+  // Already ISO (allow optional trailing time)
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10)
+  // DD/MM/YYYY or DD-MM-YYYY
+  const m = s.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/)
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`
+  return ''
+}
+
 // ── IANA timezone → ±HHMM offset string ───────────────────────────────────
 // Uses the platform Intl API so no extra dependency is needed.
 function tzOffsetString(timeZone: string, at: Date): string {
@@ -174,9 +190,35 @@ export async function ssimRoutes(app: FastifyInstance): Promise<void> {
   })
 
   // ── Export to Excel or IATA SSIM Chapter 7 text ──
+  //
+  // Query params (all optional unless noted):
+  //   operatorId       (required) — tenant scope
+  //   seasonCode               — IATA season ("S25" / "W24")
+  //   scenarioId               — restrict to a what-if scenario
+  //   format                   — 'xlsx' (default) or 'ssim' (text)
+  //   timeMode                 — 'local' | 'utc' (only for ssim)
+  //   actionCode               — 'H' | 'N' | 'R' (only for ssim; defaults 'H')
+  //   dateFrom / dateTo        — YYYY-MM-DD overlap window on effective dates
+  //   flightNumFrom / To       — numeric range, inclusive (filtered in JS — flightNumber is stored as string)
+  //   depStations / arrStations — comma-separated ICAO codes
+  //   serviceTypes             — comma-separated single-char IATA service types
+  //
+  // Known limitation: no chunking. Single in-memory result. Acceptable
+  // ceiling ~10k flights / ~5 MB SSIM text. Add streaming if operators hit it.
   app.get('/ssim/export', async (req, reply) => {
     const q = req.query as Record<string, string>
     if (!q.operatorId) return reply.code(400).send({ error: 'operatorId required' })
+
+    const splitCsv = (raw?: string) =>
+      raw
+        ? raw
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : []
+    const depStations = splitCsv(q.depStations)
+    const arrStations = splitCsv(q.arrStations)
+    const serviceTypes = splitCsv(q.serviceTypes)
 
     const filter: Record<string, unknown> = {
       operatorId: q.operatorId,
@@ -184,8 +226,45 @@ export async function ssimRoutes(app: FastifyInstance): Promise<void> {
     }
     if (q.seasonCode) filter.seasonCode = q.seasonCode
     if (q.scenarioId) filter.scenarioId = q.scenarioId
+    if (depStations.length > 0) filter.depStation = { $in: depStations }
+    if (arrStations.length > 0) filter.arrStation = { $in: arrStations }
+    if (serviceTypes.length > 0) filter.serviceType = { $in: serviceTypes }
 
-    const flights = await ScheduledFlight.find(filter).sort({ sortOrder: 1, stdUtc: 1 }).lean()
+    let flights = await ScheduledFlight.find(filter).sort({ sortOrder: 1, stdUtc: 1 }).lean()
+
+    // Flight-number range is filtered in JS because flightNumber is stored as
+    // a string — Mongo $gte/$lte would do lexical comparison ("9" > "10").
+    const fnFrom = q.flightNumFrom ? parseInt(q.flightNumFrom, 10) : null
+    const fnTo = q.flightNumTo ? parseInt(q.flightNumTo, 10) : null
+    if (fnFrom != null || fnTo != null) {
+      flights = flights.filter((f) => {
+        const n = parseInt((f.flightNumber as string) || '0', 10) || 0
+        if (fnFrom != null && n < fnFrom) return false
+        if (fnTo != null && n > fnTo) return false
+        return true
+      })
+    }
+
+    // Date-overlap filter applied in JS rather than Mongo because the
+    // ScheduledFlight collection mixes date formats: some rows store
+    // effectiveFrom / effectiveUntil as ISO YYYY-MM-DD, others as DD/MM/YYYY
+    // (legacy import path). Lexical compare on DD/MM/YYYY is wrong
+    // ("31/12/2025" sorts after "01/01/2027"). Normalising both sides to
+    // ISO before compare is the only reliable approach until the underlying
+    // storage is migrated.
+    if (q.dateFrom || q.dateTo) {
+      const userFromIso = toIsoDate(q.dateFrom)
+      const userToIso = toIsoDate(q.dateTo)
+      flights = flights.filter((f) => {
+        const effFromIso = toIsoDate(f.effectiveFrom as string)
+        const effUntilIso = toIsoDate(f.effectiveUntil as string)
+        if (!effFromIso || !effUntilIso) return false
+        // Overlap: effectiveFrom <= userTo AND effectiveUntil >= userFrom
+        if (userToIso && effFromIso > userToIso) return false
+        if (userFromIso && effUntilIso < userFromIso) return false
+        return true
+      })
+    }
 
     // Get operator (date format, IATA code, name, timezone)
     const op = await Operator.findOne({ $or: [{ code: q.operatorId }, { isActive: true }] }).lean()
@@ -315,12 +394,13 @@ export async function ssimRoutes(app: FastifyInstance): Promise<void> {
         }
       })
 
+      const actionCode: 'H' | 'N' | 'R' = q.actionCode === 'N' || q.actionCode === 'R' ? q.actionCode : 'H'
       const options: SSIMExportOptions = {
         airlineCode,
         airlineName,
         seasonStart,
         seasonEnd,
-        actionCode: 'N',
+        actionCode,
         creator: 'SKYHUB  ',
       }
 
@@ -331,6 +411,13 @@ export async function ssimRoutes(app: FastifyInstance): Promise<void> {
 
       reply.header('Content-Type', 'text/plain; charset=utf-8')
       reply.header('Content-Disposition', `attachment; filename="${filename}"`)
+      // Surface record count + filename to the browser so the client UI can
+      // show "N flights exported" without re-parsing the body. Expose them
+      // via Access-Control-Expose-Headers since fetch() hides custom headers
+      // by default in CORS responses.
+      reply.header('X-Ssim-Flight-Count', String(records.length))
+      reply.header('X-Ssim-Filename', filename)
+      reply.header('Access-Control-Expose-Headers', 'X-Ssim-Flight-Count, X-Ssim-Filename, Content-Disposition')
       return reply.send(text)
     }
 

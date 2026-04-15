@@ -34,6 +34,86 @@ export function PeriodField({ from, to, onChangeFrom, onChangeTo }: PeriodFieldP
 }
 
 /* ─────────────────────────────────────────────────────────────
+ * RollingPeriodField — 6-stop slider (Off · 3D · 4D · 5D · 6D · 7D)
+ * for live-ops windows. Off = fixed period picked via PeriodField;
+ * any other stop = N-day window that re-anchors to today on each
+ * refresh. Caller disables PeriodField when the slider is active.
+ * ───────────────────────────────────────────────────────────── */
+const ROLLING_STOPS: Array<{ label: string; value: number | null }> = [
+  { label: 'Off', value: null },
+  { label: '3D', value: 3 },
+  { label: '4D', value: 4 },
+  { label: '5D', value: 5 },
+  { label: '6D', value: 6 },
+  { label: '7D', value: 7 },
+]
+
+interface RollingPeriodFieldProps {
+  value: number | null
+  onChange: (v: number | null) => void
+}
+export function RollingPeriodField({ value, onChange }: RollingPeriodFieldProps) {
+  const idx = Math.max(
+    0,
+    ROLLING_STOPS.findIndex((s) => s.value === value),
+  )
+  const max = ROLLING_STOPS.length - 1
+  const pct = (idx / max) * 100
+  const accent = 'var(--module-accent, #1e40af)'
+  return (
+    <div className="select-none">
+      <div className="relative h-9 flex items-center">
+        <div className="absolute left-0 right-0 h-1 rounded-full" style={{ background: 'rgba(125,125,140,0.25)' }} />
+        <div className="absolute left-0 h-1 rounded-full" style={{ width: `${pct}%`, background: accent }} />
+        {ROLLING_STOPS.map((_s, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full"
+            style={{
+              left: `calc(${(i / max) * 100}% - 3px)`,
+              width: 6,
+              height: 6,
+              background: i <= idx ? accent : 'rgba(125,125,140,0.45)',
+            }}
+          />
+        ))}
+        <input
+          type="range"
+          min={0}
+          max={max}
+          step={1}
+          value={idx}
+          onChange={(e) => onChange(ROLLING_STOPS[parseInt(e.target.value, 10)].value)}
+          className="absolute inset-0 w-full opacity-0 cursor-pointer"
+          aria-label="Rolling period"
+        />
+        <div
+          className="absolute rounded-full shadow-md pointer-events-none"
+          style={{
+            left: `calc(${pct}% - 8px)`,
+            width: 16,
+            height: 16,
+            background: '#fff',
+            border: `2px solid ${accent}`,
+          }}
+        />
+      </div>
+      <div className="flex justify-between mt-1">
+        {ROLLING_STOPS.map((s, i) => (
+          <span
+            key={i}
+            className="text-[13px] font-medium"
+            style={{ color: i === idx ? accent : 'var(--hz-text-tertiary)' }}
+          >
+            {s.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────
  * SegmentedField — row of mutually-exclusive pills (Sort Order,
  * Color Mode, view tabs). Active segment takes an accent tint.
  * ───────────────────────────────────────────────────────────── */

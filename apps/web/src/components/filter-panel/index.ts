@@ -2,6 +2,7 @@ export { FilterPanel } from './panel'
 export {
   FilterSection,
   PeriodField,
+  RollingPeriodField,
   SegmentedField,
   MultiSelectField,
   SelectField,

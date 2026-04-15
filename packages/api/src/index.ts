@@ -80,6 +80,8 @@ export type {
   MxSchedulingStats,
   MxFilterOptions,
   MxEventDetail,
+  DisruptionIssueRef,
+  DisruptionActivityRef,
 } from './client'
 
 // ─── React Query layer ───

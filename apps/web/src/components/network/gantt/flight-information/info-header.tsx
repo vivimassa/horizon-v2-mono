@@ -15,8 +15,8 @@ function fmtBlock(min: number): string {
   return `${h}:${String(m).padStart(2, '0')}`
 }
 
-function fmtDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T12:00:00Z')
+function fmtDate(epochMs: number): string {
+  const d = new Date(epochMs)
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   const months = [
     'January',
@@ -142,7 +142,7 @@ export function InfoHeader({ data }: { data: FlightDetail }) {
         </span>
       </div>
       <div className="flex items-baseline gap-3 mb-6" style={{ color: muted }}>
-        <span className="text-[14px] font-medium">{fmtDate(data.operatingDate)}</span>
+        <span className="text-[14px] font-medium">{fmtDate(data.stdUtc)}</span>
         <span className="text-[13px] font-mono" style={{ color: mutedLight }}>
           STD {fmtUtc(data.stdUtc)} · STA {fmtUtc(data.staUtc)}
         </span>

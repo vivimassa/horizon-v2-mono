@@ -1373,26 +1373,41 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       cleared = result.deletedCount ?? 0
     }
 
-    // Fetch existing instances that already have OOOI to avoid re-rolling
+    // Fetch existing instances that already have OOOI to avoid re-rolling.
+    // Keep their ATA so they anchor the aircraft rotation chain and ripple delays forward.
     const existingInstances = forceReseed
       ? []
       : await FlightInstance.find(
           { operatorId, operatingDate: { $gte: fromDate, $lte: toDate }, 'actual.atdUtc': { $ne: null } },
-          { _id: 1 },
+          { _id: 1, 'actual.atdUtc': 1, 'actual.ataUtc': 1 },
         ).lean()
     const alreadySeededIds = new Set(existingInstances.map((i) => i._id as string))
+    const existingAtaById = new Map<string, number>()
+    for (const inst of existingInstances) {
+      const atd = (inst.actual as { atdUtc?: number | null } | undefined)?.atdUtc
+      const ata = (inst.actual as { ataUtc?: number | null } | undefined)?.ataUtc
+      // prefer ATA; fall back to ATD so an in-progress leg still anchors the chain
+      const anchor = ata ?? atd
+      if (anchor) existingAtaById.set(inst._id as string, anchor)
+    }
 
     const fromMs = new Date(fromDate + 'T00:00:00Z').getTime()
     const toMs = new Date(toDate + 'T00:00:00Z').getTime()
     const nowMs = Date.now()
     const DEFAULT_TAT_MS = 30 * 60_000 // fallback if AC type has no TAT configured
 
-    // Build TAT lookup by ICAO type (e.g. A320 → 25 min, A321 → 30 min)
-    const acTypes = await AircraftType.find({ operatorId }, { icaoType: 1, 'tat.defaultMinutes': 1 }).lean()
+    // Build TAT + seat lookup by ICAO type (e.g. A320 → 25 min / 180 seats, A380 → 45 min / 500 seats)
+    const acTypes = await AircraftType.find(
+      { operatorId },
+      { icaoType: 1, 'tat.defaultMinutes': 1, paxCapacity: 1 },
+    ).lean()
     const tatByType = new Map<string, number>()
+    const seatsByType = new Map<string, number>()
     for (const t of acTypes) {
       const tatMin = (t.tat as { defaultMinutes?: number | null })?.defaultMinutes
       if (tatMin) tatByType.set(t.icaoType as string, tatMin * 60_000)
+      const paxCap = (t as { paxCapacity?: number | null }).paxCapacity
+      if (paxCap && paxCap > 0) seatsByType.set(t.icaoType as string, paxCap)
     }
 
     // ── Phase 1: Expand all scheduled flights into per-date instances ──
@@ -1406,9 +1421,20 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       blockMin: number
       aircraftReg: string | null
       icaoType: string | null
+      rotationId: string | null
+    }
+
+    interface ExpandedAnchor {
+      compositeId: string
+      opDate: string
+      stdMs: number
+      ataMs: number
+      rotationId: string | null
+      aircraftReg: string | null
     }
 
     const allFlights: ExpandedFlight[] = []
+    const anchors: ExpandedAnchor[] = []
     let skipped = 0
     let alreadySeeded = 0
     let dateSkipped = 0
@@ -1450,6 +1476,18 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
         const compositeId = `${sf._id}|${opDate}`
         if (alreadySeededIds.has(compositeId)) {
           alreadySeeded++
+          // Still include as a chain anchor so its ATA ripples into later flights.
+          const anchorAta = existingAtaById.get(compositeId)
+          if (anchorAta) {
+            anchors.push({
+              compositeId,
+              opDate,
+              stdMs,
+              ataMs: anchorAta,
+              rotationId: (sf.rotationId as string) ?? null,
+              aircraftReg: (sf.aircraftReg as string) ?? null,
+            })
+          }
           continue
         }
 
@@ -1463,27 +1501,41 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
           blockMin,
           aircraftReg: (sf.aircraftReg as string) ?? null,
           icaoType: (sf.aircraftTypeIcao as string) ?? null,
+          rotationId: (sf.rotationId as string) ?? null,
         })
       }
     }
 
-    // ── Phase 2: Group by aircraft and sort chronologically ──
-    const byAircraft = new Map<string, ExpandedFlight[]>()
-    const noAircraft: ExpandedFlight[] = []
+    // ── Phase 2: Group by rotation (preferred) or aircraft reg, merge anchors, sort chronologically ──
+    // Each chain entry is either a flight to seed or an anchor (already-seeded) used only for its ATA.
+    type ChainItem =
+      | { kind: 'flight'; f: ExpandedFlight; stdMs: number }
+      | { kind: 'anchor'; a: ExpandedAnchor; stdMs: number }
+    const byChain = new Map<string, ChainItem[]>()
+    const noChain: ExpandedFlight[] = []
+
+    function chainKey(rotationId: string | null, aircraftReg: string | null): string | null {
+      return rotationId ?? aircraftReg ?? null
+    }
 
     for (const f of allFlights) {
-      if (f.aircraftReg) {
-        const list = byAircraft.get(f.aircraftReg) ?? []
-        list.push(f)
-        byAircraft.set(f.aircraftReg, list)
-      } else {
-        noAircraft.push(f)
+      const key = chainKey(f.rotationId, f.aircraftReg)
+      if (!key) {
+        noChain.push(f)
+        continue
       }
+      const list = byChain.get(key) ?? []
+      list.push({ kind: 'flight', f, stdMs: f.stdMs })
+      byChain.set(key, list)
     }
-
-    for (const [, flights] of byAircraft) {
-      flights.sort((a, b) => a.stdMs - b.stdMs)
+    for (const a of anchors) {
+      const key = chainKey(a.rotationId, a.aircraftReg)
+      if (!key) continue
+      const list = byChain.get(key) ?? []
+      list.push({ kind: 'anchor', a, stdMs: a.stdMs })
+      byChain.set(key, list)
     }
+    for (const [, list] of byChain) list.sort((a, b) => a.stdMs - b.stdMs)
 
     // ── Phase 3: Walk each aircraft sequentially with delay ripple ──
     // Primary delay codes (root-cause delays)
@@ -1589,20 +1641,25 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    // Process aircraft groups — delay ripples through each aircraft's rotation
+    // Process rotation chains — delay ripples through each aircraft's rotation.
+    // Anchors carry their known ATA forward without being re-seeded.
     const allResults: SeedResult[] = []
 
-    for (const [, flights] of byAircraft) {
+    for (const [, items] of byChain) {
       let prevAta = 0
-      for (const f of flights) {
-        const result = computeOooi(f, prevAta)
+      for (const item of items) {
+        if (item.kind === 'anchor') {
+          if (item.a.ataMs > prevAta) prevAta = item.a.ataMs
+          continue
+        }
+        const result = computeOooi(item.f, prevAta)
         allResults.push(result)
-        prevAta = result.ataUtc // carry forward — this is the ripple
+        prevAta = result.ataUtc
       }
     }
 
-    // Process unassigned flights (no aircraft = no ripple, just random primary delays)
-    for (const f of noAircraft) {
+    // Process unassigned flights (no chain = no ripple, just random primary delays)
+    for (const f of noChain) {
       allResults.push(computeOooi(f, 0))
     }
 
@@ -1649,7 +1706,7 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const totalDelayMs = r.delayMinutes * 60_000
-      const totalSeats = 180
+      const totalSeats = seatsByType.get((r.sf.aircraftTypeIcao as string) ?? '') ?? 180
       const loadFactor = 0.75 + Math.random() * 0.2
       const totalPax = Math.floor(totalSeats * loadFactor)
       const children = Math.floor(totalPax * 0.05)
@@ -1702,6 +1759,64 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       created += (result.upsertedCount ?? 0) + (result.modifiedCount ?? 0)
     }
 
+    // Progression: for flights departed before but still missing ATA/ONA where
+    // the scheduled arrival has already passed, materialize the arrival so the
+    // OTP / Fuel / LF KPIs can recognize them as completed. We preserve the
+    // delay already computed on ATD and extend it through to ATA.
+    const staleInFlight = await FlightInstance.find({
+      operatorId,
+      operatingDate: { $gte: fromDate, $lte: toDate },
+      'actual.atdUtc': { $ne: null },
+      'actual.ataUtc': null,
+      'schedule.staUtc': { $lt: nowMs - 10 * 60_000 },
+    })
+      .select({
+        _id: 1,
+        'schedule.stdUtc': 1,
+        'schedule.staUtc': 1,
+        'actual.atdUtc': 1,
+        'actual.offUtc': 1,
+        'actual.onUtc': 1,
+      })
+      .lean()
+
+    let progressed = 0
+    if (staleInFlight.length > 0) {
+      const progressOps: Array<{ updateOne: { filter: { _id: string }; update: Record<string, unknown> } }> = []
+      for (const f of staleInFlight) {
+        const stdMs = (f.schedule as { stdUtc?: number | null })?.stdUtc ?? 0
+        const staMs = (f.schedule as { staUtc?: number | null })?.staUtc ?? 0
+        const atdMs = (f.actual as { atdUtc?: number | null })?.atdUtc ?? 0
+        const offMs = (f.actual as { offUtc?: number | null })?.offUtc ?? null
+        const onMs = (f.actual as { onUtc?: number | null })?.onUtc ?? null
+        const delayMs = Math.max(0, atdMs - stdMs)
+        const scheduledBlockMs = staMs - stdMs
+        const projectedAta = Math.min(atdMs + scheduledBlockMs + delayMs, nowMs)
+        const projectedOff = offMs ?? atdMs + 12 * 60_000
+        const projectedOn = onMs ?? projectedAta - 5 * 60_000
+
+        progressOps.push({
+          updateOne: {
+            filter: { _id: f._id as string },
+            update: {
+              $set: {
+                'actual.offUtc': projectedOff,
+                'actual.onUtc': projectedOn,
+                'actual.ataUtc': projectedAta,
+                status: 'completed',
+                'syncMeta.updatedAt': Date.now(),
+              },
+              $inc: { 'syncMeta.version': 1 },
+            },
+          },
+        })
+        progressed++
+      }
+      for (let i = 0; i < progressOps.length; i += 1000) {
+        await FlightInstance.bulkWrite(progressOps.slice(i, i + 1000), { ordered: false })
+      }
+    }
+
     // Repair: fix any FlightInstances with null tail by restoring from ScheduledFlight
     const nullTailInstances = await FlightInstance.find({
       operatorId,
@@ -1731,6 +1846,7 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       dateSkipped,
       cleared,
       repaired,
+      progressed,
       otpTarget,
       scheduledFlightCount: scheduledFlights.length,
     }

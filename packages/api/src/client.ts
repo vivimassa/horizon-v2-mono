@@ -770,6 +770,7 @@ export interface OperatorRef {
   currencyCode: string | null
   currencySymbol: string | null
   dateFormat: 'DD-MMM-YY' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD' | 'DD.MM.YYYY'
+  delayCodeAdherence: 'ahm730' | 'ahm732'
   enabledModules: string[]
   accentColor: string
   logoUrl: string | null
@@ -2027,6 +2028,111 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  // ─── Disruption Center ─────────────────────────────────────
+  listDisruptions: (params: {
+    operatorId: string
+    from?: string
+    to?: string
+    status?: string
+    category?: string
+    severity?: string
+    station?: string
+    flightNumber?: string
+    includeHidden?: boolean
+  }) => {
+    const qs = new URLSearchParams()
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== null && v !== '') qs.append(k, String(v))
+    }
+    return request<DisruptionIssueRef[]>(`/disruptions?${qs.toString()}`)
+  },
+
+  getDisruption: (id: string) =>
+    request<{ issue: DisruptionIssueRef; activity: DisruptionActivityRef[] }>(`/disruptions/${id}`),
+
+  scanDisruptions: (data: {
+    operatorId: string
+    from: string
+    to: string
+    referenceTimeUtc?: string
+    persist?: boolean
+  }) =>
+    request<{ signals: unknown[]; created?: number; updated?: number }>('/disruptions/scan', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  claimDisruption: (id: string) => request<{ ok: true }>(`/disruptions/${id}/claim`, { method: 'POST' }),
+
+  startDisruption: (id: string) => request<{ ok: true }>(`/disruptions/${id}/start`, { method: 'POST' }),
+
+  resolveDisruption: (id: string, body: { resolutionType: string; resolutionNotes?: string }) =>
+    request<{ ok: true }>(`/disruptions/${id}/resolve`, { method: 'POST', body: JSON.stringify(body) }),
+
+  closeDisruption: (id: string) => request<{ ok: true }>(`/disruptions/${id}/close`, { method: 'POST' }),
+
+  hideDisruption: (id: string) => request<{ ok: true }>(`/disruptions/${id}/hide`, { method: 'POST' }),
+
+  commentDisruption: (id: string, text: string) =>
+    request<{ ok: true }>(`/disruptions/${id}/comment`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    }),
+}
+
+// ─── Disruption Center types ────────────────────────────
+export interface DisruptionIssueRef {
+  _id: string
+  operatorId: string
+  flightNumber: string | null
+  forDate: string | null
+  depStation: string | null
+  arrStation: string | null
+  tail: string | null
+  aircraftType: string | null
+  category:
+    | 'TAIL_SWAP'
+    | 'DELAY'
+    | 'CANCELLATION'
+    | 'DIVERSION'
+    | 'CONFIG_CHANGE'
+    | 'MISSING_OOOI'
+    | 'MAINTENANCE_RISK'
+    | 'CURFEW_VIOLATION'
+    | 'TAT_VIOLATION'
+  source: 'IROPS_AUTO' | 'ML_PREDICTION' | 'MANUAL'
+  severity: 'critical' | 'warning' | 'info'
+  score: number | null
+  reasons: string[]
+  title: string
+  description: string | null
+  status: 'open' | 'assigned' | 'in_progress' | 'resolved' | 'closed'
+  assignedTo: string | null
+  assignedToName: string | null
+  assignedAt: string | null
+  resolvedAt: string | null
+  resolutionType: string | null
+  resolutionNotes: string | null
+  closedAt: string | null
+  linkedModuleCode: string | null
+  linkedEntityId: string | null
+  sourceAlertId: string | null
+  hidden: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface DisruptionActivityRef {
+  _id: string
+  issueId: string
+  userId: string | null
+  userName: string | null
+  actionType: 'created' | 'assigned' | 'started' | 'commented' | 'resolved' | 'closed' | 'hidden' | 'linked'
+  actionDetail: string | null
+  previousStatus: string | null
+  newStatus: string | null
+  createdAt: string
 }
 
 // ─── Maintenance types ──────────────────────────────────

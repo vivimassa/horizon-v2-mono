@@ -4,9 +4,12 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { api, getApiBaseUrl, setApiBaseUrl, type OperatorRef } from '@skyhub/api'
 import { authedFetch } from '@/lib/authed-fetch'
 import { MasterDetailLayout } from '@/components/layout'
+import { collapseDock } from '@/lib/dock-store'
+import { useOperatorStore } from '@/stores/use-operator-store'
 import { useTheme } from '@/components/theme-provider'
 import { colors, accentTint, type Palette as PaletteType } from '@skyhub/ui/theme'
 import { CountryFlag } from '@/components/ui/country-flag'
+import { Dropdown } from '@/components/ui/dropdown'
 import {
   Building2,
   Globe,
@@ -25,7 +28,6 @@ import {
   MapPin,
   Scale,
   Tag,
-  Layers,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -43,15 +45,17 @@ const SECTIONS: SectionDef[] = [
   { key: 'company', label: 'Company Information', icon: Building2, desc: 'Identity & registration' },
   { key: 'operations', label: 'Operational Settings', icon: Clock, desc: 'Timezone, base, regulations' },
   { key: 'branding', label: 'Branding', icon: Palette, desc: 'Colors & visual identity' },
-  { key: 'modules', label: 'Enabled Modules', icon: Layers, desc: 'Feature access control' },
 ]
-
-const ALL_MODULES = ['home', 'network', 'flight-ops', 'ground-ops', 'crew-ops', 'settings']
 
 /* ── Page ── */
 export default function OperatorConfigPage() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+
+  // Focus workspace — fold the bottom dock by default on this page.
+  useEffect(() => {
+    collapseDock()
+  }, [])
   const palette: PaletteType = isDark ? colors.dark : colors.light
   const accent = '#1e40af'
 
@@ -94,6 +98,7 @@ export default function OperatorConfigPage() {
     try {
       const updated = await api.updateOperator(operator._id, draft)
       setOperator(updated)
+      useOperatorStore.getState().setOperator(updated)
       setDraft({})
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
@@ -184,7 +189,7 @@ function OperatorSidebar({
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="px-4 py-3 border-b border-hz-border shrink-0">
-        <h2 className="text-[15px] font-bold">Operator Config</h2>
+        <h2 className="text-[15px] font-bold">Operator Profile</h2>
       </div>
 
       {/* Section navigation */}
@@ -441,6 +446,22 @@ function OperatorCenter({
                 How dates appear across the system
               </p>
             </div>
+            <div>
+              <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-medium block mb-1">
+                Delay Code Adherence *
+              </label>
+              <Dropdown
+                value={getVal('delayCodeAdherence') ?? 'ahm730'}
+                onChange={(v) => onChange('delayCodeAdherence', v)}
+                options={[
+                  { value: 'ahm730', label: 'AHM 730/731' },
+                  { value: 'ahm732', label: 'AHM 732' },
+                ]}
+              />
+              <p className="text-[12px] mt-1" style={{ color: palette.textTertiary }}>
+                IATA delay-code scheme used across the operation
+              </p>
+            </div>
           </div>
         )}
         {activeSection === 'branding' && (
@@ -451,56 +472,6 @@ function OperatorCenter({
             isDark={isDark}
             accent={accent}
           />
-        )}
-        {activeSection === 'modules' && (
-          <div className="max-w-2xl space-y-2">
-            {ALL_MODULES.map((mod) => {
-              const modules: string[] = getVal('enabledModules') ?? []
-              const enabled = modules.includes(mod)
-              return (
-                <div
-                  key={mod}
-                  className="flex items-center justify-between px-4 py-3 rounded-xl transition-colors"
-                  style={{
-                    backgroundColor: enabled
-                      ? accentTint(accent, isDark ? 0.08 : 0.04)
-                      : isDark
-                        ? 'rgba(255,255,255,0.03)'
-                        : 'rgba(0,0,0,0.02)',
-                    border: `1px solid ${enabled ? accentTint(accent, isDark ? 0.2 : 0.12) : isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}`,
-                  }}
-                >
-                  <div>
-                    <span
-                      className="text-[14px] font-medium capitalize"
-                      style={{ color: enabled ? accent : palette.text }}
-                    >
-                      {mod.replace('-', ' ')}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      const next = enabled ? modules.filter((m) => m !== mod) : [...modules, mod]
-                      onChange('enabledModules', next)
-                    }}
-                    className="px-3 py-1 rounded-lg text-[12px] font-semibold transition-colors"
-                    style={{
-                      backgroundColor: enabled
-                        ? isDark
-                          ? 'rgba(22,163,74,0.15)'
-                          : '#dcfce7'
-                        : isDark
-                          ? 'rgba(255,255,255,0.08)'
-                          : 'rgba(0,0,0,0.05)',
-                      color: enabled ? (isDark ? '#4ade80' : '#16a34a') : palette.textSecondary,
-                    }}
-                  >
-                    {enabled ? 'Enabled' : 'Disabled'}
-                  </button>
-                </div>
-              )
-            })}
-          </div>
         )}
       </div>
     </div>

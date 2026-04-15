@@ -33,6 +33,8 @@ import { maintenanceCheckRoutes } from './routes/maintenance-checks.js'
 import { maintenanceEventRoutes } from './routes/maintenance-events.js'
 import { aircraftStatusBoardRoutes } from './routes/aircraft-status-board.js'
 import { contactSubmissionRoutes } from './routes/contact-submissions.js'
+import { worldMapRoutes } from './routes/world-map.js'
+import { disruptionRoutes } from './routes/disruptions.js'
 import { loadOurAirportsData, startAutoRefresh } from './data/ourairports-cache.js'
 
 const port = env.PORT
@@ -94,6 +96,8 @@ async function main(): Promise<void> {
   await app.register(maintenanceEventRoutes)
   await app.register(aircraftStatusBoardRoutes)
   await app.register(contactSubmissionRoutes)
+  await app.register(worldMapRoutes)
+  await app.register(disruptionRoutes)
 
   // Start
   await app.listen({ port, host: '0.0.0.0' })
@@ -122,6 +126,7 @@ async function main(): Promise<void> {
         if (result.alreadySeeded) parts.push(`existing=${result.alreadySeeded}`)
         if (result.skipped) parts.push(`future=${result.skipped}`)
         if (result.repaired) parts.push(`repaired=${result.repaired}`)
+        if (result.progressed) parts.push(`progressed=${result.progressed}`)
         if (result.dateSkipped) parts.push(`dateSkipped=${result.dateSkipped}`)
         const detail = parts.length > 0 ? parts.join(', ') : 'no eligible flights'
         console.log(

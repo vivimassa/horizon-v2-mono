@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useSearchParams } from 'next/navigation'
 import {
   Wand2,
   BarChart3,
@@ -26,7 +27,6 @@ import {
   Radio,
   SlidersHorizontal,
   Activity,
-  Hourglass,
 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { colors } from '@skyhub/ui/theme'
@@ -60,8 +60,8 @@ export function OpsToolbar({
   const barLabelMode = useGanttStore((s) => s.barLabelMode)
   const showTat = useGanttStore((s) => s.showTat)
   const toggleTat = useGanttStore((s) => s.toggleTat)
-  const showDelays = useGanttStore((s) => s.showDelays)
-  const toggleDelays = useGanttStore((s) => s.toggleDelays)
+  const refreshIntervalMins = useGanttStore((s) => s.refreshIntervalMins)
+  const setRefreshIntervalMins = useGanttStore((s) => s.setRefreshIntervalMins)
   // showMissingTimes removed from Display — controlled by alertCategories.missingTimes
   const showAlerts = useGanttStore((s) => s.showAlerts)
   const toggleAlerts = useGanttStore((s) => s.toggleAlerts)
@@ -88,6 +88,14 @@ export function OpsToolbar({
 
   const [collapsed, setCollapsed] = useState(false)
   const [optimizerOpen, setOptimizerOpen] = useState(false)
+
+  // Deep-link from Disruption Center (2.1.3): `?openRecovery=1` auto-opens
+  // the recovery dialog. `?disruptionId=…` is currently informational —
+  // the dialog-level pre-fill lands with the next recovery-solver iteration.
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    if (searchParams?.get('openRecovery') === '1') setOptimizerOpen(true)
+  }, [searchParams])
   const [compareOpen, setCompareOpen] = useState(false)
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false)
   const [scenarioOpen, setScenarioOpen] = useState(false)
@@ -515,7 +523,6 @@ export function OpsToolbar({
                 () => setBarLabelMode(barLabelMode === 'flightNo' ? 'sector' : 'flightNo'),
               )}
               {cb(Timer, showTat ? 'Hide TAT' : 'Show TAT', toggleTat, { active: showTat })}
-              {cb(Hourglass, showDelays ? 'Hide delays' : 'Show delays', toggleDelays, { active: showDelays })}
               {cb(Crosshair, centerTimebar ? 'Center on' : 'Center off', handleCenterTimebar, {
                 active: centerTimebar,
               })}
@@ -735,16 +742,6 @@ export function OpsToolbar({
               tooltip={showTat ? 'Hide turnaround times' : 'Show turnaround times'}
             />
             <RibbonBtn
-              icon={Hourglass}
-              label="Actual"
-              onClick={toggleDelays}
-              active={showDelays}
-              isDark={isDark}
-              hoverBg={hoverBg}
-              activeBg={activeBg}
-              tooltip={showDelays ? 'Hide scheduled position markers' : 'Show scheduled position markers'}
-            />
-            <RibbonBtn
               icon={Crosshair}
               label="Center"
               onClick={handleCenterTimebar}
@@ -912,6 +909,52 @@ export function OpsToolbar({
                   <button
                     onClick={zoomNext}
                     disabled={zoomIdx >= OPS_ZOOMS.length - 1}
+                    className="flex items-center justify-center rounded-r-lg text-[14px] font-bold transition-colors disabled:opacity-30"
+                    style={{ width: 40, height: 36, border: `1px solid ${panelBorder}` }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = hoverBg
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent'
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* Refresh Interval (auto-refresh in minutes) */}
+              <div>
+                <div className="text-[13px] font-medium text-hz-text-secondary mb-2 text-center">Refresh Interval</div>
+                <div className="flex items-center justify-center">
+                  <button
+                    onClick={() => setRefreshIntervalMins(refreshIntervalMins - 1)}
+                    disabled={refreshIntervalMins <= 5}
+                    className="flex items-center justify-center rounded-l-lg text-[14px] font-bold transition-colors disabled:opacity-30"
+                    style={{ width: 40, height: 36, border: `1px solid ${panelBorder}` }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = hoverBg
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent'
+                    }}
+                  >
+                    −
+                  </button>
+                  <div
+                    className="flex items-center justify-center text-[13px] font-mono font-medium text-hz-text"
+                    style={{
+                      width: 56,
+                      height: 36,
+                      borderTop: `1px solid ${panelBorder}`,
+                      borderBottom: `1px solid ${panelBorder}`,
+                    }}
+                  >
+                    {refreshIntervalMins}m
+                  </div>
+                  <button
+                    onClick={() => setRefreshIntervalMins(refreshIntervalMins + 1)}
+                    disabled={refreshIntervalMins >= 59}
                     className="flex items-center justify-center rounded-r-lg text-[14px] font-bold transition-colors disabled:opacity-30"
                     style={{ width: 40, height: 36, border: `1px solid ${panelBorder}` }}
                     onMouseEnter={(e) => {

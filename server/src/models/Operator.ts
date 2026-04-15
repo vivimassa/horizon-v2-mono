@@ -21,6 +21,11 @@ const operatorSchema = new Schema(
       enum: ['DD-MMM-YY', 'DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD', 'DD.MM.YYYY'],
       default: 'DD-MMM-YY',
     },
+    delayCodeAdherence: {
+      type: String,
+      enum: ['ahm730', 'ahm732'],
+      default: 'ahm730',
+    },
     enabledModules: [{ type: String }],
     accentColor: { type: String, default: '#1e40af' },
     logoUrl: { type: String, default: null },

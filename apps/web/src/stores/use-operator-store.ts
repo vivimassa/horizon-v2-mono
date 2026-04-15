@@ -15,6 +15,7 @@ interface OperatorState {
   activeScenarioId: string | null
   setActiveScenarioId: (id: string | null) => void
   loadOperator: (operatorId?: string) => Promise<void>
+  setOperator: (op: OperatorRef) => void
 }
 
 export const useOperatorStore = create<OperatorState>((set, get) => ({
@@ -40,6 +41,13 @@ export const useOperatorStore = create<OperatorState>((set, get) => ({
       console.error('Failed to load operator:', e)
     }
   },
+
+  setOperator: (op) =>
+    set({
+      operator: op,
+      dateFormat: (op.dateFormat as DateFormatType) ?? 'DD-MMM-YY',
+      loaded: true,
+    }),
 }))
 
 /** Get the current operator's _id. Use this instead of hardcoding "horizon". */

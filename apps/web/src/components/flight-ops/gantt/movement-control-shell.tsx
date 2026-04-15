@@ -32,6 +32,7 @@ export function MovementControlShell() {
   const aircraft = useGanttStore((s) => s.aircraft)
   const loading = useGanttStore((s) => s.loading)
   const periodCommitted = useGanttStore((s) => s.periodCommitted)
+  const refreshIntervalMins = useGanttStore((s) => s.refreshIntervalMins)
   const runway = useRunwayLoading()
   const [searchOpen, setSearchOpen] = useState(false)
   const [addFlightOpen, setAddFlightOpen] = useState(false)
@@ -69,6 +70,20 @@ export function MovementControlShell() {
   const handleGo = useCallback(async () => {
     await runway.run(() => useGanttStore.getState().commitPeriod(), 'Loading flights…', 'Flights loaded')
   }, [runway])
+
+  // Auto-refresh: re-fetch flights on the user-configured interval. When a rolling
+  // period is active, re-anchor the window to today first so the day rolls over
+  // silently at midnight.
+  useEffect(() => {
+    if (!periodCommitted) return
+    const ms = Math.max(5, Math.min(59, refreshIntervalMins)) * 60_000
+    const id = setInterval(() => {
+      const s = useGanttStore.getState()
+      if (s.rollingPeriodDays !== null) s.setRollingPeriod(s.rollingPeriodDays)
+      s.commitPeriod()
+    }, ms)
+    return () => clearInterval(id)
+  }, [periodCommitted, refreshIntervalMins])
 
   return (
     <div

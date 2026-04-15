@@ -44,6 +44,14 @@ interface GanttState {
   periodTo: string
   periodCommitted: boolean
 
+  // Movement Control — rolling period (ops mode only).
+  // null = off (use periodFrom/periodTo from date picker).
+  // 3-7  = N-day window anchored at (today - 1 day): previous, current, next, next+1, ...
+  rollingPeriodDays: number | null
+
+  // Auto-refresh interval in minutes (1-59). Default 15. Applies to Movement Control.
+  refreshIntervalMins: number
+
   // Filters
   acTypeFilter: string[] | null // null = all types
   statusFilter: string[] | null // null = server default
@@ -128,6 +136,8 @@ interface GanttState {
 
   // Actions
   setPeriod: (from: string, to: string) => void
+  setRollingPeriod: (days: number | null) => void
+  setRefreshIntervalMins: (mins: number) => void
   setAcTypeFilter: (types: string[] | null) => void
   setStatusFilter: (statuses: string[] | null) => void
   setScenarioId: (id: string | null) => void
@@ -310,6 +320,8 @@ export const useGanttStore = create<GanttState>((set, get) => {
     periodFrom: '',
     periodTo: '',
     periodCommitted: false,
+    rollingPeriodDays: null,
+    refreshIntervalMins: 15,
     acTypeFilter: null,
     statusFilter: null,
     scenarioId: null,
@@ -358,6 +370,32 @@ export const useGanttStore = create<GanttState>((set, get) => {
     scrollTargetMs: null,
 
     setPeriod: (from, to) => set({ periodFrom: from, periodTo: to }),
+
+    setRollingPeriod: (days) => {
+      if (days === null) {
+        localStorage.removeItem('gantt.rollingPeriodDays')
+        set({ rollingPeriodDays: null })
+        return
+      }
+      const clamped = Math.max(3, Math.min(7, Math.round(days)))
+      localStorage.setItem('gantt.rollingPeriodDays', String(clamped))
+      // Anchor window at (today - 1): previous, current, next, next+1, …
+      const d = new Date()
+      d.setHours(0, 0, 0, 0)
+      const start = new Date(d)
+      start.setDate(d.getDate() - 1)
+      const end = new Date(start)
+      end.setDate(start.getDate() + clamped - 1)
+      const toISODate = (x: Date) =>
+        `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+      set({ rollingPeriodDays: clamped, periodFrom: toISODate(start), periodTo: toISODate(end) })
+    },
+
+    setRefreshIntervalMins: (mins) => {
+      const clamped = Math.max(5, Math.min(59, Math.round(mins)))
+      localStorage.setItem('gantt.refreshIntervalMins', String(clamped))
+      set({ refreshIntervalMins: clamped })
+    },
     setAcTypeFilter: (types) => set({ acTypeFilter: types }),
     setStatusFilter: (statuses) => set({ statusFilter: statuses }),
     setScenarioId: (id) => set({ scenarioId: id }),
@@ -722,6 +760,16 @@ export const useGanttStore = create<GanttState>((set, get) => {
       if (from && to) set({ periodFrom: from, periodTo: to })
       const savedGrace = localStorage.getItem('gantt.oooiGraceMins')
       if (savedGrace) set({ oooiGraceMins: parseInt(savedGrace, 10) || 15 })
+      const savedRolling = localStorage.getItem('gantt.rollingPeriodDays')
+      if (savedRolling) {
+        const n = parseInt(savedRolling, 10)
+        if (n >= 3 && n <= 7) set({ rollingPeriodDays: n })
+      }
+      const savedInterval = localStorage.getItem('gantt.refreshIntervalMins')
+      if (savedInterval) {
+        const n = parseInt(savedInterval, 10)
+        if (n >= 5 && n <= 59) set({ refreshIntervalMins: n })
+      }
       try {
         const raw = localStorage.getItem('gantt.utilizationTargets')
         if (raw) set({ utilizationTargets: new Map(JSON.parse(raw)) })

@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { CheckCircle, Plus, Trash2, Search, Check, X } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
-import { Dropdown } from '@/components/ui/dropdown'
 import { api } from '@skyhub/api'
 import type { DelayCodeRef } from '@skyhub/api'
 import { useOperatorStore } from '@/stores/use-operator-store'
@@ -31,6 +30,29 @@ function getCategoryColor(cat: string): string {
   return CATEGORY_COLORS[cat] ?? CATEGORY_COLORS[cat.toLowerCase().replace(/[\s/]+/g, '_')] ?? '#6B7280'
 }
 
+/** Format minutes as "H:MM" (e.g. 153 → "2:33", 0 → "0:00"). */
+function formatHoursMinutes(totalMinutes: number): string {
+  const m = Math.max(0, Math.round(totalMinutes))
+  const h = Math.floor(m / 60)
+  const mm = m % 60
+  return `${h}:${String(mm).padStart(2, '0')}`
+}
+
+/** Parse "H:MM" / "HH:MM" / "M" into total minutes. Returns null on invalid. */
+function parseHoursMinutes(input: string): number | null {
+  const trimmed = input.trim()
+  if (!trimmed) return 0
+  if (trimmed.includes(':')) {
+    const [h, m] = trimmed.split(':')
+    const hh = parseInt(h, 10)
+    const mm = parseInt(m, 10)
+    if (isNaN(hh) || isNaN(mm) || mm < 0 || mm > 59) return null
+    return hh * 60 + mm
+  }
+  const n = parseInt(trimmed, 10)
+  return isNaN(n) ? null : n
+}
+
 type AhmMode = '730' | '732'
 
 interface DelaysTabProps {
@@ -50,8 +72,9 @@ export function DelaysTab({ data, onUpdate }: DelaysTabProps) {
   const inputBg = isDark ? 'rgba(255,255,255,0.08)' : '#fff'
   const inputBorder = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)'
 
+  const operator = useOperatorStore((s) => s.operator)
+  const ahmMode: AhmMode = operator?.delayCodeAdherence === 'ahm732' ? '732' : '730'
   const [delayCodes, setDelayCodes] = useState<DelayCodeRef[]>([])
-  const [ahmMode, setAhmMode] = useState<AhmMode | null>(null)
 
   useEffect(() => {
     const operatorId = useOperatorStore.getState().operator?._id ?? ''
@@ -105,24 +128,6 @@ export function DelaysTab({ data, onUpdate }: DelaysTabProps) {
 
   return (
     <div>
-      {/* AHM scheme selector */}
-      <div className="flex items-center gap-3 mb-4">
-        <span className="text-[13px] font-medium shrink-0" style={{ color: muted }}>
-          Delay code scheme <span style={{ color: '#E63535' }}>*</span>
-        </span>
-        <Dropdown
-          size="sm"
-          value={ahmMode}
-          onChange={(v) => setAhmMode(v as AhmMode)}
-          placeholder="Select scheme..."
-          options={[
-            { value: '730', label: 'AHM 730/731' },
-            { value: '732', label: 'AHM 732' },
-          ]}
-          className="w-[160px]"
-        />
-      </div>
-
       {/* Computed delay from OOOI */}
       <ComputedDelayBanner data={data} isDark={isDark} muted={muted} accent={accent} />
 
@@ -198,14 +203,14 @@ function ComputedDelayBanner({
         style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
       >
         <div className="text-[24px] font-bold tabular-nums" style={{ color: depMin > 0 ? '#E63535' : '#06C270' }}>
-          {depMin > 0 ? `+${depMin}` : '0'}
+          {depMin > 0 ? `+${formatHoursMinutes(depMin)}` : '0:00'}
         </div>
         <div>
           <div className="text-[13px] font-semibold" style={{ color: depMin > 0 ? '#E63535' : '#06C270' }}>
             {depMin > 0 ? 'Departure Delayed' : 'On Time'}
           </div>
-          <div className="text-[11px]" style={{ color: muted }}>
-            ATD vs STD ({depMin > 0 ? `${depMin} min late` : 'on time'})
+          <div className="text-[13px]" style={{ color: muted }}>
+            ATD vs STD ({depMin > 0 ? `${formatHoursMinutes(depMin)} late` : 'on time'})
           </div>
         </div>
       </div>
@@ -214,14 +219,14 @@ function ComputedDelayBanner({
         style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
       >
         <div className="text-[24px] font-bold tabular-nums" style={{ color: arrMin > 0 ? '#FF8800' : '#06C270' }}>
-          {arrMin > 0 ? `+${arrMin}` : '0'}
+          {arrMin > 0 ? `+${formatHoursMinutes(arrMin)}` : '0:00'}
         </div>
         <div>
           <div className="text-[13px] font-semibold" style={{ color: arrMin > 0 ? '#FF8800' : '#06C270' }}>
             {arrMin > 0 ? 'Arrival Delayed' : 'On Time'}
           </div>
-          <div className="text-[11px]" style={{ color: muted }}>
-            ATA vs STA ({arrMin > 0 ? `${arrMin} min late` : 'on time'})
+          <div className="text-[13px]" style={{ color: muted }}>
+            ATA vs STA ({arrMin > 0 ? `${formatHoursMinutes(arrMin)} late` : 'on time'})
           </div>
         </div>
       </div>
@@ -502,13 +507,11 @@ function DelaySection({
                   border: `1px solid ${cardBorder}`,
                 }}
               >
-                <input
-                  type="number"
-                  min={0}
-                  value={d.minutes || ''}
-                  onChange={(e) => onUpdateMinutes(i, parseInt(e.target.value) || 0)}
-                  className="w-[56px] h-[36px] text-center rounded-lg text-[18px] font-mono font-bold outline-none"
-                  style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: '#E63535' }}
+                <DelayMinutesInput
+                  minutes={d.minutes}
+                  onChange={(m) => onUpdateMinutes(i, m)}
+                  inputBg={inputBg}
+                  inputBorder={inputBorder}
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -543,5 +546,45 @@ function DelaySection({
         </div>
       )}
     </div>
+  )
+}
+
+function DelayMinutesInput({
+  minutes,
+  onChange,
+  inputBg,
+  inputBorder,
+}: {
+  minutes: number
+  onChange: (minutes: number) => void
+  inputBg: string
+  inputBorder: string
+}) {
+  const [text, setText] = useState(() => formatHoursMinutes(minutes))
+
+  // Keep the local text in sync when the underlying value is updated externally
+  useEffect(() => {
+    setText(formatHoursMinutes(minutes))
+  }, [minutes])
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      placeholder="H:MM"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => {
+        const parsed = parseHoursMinutes(text)
+        if (parsed == null) {
+          setText(formatHoursMinutes(minutes))
+          return
+        }
+        onChange(parsed)
+        setText(formatHoursMinutes(parsed))
+      }}
+      className="w-[64px] h-[36px] text-center rounded-lg text-[15px] font-mono font-bold outline-none tabular-nums"
+      style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: '#E63535' }}
+    />
   )
 }

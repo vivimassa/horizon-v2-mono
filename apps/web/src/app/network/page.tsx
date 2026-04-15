@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
 
 export default function Page() {
-  redirect('/?domain=network')
+  redirect('/hub?domain=network')
 }

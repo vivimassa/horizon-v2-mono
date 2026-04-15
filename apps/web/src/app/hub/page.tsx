@@ -62,23 +62,43 @@ const DOMAINS: DomainCard[] = [
   },
   {
     key: 'settings',
-    label: 'Settings',
-    description: 'Master data, users, roles & operator config',
-    icon: 'Settings',
+    label: 'Master Database',
+    description: 'Reference data catalogues for every operational domain',
+    icon: 'Database',
     href: '/settings',
     module: 'admin',
+    image: '/assets/domains/master-database.png',
+  },
+  {
+    key: 'sysadmin',
+    label: 'System Administration',
+    description: 'User accounts, access rights, operator config & company documents',
+    icon: 'ShieldCheck',
+    href: '/sysadmin',
+    module: 'sysadmin',
     image: '/assets/domains/settings.png',
   },
 ]
 
+interface ChildNode {
+  entry: ModuleEntry
+  subChildren: ModuleEntry[]
+}
+
 interface SectionGroup {
   section: ModuleEntry
-  children: ModuleEntry[]
+  children: ChildNode[]
 }
 
 function buildTree(mod: string): SectionGroup[] {
   return MODULE_REGISTRY.filter((m) => m.module === mod && m.level === 1)
-    .map((s) => ({ section: s, children: MODULE_REGISTRY.filter((m) => m.parent_code === s.code && m.level === 2) }))
+    .map((s) => ({
+      section: s,
+      children: MODULE_REGISTRY.filter((m) => m.parent_code === s.code && m.level === 2).map((c) => ({
+        entry: c,
+        subChildren: MODULE_REGISTRY.filter((sc) => sc.parent_code === c.code && sc.level === 3),
+      })),
+    }))
     .filter((g) => g.children.length > 0)
 }
 
@@ -210,21 +230,44 @@ export default function HomePage() {
   const selAccent = selDomain ? (MODULE_THEMES[selDomain.module]?.accent ?? '#64748b') : '#64748b'
   const selTreeRaw = selDomain ? (TREES[selDomain.key] ?? []) : []
   const [panelSearch, setPanelSearch] = useState('')
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
   // Reset search when domain changes
   useEffect(() => {
     setPanelSearch('')
+    setCollapsed(new Set())
   }, [sel])
+
+  const toggleCollapsed = useCallback((code: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(code)) next.delete(code)
+      else next.add(code)
+      return next
+    })
+  }, [])
 
   // Filter tree by search
   const selTree = panelSearch.trim()
     ? selTreeRaw
         .map((g) => ({
           ...g,
-          children: g.children.filter((c) => {
-            const q = panelSearch.trim().toLowerCase()
-            return c.name.toLowerCase().includes(q) || c.description.toLowerCase().includes(q) || c.code.includes(q)
-          }),
+          children: g.children
+            .map((c) => {
+              const q = panelSearch.trim().toLowerCase()
+              const matchSelf =
+                c.entry.name.toLowerCase().includes(q) ||
+                c.entry.description.toLowerCase().includes(q) ||
+                c.entry.code.includes(q)
+              const matchedSubs = c.subChildren.filter(
+                (sc) =>
+                  sc.name.toLowerCase().includes(q) || sc.description.toLowerCase().includes(q) || sc.code.includes(q),
+              )
+              if (matchSelf) return c
+              if (matchedSubs.length > 0) return { ...c, subChildren: matchedSubs }
+              return null
+            })
+            .filter((c): c is ChildNode => c !== null),
         }))
         .filter((g) => g.children.length > 0)
     : selTreeRaw
@@ -616,32 +659,20 @@ export default function HomePage() {
                       </div>
 
                       {/* Items */}
-                      {group.children.map((child, ci) => {
+                      {group.children.map((node, ci) => {
+                        const child = node.entry
                         const CI = getIcon(child.icon)
-                        return (
-                          <button
-                            key={child.code}
-                            data-nav-loading={pendingCode === child.code ? 'true' : undefined}
-                            className="relative isolate w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left group transition-all duration-150 active:scale-[0.985]"
-                            style={
-                              {
-                                animation: `hzSlide 300ms ease-out ${gi * 60 + (ci + 1) * 40}ms both`,
-                                '--loading-accent': selAccent,
-                              } as React.CSSProperties
-                            }
-                            disabled={pendingCode !== null}
-                            onClick={(e) => go(child.route, selAccent, { x: e.clientX, y: e.clientY }, child.code)}
-                            onMouseEnter={(e) => {
-                              if (pendingCode !== child.code) {
-                                e.currentTarget.style.background = 'rgba(255,255,255,.06)'
-                              }
-                              prefetch(child.route)
-                            }}
-                            onFocus={() => prefetch(child.route)}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'transparent'
-                            }}
-                          >
+                        const hasSubs = node.subChildren.length > 0
+                        const isCollapsed = collapsed.has(child.code)
+                        const rowClass =
+                          'relative isolate w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left group transition-all duration-150'
+                        const rowStyle = {
+                          animation: `hzSlide 300ms ease-out ${gi * 60 + (ci + 1) * 40}ms both`,
+                          '--loading-accent': selAccent,
+                        } as React.CSSProperties
+
+                        const innerContent = (
+                          <>
                             <div
                               className="flex items-center justify-center rounded-lg shrink-0"
                               style={{
@@ -654,10 +685,6 @@ export default function HomePage() {
                               <CI size={16} strokeWidth={1.8} color="rgba(255,255,255,.55)" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              {/* Code sits as a discreet trailing tag after
-                                 the name — same line, Inter (inherits from
-                                 root layout), muted so it doesn't compete
-                                 with the name for attention. */}
                               <div className="flex items-baseline gap-2">
                                 <span className="text-[14px] font-medium truncate text-white/90">{child.name}</span>
                                 <span className="text-[11px] font-medium text-white/35 shrink-0 tabular-nums">
@@ -666,12 +693,99 @@ export default function HomePage() {
                               </div>
                               <div className="text-[12px] mt-0.5 truncate text-white/35">{child.description}</div>
                             </div>
-                            <LucideIcons.ChevronRight
-                              size={14}
-                              color="rgba(255,255,255,.3)"
-                              className="shrink-0 opacity-0 group-hover:opacity-60 transition-opacity"
-                            />
-                          </button>
+                          </>
+                        )
+
+                        return (
+                          <div key={child.code}>
+                            {hasSubs ? (
+                              <button
+                                type="button"
+                                aria-expanded={!isCollapsed}
+                                className={`${rowClass} active:scale-[0.99] cursor-default`}
+                                style={rowStyle}
+                                onClick={() => toggleCollapsed(child.code)}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = 'rgba(255,255,255,.04)'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'transparent'
+                                }}
+                              >
+                                {innerContent}
+                                <LucideIcons.ChevronDown
+                                  size={16}
+                                  color="rgba(255,255,255,.5)"
+                                  className="shrink-0 transition-transform duration-200"
+                                  style={{ transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
+                                />
+                              </button>
+                            ) : (
+                              <button
+                                data-nav-loading={pendingCode === child.code ? 'true' : undefined}
+                                className={`${rowClass} active:scale-[0.985]`}
+                                style={rowStyle}
+                                disabled={pendingCode !== null}
+                                onClick={(e) => go(child.route, selAccent, { x: e.clientX, y: e.clientY }, child.code)}
+                                onMouseEnter={(e) => {
+                                  if (pendingCode !== child.code) {
+                                    e.currentTarget.style.background = 'rgba(255,255,255,.06)'
+                                  }
+                                  prefetch(child.route)
+                                }}
+                                onFocus={() => prefetch(child.route)}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'transparent'
+                                }}
+                              >
+                                {innerContent}
+                                <LucideIcons.ChevronRight
+                                  size={14}
+                                  color="rgba(255,255,255,.3)"
+                                  className="shrink-0 opacity-0 group-hover:opacity-60 transition-opacity"
+                                />
+                              </button>
+                            )}
+
+                            {/* Level-3 sub-items — compact, indented, text-only */}
+                            {hasSubs && !isCollapsed && (
+                              <div
+                                className="ml-[46px] mr-2 mb-1 border-l"
+                                style={{ borderColor: 'rgba(255,255,255,.08)' }}
+                              >
+                                {node.subChildren.map((sub, si) => (
+                                  <button
+                                    key={sub.code}
+                                    data-nav-loading={pendingCode === sub.code ? 'true' : undefined}
+                                    className="relative isolate w-full flex items-baseline gap-2 pl-3 pr-2 py-1.5 rounded-md text-left group transition-all duration-150 active:scale-[0.985]"
+                                    style={
+                                      {
+                                        animation: `hzSlide 300ms ease-out ${gi * 60 + (ci + 1) * 40 + (si + 1) * 30}ms both`,
+                                        '--loading-accent': selAccent,
+                                      } as React.CSSProperties
+                                    }
+                                    disabled={pendingCode !== null}
+                                    onClick={(e) => go(sub.route, selAccent, { x: e.clientX, y: e.clientY }, sub.code)}
+                                    onMouseEnter={(e) => {
+                                      if (pendingCode !== sub.code) {
+                                        e.currentTarget.style.background = 'rgba(255,255,255,.05)'
+                                      }
+                                      prefetch(sub.route)
+                                    }}
+                                    onFocus={() => prefetch(sub.route)}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.background = 'transparent'
+                                    }}
+                                  >
+                                    <span className="text-[11px] font-medium text-white/35 shrink-0 tabular-nums">
+                                      {sub.code}
+                                    </span>
+                                    <span className="text-[13px] font-medium truncate text-white/75">{sub.name}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         )
                       })}
                     </div>

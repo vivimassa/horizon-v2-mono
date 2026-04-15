@@ -35,6 +35,8 @@ import {
   DoorOpen,
   LayoutGrid,
   Dock,
+  Radio,
+  LayoutDashboard,
 } from 'lucide-react-native'
 
 export interface NavPage {
@@ -202,13 +204,27 @@ export const NAV_TREE: NavModule[] = [
             route: '/flight-ops/control/movement-control',
             icon: Radar,
           },
-          { key: 'world-map', label: 'World Map', num: '2.1.2', route: '/flight-ops/control/world-map', icon: Map },
           {
-            key: 'disruption-center',
-            label: 'Disruption Center',
-            num: '2.1.3',
-            route: '/flight-ops/control/disruption-center',
-            icon: AlertTriangle,
+            key: 'disruption-management',
+            label: 'Disruption Management',
+            num: '2.1.3.3',
+            route: '/flight-ops/control/disruption-center/disruption-management',
+            icon: Radar,
+          },
+          {
+            key: 'movement-messages',
+            label: 'Movement Messages',
+            num: '2.1.4',
+            route: '/flight-ops/control/movement-messages',
+            icon: Radio,
+          },
+          { key: 'world-map', label: 'World Map', num: '2.1.5', route: '/flight-ops/control/world-map', icon: Map },
+          {
+            key: 'occ-dashboard',
+            label: 'OCC Dashboard',
+            num: '2.1.6',
+            route: '/flight-ops/control/occ-dashboard',
+            icon: LayoutDashboard,
           },
         ],
       },

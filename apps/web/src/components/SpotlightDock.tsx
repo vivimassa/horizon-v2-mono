@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, Globe, Plane, Truck, Users, Settings, ChevronUp, ChevronDown } from 'lucide-react'
+import { Home, Globe, Plane, Truck, Users, Database, ShieldCheck, ChevronUp, ChevronDown } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTheme } from './theme-provider'
 import { revealNavigate } from '@/lib/nav-transition'
@@ -27,18 +27,23 @@ interface Tab {
 }
 
 const TABS: Tab[] = [
-  { key: 'home', label: 'Home', icon: Home, href: '/' },
-  { key: 'network', label: 'Network', icon: Globe, href: '/?domain=network', pathMatch: '/network' },
-  { key: 'flightops', label: 'Flight Ops', icon: Plane, href: '/?domain=flightops', pathMatch: '/flight-ops' },
-  { key: 'groundops', label: 'Ground Ops', icon: Truck, href: '/?domain=groundops', pathMatch: '/ground-ops' },
-  { key: 'crewops', label: 'Crew Ops', icon: Users, href: '/?domain=crewops', pathMatch: '/crew-ops' },
-  { key: 'settings', label: 'Settings', icon: Settings, href: '/?domain=settings', pathMatch: '/settings' },
+  { key: 'home', label: 'Home', icon: Home, href: '/hub' },
+  { key: 'network', label: 'Network', icon: Globe, href: '/hub?domain=network', pathMatch: '/network' },
+  { key: 'flightops', label: 'Flight Ops', icon: Plane, href: '/hub?domain=flightops', pathMatch: '/flight-ops' },
+  { key: 'groundops', label: 'Ground Ops', icon: Truck, href: '/hub?domain=groundops', pathMatch: '/ground-ops' },
+  { key: 'crewops', label: 'Crew Ops', icon: Users, href: '/hub?domain=crewops', pathMatch: '/crew-ops' },
+  { key: 'database', label: 'Database', icon: Database, href: '/hub?domain=settings', pathMatch: '/settings' },
+  { key: 'sysadmin', label: 'Admin', icon: ShieldCheck, href: '/hub?domain=sysadmin', pathMatch: '/sysadmin' },
 ]
 
 function getActiveIndex(pathname: string): number {
-  if (pathname === '/') return 0
-  // Admin routes light up the Settings tab.
+  if (pathname === '/hub') return 0
+  // Master-data routes live under /admin/* — light up the Database tab.
   if (pathname.startsWith('/admin')) return 5
+  // Operator Profile lives under /settings/admin/* but belongs to Admin, not Database.
+  if (pathname.startsWith('/settings/admin')) return 6
+  // /sysadmin/* → Admin tab.
+  if (pathname.startsWith('/sysadmin')) return 6
   const idx = TABS.findIndex((t) => t.pathMatch && pathname.startsWith(t.pathMatch))
   return idx >= 0 ? idx : 0
 }
@@ -78,7 +83,7 @@ export function SpotlightDock() {
   const setCollapsed = useDockStore((s) => s.setCollapsed)
   const expand = useDockStore((s) => s.expand)
 
-  const isHome = pathname === '/'
+  const isHome = pathname === '/hub'
 
   // Auto-expand whenever the user navigates to a new page.
   useEffect(() => {

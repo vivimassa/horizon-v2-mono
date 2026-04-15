@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <g fill="#ffffff">
+    <!-- Fuselage (shorter, slimmer) -->
+    <path d="M128 72 Q120 76 119 94 L118 178 Q122 190 128 194 Q134 190 138 178 L137 94 Q136 76 128 72 Z"/>
+    <!-- Main wings (straighter, high-wing look) -->
+    <path d="M122 130 L78 152 L74 158 L122 146 Z"/>
+    <path d="M134 130 L178 152 L182 158 L134 146 Z"/>
+    <!-- Horizontal stabilizer -->
+    <path d="M124 180 L106 192 L104 196 L126 188 Z"/>
+    <path d="M132 180 L150 192 L152 196 L130 188 Z"/>
+    <!-- 2 props / engines on wings -->
+    <circle cx="96" cy="148" r="6"/>
+    <circle cx="160" cy="148" r="6"/>
+  </g>
+</svg>

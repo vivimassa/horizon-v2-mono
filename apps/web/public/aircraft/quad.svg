@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <g fill="#ffffff">
+    <!-- Fuselage (largest) -->
+    <path d="M128 26 Q113 34 112 64 L110 214 Q116 232 128 236 Q140 232 146 214 L144 64 Q143 34 128 26 Z"/>
+    <!-- Main wings (widest) -->
+    <path d="M116 120 L14 178 L8 190 L116 154 Z"/>
+    <path d="M140 120 L242 178 L248 190 L140 154 Z"/>
+    <!-- Horizontal stabilizer -->
+    <path d="M122 206 L76 228 L72 234 L124 220 Z"/>
+    <path d="M134 206 L180 228 L184 234 L132 220 Z"/>
+    <!-- 4 Engines (2 per wing) -->
+    <ellipse cx="46" cy="170" rx="8" ry="14"/>
+    <ellipse cx="86" cy="160" rx="8" ry="14"/>
+    <ellipse cx="170" cy="160" rx="8" ry="14"/>
+    <ellipse cx="210" cy="170" rx="8" ry="14"/>
+  </g>
+</svg>

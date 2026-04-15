@@ -1,0 +1,67 @@
+/* ─── World Map — compat shim for shadcn-style utilities ───────────── */
+/* These classes are used verbatim by the V1 World Map port.            */
+
+.wm-root .glass,
+.glass {
+  background: rgba(255, 255, 255, 0.60);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+}
+.dark .glass {
+  background: rgba(24, 24, 27, 0.70);
+}
+.glass-heavy {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+}
+.dark .glass-heavy {
+  background: rgba(24, 24, 27, 0.85);
+}
+
+/* Shadcn-style tokens → static values scoped to world-map */
+.bg-popover { background-color: #ffffff; }
+.dark .bg-popover { background-color: #18181b; }
+
+.text-muted-foreground { color: #71717a; }
+.dark .text-muted-foreground { color: #a1a1aa; }
+
+.text-foreground { color: #18181b; }
+.dark .text-foreground { color: #fafafa; }
+
+.bg-foreground\/\[0\.03\] { background-color: rgba(24, 24, 27, 0.03); }
+.dark .bg-foreground\/\[0\.03\] { background-color: rgba(250, 250, 250, 0.03); }
+.bg-foreground\/\[0\.04\] { background-color: rgba(24, 24, 27, 0.04); }
+.dark .bg-foreground\/\[0\.04\] { background-color: rgba(250, 250, 250, 0.04); }
+
+.bg-primary { background-color: var(--color-module-accent, #1e40af); }
+.text-primary { color: var(--color-module-accent, #1e40af); }
+.text-primary-foreground { color: #ffffff; }
+.bg-primary\/10 { background-color: color-mix(in oklab, var(--color-module-accent, #1e40af) 10%, transparent); }
+.bg-primary\/20 { background-color: color-mix(in oklab, var(--color-module-accent, #1e40af) 20%, transparent); }
+.ring-primary\/20 { --tw-ring-color: color-mix(in oklab, var(--color-module-accent, #1e40af) 20%, transparent); }
+.ring-primary\/30 { --tw-ring-color: color-mix(in oklab, var(--color-module-accent, #1e40af) 30%, transparent); }
+
+.bg-muted\/30 { background-color: rgba(244, 244, 245, 0.30); }
+.dark .bg-muted\/30 { background-color: rgba(39, 39, 42, 0.30); }
+.bg-muted\/50 { background-color: rgba(244, 244, 245, 0.50); }
+.dark .bg-muted\/50 { background-color: rgba(39, 39, 42, 0.50); }
+
+/* CSS var used by the canvas clock for hour/second hands */
+:root {
+  --primary: 222 47% 40%; /* fallback */
+}
+
+/* Animations */
+@keyframes highlight-pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+  50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.3; }
+}
+@keyframes world-map-fade-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: world-map-fade-in 140ms ease-out both; }
+
+/* Scrollbar already styled globally — keep class as no-op */
+.custom-scrollbar {}

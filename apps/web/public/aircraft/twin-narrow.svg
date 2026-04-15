@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <g fill="#ffffff">
+    <!-- Fuselage (nose up) -->
+    <path d="M128 46 Q118 52 117 78 L116 196 Q120 212 128 216 Q136 212 140 196 L139 78 Q138 52 128 46 Z"/>
+    <!-- Main wings (swept back) -->
+    <path d="M120 126 L54 166 L50 174 L120 152 Z"/>
+    <path d="M136 126 L202 166 L206 174 L136 152 Z"/>
+    <!-- Horizontal stabilizer -->
+    <path d="M122 192 L92 210 L90 214 L124 204 Z"/>
+    <path d="M134 192 L164 210 L166 214 L132 204 Z"/>
+    <!-- Engines (2 under wings) -->
+    <ellipse cx="88" cy="162" rx="6" ry="11"/>
+    <ellipse cx="168" cy="162" rx="6" ry="11"/>
+  </g>
+</svg>

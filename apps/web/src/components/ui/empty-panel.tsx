@@ -1,10 +1,16 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { useTheme } from '@/components/theme-provider'
 
 interface EmptyPanelProps {
   message?: string
   className?: string
+  /**
+   * Optional overlay content rendered above the watermark. When provided,
+   * the default message is hidden and this content takes the center slot.
+   */
+  children?: ReactNode
 }
 
 /**
@@ -14,20 +20,42 @@ interface EmptyPanelProps {
 export function EmptyPanel({
   message = 'Select a period and click Go to load the schedule',
   className = '',
+  children,
 }: EmptyPanelProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
+  const containerStyle = {
+    background: isDark ? 'rgba(25,25,33,0.85)' : 'rgba(255,255,255,0.85)',
+    border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)'}`,
+    backdropFilter: 'blur(20px)',
+    boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+  } as const
+
+  if (children) {
+    return (
+      <div className={`flex-1 relative flex rounded-2xl overflow-hidden ${className}`} style={containerStyle}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/skyhub-logo.png"
+          alt=""
+          aria-hidden="true"
+          data-watermark
+          className="select-none absolute pointer-events-none left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+          style={{
+            width: 360,
+            filter: isDark ? 'brightness(10) grayscale(1)' : 'grayscale(1) brightness(0)',
+            opacity: isDark ? 0.051 : 0.038,
+          }}
+          draggable={false}
+        />
+        <div className="relative z-10 flex-1 flex min-h-0">{children}</div>
+      </div>
+    )
+  }
+
   return (
-    <div
-      className={`flex-1 flex flex-col items-center justify-center rounded-2xl ${className}`}
-      style={{
-        background: isDark ? 'rgba(25,25,33,0.85)' : 'rgba(255,255,255,0.85)',
-        border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)'}`,
-        backdropFilter: 'blur(20px)',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-      }}
-    >
+    <div className={`flex-1 flex flex-col items-center justify-center rounded-2xl ${className}`} style={containerStyle}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/skyhub-logo.png"

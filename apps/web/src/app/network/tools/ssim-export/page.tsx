@@ -1,5 +1,9 @@
-import { ComingSoon } from '@/components/coming-soon'
+import { SsimExportShell } from '@/components/ssim-export/ssim-export-shell'
 
 export default function Page() {
-  return <ComingSoon />
+  return (
+    <div className="h-full">
+      <SsimExportShell />
+    </div>
+  )
 }

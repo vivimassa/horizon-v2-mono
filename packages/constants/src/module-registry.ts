@@ -6,7 +6,7 @@ export interface ModuleEntry {
   route: string
   parent_code: string | null
   /** Top-level module key for theming */
-  module: 'home' | 'network' | 'operations' | 'ground' | 'workforce' | 'integration' | 'admin' | 'settings'
+  module: 'home' | 'network' | 'operations' | 'ground' | 'workforce' | 'integration' | 'admin' | 'sysadmin' | 'settings'
   level: number
 }
 
@@ -318,6 +318,16 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
     level: 2,
   },
   {
+    code: '2.1.2.1',
+    name: 'Maintenance Planning',
+    description: 'Plan and forecast upcoming maintenance events',
+    icon: 'CalendarClock',
+    route: '/flight-ops/control/aircraft-maintenance/planning',
+    parent_code: '2.1.2',
+    module: 'operations',
+    level: 3,
+  },
+  {
     code: '2.1.2.2',
     name: 'Aircraft Status Board',
     description: 'Fleet-wide maintenance status and health overview',
@@ -328,24 +338,79 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
     level: 3,
   },
   {
-    code: '2.1.2.3',
-    name: 'Maintenance Planning',
-    description: 'Plan and forecast upcoming maintenance events',
-    icon: 'CalendarClock',
-    route: '/flight-ops/control/aircraft-maintenance/planning',
-    parent_code: '2.1.2',
-    module: 'operations',
-    level: 3,
-  },
-  {
     code: '2.1.3',
-    name: 'World Map',
-    description: 'Global flight tracking on an interactive world map',
-    icon: 'Globe',
-    route: '/flight-ops/control/world-map',
+    name: 'Disruption Center',
+    description: 'Disruption toolkit — live IROPS management, ML training and AI customization',
+    icon: 'ShieldAlert',
+    route: '/flight-ops/control/disruption-center',
     parent_code: '2.1',
     module: 'operations',
     level: 2,
+  },
+  // 2.1.3.1 — Machine Learning Training (FUTURE, next year).
+  // Purpose: let each operator train the disruption-prediction model on THEIR
+  // own historical data (flights, tail swaps, crew mods, cancellations, weather
+  // at the time). The global v1 model was fleet-agnostic and weak.
+  //
+  // Data sources to wire in when this ships:
+  //   - Internal: flight_instances, crew_modifications (once Crew Ops exists),
+  //     maintenance_events, disruption_issues history.
+  //   - External weather (historical METAR):
+  //       * Iowa State IEM ASOS archive — free CSV, decades, preferred for ML.
+  //         https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py
+  //       * NOAA ISD via NCEI — authoritative, bulk download.
+  //   - NOAA AWC live API only gives 15 days via hoursBeforeNow — NOT enough
+  //     for training. Do not rely on it for this module.
+  //
+  // Scope when built: dataset picker (date range, stations, fleet), feature
+  // preview, train/validate/publish flow, per-operator model versioning, A/B
+  // comparison against baseline rules. Keep UI separate from the live
+  // Disruption Center feed — this is a lab surface, not an ops surface.
+  {
+    code: '2.1.3.1',
+    name: 'Machine Learning Training',
+    description:
+      'Train the disruption-prediction model on operator-specific historical data (planned — not yet built).',
+    icon: 'Brain',
+    route: '/flight-ops/control/disruption-center/ml-training',
+    parent_code: '2.1.3',
+    module: 'operations',
+    level: 3,
+  },
+  // 2.1.3.2 — AI Customization (FUTURE, stub only).
+  // Per-operator controls over the Disruption Center AI advisor. Principle:
+  // users never see raw model names (Haiku/Sonnet/Opus) — instead pick a
+  // "smartness tier" with a friendly label. What matters is output quality,
+  // not the underlying model.
+  //
+  // Planned features: smartness tier, advisory-scope toggles, priority
+  // weights (OTP vs cost vs crew welfare), regulatory context (CAAV VAR 15 /
+  // FAA / EASA), operator SOP upload (RAG), output language, feedback loop,
+  // cost guardrails, allowed-action scope, privacy/redaction, confidence
+  // threshold. Full notes live in the stub page.
+  {
+    code: '2.1.3.2',
+    name: 'AI Customization',
+    description:
+      'Tune the Disruption Center AI advisor — smartness, scope, tone and priorities (planned — not yet built).',
+    icon: 'Sparkles',
+    route: '/flight-ops/control/disruption-center/ai-customization',
+    parent_code: '2.1.3',
+    module: 'operations',
+    level: 3,
+  },
+  // 2.1.3.3 — Disruption Management. The live ops surface for IROPS
+  // handling. Rule-based detection today; ML predictions plug in from
+  // 2.1.3.1 and the AI advisor from 2.1.3.2 without changes here.
+  {
+    code: '2.1.3.3',
+    name: 'Disruption Management',
+    description: 'Live IROPS feed, severity triage and recovery-solver hand-off.',
+    icon: 'Radar',
+    route: '/flight-ops/control/disruption-center/disruption-management',
+    parent_code: '2.1.3',
+    module: 'operations',
+    level: 3,
   },
   {
     code: '2.1.4',
@@ -359,10 +424,10 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
   },
   {
     code: '2.1.5',
-    name: 'Disruption Center',
-    description: 'Predictive disruption management with live IROPS alerts',
-    icon: 'ShieldAlert',
-    route: '/flight-ops/control/disruption-center',
+    name: 'World Map',
+    description: 'Global flight tracking on an interactive world map',
+    icon: 'Globe',
+    route: '/flight-ops/control/world-map',
     parent_code: '2.1',
     module: 'operations',
     level: 2,
@@ -575,13 +640,13 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
   },
 
   // ──────────────────────────────────────────────
-  // 5. SETTINGS / ADMIN
+  // 5. MASTER DATABASE
   // ──────────────────────────────────────────────
   {
     code: '5',
-    name: 'Settings',
-    description: 'System administration and configuration',
-    icon: 'Settings',
+    name: 'Master Database',
+    description: 'Reference data catalogues for every operational domain',
+    icon: 'Database',
     route: '/settings',
     parent_code: null,
     module: 'admin',
@@ -839,6 +904,70 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
     module: 'integration',
     level: 0,
   },
+
+  // ──────────────────────────────────────────────
+  // 7. SYSTEM ADMINISTRATION
+  // ──────────────────────────────────────────────
+  {
+    code: '7',
+    name: 'System Administration',
+    description: 'User accounts, access rights, operator profile and the company document library',
+    icon: 'ShieldCheck',
+    route: '/sysadmin',
+    parent_code: null,
+    module: 'sysadmin',
+    level: 0,
+  },
+  {
+    code: '7.1',
+    name: 'Administration',
+    description: 'Operator profile, user management and document library',
+    icon: 'ShieldCheck',
+    route: '/sysadmin',
+    parent_code: '7',
+    module: 'sysadmin',
+    level: 1,
+  },
+  {
+    code: '7.1.1',
+    name: 'Operator Profile',
+    description: 'Operator-wide settings — branding, accent colour, time zone and defaults',
+    icon: 'Building2',
+    route: '/settings/admin/operator-config',
+    parent_code: '7.1',
+    module: 'sysadmin',
+    level: 2,
+  },
+  {
+    code: '7.1.2',
+    name: 'User List Maintenance',
+    description: 'Manage user accounts and their profile details',
+    icon: 'Users',
+    route: '/sysadmin/users',
+    parent_code: '7.1',
+    module: 'sysadmin',
+    level: 2,
+  },
+  {
+    code: '7.1.3',
+    name: 'User Access Rights',
+    description: 'Define roles, permissions and module-level access control',
+    icon: 'KeyRound',
+    route: '/sysadmin/access-rights',
+    parent_code: '7.1',
+    module: 'sysadmin',
+    level: 2,
+  },
+  {
+    code: '7.1.4',
+    name: 'Document Management',
+    description: 'Central library for operational manuals, SOPs and procedures shared across every module',
+    icon: 'FolderOpen',
+    route: '/sysadmin/company-documents',
+    parent_code: '7.1',
+    module: 'sysadmin',
+    level: 2,
+  },
 ]
 
 // ─── Index maps for fast lookup ────────────────
@@ -917,5 +1046,6 @@ export const MODULE_THEMES: Record<string, { accent: string; bg: string; bgSubtl
   workforce: { accent: '#7c3aed', bg: '#ede9fe', bgSubtle: '#f5f3ff' },
   integration: { accent: '#0891b2', bg: '#cffafe', bgSubtle: '#ecfeff' },
   admin: { accent: '#64748b', bg: '#e2e8f0', bgSubtle: '#f8fafc' },
+  sysadmin: { accent: '#d97706', bg: '#fef3c7', bgSubtle: '#fffbeb' },
   settings: { accent: '#64748b', bg: '#e2e8f0', bgSubtle: '#f8fafc' },
 }

@@ -187,4 +187,40 @@ export async function userRoutes(app: FastifyInstance) {
 
     return { success: true }
   })
+
+  // ── GET /users — list users for an operator (assignee picker) ──
+  app.get('/users', async (req, reply) => {
+    const q = req.query as { operatorId?: string; role?: string; active?: string }
+    if (!q.operatorId) return reply.code(400).send({ error: 'operatorId is required' })
+
+    const filter: Record<string, unknown> = { operatorId: q.operatorId }
+    if (q.active !== 'false') filter.isActive = true
+    if (q.role) filter.role = q.role
+
+    const users = await User.find(filter, {
+      _id: 1,
+      operatorId: 1,
+      role: 1,
+      isActive: 1,
+      'profile.firstName': 1,
+      'profile.lastName': 1,
+      'profile.email': 1,
+      'profile.avatarUrl': 1,
+      'profile.department': 1,
+    })
+      .lean()
+      .limit(500)
+
+    return users.map((u: any) => ({
+      _id: u._id,
+      operatorId: u.operatorId,
+      role: u.role,
+      isActive: u.isActive,
+      firstName: u.profile?.firstName ?? '',
+      lastName: u.profile?.lastName ?? '',
+      email: u.profile?.email ?? '',
+      avatarUrl: u.profile?.avatarUrl ?? '',
+      department: u.profile?.department ?? '',
+    }))
+  })
 }

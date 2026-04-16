@@ -934,6 +934,104 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     }
   }
 
+  // ── GET /gantt/resolve-flight — find sfId for (flightNumber, date, dep, arr) ──
+  // Used by modules outside the Gantt (e.g. Disruption Center right-click)
+  // that hold human-readable flight identifiers but need the composite ID
+  // ("sfId|opDate") that openFlightInfo() expects. Start from FlightInstance
+  // (the operating-day record disruptions attach to) which stores both
+  // ICAO and IATA station codes; fall back to ScheduledFlight if no
+  // instance exists for the date.
+  app.get('/gantt/resolve-flight', async (req, reply) => {
+    const q = req.query as { operatorId?: string; flightNumber?: string; date?: string; dep?: string; arr?: string }
+    if (!q.operatorId || !q.flightNumber || !q.date) {
+      return reply.code(400).send({ error: 'operatorId, flightNumber, date required' })
+    }
+
+    // ── 1. FlightInstance lookup ──
+    // Disruptions are detected against operating-day instances; the
+    // instance carries the scheduledFlightId we need.
+    const instances = await FlightInstance.find(
+      { operatorId: q.operatorId, flightNumber: q.flightNumber, operatingDate: q.date },
+      { _id: 1, scheduledFlightId: 1, dep: 1, arr: 1, schedule: 1 },
+    ).lean()
+
+    const matchByStations = (rows: any[]) => {
+      if (!q.dep && !q.arr) return rows
+      return rows.filter((r) => {
+        const depOk = !q.dep || r.dep?.icao === q.dep || r.dep?.iata === q.dep
+        const arrOk = !q.arr || r.arr?.icao === q.arr || r.arr?.iata === q.arr
+        return depOk && arrOk
+      })
+    }
+
+    const instanceMatches = matchByStations(instances)
+    const usableInstances = (instanceMatches.length > 0 ? instanceMatches : instances).filter(
+      (i: any) => i.scheduledFlightId,
+    )
+    if (usableInstances.length > 0) {
+      if (usableInstances.length > 1) {
+        app.log.warn(
+          { operatorId: q.operatorId, flightNumber: q.flightNumber, date: q.date, count: usableInstances.length },
+          'resolve-flight: more than one FlightInstance match — picking earliest STD',
+        )
+        usableInstances.sort((a: any, b: any) => (a.schedule?.stdUtc ?? 0) - (b.schedule?.stdUtc ?? 0))
+      }
+      return { scheduledFlightId: usableInstances[0].scheduledFlightId, operatingDate: q.date }
+    }
+
+    // ── 2. ScheduledFlight fallback ──
+    // Used when no operating-day instance exists yet (e.g. future-dated
+    // schedule flag). depStation may be ICAO or IATA on the schedule
+    // itself; check both via the Airport collection if exact match fails.
+    const candidates = await ScheduledFlight.find(
+      {
+        operatorId: q.operatorId,
+        flightNumber: q.flightNumber,
+        effectiveFrom: { $lte: q.date },
+        effectiveUntil: { $gte: q.date },
+      },
+      { _id: 1, depStation: 1, arrStation: 1, daysOfWeek: 1, stdUtc: 1 },
+    ).lean()
+
+    const jsDay = new Date(q.date + 'T12:00:00Z').getUTCDay()
+    const ssimDay = jsDay === 0 ? 7 : jsDay
+    let matches = candidates.filter((c: any) => (c.daysOfWeek as string).includes(String(ssimDay)))
+
+    if (matches.length > 1 && (q.dep || q.arr)) {
+      // Translate the disruption's station codes through Airport so we
+      // can match either an ICAO or IATA-stored value on the schedule.
+      const codes = [q.dep, q.arr].filter(Boolean) as string[]
+      const airports = await Airport.find(
+        { $or: codes.map((c) => ({ $or: [{ icaoCode: c }, { iataCode: c }] })) },
+        { icaoCode: 1, iataCode: 1 },
+      ).lean()
+      const variants = (code?: string) => {
+        if (!code) return null
+        const a = airports.find((x: any) => x.icaoCode === code || x.iataCode === code)
+        return a ? [a.icaoCode, a.iataCode].filter(Boolean) : [code]
+      }
+      const depVariants = variants(q.dep)
+      const arrVariants = variants(q.arr)
+      const narrowed = matches.filter(
+        (c: any) =>
+          (!depVariants || depVariants.includes(c.depStation)) && (!arrVariants || arrVariants.includes(c.arrStation)),
+      )
+      if (narrowed.length > 0) matches = narrowed
+    }
+
+    if (matches.length === 0) return reply.code(404).send({ error: 'No matching flight on that date' })
+
+    if (matches.length > 1) {
+      app.log.warn(
+        { operatorId: q.operatorId, flightNumber: q.flightNumber, date: q.date, count: matches.length },
+        'resolve-flight: more than one ScheduledFlight match — picking earliest STD',
+      )
+      matches.sort((a: any, b: any) => String(a.stdUtc).localeCompare(String(b.stdUtc)))
+    }
+
+    return { scheduledFlightId: matches[0]._id, operatingDate: q.date }
+  })
+
   // ── GET /gantt/flight-detail — full flight data for Flight Information dialog ──
   app.get('/gantt/flight-detail', async (req, reply) => {
     const q = req.query as Record<string, string>

@@ -34,12 +34,15 @@ export function PeriodField({ from, to, onChangeFrom, onChangeTo }: PeriodFieldP
 }
 
 /* ─────────────────────────────────────────────────────────────
- * RollingPeriodField — 6-stop slider (Off · 3D · 4D · 5D · 6D · 7D)
- * for live-ops windows. Off = fixed period picked via PeriodField;
- * any other stop = N-day window that re-anchors to today on each
- * refresh. Caller disables PeriodField when the slider is active.
+ * RollingPeriodField — slider for live-ops windows. Off = fixed
+ * period picked via PeriodField; any other stop = N-day window
+ * that re-anchors to today on each refresh. Caller disables
+ * PeriodField when the slider is active. Pass `stops` to override
+ * the default (Off · 3D · 4D · 5D · 6D · 7D).
  * ───────────────────────────────────────────────────────────── */
-const ROLLING_STOPS: Array<{ label: string; value: number | null }> = [
+export type RollingStop = { label: string; value: number | null }
+
+const DEFAULT_ROLLING_STOPS: RollingStop[] = [
   { label: 'Off', value: null },
   { label: '3D', value: 3 },
   { label: '4D', value: 4 },
@@ -51,13 +54,14 @@ const ROLLING_STOPS: Array<{ label: string; value: number | null }> = [
 interface RollingPeriodFieldProps {
   value: number | null
   onChange: (v: number | null) => void
+  stops?: RollingStop[]
 }
-export function RollingPeriodField({ value, onChange }: RollingPeriodFieldProps) {
+export function RollingPeriodField({ value, onChange, stops = DEFAULT_ROLLING_STOPS }: RollingPeriodFieldProps) {
   const idx = Math.max(
     0,
-    ROLLING_STOPS.findIndex((s) => s.value === value),
+    stops.findIndex((s) => s.value === value),
   )
-  const max = ROLLING_STOPS.length - 1
+  const max = stops.length - 1
   const pct = (idx / max) * 100
   const accent = 'var(--module-accent, #1e40af)'
   return (
@@ -65,7 +69,7 @@ export function RollingPeriodField({ value, onChange }: RollingPeriodFieldProps)
       <div className="relative h-9 flex items-center">
         <div className="absolute left-0 right-0 h-1 rounded-full" style={{ background: 'rgba(125,125,140,0.25)' }} />
         <div className="absolute left-0 h-1 rounded-full" style={{ width: `${pct}%`, background: accent }} />
-        {ROLLING_STOPS.map((_s, i) => (
+        {stops.map((_s, i) => (
           <div
             key={i}
             className="absolute rounded-full"
@@ -83,7 +87,7 @@ export function RollingPeriodField({ value, onChange }: RollingPeriodFieldProps)
           max={max}
           step={1}
           value={idx}
-          onChange={(e) => onChange(ROLLING_STOPS[parseInt(e.target.value, 10)].value)}
+          onChange={(e) => onChange(stops[parseInt(e.target.value, 10)].value)}
           className="absolute inset-0 w-full opacity-0 cursor-pointer"
           aria-label="Rolling period"
         />
@@ -99,7 +103,7 @@ export function RollingPeriodField({ value, onChange }: RollingPeriodFieldProps)
         />
       </div>
       <div className="flex justify-between mt-1">
-        {ROLLING_STOPS.map((s, i) => (
+        {stops.map((s, i) => (
           <span
             key={i}
             className="text-[13px] font-medium"

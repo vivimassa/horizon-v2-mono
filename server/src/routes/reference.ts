@@ -1350,8 +1350,8 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     const defaults = [
       { code: 'CP', name: 'Captain', category: 'cockpit', rankOrder: 1, isPic: true, color: '#4338ca' },
       { code: 'FO', name: 'First Officer', category: 'cockpit', rankOrder: 2, isPic: false, color: '#4f46e5' },
-      { code: 'SO', name: 'Second Officer', category: 'cockpit', rankOrder: 3, isPic: false, color: '#6366f1' },
-      { code: 'FE', name: 'Flight Engineer', category: 'cockpit', rankOrder: 4, isPic: false, color: '#818cf8' },
+      { code: 'SO', name: 'Second Officer', category: 'cockpit', rankOrder: 3, isPic: false, color: '#818CF8' },
+      { code: 'FE', name: 'Flight Engineer', category: 'cockpit', rankOrder: 4, isPic: false, color: '#a5b4fc' },
       { code: 'CC', name: 'Cabin Chief', category: 'cabin', rankOrder: 1, isPic: false, color: '#92400e' },
       { code: 'SP', name: 'Senior Purser', category: 'cabin', rankOrder: 2, isPic: false, color: '#b45309' },
       { code: 'PS', name: 'Purser', category: 'cabin', rankOrder: 3, isPic: false, color: '#d97706' },

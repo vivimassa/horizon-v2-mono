@@ -84,15 +84,15 @@ const codes = [
   { code: "77", alphaCode: "WG", category: "Weather", name: "Ground Handling Weather", description: "Ground handling impaired by adverse weather", color: "#0ea5e9" },
 
   // ATC & Airport (81-89)
-  { code: "81", alphaCode: "AT", category: "ATC & Airport", name: "ATC Restriction (En-Route)", description: "ATC en-route restriction, flow control, capacity", color: "#6366f1" },
-  { code: "82", alphaCode: "AX", category: "ATC & Airport", name: "ATC Staff/Equipment", description: "ATC staff shortage or equipment failure", color: "#6366f1" },
-  { code: "83", alphaCode: "AE", category: "ATC & Airport", name: "ATC Restriction (Destination)", description: "ATC restriction at destination", color: "#6366f1" },
-  { code: "84", alphaCode: "AW", category: "ATC & Airport", name: "ATC Weather Restriction", description: "ATC restriction due to weather at destination", color: "#6366f1" },
-  { code: "85", alphaCode: "AS", category: "ATC & Airport", name: "Mandatory Security", description: "Mandatory security measures", color: "#6366f1" },
-  { code: "86", alphaCode: "AG", category: "ATC & Airport", name: "Immigration/Customs/Health", description: "Government authority restrictions", color: "#6366f1" },
-  { code: "87", alphaCode: "AF", category: "ATC & Airport", name: "Airport Facilities", description: "Airport facilities, parking, ramp congestion", color: "#6366f1" },
-  { code: "88", alphaCode: "AD", category: "ATC & Airport", name: "Destination Restriction", description: "Airport restriction at destination (curfew, closure)", color: "#6366f1" },
-  { code: "89", alphaCode: "AM", category: "ATC & Airport", name: "Departure Restriction", description: "Airport restriction at departure (curfew, closure)", color: "#6366f1" },
+  { code: "81", alphaCode: "AT", category: "ATC & Airport", name: "ATC Restriction (En-Route)", description: "ATC en-route restriction, flow control, capacity", color: "#14B8A6" },
+  { code: "82", alphaCode: "AX", category: "ATC & Airport", name: "ATC Staff/Equipment", description: "ATC staff shortage or equipment failure", color: "#14B8A6" },
+  { code: "83", alphaCode: "AE", category: "ATC & Airport", name: "ATC Restriction (Destination)", description: "ATC restriction at destination", color: "#14B8A6" },
+  { code: "84", alphaCode: "AW", category: "ATC & Airport", name: "ATC Weather Restriction", description: "ATC restriction due to weather at destination", color: "#14B8A6" },
+  { code: "85", alphaCode: "AS", category: "ATC & Airport", name: "Mandatory Security", description: "Mandatory security measures", color: "#14B8A6" },
+  { code: "86", alphaCode: "AG", category: "ATC & Airport", name: "Immigration/Customs/Health", description: "Government authority restrictions", color: "#14B8A6" },
+  { code: "87", alphaCode: "AF", category: "ATC & Airport", name: "Airport Facilities", description: "Airport facilities, parking, ramp congestion", color: "#14B8A6" },
+  { code: "88", alphaCode: "AD", category: "ATC & Airport", name: "Destination Restriction", description: "Airport restriction at destination (curfew, closure)", color: "#14B8A6" },
+  { code: "89", alphaCode: "AM", category: "ATC & Airport", name: "Departure Restriction", description: "Airport restriction at departure (curfew, closure)", color: "#14B8A6" },
 
   // Reactionary & Misc (91-99)
   { code: "91", alphaCode: "RL", category: "Reactionary & Misc", name: "Passenger Connection", description: "Connecting passengers, crew, or baggage protection", color: "#a855f7" },

@@ -106,6 +106,8 @@ export type {
   MxEventDetail,
   DisruptionIssueRef,
   DisruptionActivityRef,
+  NonCrewPersonRef,
+  NonCrewPersonCreate,
 } from './client'
 
 // ─── React Query layer ───

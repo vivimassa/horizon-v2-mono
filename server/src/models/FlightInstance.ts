@@ -123,6 +123,42 @@ const flightInstanceSchema = new Schema(
       ],
     },
 
+    /** Divert / Air Return / Ramp Return state — AIMS 2.1.1 §5.4.1–5.4.2 */
+    disruption: {
+      kind: {
+        type: String,
+        enum: ['none', 'divert', 'airReturn', 'rampReturn'],
+        default: 'none',
+      },
+      divertAirportIcao: { type: String, default: null },
+      ataUtc: { type: Number, default: null },
+      etaUtc: { type: Number, default: null },
+      reasonCode: { type: String, default: null },
+      reasonText: { type: String, default: null },
+      nextFlightNumber: { type: String, default: null },
+      nextEtdUtc: { type: Number, default: null },
+      doNotGenerateNextFlight: { type: Boolean, default: false },
+      appliedAt: { type: Number, default: null },
+      appliedBy: { type: String, default: null },
+    },
+
+    /** Crew reporting time. Reschedule action (§5.4.4) resets this to null so the duty engine recomputes off the new ETD. */
+    crewReportingTimeUtc: { type: Number, default: null },
+
+    /** Jump seaters — personnel from crew or non-crew directory (§5.3). */
+    jumpSeaters: [
+      {
+        _id: false,
+        kind: { type: String, enum: ['crew', 'nonCrew'], required: true },
+        personId: { type: String, required: true },
+        name: { type: String, required: true },
+        company: { type: String, default: null },
+        department: { type: String, default: null },
+        assignedAt: { type: Number, required: true },
+        assignedBy: { type: String, default: '' },
+      },
+    ],
+
     status: {
       type: String,
       enum: [

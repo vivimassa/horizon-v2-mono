@@ -56,7 +56,7 @@ export function getFlightStatusBadge(status: string): { label: string; color: st
     case 'published':
       return { label: 'Published', color: '#111827', bg: '#f3f4f6' }
     case 'draft':
-      return { label: 'Draft', color: '#6366f1', bg: '#eef2ff' }
+      return { label: 'Draft', color: '#64748B', bg: '#f1f5f9' }
     case 'cancelled':
       return { label: 'Cancelled', color: '#9ca3af', bg: '#f9fafb' }
     default:

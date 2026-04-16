@@ -213,7 +213,7 @@ export function AssignToPicker({ issue, operatorId, onClose, onConfirm }: Props)
             onClick={() => selected && onConfirm(selected)}
             className="px-4 h-8 rounded-lg text-[13px] font-semibold transition-opacity hover:opacity-90"
             style={{
-              background: 'var(--module-accent, #6366f1)',
+              background: 'var(--module-accent, #F59E0B)',
               color: '#fff',
               opacity: selected ? 1 : 0.5,
               cursor: selected ? 'pointer' : 'not-allowed',

@@ -34,6 +34,9 @@ import { RotationPopover } from './rotation-popover'
 import { AssignPopover } from './assign-popover'
 import { GanttSwapDialog } from './gantt-swap-dialog'
 import { GanttCancelDialog } from './gantt-cancel-dialog'
+import { GanttRescheduleDialog } from './gantt-reschedule-dialog'
+import { GanttDiversionDialog } from './gantt-diversion-dialog'
+import { GanttJumpseaterDialog } from './gantt-jumpseater-dialog'
 
 const ROW_LABEL_W = 160
 
@@ -231,8 +234,9 @@ export function GanttCanvas() {
   } | null>(null)
   const [rubberband, setRubberband] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
 
-  // Flight drag & drop state
-  const DRAG_HOLD_MS = 50
+  // Flight drag & drop state — hold threshold tuned so a normal click-release
+  // never trips the drag. Below ~150 ms you start losing plain clicks.
+  const DRAG_HOLD_MS = 220
   const dragFlightRef = useRef<{
     active: boolean
     timerId: ReturnType<typeof setTimeout> | null
@@ -396,8 +400,10 @@ export function GanttCanvas() {
       if (dragFlightRef.current?.active) {
         const df = dragFlightRef.current
         const targetRow = df.targetRowIdx >= 0 ? layout.rows[df.targetRowIdx] : null
+        const didRearrange = !!targetRow?.registration && targetRow.registration !== df.sourceReg
 
-        if (targetRow?.registration && targetRow.registration !== df.sourceReg) {
+        if (didRearrange && targetRow?.registration) {
+          const targetReg = targetRow.registration
           const flightIds = [...df.flightIds]
           const draggedFlights = flights.filter((f) => flightIds.includes(f.id))
           const dragDates = new Set(draggedFlights.map((f) => f.operatingDate))
@@ -406,20 +412,27 @@ export function GanttCanvas() {
           const targetFlightIds = layout.bars
             .filter((b) => {
               const row = layout.rows[b.row]
-              return row?.registration === targetRow.registration && dragDates.has(b.flight.operatingDate)
+              return row?.registration === targetReg && dragDates.has(b.flight.operatingDate)
             })
             .map((b) => b.flightId)
             .filter((id) => !flightIds.includes(id))
 
           // Visual rearrange only — no DB writes, just swap virtual placements
-          useGanttStore
-            .getState()
-            .rearrangeVirtualPlacements(flightIds, df.sourceReg, targetFlightIds, targetRow.registration)
+          useGanttStore.getState().rearrangeVirtualPlacements(flightIds, df.sourceReg, targetFlightIds, targetReg)
         }
 
+        const hitBarId = dragRef.current?.hitBarId ?? null
+        const wasCtrl = dragRef.current?.ctrlKey ?? false
         cancelDragFlight()
         dragRef.current = null
         setRubberband(null)
+
+        // Hold-but-no-drop behaves like a click: select the flight.
+        if (!didRearrange && hitBarId) {
+          const s = useGanttStore.getState()
+          s.closeContextMenu()
+          s.selectFlight(hitBarId, wasCtrl)
+        }
         return
       }
 
@@ -532,7 +545,7 @@ export function GanttCanvas() {
           : hoveredFlightId
             ? 'grab'
             : 'default'
-  }, [hoveredFlightId])
+  }, [hoveredFlightId, swapMode])
 
   // Redraw on data/view changes (hover excluded — handled by mouse move rAF)
   useEffect(() => {
@@ -859,6 +872,15 @@ export function GanttCanvas() {
 
       {/* Cancel dialog */}
       <GanttCancelDialog />
+
+      {/* Reschedule dialog (from right-click context menu or toolbar pick mode) */}
+      <GanttRescheduleDialog />
+
+      {/* Diversion dialog (from toolbar pick mode) */}
+      <GanttDiversionDialog />
+
+      {/* Jumpseater dialog (from right-click context menu) */}
+      <GanttJumpseaterDialog />
     </div>
   )
 }

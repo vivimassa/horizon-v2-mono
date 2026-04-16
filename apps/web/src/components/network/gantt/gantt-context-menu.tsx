@@ -2,7 +2,18 @@
 
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Info, Link, Unlink, ArrowLeftRight, Trash2, ChevronRight, Clock, ShieldCheck, ShieldOff } from 'lucide-react'
+import {
+  Info,
+  Link,
+  Unlink,
+  ArrowLeftRight,
+  Trash2,
+  ChevronRight,
+  CalendarClock,
+  ShieldCheck,
+  ShieldOff,
+  UserPlus,
+} from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { useGanttStore } from '@/stores/use-gantt-store'
 
@@ -146,12 +157,22 @@ export function GanttContextMenu() {
           hoverBg={hoverBg}
         />
         <MenuItem
-          icon={Clock}
-          label="Slot Details"
-          disabled={!isSingle || !selectedFlts[0]?.slotStatus}
+          icon={CalendarClock}
+          label="Reschedule"
+          disabled={!isSingle}
           onClick={() => {
-            window.open('/network/schedule/slot-manager', '_blank')
-            closeContextMenu()
+            useGanttStore.getState().openRescheduleDialog(ctx.flightId)
+          }}
+          textColor={textColor}
+          textMuted={textMuted}
+          hoverBg={hoverBg}
+        />
+        <MenuItem
+          icon={UserPlus}
+          label="Add Jumpseater"
+          disabled={!isSingle}
+          onClick={() => {
+            useGanttStore.getState().openJumpseaterDialog(ctx.flightId)
           }}
           textColor={textColor}
           textMuted={textMuted}

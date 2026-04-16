@@ -22,6 +22,7 @@ import {
   GitBranch,
   Plus,
   CheckCircle,
+  CalendarClock,
   Crosshair,
   MessageSquare,
   Radio,
@@ -58,7 +59,10 @@ export function OpsToolbar({
   const palette = isDark ? colors.dark : colors.light
 
   const barLabelMode = useGanttStore((s) => s.barLabelMode)
+  const selectedFlightIds = useGanttStore((s) => s.selectedFlightIds)
   const showTat = useGanttStore((s) => s.showTat)
+
+  const singleSelectedFlightId = selectedFlightIds.size === 1 ? [...selectedFlightIds][0] : null
   const toggleTat = useGanttStore((s) => s.toggleTat)
   const refreshIntervalMins = useGanttStore((s) => s.refreshIntervalMins)
   const setRefreshIntervalMins = useGanttStore((s) => s.setRefreshIntervalMins)
@@ -659,6 +663,36 @@ export function OpsToolbar({
               hoverBg={hoverBg}
               activeBg={activeBg}
               tooltip="Bulk assign/deassign aircraft"
+            />
+            <RibbonBtn
+              icon={CalendarClock}
+              label="Reschedule"
+              onClick={() => {
+                if (singleSelectedFlightId) useGanttStore.getState().openRescheduleDialog(singleSelectedFlightId)
+              }}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              disabled={!singleSelectedFlightId}
+              tooltip={
+                singleSelectedFlightId ? 'Reschedule the selected flight' : 'Select one flight on the chart first'
+              }
+            />
+            <RibbonBtn
+              icon={AlertTriangle}
+              label="Diversion"
+              onClick={() => {
+                if (singleSelectedFlightId) useGanttStore.getState().openDiversionDialog(singleSelectedFlightId)
+              }}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              disabled={!singleSelectedFlightId}
+              tooltip={
+                singleSelectedFlightId
+                  ? 'Divert / Air Return / Ramp Return for the selected flight'
+                  : 'Select one flight on the chart first'
+              }
             />
             <RibbonBtn
               icon={Plus}

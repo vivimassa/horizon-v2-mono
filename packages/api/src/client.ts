@@ -2204,6 +2204,69 @@ export const api = {
 
   getStationWeather: (icao: string) =>
     request<WeatherStationObservation>(`/weather/station/${encodeURIComponent(icao)}`),
+
+  // ── Non-Crew People (AIMS 5.2.5) ──
+  listNonCrewPeople: (q?: { search?: string; availableOnly?: boolean }) => {
+    const params = new URLSearchParams()
+    if (q?.search) params.set('search', q.search)
+    if (q?.availableOnly) params.set('availableOnly', 'true')
+    const qs = params.toString()
+    return request<NonCrewPersonRef[]>(`/non-crew-people${qs ? `?${qs}` : ''}`)
+  },
+
+  getNonCrewPerson: (id: string) => request<NonCrewPersonRef>(`/non-crew-people/${encodeURIComponent(id)}`),
+
+  createNonCrewPerson: (data: NonCrewPersonCreate) =>
+    request<NonCrewPersonRef>('/non-crew-people', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateNonCrewPerson: (id: string, data: Partial<NonCrewPersonCreate>) =>
+    request<NonCrewPersonRef>(`/non-crew-people/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteNonCrewPerson: (id: string) =>
+    request<{ success: boolean }>(`/non-crew-people/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+}
+
+// ── Non-Crew Person types ──
+
+export interface NonCrewPersonRef {
+  _id: string
+  operatorId: string
+  fullName: { first: string; middle: string | null; last: string }
+  dateOfBirth: string
+  gender: 'M' | 'F' | 'X'
+  nationality: string
+  passport: { number: string; countryOfIssue: string; expiryDate: string }
+  contact: { email: string | null; phone: string | null }
+  company: string | null
+  department: string | null
+  avatarUrl: string | null
+  jumpseatPriority: 'low' | 'normal' | 'high'
+  doNotList: boolean
+  terminated: boolean
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface NonCrewPersonCreate {
+  fullName: { first: string; middle?: string | null; last: string }
+  dateOfBirth: string
+  gender: 'M' | 'F' | 'X'
+  nationality: string
+  passport: { number: string; countryOfIssue: string; expiryDate: string }
+  contact?: { email?: string | null; phone?: string | null }
+  company?: string | null
+  department?: string | null
+  jumpseatPriority?: 'low' | 'normal' | 'high'
+  doNotList?: boolean
+  terminated?: boolean
 }
 
 // ─── Disruption Center types ────────────────────────────

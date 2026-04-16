@@ -88,6 +88,35 @@ export interface FlightDetail {
     incoming: Array<{ flightNumber: string; pax: number }>
   }
 
+  // Disruption state (AIMS §5.4.1–5.4.2)
+  disruption: {
+    kind: 'none' | 'divert' | 'airReturn' | 'rampReturn'
+    divertAirportIcao?: string | null
+    ataUtc?: number | null
+    etaUtc?: number | null
+    reasonCode?: string | null
+    reasonText?: string | null
+    nextFlightNumber?: string | null
+    nextEtdUtc?: number | null
+    doNotGenerateNextFlight?: boolean
+    appliedAt?: number | null
+    appliedBy?: string | null
+  }
+
+  // Crew reporting time (AIMS §5.4.4) — Reschedule resets this to null
+  crewReportingTimeUtc: number | null
+
+  // Jump seaters (AIMS §5.3) — from crew directory or non-crew directory
+  jumpSeaters: Array<{
+    kind: 'crew' | 'nonCrew'
+    personId: string
+    name: string
+    company: string | null
+    department: string | null
+    assignedAt: number
+    assignedBy: string
+  }>
+
   // Schedule metadata
   status: string
   serviceType: string

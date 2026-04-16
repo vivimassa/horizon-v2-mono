@@ -791,6 +791,16 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
     module: 'admin',
     level: 2,
   },
+  {
+    code: '5.2.5',
+    name: 'Non-Crew Directory',
+    description: 'Non-crew personnel for jumpseat assignment & APIS',
+    icon: 'Contact',
+    route: '/admin/non-crew-people',
+    parent_code: '5.2',
+    module: 'admin',
+    level: 2,
+  },
 
   // 5.3 Ground Ops (Master Database)
   {
@@ -1056,11 +1066,11 @@ export function getTopLevelModules(): ModuleEntry[] {
 export const MODULE_THEMES: Record<string, { accent: string; bg: string; bgSubtle: string }> = {
   home: { accent: '#1e40af', bg: '#dbeafe', bgSubtle: '#eff6ff' },
   network: { accent: '#2563eb', bg: '#dbeafe', bgSubtle: '#eff6ff' },
-  operations: { accent: '#6366f1', bg: '#e0e7ff', bgSubtle: '#eef2ff' },
+  operations: { accent: '#F59E0B', bg: '#fde68a', bgSubtle: '#fef3c7' },
   ground: { accent: '#059669', bg: '#d1fae5', bgSubtle: '#ecfdf5' },
   workforce: { accent: '#7c3aed', bg: '#ede9fe', bgSubtle: '#f5f3ff' },
   integration: { accent: '#0891b2', bg: '#cffafe', bgSubtle: '#ecfeff' },
   admin: { accent: '#64748b', bg: '#e2e8f0', bgSubtle: '#f8fafc' },
-  sysadmin: { accent: '#d97706', bg: '#fef3c7', bgSubtle: '#fffbeb' },
+  sysadmin: { accent: '#B45309', bg: '#fed7aa', bgSubtle: '#ffedd5' },
   settings: { accent: '#64748b', bg: '#e2e8f0', bgSubtle: '#f8fafc' },
 }

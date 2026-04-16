@@ -615,7 +615,7 @@ export const SERVICE_TYPE_GROUPS: { label: string; codes: string[]; color: strin
   { label: 'Charter — Cargo/Mail', codes: ['H'], color: '#ea580c' },
   { label: 'Additional — Cargo/Mail', codes: ['A'], color: '#c2410c' },
   { label: 'Passenger/Cargo Mixed', codes: ['Q', 'R'], color: '#0ea5e9' },
-  { label: 'Charter — Pax/Cargo/Mail', codes: ['L', 'O'], color: '#6366f1' },
+  { label: 'Charter — Pax/Cargo/Mail', codes: ['L', 'O'], color: '#EC4899' },
   { label: 'Others', codes: ['P', 'T', 'K', 'W', 'E', 'D', 'N', 'I', 'X'], color: '#6b7280' },
 ]
 

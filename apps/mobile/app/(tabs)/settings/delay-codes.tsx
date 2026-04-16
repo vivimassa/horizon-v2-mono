@@ -18,7 +18,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   'Damage & EDP': '#e11d48',
   'Operations & Crew': '#8b5cf6',
   Weather: '#0ea5e9',
-  'ATC & Airport': '#6366f1',
+  'ATC & Airport': '#14B8A6',
   'Reactionary & Misc': '#a855f7',
 }
 const CATEGORY_ORDER: Record<string, number> = {

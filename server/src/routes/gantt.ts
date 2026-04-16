@@ -1204,6 +1204,32 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
         })),
       },
 
+      disruption: instance?.disruption
+        ? {
+            kind: instance.disruption.kind ?? 'none',
+            divertAirportIcao: instance.disruption.divertAirportIcao ?? null,
+            ataUtc: instance.disruption.ataUtc ?? null,
+            etaUtc: instance.disruption.etaUtc ?? null,
+            reasonCode: instance.disruption.reasonCode ?? null,
+            reasonText: instance.disruption.reasonText ?? null,
+            nextFlightNumber: instance.disruption.nextFlightNumber ?? null,
+            nextEtdUtc: instance.disruption.nextEtdUtc ?? null,
+            doNotGenerateNextFlight: !!instance.disruption.doNotGenerateNextFlight,
+            appliedAt: instance.disruption.appliedAt ?? null,
+            appliedBy: instance.disruption.appliedBy ?? null,
+          }
+        : { kind: 'none' as const },
+      crewReportingTimeUtc: instance?.crewReportingTimeUtc ?? null,
+      jumpSeaters: (instance?.jumpSeaters ?? []).map((j) => ({
+        kind: j.kind,
+        personId: j.personId,
+        name: j.name,
+        company: j.company ?? null,
+        department: j.department ?? null,
+        assignedAt: j.assignedAt,
+        assignedBy: j.assignedBy ?? '',
+      })),
+
       status: sf.status,
       serviceType: sf.serviceType ?? 'J',
       cockpitCrewRequired: sf.cockpitCrewRequired ?? null,
@@ -1435,6 +1461,223 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     if (!q.operatorId) return { error: 'operatorId required' }
     const result = await FlightInstance.deleteMany({ operatorId: q.operatorId })
     return { deleted: result.deletedCount }
+  })
+
+  // ── Helper: parse composite flight-instance id "${sfId}|${opDate}" and upsert a minimal shell ──
+  async function ensureInstanceShell(operatorId: string, compositeId: string) {
+    const [sfId, opDate] = compositeId.split('|')
+    if (!sfId || !opDate) return null
+
+    const sf = await ScheduledFlight.findOne({ _id: sfId, operatorId }).lean()
+    if (!sf) return null
+
+    const existing = await FlightInstance.findOne({ _id: compositeId }).lean()
+    if (existing) return existing
+
+    const findAirportCodes = async (code: string) => {
+      const ap = await Airport.findOne({ $or: [{ icaoCode: code }, { iataCode: code }] }).lean()
+      return { icao: ap?.icaoCode ?? code, iata: ap?.iataCode ?? code }
+    }
+    const [depCodes, arrCodes] = await Promise.all([
+      findAirportCodes(sf.depStation as string),
+      findAirportCodes(sf.arrStation as string),
+    ])
+
+    const dayMs = new Date(opDate + 'T00:00:00Z').getTime()
+    const depOff = (sf.departureDayOffset as number) ?? 1
+    const arrOff = (sf.arrivalDayOffset as number) ?? 1
+    const stdMs = dayMs + (depOff - 1) * DAY_MS + timeStringToMs(sf.stdUtc as string)
+    const staMs = dayMs + (arrOff - 1) * DAY_MS + timeStringToMs(sf.staUtc as string)
+
+    const shell = await FlightInstance.create({
+      _id: compositeId,
+      operatorId,
+      scheduledFlightId: sfId,
+      flightNumber: sf.flightNumber,
+      operatingDate: opDate,
+      dep: depCodes,
+      arr: arrCodes,
+      schedule: { stdUtc: stdMs, staUtc: staMs },
+      tail: {
+        registration: (sf.aircraftReg as string) ?? null,
+        icaoType: (sf.aircraftTypeIcao as string) ?? null,
+      },
+      status: sf.aircraftReg ? 'assigned' : 'scheduled',
+    })
+    return shell.toObject()
+  }
+
+  // ── POST /gantt/flight-instance/:id/disruption — apply Divert / Air Return / Ramp Return (AIMS §5.4.1–5.4.2) ──
+  app.post('/gantt/flight-instance/:id/disruption', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const operatorId = req.operatorId
+    const body = req.body as {
+      kind: 'divert' | 'airReturn' | 'rampReturn' | 'none'
+      divertAirportIcao?: string | null
+      ataUtc?: number | null
+      etaUtc?: number | null
+      reasonCode?: string | null
+      reasonText?: string | null
+      nextFlightNumber?: string | null
+      nextEtdUtc?: number | null
+      doNotGenerateNextFlight?: boolean
+    }
+
+    if (!body || !['divert', 'airReturn', 'rampReturn', 'none'].includes(body.kind)) {
+      return reply.code(400).send({ error: 'kind must be divert | airReturn | rampReturn | none' })
+    }
+    if (body.kind === 'divert' && !body.divertAirportIcao) {
+      return reply.code(400).send({ error: 'divertAirportIcao required for divert' })
+    }
+
+    const shell = await ensureInstanceShell(operatorId, id)
+    if (!shell) return reply.code(404).send({ error: 'Flight not found' })
+
+    const disruption = {
+      kind: body.kind,
+      divertAirportIcao: body.divertAirportIcao ?? null,
+      ataUtc: body.ataUtc ?? null,
+      etaUtc: body.etaUtc ?? null,
+      reasonCode: body.reasonCode ?? null,
+      reasonText: body.reasonText ?? null,
+      nextFlightNumber: body.nextFlightNumber ?? null,
+      nextEtdUtc: body.nextEtdUtc ?? null,
+      doNotGenerateNextFlight: !!body.doNotGenerateNextFlight,
+      appliedAt: Date.now(),
+      appliedBy: (req.user as { userId?: string } | undefined)?.userId ?? '',
+    }
+
+    const update: Record<string, unknown> = { disruption }
+    if (body.kind === 'divert') update.status = 'diverted'
+
+    const doc = await FlightInstance.findOneAndUpdate(
+      { _id: id, operatorId },
+      { $set: update, $inc: { 'syncMeta.version': 1 } },
+      { new: true },
+    ).lean()
+
+    return { success: true, flight: doc }
+  })
+
+  // ── POST /gantt/flight-instance/:id/delay — simple delay (does NOT reset crew report time) ──
+  app.post('/gantt/flight-instance/:id/delay', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const operatorId = req.operatorId
+    const body = req.body as {
+      newEtdUtc: number
+      delayCode: string
+      delayMinutes: number
+      reason?: string
+    }
+
+    if (!body?.newEtdUtc || !body.delayCode || typeof body.delayMinutes !== 'number') {
+      return reply.code(400).send({ error: 'newEtdUtc, delayCode, delayMinutes required' })
+    }
+
+    const shell = await ensureInstanceShell(operatorId, id)
+    if (!shell) return reply.code(404).send({ error: 'Flight not found' })
+
+    const delayEntry = {
+      code: body.delayCode,
+      minutes: body.delayMinutes,
+      reason: body.reason ?? '',
+      category: 'delay',
+    }
+
+    const doc = await FlightInstance.findOneAndUpdate(
+      { _id: id, operatorId },
+      {
+        $set: { 'estimated.etdUtc': body.newEtdUtc, status: 'delayed' },
+        $push: { delays: delayEntry },
+        $inc: { 'syncMeta.version': 1 },
+      },
+      { new: true },
+    ).lean()
+
+    return { success: true, flight: doc }
+  })
+
+  // ── POST /gantt/flight-instance/:id/reschedule — reschedule (resets crewReportingTimeUtc per AIMS §5.4.4) ──
+  app.post('/gantt/flight-instance/:id/reschedule', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const operatorId = req.operatorId
+    const body = req.body as {
+      newEtdUtc: number
+      newEtaUtc?: number | null
+      reason?: string
+    }
+
+    if (!body?.newEtdUtc) {
+      return reply.code(400).send({ error: 'newEtdUtc required' })
+    }
+
+    const shell = await ensureInstanceShell(operatorId, id)
+    if (!shell) return reply.code(404).send({ error: 'Flight not found' })
+
+    const delayEntry = {
+      code: 'RSC',
+      minutes: 0,
+      reason: body.reason ?? 'Rescheduled',
+      category: 'reschedule',
+    }
+
+    const doc = await FlightInstance.findOneAndUpdate(
+      { _id: id, operatorId },
+      {
+        $set: {
+          'estimated.etdUtc': body.newEtdUtc,
+          'estimated.etaUtc': body.newEtaUtc ?? null,
+          crewReportingTimeUtc: null, // AIMS §5.4.4: Reschedule resets crew report time
+        },
+        $push: { delays: delayEntry },
+        $inc: { 'syncMeta.version': 1 },
+      },
+      { new: true },
+    ).lean()
+
+    return { success: true, flight: doc }
+  })
+
+  // ── PUT /gantt/flight-instance/:id/jumpseaters — replace jumpseaters array (AIMS §5.3) ──
+  app.put('/gantt/flight-instance/:id/jumpseaters', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const operatorId = req.operatorId
+    const body = req.body as {
+      jumpSeaters: Array<{
+        kind: 'crew' | 'nonCrew'
+        personId: string
+        name: string
+        company?: string | null
+        department?: string | null
+      }>
+    }
+
+    if (!Array.isArray(body?.jumpSeaters)) {
+      return reply.code(400).send({ error: 'jumpSeaters array required' })
+    }
+
+    const shell = await ensureInstanceShell(operatorId, id)
+    if (!shell) return reply.code(404).send({ error: 'Flight not found' })
+
+    const now = Date.now()
+    const assignedBy = (req.user as { userId?: string } | undefined)?.userId ?? ''
+    const normalized = body.jumpSeaters.map((j) => ({
+      kind: j.kind,
+      personId: j.personId,
+      name: j.name,
+      company: j.company ?? null,
+      department: j.department ?? null,
+      assignedAt: now,
+      assignedBy,
+    }))
+
+    const doc = await FlightInstance.findOneAndUpdate(
+      { _id: id, operatorId },
+      { $set: { jumpSeaters: normalized }, $inc: { 'syncMeta.version': 1 } },
+      { new: true },
+    ).lean()
+
+    return { success: true, jumpSeaters: doc?.jumpSeaters ?? [] }
   })
 
   // ── POST /gantt/seed-oooi — Seed realistic OOOI data with delay-ripple cascading ──

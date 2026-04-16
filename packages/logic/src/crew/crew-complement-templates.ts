@@ -47,8 +47,8 @@ export type PositionKey = (typeof POSITION_COLUMNS)[number]['key']
 export const POSITION_DEFAULT_COLORS: Record<string, string> = {
   CP: '#4338ca',
   FO: '#4f46e5',
-  SO: '#6366f1',
-  FE: '#818cf8',
+  SO: '#818cf8',
+  FE: '#a5b4fc',
   CC: '#92400e',
   SP: '#b45309',
   PS: '#d97706',

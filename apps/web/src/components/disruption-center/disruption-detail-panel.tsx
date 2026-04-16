@@ -92,7 +92,7 @@ export function DisruptionDetailPanel() {
             border: '1px solid rgba(99,102,241,0.22)',
           }}
         >
-          <Bot size={16} className="mt-[2px] shrink-0" style={{ color: 'var(--module-accent, #6366f1)' }} />
+          <Bot size={16} className="mt-[2px] shrink-0" style={{ color: 'var(--module-accent, #F59E0B)' }} />
           <div className="text-[13px] leading-relaxed text-hz-text">
             Per-operator AI advisor available after <span className="font-semibold">2.1.3.2 — AI Customization</span>.
             Preferences are staged but the advisor call is not wired yet.

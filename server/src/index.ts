@@ -38,6 +38,7 @@ import { disruptionRoutes } from './routes/disruptions.js'
 import { operatorDisruptionConfigRoutes } from './routes/operator-disruption-config.js'
 import { mlRoutes } from './routes/ml.js'
 import { weatherRoutes } from './routes/weather.js'
+import { nonCrewPeopleRoutes } from './routes/non-crew-people.js'
 import { startWeatherPoll } from './jobs/weather-poll.js'
 import { loadOurAirportsData, startAutoRefresh } from './data/ourairports-cache.js'
 
@@ -105,6 +106,7 @@ async function main(): Promise<void> {
   await app.register(operatorDisruptionConfigRoutes)
   await app.register(mlRoutes)
   await app.register(weatherRoutes)
+  await app.register(nonCrewPeopleRoutes)
 
   // Start
   await app.listen({ port, host: '0.0.0.0' })

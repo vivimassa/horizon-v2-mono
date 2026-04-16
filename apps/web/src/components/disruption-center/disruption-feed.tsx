@@ -163,8 +163,8 @@ export function DisruptionFeed({ onContextMenu }: FeedProps = {}) {
                     isActive ? 'text-white' : 'text-hz-text-secondary'
                   }`}
                   style={{
-                    background: isActive ? 'var(--module-accent, #6366f1)' : 'transparent',
-                    border: `1px solid ${isActive ? 'var(--module-accent, #6366f1)' : isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}`,
+                    background: isActive ? 'var(--module-accent, #F59E0B)' : 'transparent',
+                    border: `1px solid ${isActive ? 'var(--module-accent, #F59E0B)' : isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}`,
                   }}
                 >
                   <span
@@ -230,8 +230,8 @@ function AllPill({ active, count, onClick }: { active: boolean; count: number; o
         active ? 'text-white' : 'text-hz-text'
       }`}
       style={{
-        background: active ? 'var(--module-accent, #6366f1)' : 'transparent',
-        border: `1px solid ${active ? 'var(--module-accent, #6366f1)' : isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}`,
+        background: active ? 'var(--module-accent, #F59E0B)' : 'transparent',
+        border: `1px solid ${active ? 'var(--module-accent, #F59E0B)' : isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}`,
       }}
     >
       <span>All</span>

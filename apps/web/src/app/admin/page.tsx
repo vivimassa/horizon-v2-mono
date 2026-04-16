@@ -25,6 +25,7 @@ import {
   Shield,
   CalendarDays,
   ClipboardCheck,
+  Contact,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -133,6 +134,13 @@ const SECTIONS: SectionDef[] = [
         desc: 'Check types, thresholds & windows',
         icon: ClipboardCheck,
         href: '/admin/maintenance-checks',
+      },
+      {
+        code: '5.2.5',
+        label: 'Non-Crew Directory',
+        desc: 'Non-crew personnel for jumpseat & APIS',
+        icon: Contact,
+        href: '/admin/non-crew-people',
       },
     ],
   },

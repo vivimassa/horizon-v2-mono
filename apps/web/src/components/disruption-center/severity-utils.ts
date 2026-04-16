@@ -1,7 +1,7 @@
 import type { DisruptionIssueRef, OperatorDisruptionResolutionType } from '@skyhub/api'
 
 /** Module accent for Operations (2.x) — matches MODULE_THEMES. */
-export const OPS_ACCENT = '#6366f1'
+export const OPS_ACCENT = '#F59E0B'
 
 /** Vibrant XD status palette — do not hardcode elsewhere. */
 export const SEVERITY_COLOR = {

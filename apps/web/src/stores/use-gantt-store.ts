@@ -117,6 +117,16 @@ interface GanttState {
   // Cancel confirmation
   cancelDialog: { flightIds: string[] } | null
 
+  // Reschedule dialog — opened from right-click menu or from the toolbar
+  // (toolbar uses the currently selected flight). Select → act.
+  rescheduleDialogFlightId: string | null
+
+  // Diversion dialog — same pattern: opened from toolbar with current selection.
+  diversionDialogFlightId: string | null
+
+  // Jumpseater dialog — opened from right-click menu.
+  jumpseaterDialogFlightId: string | null
+
   // Swap mode
   swapMode: {
     sourceFlightIds: string[]
@@ -190,6 +200,12 @@ interface GanttState {
   openCancelDialog: (flightIds: string[]) => void
   closeCancelDialog: () => void
   confirmCancel: () => Promise<void>
+  openRescheduleDialog: (flightId: string) => void
+  closeRescheduleDialog: () => void
+  openDiversionDialog: (flightId: string) => void
+  closeDiversionDialog: () => void
+  openJumpseaterDialog: (flightId: string) => void
+  closeJumpseaterDialog: () => void
   /** Visual-only rearrange: swap virtual placements between two sets of flights without DB writes */
   rearrangeVirtualPlacements: (
     sourceFlightIds: string[],
@@ -364,6 +380,9 @@ export const useGanttStore = create<GanttState>((set, get) => {
     rotationPopover: null,
     assignPopover: null,
     cancelDialog: null,
+    rescheduleDialogFlightId: null,
+    diversionDialogFlightId: null,
+    jumpseaterDialogFlightId: null,
     swapMode: null,
     swapDialog: null,
     layout: null,
@@ -585,6 +604,12 @@ export const useGanttStore = create<GanttState>((set, get) => {
 
     openCancelDialog: (flightIds) => set({ cancelDialog: { flightIds }, contextMenu: null }),
     closeCancelDialog: () => set({ cancelDialog: null }),
+    openRescheduleDialog: (flightId) => set({ rescheduleDialogFlightId: flightId, contextMenu: null }),
+    closeRescheduleDialog: () => set({ rescheduleDialogFlightId: null }),
+    openDiversionDialog: (flightId) => set({ diversionDialogFlightId: flightId, contextMenu: null }),
+    closeDiversionDialog: () => set({ diversionDialogFlightId: null }),
+    openJumpseaterDialog: (flightId) => set({ jumpseaterDialogFlightId: flightId, contextMenu: null }),
+    closeJumpseaterDialog: () => set({ jumpseaterDialogFlightId: null }),
     confirmCancel: async () => {
       const s = get()
       if (!s.cancelDialog) return

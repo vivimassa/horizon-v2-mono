@@ -24,9 +24,16 @@ export interface MvtEta {
   destination: string // 3-letter IATA
 }
 
+export interface Ahm732Triple {
+  process: string // 1-char — part of the journey where delay happened
+  reason: string // 1-char — specific cause
+  stakeholder: string // 1-char — who is accountable
+}
+
 export interface MvtDelay {
-  code: string // 2-digit numeric
+  code: string // AHM 730/731: 2-digit numeric. AHM 732 DLA: 3-char concat (processreasonstakeholder), empty string permitted for blank slots.
   duration?: string // HHMM (optional)
+  ahm732?: Ahm732Triple // Populated when parsed from a DLA line or provided for encoding to DLA
 }
 
 export interface MvtPassengers {

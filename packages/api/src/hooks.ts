@@ -31,6 +31,13 @@ import type {
   UserData,
   ScheduledFlightRef,
   ScenarioRef,
+  MovementMessageRef,
+  MovementMessageQuery,
+  MovementMessageStats,
+  CreateMovementMessageInput,
+  CreateMovementMessageResult,
+  ParseInboundResult,
+  ApplyInboundResult,
 } from './client'
 
 // ─── Stale time constants ───
@@ -218,5 +225,127 @@ export function useDeleteAircraftType() {
   return useMutation({
     mutationFn: (id: string) => api.deleteAircraftType(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.aircraftTypes.all }),
+  })
+}
+
+// ─── Movement Messages ────────────────────────────────────
+
+export function useMovementMessages(params: MovementMessageQuery) {
+  return useQuery<{ messages: MovementMessageRef[]; total: number }>({
+    queryKey: queryKeys.movementMessages.list(params as unknown as Record<string, unknown>),
+    queryFn: () => api.getMovementMessages(params),
+    enabled: !!params.operatorId,
+    staleTime: OPERATIONAL_STALE,
+  })
+}
+
+export function useMovementMessage(id: string) {
+  return useQuery<{ message: MovementMessageRef }>({
+    queryKey: queryKeys.movementMessages.detail(id),
+    queryFn: () => api.getMovementMessage(id),
+    enabled: !!id,
+    staleTime: OPERATIONAL_STALE,
+  })
+}
+
+export function useMovementMessageStats(
+  operatorId: string,
+  params?: { flightDateFrom?: string; flightDateTo?: string },
+) {
+  return useQuery<MovementMessageStats>({
+    queryKey: [
+      ...queryKeys.movementMessages.stats(operatorId),
+      params?.flightDateFrom ?? '',
+      params?.flightDateTo ?? '',
+    ],
+    queryFn: () => api.getMovementMessageStats(operatorId, params),
+    enabled: Boolean(operatorId),
+    staleTime: OPERATIONAL_STALE,
+  })
+}
+
+export function useHeldMovementMessages(operatorId: string) {
+  return useQuery<{ messages: MovementMessageRef[] }>({
+    queryKey: queryKeys.movementMessages.held(operatorId),
+    queryFn: () => api.getHeldMovementMessages(operatorId),
+    enabled: !!operatorId,
+    staleTime: OPERATIONAL_STALE,
+  })
+}
+
+export function useMovementMessagesByFlight(operatorId: string, flightInstanceId: string) {
+  return useQuery<{ messages: MovementMessageRef[]; total: number }>({
+    queryKey: queryKeys.movementMessages.byFlight(flightInstanceId),
+    queryFn: () => api.getMovementMessages({ operatorId, flightInstanceId, limit: 100 }),
+    enabled: Boolean(operatorId) && Boolean(flightInstanceId),
+    staleTime: OPERATIONAL_STALE,
+  })
+}
+
+export function useCreateMovementMessage() {
+  const qc = useQueryClient()
+  return useMutation<CreateMovementMessageResult, Error, CreateMovementMessageInput>({
+    mutationFn: (input) => api.createMovementMessage(input),
+    onSuccess: (data) => {
+      // Only invalidate on successful creation — a 409 conflict is a
+      // productive interrupt, not a state change.
+      if (!data.ok) return
+      qc.invalidateQueries({ queryKey: queryKeys.movementMessages.all })
+      if (data.message.flightInstanceId) {
+        qc.invalidateQueries({
+          queryKey: queryKeys.movementMessages.byFlight(data.message.flightInstanceId),
+        })
+      }
+    },
+  })
+}
+
+export function useReleaseMovementMessages() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (messageIds: string[]) => api.releaseMovementMessages(messageIds),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.movementMessages.all }),
+  })
+}
+
+export function useDiscardMovementMessages() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (messageIds: string[]) => api.discardMovementMessages(messageIds),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.movementMessages.all }),
+  })
+}
+
+export function useTransmitMovementMessage() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.transmitMovementMessage(id),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: queryKeys.movementMessages.all })
+      qc.invalidateQueries({ queryKey: queryKeys.movementMessages.detail(data.message._id) })
+    },
+  })
+}
+
+export function useParseInboundTelex() {
+  return useMutation<ParseInboundResult, Error, string>({
+    mutationFn: (rawMessage: string) => api.parseInboundTelex(rawMessage),
+  })
+}
+
+export function useApplyInboundMvtMessage() {
+  const qc = useQueryClient()
+  return useMutation<ApplyInboundResult, Error, { rawMessage: string; flightInstanceId: string }>({
+    mutationFn: (input) => api.applyInboundMvtMessage(input),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: queryKeys.movementMessages.all })
+      qc.invalidateQueries({ queryKey: queryKeys.flights.all })
+      if (data.message.flightInstanceId) {
+        qc.invalidateQueries({ queryKey: queryKeys.flights.detail(data.message.flightInstanceId) })
+        qc.invalidateQueries({
+          queryKey: queryKeys.movementMessages.byFlight(data.message.flightInstanceId),
+        })
+      }
+    },
   })
 }

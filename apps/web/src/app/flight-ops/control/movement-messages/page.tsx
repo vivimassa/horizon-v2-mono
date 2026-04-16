@@ -1,5 +1,9 @@
-import { ComingSoon } from '@/components/coming-soon'
+import { MovementMessagesShell } from '@/components/movement-messages/movement-messages-shell'
 
 export default function Page() {
-  return <ComingSoon />
+  return (
+    <div className="h-full">
+      <MovementMessagesShell />
+    </div>
+  )
 }

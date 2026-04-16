@@ -63,6 +63,9 @@ export function parseMvtMessage(raw: string): ParsedMvt | null {
       parseActionNI(line, result)
     } else if (upper.startsWith('FR')) {
       parseActionFR(line, result)
+    } else if (upper.startsWith('DLA')) {
+      // AHM 732 Triple-A — check before DL to avoid prefix collision
+      parseDlaLine(line, result)
     } else if (upper.startsWith('DL')) {
       parseDelayLine(line, result)
     } else if (upper.startsWith('PX')) {
@@ -207,6 +210,68 @@ function parseDelayLine(line: string, result: ParsedMvt) {
     result.delays.push({ code: parts[0].trim(), duration: parts[2].trim() })
     result.delays.push({ code: parts[1].trim() })
   }
+}
+
+// ─── DLA — AHM 732 Triple-A delay codes ──────────────────────────
+
+function parseDlaLine(line: string, result: ParsedMvt) {
+  // Strip leading "DLA" plus any optional whitespace
+  const body = line.toUpperCase().replace(/^DLA\s*/, '')
+  if (!body) return
+
+  const parts = body.split('/').map((s) => s.trim())
+
+  const isDuration = (token: string): boolean => /^\d{4}$/.test(token)
+
+  const tripleFromToken = (
+    token: string,
+  ): { code: string; ahm732?: { process: string; reason: string; stakeholder: string } } => {
+    if (!token || token.length < 3) return { code: token }
+    const process = token.charAt(0)
+    const reason = token.charAt(1)
+    const stakeholder = token.charAt(2)
+    return { code: token.slice(0, 3), ahm732: { process, reason, stakeholder } }
+  }
+
+  // Strategy: walk the slots, pairing each code with the next duration-looking slot
+  // if any. This handles all the real-world forms:
+  //   DLA NRH           → 1 code
+  //   DLA NRH/0045      → code + duration
+  //   DLA NRH/TPA       → 2 codes
+  //   DLA NRH/TPA/0045/0015 → 2 codes + 2 durations
+  //   DLA 841/812/932/652   → 4 codes (no durations, authoritative OAG example)
+  //   DLA 93B//11C/     → codes with empty slots
+  const tokens = parts
+  const codes: string[] = []
+  const durations: (string | undefined)[] = []
+
+  for (const t of tokens) {
+    if (!t) continue
+    if (isDuration(t)) {
+      durations.push(t)
+    } else {
+      codes.push(t)
+      durations.push(undefined) // reserve slot aligned with code
+    }
+  }
+
+  // Collect codes and durations in order; pair positionally (DL convention:
+  // CODE1/CODE2/DUR1/DUR2 → delay[i].duration = DUR[i]).
+  const codeTokens: string[] = []
+  const durationTokens: string[] = []
+  for (const t of tokens) {
+    if (!t) continue
+    if (isDuration(t)) durationTokens.push(t)
+    else codeTokens.push(t)
+  }
+
+  const delays = codeTokens.map((c, i) => {
+    const d = tripleFromToken(c)
+    if (durationTokens[i]) (d as { duration?: string }).duration = durationTokens[i]
+    return d
+  })
+
+  for (const d of delays) result.delays.push(d)
 }
 
 // ─── PX — Passengers ─────────────────────────────────────────────

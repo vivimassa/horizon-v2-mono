@@ -29,7 +29,8 @@ export interface MvtEncodeInput {
   returnTime?: string // HHMM or DDHHMM
   // EA entries
   etas?: MvtEta[]
-  // DL
+  // DL / DLA — operator standard selects line type
+  delayStandard?: 'ahm730' | 'ahm732'
   delays?: MvtDelay[]
   // PX
   passengers?: MvtPassengers
@@ -106,32 +107,37 @@ export function encodeMvtMessage(input: MvtEncodeInput): string {
 
   lines.push(actionLine)
 
-  // ─── Delay line (DL) ──────────────────────────────────────────
+  // ─── Delay line (DL / DLA) ────────────────────────────────────
+  //
+  // IATA AHM 780 allows up to 4 delay entries on one line. Convention:
+  //   DL{C1}/{C2}/{C3}/{C4}/{D1}/{D2}/{D3}/{D4}
+  // (any duration slot may be empty). If no delay has a duration, emit the
+  // codes only. Codes beyond the 4-limit fall through to SI lines.
   if (input.delays && input.delays.length > 0) {
-    if (input.delays.length === 1) {
-      const d = input.delays[0]
-      let dl = `DL${d.code}`
-      if (d.duration) dl += `/${d.duration}`
-      lines.push(dl)
-    } else if (input.delays.length === 2) {
-      const [d1, d2] = input.delays
-      if (d1.duration && d2.duration) {
-        lines.push(`DL${d1.code}/${d2.code}/${d1.duration}/${d2.duration}`)
-      } else {
-        lines.push(`DL${d1.code}/${d2.code}`)
+    const standard = input.delayStandard ?? 'ahm730'
+    const prefix = standard === 'ahm732' ? 'DLA' : 'DL'
+    const normalize = (d: MvtDelay): string => {
+      if (standard === 'ahm732' && d.ahm732) {
+        return `${d.ahm732.process}${d.ahm732.reason}${d.ahm732.stakeholder}`.toUpperCase()
       }
-    } else {
-      // More than 2 — encode first two, rest in SI
-      const [d1, d2, ...rest] = input.delays
-      if (d1.duration && d2.duration) {
-        lines.push(`DL${d1.code}/${d2.code}/${d1.duration}/${d2.duration}`)
-      } else {
-        lines.push(`DL${d1.code}/${d2.code}`)
-      }
-      for (const d of rest) {
-        const si = d.duration ? `SI ADDL DELAY ${d.code}/${d.duration}` : `SI ADDL DELAY ${d.code}`
-        lines.push(si)
-      }
+      return d.code
+    }
+
+    const primary = input.delays.slice(0, 4)
+    const overflow = input.delays.slice(4)
+
+    const codes = primary.map(normalize)
+    const anyDuration = primary.some((d) => d.duration)
+    const parts = [...codes]
+    if (anyDuration) {
+      for (const d of primary) parts.push(d.duration ?? '')
+    }
+    // Concatenate: DL/DLA prefix sticks to the first code, the rest are slash-joined.
+    lines.push(`${prefix}${parts[0]}${parts.length > 1 ? '/' + parts.slice(1).join('/') : ''}`)
+
+    for (const d of overflow) {
+      const token = normalize(d)
+      lines.push(d.duration ? `SI ADDL DELAY ${token}/${d.duration}` : `SI ADDL DELAY ${token}`)
     }
   }
 

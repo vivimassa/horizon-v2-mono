@@ -399,11 +399,26 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
     module: 'operations',
     level: 3,
   },
-  // 2.1.3.3 — Disruption Management. The live ops surface for IROPS
+  // 2.1.3.3 — Disruption Customization. Per-operator tuning of the
+  // Disruption Management surface (SLAs, backlog threshold, rolling-period
+  // stops, vocabulary overrides, resolution types). Config-first flow:
+  // users set ML (2.1.3.1) → AI (2.1.3.2) → Disruption rules (2.1.3.3)
+  // before operating the module (2.1.3.4).
+  {
+    code: '2.1.3.3',
+    name: 'Disruption Customization',
+    description: 'Tune SLAs, labels, resolution vocabulary and feed defaults for the Disruption Management module.',
+    icon: 'SlidersHorizontal',
+    route: '/flight-ops/control/disruption-center/customization',
+    parent_code: '2.1.3',
+    module: 'operations',
+    level: 3,
+  },
+  // 2.1.3.4 — Disruption Management. The live ops surface for IROPS
   // handling. Rule-based detection today; ML predictions plug in from
   // 2.1.3.1 and the AI advisor from 2.1.3.2 without changes here.
   {
-    code: '2.1.3.3',
+    code: '2.1.3.4',
     name: 'Disruption Management',
     description: 'Live IROPS feed, severity triage and recovery-solver hand-off.',
     icon: 'Radar',
@@ -1041,7 +1056,7 @@ export function getTopLevelModules(): ModuleEntry[] {
 export const MODULE_THEMES: Record<string, { accent: string; bg: string; bgSubtle: string }> = {
   home: { accent: '#1e40af', bg: '#dbeafe', bgSubtle: '#eff6ff' },
   network: { accent: '#2563eb', bg: '#dbeafe', bgSubtle: '#eff6ff' },
-  operations: { accent: '#4f46e5', bg: '#e0e7ff', bgSubtle: '#eef2ff' },
+  operations: { accent: '#6366f1', bg: '#e0e7ff', bgSubtle: '#eef2ff' },
   ground: { accent: '#059669', bg: '#d1fae5', bgSubtle: '#ecfdf5' },
   workforce: { accent: '#7c3aed', bg: '#ede9fe', bgSubtle: '#f5f3ff' },
   integration: { accent: '#0891b2', bg: '#cffafe', bgSubtle: '#ecfeff' },

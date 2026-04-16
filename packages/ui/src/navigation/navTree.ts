@@ -37,6 +37,7 @@ import {
   Dock,
   Radio,
   LayoutDashboard,
+  SlidersHorizontal,
 } from 'lucide-react-native'
 
 export interface NavPage {
@@ -205,9 +206,16 @@ export const NAV_TREE: NavModule[] = [
             icon: Radar,
           },
           {
+            key: 'disruption-customization',
+            label: 'Disruption Customization',
+            num: '2.1.3.3',
+            route: '/flight-ops/control/disruption-center/customization',
+            icon: SlidersHorizontal,
+          },
+          {
             key: 'disruption-management',
             label: 'Disruption Management',
-            num: '2.1.3.3',
+            num: '2.1.3.4',
             route: '/flight-ops/control/disruption-center/disruption-management',
             icon: Radar,
           },

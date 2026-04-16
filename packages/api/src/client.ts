@@ -865,6 +865,13 @@ export const api = {
 
   getMe: () => request<UserData>('/users/me'),
 
+  listUsers: (q: { operatorId: string; role?: string; active?: boolean }) => {
+    const params = new URLSearchParams({ operatorId: q.operatorId })
+    if (q.role) params.set('role', q.role)
+    if (q.active === false) params.set('active', 'false')
+    return request<UserListItem[]>(`/users?${params.toString()}`)
+  },
+
   // Flights
   getFlights: (operatorId = '', from?: string, to?: string) => {
     let path = `/flights?operatorId=${operatorId}`
@@ -1454,8 +1461,11 @@ export const api = {
     const p = new URLSearchParams({ operatorId: params.operatorId })
     if (params.direction) p.set('direction', params.direction)
     if (params.actionCodes) p.set('actionCodes', params.actionCodes.join(','))
+    if (params.messageTypes && params.messageTypes.length > 0) p.set('messageTypes', params.messageTypes.join(','))
+    if (params.stations && params.stations.length > 0) p.set('stations', params.stations.join(','))
     if (params.status) p.set('status', params.status)
     if (params.flightNumber) p.set('flightNumber', params.flightNumber)
+    if (params.flightInstanceId) p.set('flightInstanceId', params.flightInstanceId)
     if (params.flightDateFrom) p.set('flightDateFrom', params.flightDateFrom)
     if (params.flightDateTo) p.set('flightDateTo', params.flightDateTo)
     if (params.limit) p.set('limit', String(params.limit))
@@ -1463,14 +1473,75 @@ export const api = {
     return request<{ messages: MovementMessageRef[]; total: number }>(`/movement-messages?${p.toString()}`)
   },
 
-  getMovementMessageStats: (operatorId: string) =>
-    request<MovementMessageStats>(`/movement-messages/stats?operatorId=${operatorId}`),
+  getMovementMessage: (id: string) => request<{ message: MovementMessageRef }>(`/movement-messages/${id}`),
+
+  getMovementMessageStats: (operatorId: string, params?: { flightDateFrom?: string; flightDateTo?: string }) => {
+    const p = new URLSearchParams({ operatorId })
+    if (params?.flightDateFrom) p.set('flightDateFrom', params.flightDateFrom)
+    if (params?.flightDateTo) p.set('flightDateTo', params.flightDateTo)
+    return request<MovementMessageStats>(`/movement-messages/stats?${p.toString()}`)
+  },
 
   getHeldMovementMessages: (operatorId: string) =>
     request<{ messages: MovementMessageRef[] }>(`/movement-messages/held?operatorId=${operatorId}`),
 
+  /**
+   * Compose an outbound MVT. Returns a discriminated union so the UI can
+   * react to a 409 duplicate-held without treating it as an exception:
+   *   { ok: true, message }       — new held message created
+   *   { ok: false, conflict: … }  — a held message already exists; UI prompts
+   *                                  the user to Replace / Keep both / Cancel.
+   * All other non-2xx responses still throw via request().
+   */
+  createMovementMessage: async (input: CreateMovementMessageInput): Promise<CreateMovementMessageResult> => {
+    const token = _authCallbacks?.getAccessToken() ?? null
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
+    let res = await fetch(`${_baseUrl}/movement-messages`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(input),
+    })
+    // Auto-refresh on 401, mirroring request()
+    if (res.status === 401) {
+      const pair = await refreshAccessToken()
+      if (pair) {
+        res = await fetch(`${_baseUrl}/movement-messages`, {
+          method: 'POST',
+          headers: { ...headers, Authorization: `Bearer ${pair.accessToken}` },
+          body: JSON.stringify(input),
+        })
+      } else {
+        _authCallbacks?.onAuthFailure()
+        throw new Error('API 401: Unauthorized')
+      }
+    }
+
+    if (res.status === 409) {
+      const body = (await res.json()) as { error: string; existing?: DuplicateHeldExisting }
+      if (body.error === 'duplicate_held' && body.existing) {
+        return { ok: false, conflict: body.existing }
+      }
+      throw new Error(`API 409: ${JSON.stringify(body)}`)
+    }
+
+    if (!res.ok) {
+      const body = await res.text()
+      throw new Error(`API ${res.status}: ${body}`)
+    }
+
+    const data = (await res.json()) as { message: MovementMessageRef }
+    return { ok: true, message: data.message }
+  },
+
+  transmitMovementMessage: (id: string) =>
+    request<{ message: MovementMessageRef }>(`/movement-messages/${id}/transmit`, {
+      method: 'POST',
+    }),
+
   releaseMovementMessages: (messageIds: string[]) =>
-    request<{ released: number }>('/movement-messages/release', {
+    request<{ released: number; sent: number; failed: number }>('/movement-messages/release', {
       method: 'POST',
       body: JSON.stringify({ messageIds }),
     }),
@@ -1479,6 +1550,18 @@ export const api = {
     request<{ discarded: number }>('/movement-messages/discard', {
       method: 'POST',
       body: JSON.stringify({ messageIds }),
+    }),
+
+  parseInboundTelex: (rawMessage: string) =>
+    request<ParseInboundResult>('/movement-messages/inbound/parse', {
+      method: 'POST',
+      body: JSON.stringify({ rawMessage }),
+    }),
+
+  applyInboundMvtMessage: (input: { rawMessage: string; flightInstanceId: string }) =>
+    request<ApplyInboundResult>('/movement-messages/inbound/apply', {
+      method: 'POST',
+      body: JSON.stringify(input),
     }),
 
   // ─── FDTL ───────────────────────────────────────────────
@@ -2065,6 +2148,12 @@ export const api = {
 
   claimDisruption: (id: string) => request<{ ok: true }>(`/disruptions/${id}/claim`, { method: 'POST' }),
 
+  assignDisruption: (id: string, userId: string) =>
+    request<{ ok: true }>(`/disruptions/${id}/assign`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }),
+
   startDisruption: (id: string) => request<{ ok: true }>(`/disruptions/${id}/start`, { method: 'POST' }),
 
   resolveDisruption: (id: string, body: { resolutionType: string; resolutionNotes?: string }) =>
@@ -2079,6 +2168,42 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ text }),
     }),
+
+  adviseDisruption: (issueId: string) =>
+    request<DisruptionAdviceResponse>('/ml/advise-disruption', {
+      method: 'POST',
+      body: JSON.stringify({ issueId }),
+    }),
+
+  getOperatorDisruptionConfig: (operatorId: string) =>
+    request<OperatorDisruptionConfig | null>(
+      `/operator-disruption-config?operatorId=${encodeURIComponent(operatorId)}`,
+    ).catch((err) => {
+      // 404 is "no config yet" — resolve to null so callers fall back to defaults.
+      if (err instanceof Error && /^API 404/.test(err.message)) return null
+      throw err
+    }),
+
+  upsertOperatorDisruptionConfig: (body: OperatorDisruptionConfigUpsert) =>
+    request<OperatorDisruptionConfig>('/operator-disruption-config', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  resolveFlight: (q: { operatorId: string; flightNumber: string; date: string; dep?: string; arr?: string }) => {
+    const params = new URLSearchParams({ operatorId: q.operatorId, flightNumber: q.flightNumber, date: q.date })
+    if (q.dep) params.set('dep', q.dep)
+    if (q.arr) params.set('arr', q.arr)
+    return request<{ scheduledFlightId: string; operatingDate: string }>(`/gantt/resolve-flight?${params.toString()}`)
+  },
+
+  listWeatherAlerts: (icaos?: string[]) => {
+    const qs = icaos && icaos.length > 0 ? `?icaos=${encodeURIComponent(icaos.join(','))}` : ''
+    return request<WeatherAlertsResponse>(`/weather/alerts${qs}`)
+  },
+
+  getStationWeather: (icao: string) =>
+    request<WeatherStationObservation>(`/weather/station/${encodeURIComponent(icao)}`),
 }
 
 // ─── Disruption Center types ────────────────────────────
@@ -2133,6 +2258,127 @@ export interface DisruptionActivityRef {
   previousStatus: string | null
   newStatus: string | null
   createdAt: string
+}
+
+export interface DisruptionAdviceSuggestion {
+  title: string
+  detail: string
+  moduleCode?: string
+  confidence?: number
+}
+
+export type FeedStatusFilter = 'active' | 'open' | 'assigned' | 'in_progress' | 'resolved' | 'closed' | 'all'
+
+export interface OperatorDisruptionResolutionType {
+  key: string
+  label: string
+  hint: string
+  enabled: boolean
+}
+
+export interface OperatorDisruptionConfigSla {
+  critical?: number | null
+  warning?: number | null
+  info?: number | null
+}
+
+export interface OperatorDisruptionConfigUi {
+  defaultFeedStatus?: FeedStatusFilter | null
+  rollingPeriodStops?: number[]
+  openBacklogThreshold?: number | null
+}
+
+export interface OperatorDisruptionConfigVocabulary {
+  categoryLabels?: Record<string, string>
+  statusLabels?: Record<string, string>
+  resolutionTypes?: OperatorDisruptionResolutionType[]
+}
+
+export interface OperatorDisruptionConfig {
+  _id: string
+  operatorId: string
+  sla?: OperatorDisruptionConfigSla
+  ui?: OperatorDisruptionConfigUi
+  vocabulary?: OperatorDisruptionConfigVocabulary
+  refresh?: unknown
+  notifications?: unknown
+  coverage?: unknown
+  overrides?: unknown
+  createdAt: string
+  updatedAt: string
+}
+
+export interface OperatorDisruptionConfigUpsert {
+  operatorId: string
+  sla?: OperatorDisruptionConfigSla
+  ui?: OperatorDisruptionConfigUi
+  vocabulary?: OperatorDisruptionConfigVocabulary
+  refresh?: unknown
+  notifications?: unknown
+  coverage?: unknown
+  overrides?: unknown
+}
+
+export type WeatherAlertTier = 'none' | 'caution' | 'warn'
+export type WeatherFlightCategory = 'VFR' | 'MVFR' | 'IFR' | 'LIFR'
+
+export interface WeatherStationObservation {
+  icao: string
+  observedAt: string
+  raw: string
+  flightCategory: WeatherFlightCategory
+  alertTier: WeatherAlertTier
+  windDirectionDeg: number | null
+  windSpeedKts: number | null
+  windGustKts: number | null
+  visibilityMeters: number | null
+  ceilingFeet: number | null
+  temperatureC: number | null
+  dewpointC: number | null
+  weatherPhenomena: string[]
+}
+
+export interface WeatherAlertObservation {
+  icao: string
+  observedAt: string
+  raw: string
+  flightCategory: WeatherFlightCategory
+  alertTier: WeatherAlertTier
+  windSpeedKts: number | null
+  windGustKts: number | null
+  visibilityMeters: number | null
+  ceilingFeet: number | null
+  weatherPhenomena: string[]
+}
+
+export interface WeatherAlertsResponse {
+  stationsMonitored: number
+  stationsReporting: number
+  counts: { warn: number; caution: number; none: number }
+  ifrCount: number
+  worst: {
+    icao: string
+    flightCategory: WeatherFlightCategory
+    alertTier: WeatherAlertTier
+    observedAt: string
+  } | null
+  observations: WeatherAlertObservation[]
+}
+
+export interface DisruptionAdviceResponse {
+  source: 'ml' | 'canned'
+  context: {
+    flightNumber: string | null
+    forDate: string | null
+    depStation: string | null
+    arrStation: string | null
+    tail: string | null
+    category: string
+    severity: string
+    score: number | null
+    reasons: string[]
+  }
+  suggestions: DisruptionAdviceSuggestion[]
 }
 
 // ─── Maintenance types ──────────────────────────────────
@@ -2402,6 +2648,18 @@ export interface UserData {
   lastLoginUtc: string
   createdAt: string
   updatedAt: string
+}
+
+export interface UserListItem {
+  _id: string
+  operatorId: string
+  role: string
+  isActive: boolean
+  firstName: string
+  lastName: string
+  email: string
+  avatarUrl: string
+  department: string
 }
 
 // ─── Slot types ──────────────────────────────────────────
@@ -2678,13 +2936,31 @@ export interface ScheduleMessageStats {
 
 // ─── Movement Messages ─────────────────────────────────────
 
+export interface Ahm732Triple {
+  process: string
+  reason: string
+  stakeholder: string
+}
+
+export interface MovementMessageDelayRef {
+  code: string | null
+  alphaCode: string | null
+  ahm732Process: string | null
+  ahm732Reason: string | null
+  ahm732Stakeholder: string | null
+  duration: string | null
+  minutes: number | null
+  reasonText: string | null
+  category: string | null
+}
+
 export interface MovementMessageRef {
   _id: string
   operatorId: string
   messageType: 'MVT' | 'LDM'
   actionCode: string
   direction: 'inbound' | 'outbound'
-  status: 'held' | 'pending' | 'sent' | 'applied' | 'rejected' | 'discarded'
+  status: 'held' | 'pending' | 'sent' | 'applied' | 'rejected' | 'discarded' | 'failed'
   flightNumber: string | null
   flightDate: string | null
   registration: string | null
@@ -2692,18 +2968,54 @@ export interface MovementMessageRef {
   arrStation: string | null
   summary: string | null
   rawMessage: string | null
+  delayStandard: 'ahm730' | 'ahm732' | null
+  delayCodes: MovementMessageDelayRef[]
+  envelope: {
+    priority: string | null
+    addresses: string[]
+    originator: string | null
+    timestamp: string | null
+  } | null
+  recipients: string[]
+  parsed: unknown
+  appliedToFlight: {
+    atdUtc: number | null
+    offUtc: number | null
+    onUtc: number | null
+    ataUtc: number | null
+    etdUtc: number | null
+    etaUtc: number | null
+    delaysAppended: number
+  } | null
   scenarioId: string | null
   flightInstanceId: string | null
+  externalMessageId: string | null
+  errorReason: string | null
+  createdBy: string | null
+  createdByName: string | null
+  releasedBy: string | null
+  releasedByName: string | null
+  releasedAtUtc: string | null
+  discardedBy: string | null
+  discardedByName: string | null
+  discardedAtUtc: string | null
+  supersedesMessageId: string | null
+  supersededByMessageId: string | null
   createdAtUtc: string
   updatedAtUtc: string
+  sentAtUtc: string | null
+  appliedAtUtc: string | null
 }
 
 export interface MovementMessageQuery {
   operatorId: string
   direction?: 'inbound' | 'outbound'
   actionCodes?: string[]
+  messageTypes?: string[]
+  stations?: string[]
   status?: string
   flightNumber?: string
+  flightInstanceId?: string
   flightDateFrom?: string
   flightDateTo?: string
   limit?: number
@@ -2715,6 +3027,97 @@ export interface MovementMessageStats {
   held: number
   pending: number
   sent: number
+  applied: number
+  rejected: number
+  discarded: number
+  failed: number
+}
+
+export interface MvtEtaInput {
+  time: string
+  destination: string
+}
+
+export interface MvtDelayInput {
+  code: string
+  duration?: string
+  ahm732?: Ahm732Triple
+}
+
+export interface CreateMovementMessageInput {
+  flightInstanceId: string
+  actionCode: 'AD' | 'AA' | 'ED' | 'EA' | 'NI' | 'RR' | 'FR'
+  offBlocks?: string
+  airborne?: string
+  touchdown?: string
+  onBlocks?: string
+  estimatedDeparture?: string
+  nextInfoTime?: string
+  returnTime?: string
+  etas?: MvtEtaInput[]
+  delays?: MvtDelayInput[]
+  passengers?: { total: number; noSeatHolders?: number; sectors?: number[] }
+  supplementaryInfo?: string[]
+  recipients?: string[]
+  envelope?: {
+    priority?: string
+    addresses?: string[]
+    originator?: string
+    timestamp?: string
+  }
+  correction?: boolean
+  /**
+   * If set, supersede the specified held message: the target is marked
+   * `discarded` with `supersededByMessageId` pointing at the new message.
+   * Server 409s if the target isn't held or doesn't match.
+   */
+  replaceExistingId?: string
+  /** Bypass the duplicate-held check entirely and create anyway. */
+  allowDuplicate?: boolean
+}
+
+/**
+ * Structured 409 returned when a held MVT already exists for the same
+ * `(flightInstanceId, actionCode)`. The caller inspects `existing`
+ * and decides: retry with `replaceExistingId`, retry with `allowDuplicate`,
+ * or cancel the compose.
+ */
+export interface DuplicateHeldExisting {
+  _id: string
+  actionCode: string
+  flightNumber: string | null
+  flightDate: string | null
+  summary: string | null
+  createdAtUtc: string
+  createdBy: string | null
+  createdByName: string | null
+}
+
+export type CreateMovementMessageResult =
+  | { ok: true; message: MovementMessageRef }
+  | { ok: false; conflict: DuplicateHeldExisting }
+
+export interface ParseInboundResult {
+  type: 'MVT' | 'LDM' | 'UNKNOWN'
+  parsed?: unknown
+  error?: string
+  candidateFlights: Array<{
+    _id: string
+    flightNumber: string
+    operatingDate: string
+    dep: { icao: string | null; iata: string | null }
+    arr: { icao: string | null; iata: string | null }
+  }>
+}
+
+export interface ApplyInboundResult {
+  message: MovementMessageRef
+  delta: {
+    set: Record<string, number | null>
+    pushDelays: Array<{ code: string; minutes: number; reason: string; category: string }>
+    summary: string
+    delaysAppended: number
+  }
 }
 
 export interface ScheduleMessageSnapshot {

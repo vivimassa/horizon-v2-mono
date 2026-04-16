@@ -117,6 +117,16 @@ export const queryKeys = {
     tables: (operatorId?: string) => ['fdtl', 'tables', operatorId ?? ''] as const,
   },
 
+  // ─── Movement Messages ───
+  movementMessages: {
+    all: ['movementMessages'] as const,
+    list: (params?: Record<string, unknown>) => ['movementMessages', 'list', params ?? {}] as const,
+    detail: (id: string) => ['movementMessages', 'detail', id] as const,
+    stats: (operatorId: string) => ['movementMessages', 'stats', operatorId] as const,
+    held: (operatorId: string) => ['movementMessages', 'held', operatorId] as const,
+    byFlight: (flightInstanceId: string) => ['movementMessages', 'byFlight', flightInstanceId] as const,
+  },
+
   // ─── Slots ───
   slots: {
     airports: ['slots', 'airports'] as const,

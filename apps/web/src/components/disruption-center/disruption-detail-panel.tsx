@@ -1,13 +1,15 @@
 'use client'
 
-import { useMemo } from 'react'
-import { CheckCircle2, Play, UserCheck, X, EyeOff, ArrowUpRight, Sparkles, Bot } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ArrowUpRight, Sparkles, Bot } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { MODULE_REGISTRY } from '@skyhub/constants'
 import { useTheme } from '@/components/theme-provider'
-import { useDisruptionStore } from '@/stores/use-disruption-store'
+import { useDisruptionStore, useEffectiveCategoryLabels, useEffectiveStatusLabels } from '@/stores/use-disruption-store'
 import type { DisruptionIssueRef } from '@skyhub/api'
-import { CATEGORY_LABEL, SEVERITY_COLOR, STATUS_LABEL } from './severity-utils'
+import { SEVERITY_COLOR } from './severity-utils'
+import { ResolveDialog } from './resolve-dialog'
+import { WorkflowTimeline } from './workflow-timeline'
 
 const DETAIL_WIDTH = 420
 
@@ -23,13 +25,12 @@ export function DisruptionDetailPanel() {
   const selectedIssueId = useDisruptionStore((s) => s.selectedIssueId)
   const issues = useDisruptionStore((s) => s.issues)
   const activity = useDisruptionStore((s) => s.selectedActivity)
-  const claim = useDisruptionStore((s) => s.claim)
-  const start = useDisruptionStore((s) => s.start)
   const resolve = useDisruptionStore((s) => s.resolve)
-  const close = useDisruptionStore((s) => s.close)
-  const hide = useDisruptionStore((s) => s.hide)
+  const CATEGORY_LABEL = useEffectiveCategoryLabels()
+  const STATUS_LABEL = useEffectiveStatusLabels()
 
   const issue = useMemo(() => issues.find((i) => i._id === selectedIssueId) ?? null, [issues, selectedIssueId])
+  const [resolveOpen, setResolveOpen] = useState(false)
 
   const sectionBorder = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
   const divStyle = { width: DETAIL_WIDTH, borderLeft: `1px solid ${sectionBorder}` } as const
@@ -80,81 +81,35 @@ export function DisruptionDetailPanel() {
       <SuggestedActionsSlot issue={issue} sectionBorder={sectionBorder} isDark={isDark} />
 
       <Section title="Workflow" sectionBorder={sectionBorder}>
-        <div className="flex flex-wrap gap-2">
-          {issue.status === 'open' && <ActionButton icon={UserCheck} label="Claim" onClick={() => claim(issue._id)} />}
-          {issue.status === 'assigned' && <ActionButton icon={Play} label="Start" onClick={() => start(issue._id)} />}
-          {(issue.status === 'assigned' || issue.status === 'in_progress') && (
-            <ActionButton
-              icon={CheckCircle2}
-              label="Resolve"
-              variant="affirmative"
-              onClick={() => {
-                const resolutionType = window.prompt('Resolution type (swap / delay_accepted / cancelled):')
-                if (!resolutionType) return
-                const notes = window.prompt('Notes (optional):') ?? undefined
-                resolve(issue._id, resolutionType, notes)
-              }}
-            />
-          )}
-          {issue.status === 'resolved' && <ActionButton icon={X} label="Close" onClick={() => close(issue._id)} />}
-          <ActionButton
-            icon={EyeOff}
-            label="Hide"
-            variant="secondary"
-            onClick={() => {
-              if (window.confirm('Hide this disruption?')) hide(issue._id)
-            }}
-          />
-        </div>
-      </Section>
-
-      <Section title="Activity" sectionBorder={sectionBorder}>
-        {activity.length === 0 ? (
-          <div className="text-[13px] text-hz-text-tertiary">No activity yet.</div>
-        ) : (
-          <ol className="flex flex-col gap-3">
-            {activity.map((a) => (
-              <li key={a._id} className="flex items-start gap-3">
-                <div
-                  className="w-2 h-2 rounded-full mt-[7px] shrink-0"
-                  style={{ background: 'var(--module-accent, #4f46e5)' }}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13px] font-semibold text-hz-text">
-                    {a.actionType}
-                    {a.newStatus && (
-                      <span className="text-hz-text-secondary font-normal">
-                        {' → '}
-                        {STATUS_LABEL[a.newStatus as keyof typeof STATUS_LABEL] ?? a.newStatus}
-                      </span>
-                    )}
-                  </div>
-                  {a.actionDetail && <div className="text-[13px] text-hz-text-secondary">{a.actionDetail}</div>}
-                  <div className="text-[13px] text-hz-text-tertiary">
-                    {new Date(a.createdAt).toUTCString()} · {a.userName ?? 'system'}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
+        <WorkflowTimeline issue={issue} activity={activity} />
       </Section>
 
       <Section title="AI advisor" sectionBorder={sectionBorder}>
         <div
           className="rounded-xl px-4 py-3 flex items-start gap-3"
           style={{
-            background: 'rgba(79,70,229,0.08)',
-            border: '1px solid rgba(79,70,229,0.22)',
+            background: 'rgba(99,102,241,0.08)',
+            border: '1px solid rgba(99,102,241,0.22)',
           }}
         >
-          <Bot size={16} className="mt-[2px] shrink-0" style={{ color: 'var(--module-accent, #4f46e5)' }} />
+          <Bot size={16} className="mt-[2px] shrink-0" style={{ color: 'var(--module-accent, #6366f1)' }} />
           <div className="text-[13px] leading-relaxed text-hz-text">
             Per-operator AI advisor available after <span className="font-semibold">2.1.3.2 — AI Customization</span>.
             Preferences are staged but the advisor call is not wired yet.
           </div>
         </div>
       </Section>
+
+      {resolveOpen && (
+        <ResolveDialog
+          issue={issue}
+          onClose={() => setResolveOpen(false)}
+          onConfirm={async (resolutionType, notes) => {
+            setResolveOpen(false)
+            await resolve(issue._id, resolutionType, notes)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -182,12 +137,13 @@ function Section({
 }
 
 function StatusPill({ status }: { status: DisruptionIssueRef['status'] }) {
+  const STATUS_LABEL = useEffectiveStatusLabels()
   return (
     <span
       className="inline-flex items-center px-2 py-0.5 rounded-full text-[13px] font-semibold text-hz-text"
       style={{
-        background: 'rgba(79,70,229,0.16)',
-        border: '1px solid rgba(79,70,229,0.32)',
+        background: 'rgba(99,102,241,0.16)',
+        border: '1px solid rgba(99,102,241,0.32)',
       }}
     >
       {STATUS_LABEL[status]}
@@ -282,46 +238,4 @@ function deriveActions(
     default:
       return [planRecovery]
   }
-}
-
-function ActionButton({
-  icon: Icon,
-  label,
-  onClick,
-  variant = 'primary',
-}: {
-  icon: typeof Play
-  label: string
-  onClick: () => void
-  variant?: 'primary' | 'secondary' | 'affirmative'
-}) {
-  const base =
-    'h-9 px-3 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition-opacity hover:opacity-90'
-  if (variant === 'affirmative') {
-    return (
-      <button type="button" onClick={onClick} className={base} style={{ background: '#06C270', color: '#fff' }}>
-        <Icon size={14} strokeWidth={2} />
-        {label}
-      </button>
-    )
-  }
-  if (variant === 'secondary') {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className={`${base} bg-transparent text-module-accent`}
-        style={{ border: '1px solid var(--module-accent, #4f46e5)' }}
-      >
-        <Icon size={14} strokeWidth={2} />
-        {label}
-      </button>
-    )
-  }
-  return (
-    <button type="button" onClick={onClick} className={`${base} bg-module-accent text-white`}>
-      <Icon size={14} strokeWidth={2} />
-      {label}
-    </button>
-  )
 }

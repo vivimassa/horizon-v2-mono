@@ -1,68 +1,59 @@
 'use client'
 
-import { useMemo } from 'react'
-import { AlertTriangle, AlertCircle, XCircle, CheckCircle2 } from 'lucide-react'
-import { useTheme } from '@/components/theme-provider'
+import type { ReactNode } from 'react'
 import type { DisruptionIssueRef } from '@skyhub/api'
-import { SEVERITY_COLOR } from './severity-utils'
+import { useTheme } from '@/components/theme-provider'
+import { SeverityDonutCard } from './kpi/severity-donut-card'
+import { WorkflowStatusCard } from './kpi/workflow-status-card'
+import { ResponseTimeCard } from './kpi/response-time-card'
+import { WeatherOpsCard } from './kpi/weather-ops-card'
 
 interface Props {
   issues: DisruptionIssueRef[]
 }
 
 /**
- * Horizontal KPI ribbon. Rendered inside the shell's glass toolbar card,
- * so this component owns no outer chrome — just four stat cells separated
- * by thin dividers (matching OpsToolbar's ribbon style).
+ * Top-of-workspace KPI row for the OCC 24×7 disruption center. Four
+ * equally sized glass cards surface the most decision-relevant signals:
+ *   1. Severity donut (click segments to filter feed)
+ *   2. Workflow status (lifecycle stacked bar + unassigned count)
+ *   3. Response time (MTTR, median age, SLA breaches)
+ *   4. Weather ops (worst station + warn/caution/IFR counts)
+ *
+ * Cards flow to 2×2 on tablet, stack on phone.
  */
 export function DisruptionKpiStrip({ issues }: Props) {
+  return (
+    <div className="grid gap-3 p-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+      <GlassCard>
+        <SeverityDonutCard issues={issues} />
+      </GlassCard>
+      <GlassCard>
+        <WorkflowStatusCard issues={issues} />
+      </GlassCard>
+      <GlassCard>
+        <ResponseTimeCard issues={issues} />
+      </GlassCard>
+      <GlassCard>
+        <WeatherOpsCard />
+      </GlassCard>
+    </div>
+  )
+}
+
+function GlassCard({ children }: { children: ReactNode }) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
-
-  const stats = useMemo(() => {
-    const open = issues.filter((i) => i.status !== 'resolved' && i.status !== 'closed')
-    return {
-      critical: open.filter((i) => i.severity === 'critical').length,
-      warning: open.filter((i) => i.severity === 'warning').length,
-      info: open.filter((i) => i.severity === 'info').length,
-      resolved: issues.filter((i) => i.status === 'resolved' || i.status === 'closed').length,
-    }
-  }, [issues])
-
-  const dividerColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
-
-  const cells: Array<{ label: string; value: number; color: string; icon: typeof XCircle }> = [
-    { label: 'Critical', value: stats.critical, color: SEVERITY_COLOR.critical, icon: XCircle },
-    { label: 'Warning', value: stats.warning, color: SEVERITY_COLOR.warning, icon: AlertTriangle },
-    { label: 'Info', value: stats.info, color: SEVERITY_COLOR.info, icon: AlertCircle },
-    { label: 'Resolved', value: stats.resolved, color: '#06C270', icon: CheckCircle2 },
-  ]
-
   return (
-    <div className="flex items-stretch">
-      {cells.map((c, i) => {
-        const Icon = c.icon
-        return (
-          <div
-            key={c.label}
-            className="flex-1 flex items-center gap-3 px-5 py-3"
-            style={{ borderLeft: i === 0 ? 'none' : `1px solid ${dividerColor}` }}
-          >
-            <div
-              className="flex items-center justify-center rounded-lg shrink-0"
-              style={{ width: 36, height: 36, background: `${c.color}18` }}
-            >
-              <Icon size={18} color={c.color} strokeWidth={2} />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[13px] font-semibold uppercase tracking-wider text-hz-text-tertiary">
-                {c.label}
-              </span>
-              <span className="text-[22px] font-bold leading-tight text-hz-text">{c.value}</span>
-            </div>
-          </div>
-        )
-      })}
+    <div
+      className="rounded-xl px-4 py-3 min-w-0"
+      style={{
+        background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.75)',
+        border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+        boxShadow: isDark ? '0 4px 12px rgba(0,0,0,0.20)' : '0 2px 8px rgba(96,97,112,0.08)',
+      }}
+    >
+      {children}
     </div>
   )
 }

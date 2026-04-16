@@ -12,11 +12,9 @@ import {
   MultiSelectField,
   FilterGoButton,
   type MultiSelectOption,
+  type RollingStop,
 } from '@/components/filter-panel/fields'
-import { useDisruptionStore } from '@/stores/use-disruption-store'
-import { CATEGORY_LABEL } from './severity-utils'
-
-const CATEGORY_OPTIONS = Object.entries(CATEGORY_LABEL).map(([key, label]) => ({ key, label }))
+import { useDisruptionStore, useEffectiveCategoryLabels, useEffectiveRollingStops } from '@/stores/use-disruption-store'
 const SEVERITY_OPTIONS = [
   { value: '', label: 'All severities' },
   { value: 'critical', label: 'Critical' },
@@ -40,6 +38,16 @@ export function DisruptionFilterPanel({ onGo, loading = false }: Props) {
   const isDark = theme === 'dark'
   const filters = useDisruptionStore((s) => s.filters)
   const setFilter = useDisruptionStore((s) => s.setFilter)
+  const CATEGORY_LABEL = useEffectiveCategoryLabels()
+  const rollingStopValues = useEffectiveRollingStops()
+  const CATEGORY_OPTIONS = useMemo(
+    () => Object.entries(CATEGORY_LABEL).map(([key, label]) => ({ key, label })),
+    [CATEGORY_LABEL],
+  )
+  const ROLLING_STOPS = useMemo<RollingStop[]>(
+    () => [{ label: 'Off', value: null }, ...rollingStopValues.map((d) => ({ label: `${d}D`, value: d }))],
+    [rollingStopValues],
+  )
 
   // Match MultiSelectField trigger styling so raw text inputs feel native.
   const inputBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.7)'
@@ -94,7 +102,11 @@ export function DisruptionFilterPanel({ onGo, loading = false }: Props) {
       </FilterSection>
 
       <FilterSection label="Rolling Period">
-        <RollingPeriodField value={filters.rollingPeriodDays} onChange={(v) => setFilter('rollingPeriodDays', v)} />
+        <RollingPeriodField
+          stops={ROLLING_STOPS}
+          value={filters.rollingPeriodDays}
+          onChange={(v) => setFilter('rollingPeriodDays', v)}
+        />
       </FilterSection>
 
       <FilterSection label="Severity">

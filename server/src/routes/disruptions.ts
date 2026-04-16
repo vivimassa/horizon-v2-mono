@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import { DisruptionIssue } from '../models/DisruptionIssue.js'
 import { DisruptionIssueActivity } from '../models/DisruptionIssueActivity.js'
+import { User } from '../models/User.js'
 import { FlightInstance } from '../models/FlightInstance.js'
 import { MaintenanceEvent } from '../models/MaintenanceEvent.js'
 import { AircraftRegistration } from '../models/AircraftRegistration.js'
@@ -279,6 +280,50 @@ export async function disruptionRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return { created, updated }
+  })
+
+  // ── POST /disruptions/:id/assign — assign to a specific user ──
+  app.post('/disruptions/:id/assign', async (req, reply) => {
+    const parsed = z.object({ userId: z.string().min(1) }).safeParse(req.body)
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Validation failed', details: parsed.error.issues })
+    }
+    const { id } = req.params as { id: string }
+    const issue = await DisruptionIssue.findById(id).lean()
+    if (!issue) return reply.code(404).send({ error: 'Disruption issue not found' })
+
+    const target: any = await User.findById(parsed.data.userId).lean()
+    if (!target || target.operatorId !== issue.operatorId) {
+      return reply.code(400).send({ error: 'Target user not found in this operator' })
+    }
+
+    const actor = actorFromReq(req)
+    const now = new Date().toISOString()
+    const targetName = `${target.profile?.firstName ?? ''} ${target.profile?.lastName ?? ''}`.trim()
+    await DisruptionIssue.updateOne(
+      { _id: id },
+      {
+        $set: {
+          status: 'assigned',
+          assignedTo: target._id,
+          assignedToName: targetName || target.profile?.email || target._id,
+          assignedBy: actor.userId,
+          assignedByName: actor.userName,
+          assignedAt: now,
+          updatedAt: now,
+        },
+      },
+    )
+    await logActivity({
+      issueId: id,
+      operatorId: issue.operatorId,
+      actionType: 'assigned',
+      actionDetail: `Assigned to ${targetName || target._id}`,
+      previousStatus: issue.status,
+      newStatus: 'assigned',
+      actor,
+    })
+    return { ok: true }
   })
 
   // ── POST /disruptions/:id/claim — assign to current user ──

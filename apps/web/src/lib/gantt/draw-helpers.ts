@@ -92,20 +92,36 @@ export function drawGroupHeaders(
 ) {
   ctx.textBaseline = 'middle'
   for (const row of rows) {
-    if (row.type !== 'group_header' && row.type !== 'unassigned') continue
+    if (
+      row.type !== 'group_header' &&
+      row.type !== 'unassigned' &&
+      row.type !== 'suspended' &&
+      row.type !== 'cancelled'
+    )
+      continue
     if (row.y + row.height < sy || row.y > sy + vh) continue
 
-    ctx.fillStyle = row.color
-      ? hexToRgba(row.color, isDark ? 0.05 : 0.04)
-      : isDark
-        ? 'rgba(255,255,255,0.02)'
-        : 'rgba(0,0,0,0.02)'
+    let bg: string
+    if (row.type === 'cancelled') {
+      bg = isDark ? 'rgba(255,59,59,0.14)' : 'rgba(255,59,59,0.08)'
+    } else if (row.type === 'suspended') {
+      bg = isDark ? 'rgba(143,144,166,0.12)' : 'rgba(143,144,166,0.08)'
+    } else if (row.color) {
+      bg = hexToRgba(row.color, isDark ? 0.05 : 0.04)
+    } else {
+      bg = isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)'
+    }
+    ctx.fillStyle = bg
     ctx.fillRect(sx, row.y, vw, row.height)
 
-    // Pinned label in canvas area
-    ctx.fillStyle = isDark ? 'rgba(194,198,217,0.4)' : 'rgba(55,65,81,0.3)'
-    ctx.font = '600 11px Inter, system-ui, sans-serif'
-    ctx.fillText(row.label, sx + 12, row.y + row.height / 2)
+    // Pinned canvas-side label only for group headers and unassigned —
+    // synthetic status rows (cancelled / suspended) carry their label
+    // in the left column already.
+    if (row.type === 'group_header' || row.type === 'unassigned') {
+      ctx.fillStyle = isDark ? 'rgba(194,198,217,0.4)' : 'rgba(55,65,81,0.3)'
+      ctx.font = '600 11px Inter, system-ui, sans-serif'
+      ctx.fillText(row.label, sx + 12, row.y + row.height / 2)
+    }
   }
 }
 

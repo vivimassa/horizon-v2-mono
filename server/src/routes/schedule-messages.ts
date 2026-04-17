@@ -5,6 +5,7 @@ import { ScheduledFlight } from '../models/ScheduledFlight.js'
 import { ScheduleMessageLog } from '../models/ScheduleMessageLog.js'
 import { FlightInstance } from '../models/FlightInstance.js'
 import { AircraftType } from '../models/AircraftType.js'
+import { AsmSsmConsumer } from '../models/AsmSsmConsumer.js'
 import { computeScheduleDiff } from '../utils/schedule-diff-engine.js'
 import { computeAsmDiff, findNeutralizablePairs } from '@skyhub/logic/src/messaging/asm-diff-engine'
 import { generateAsmMessage } from '@skyhub/logic/src/messaging/asm-parser'
@@ -288,17 +289,74 @@ export async function scheduleMessageRoutes(app: FastifyInstance): Promise<void>
   })
 
   // ── POST /schedule-messages/release — Release held messages ──
+  //
+  // Fans each message out to every active AsmSsmConsumer for the operator.
+  // Each (message × consumer) pair becomes an entry in deliveries[].
+  // Message status transitions:
+  //   - 0 consumers:       held → sent         (release acts as a no-op fan-out)
+  //   - ≥1 consumers:      held → pending      (worker drains SMTP/SFTP; pull_api
+  //                                              drains when the consumer polls)
   app.post('/schedule-messages/release', async (req, reply) => {
     const { messageIds } = batchIdsSchema.parse(req.body)
-    if (messageIds.length === 0) return { released: 0 }
+    if (messageIds.length === 0) return { released: 0, pending: 0, sent: 0 }
 
     const now = new Date().toISOString()
-    const result = await ScheduleMessageLog.updateMany(
-      { _id: { $in: messageIds }, status: 'held' },
-      { status: 'sent', updatedAtUtc: now },
-    )
 
-    return { released: result.modifiedCount }
+    // Load held messages first so we know the operator(s) involved.
+    const heldDocs = await ScheduleMessageLog.find({
+      _id: { $in: messageIds },
+      status: 'held',
+    }).lean()
+
+    if (heldDocs.length === 0) return { released: 0, pending: 0, sent: 0 }
+
+    // Group by operator — typical release is same-operator but we don't assume.
+    const byOperator = new Map<string, typeof heldDocs>()
+    for (const d of heldDocs) {
+      const key = d.operatorId as string
+      const arr = byOperator.get(key)
+      if (arr) arr.push(d)
+      else byOperator.set(key, [d])
+    }
+
+    let pending = 0
+    let sent = 0
+
+    for (const [operatorId, docs] of byOperator) {
+      const consumers = await AsmSsmConsumer.find({ operatorId, active: true }).lean()
+
+      if (consumers.length === 0) {
+        // No consumers → just mark sent (legacy behavior for tenants that
+        // haven't configured delivery yet).
+        const res = await ScheduleMessageLog.updateMany(
+          { _id: { $in: docs.map((d) => d._id) }, status: 'held' },
+          { $set: { status: 'sent', updatedAtUtc: now } },
+        )
+        sent += res.modifiedCount
+        continue
+      }
+
+      // Build deliveries fan-out per message.
+      const deliveries = consumers.map((c) => ({
+        consumerId: c._id as string,
+        consumerName: c.name as string,
+        deliveryMode: c.deliveryMode as 'pull_api' | 'sftp' | 'smtp',
+        status: 'pending' as const,
+        attemptCount: 0,
+        lastAttemptAtUtc: null,
+        deliveredAtUtc: null,
+        errorDetail: null,
+        externalRef: null,
+      }))
+
+      const res = await ScheduleMessageLog.updateMany(
+        { _id: { $in: docs.map((d) => d._id) }, status: 'held' },
+        { $set: { status: 'pending', deliveries, updatedAtUtc: now } },
+      )
+      pending += res.modifiedCount
+    }
+
+    return { released: pending + sent, pending, sent }
   })
 
   // ── POST /schedule-messages/discard — Discard held messages ──
@@ -466,5 +524,175 @@ export async function scheduleMessageRoutes(app: FastifyInstance): Promise<void>
     )
 
     return { messages, baseCount: baseFlights.length, targetCount: targetFlights.length }
+  })
+
+  // ── POST /schedule-messages/generate-and-hold — Generate + persist as held ──
+  //
+  // Same inputs as /generate, but also builds IATA raw text for each diff and
+  // stores a held ScheduleMessageLog doc. Used by the Movement Control 2.1.1
+  // ASM dialog "Generate & Hold" button — generates from ScheduledFlight diff
+  // (pattern-level) rather than FlightInstance diff (instance-level).
+  app.post('/schedule-messages/generate-and-hold', async (req, reply) => {
+    const { operatorId, dateFrom, dateTo, targetScenarioId, operatorIataCode } = req.body as {
+      operatorId?: string
+      dateFrom?: string
+      dateTo?: string
+      targetScenarioId?: string
+      operatorIataCode?: string
+    }
+    if (!operatorId) return reply.code(400).send({ error: 'operatorId required' })
+    if (!operatorIataCode) return reply.code(400).send({ error: 'operatorIataCode required' })
+
+    const periodFilter: Record<string, unknown> = {}
+    if (dateFrom) periodFilter.effectiveUntil = { $gte: dateFrom }
+    if (dateTo) periodFilter.effectiveFrom = { $lte: dateTo }
+
+    const baseFilter: Record<string, unknown> = {
+      operatorId,
+      isActive: { $ne: false },
+      scenarioId: null,
+      ...periodFilter,
+    }
+    const targetFilter: Record<string, unknown> = {
+      operatorId,
+      isActive: { $ne: false },
+      ...periodFilter,
+    }
+    if (targetScenarioId) targetFilter.scenarioId = targetScenarioId
+    else targetFilter.scenarioId = null
+
+    const [baseFlights, targetFlights] = await Promise.all([
+      ScheduledFlight.find(baseFilter).lean(),
+      ScheduledFlight.find(targetFilter).lean(),
+    ])
+
+    const diffs = computeScheduleDiff(
+      baseFlights.map((f) => ({
+        _id: f._id as string,
+        flightNumber: `${f.airlineCode}${f.flightNumber}`,
+        depStation: f.depStation as string,
+        arrStation: f.arrStation as string,
+        stdUtc: f.stdUtc as string,
+        staUtc: f.staUtc as string,
+        aircraftTypeIcao: f.aircraftTypeIcao as string | null,
+        daysOfWeek: f.daysOfWeek as string,
+        effectiveFrom: f.effectiveFrom as string,
+        effectiveUntil: f.effectiveUntil as string,
+        status: f.status as string,
+      })),
+      targetFlights.map((f) => ({
+        _id: f._id as string,
+        flightNumber: `${f.airlineCode}${f.flightNumber}`,
+        depStation: f.depStation as string,
+        arrStation: f.arrStation as string,
+        stdUtc: f.stdUtc as string,
+        staUtc: f.staUtc as string,
+        aircraftTypeIcao: f.aircraftTypeIcao as string | null,
+        daysOfWeek: f.daysOfWeek as string,
+        effectiveFrom: f.effectiveFrom as string,
+        effectiveUntil: f.effectiveUntil as string,
+        status: f.status as string,
+      })),
+    )
+
+    if (diffs.length === 0) return { held: 0, neutralized: 0 }
+
+    const now = new Date().toISOString()
+    const docs = diffs.map((d) => {
+      const fltNum = d.flightNumber.replace(/^[A-Z]{2}/, '')
+      // Schedule-pattern diff uses effectiveFrom as the effective date for the
+      // IATA header. Downstream consumers receiving ASM will key on this +
+      // flight number to apply the change.
+      const raw = generateAsmMessage({
+        actionCode: d.actionCode,
+        airline: operatorIataCode,
+        flightNumber: fltNum,
+        flightDate: d.effectiveFrom,
+        changes: d.changes as Record<string, { from?: string; to: string }>,
+      })
+
+      return {
+        _id: crypto.randomUUID(),
+        operatorId,
+        messageType: d.type,
+        actionCode: d.actionCode,
+        direction: 'outbound' as const,
+        status: 'held' as const,
+        flightNumber: d.flightNumber,
+        flightDate: d.effectiveFrom,
+        depStation: d.depStation,
+        arrStation: d.arrStation,
+        summary: d.summary,
+        rawMessage: raw,
+        changes: d.changes,
+        createdAtUtc: now,
+        updatedAtUtc: now,
+      }
+    })
+
+    await ScheduleMessageLog.insertMany(docs)
+
+    // Neutralization: NEW + CNL pairs across all held outbound for operator.
+    const allHeld = await ScheduleMessageLog.find(
+      { operatorId, status: 'held', direction: 'outbound' },
+      { _id: 1, actionCode: 1, flightNumber: 1, flightDate: 1, changes: 1 },
+    ).lean()
+
+    const heldRefs: HeldMessageRef[] = allHeld.map((m) => ({
+      id: m._id as string,
+      actionCode: m.actionCode as string,
+      flightNumber: m.flightNumber as string,
+      flightDate: m.flightDate as string,
+      changes: (m.changes || {}) as Record<string, unknown>,
+    }))
+    const toNeutralize = findNeutralizablePairs(heldRefs)
+    if (toNeutralize.length > 0) {
+      await ScheduleMessageLog.updateMany({ _id: { $in: toNeutralize } }, { status: 'neutralized', updatedAtUtc: now })
+    }
+
+    return { held: docs.length - toNeutralize.length, neutralized: toNeutralize.length }
+  })
+
+  // ── GET /schedule-messages/delivery-log — Per-consumer delivery audit ──
+  //
+  // Returns messages that have been released (status in pending|sent|partial)
+  // along with their deliveries[] array, so 7.1.5.1 can render a per-consumer
+  // status grid. Filters:
+  //   - operatorId (required)
+  //   - status         — filter by message-level status
+  //   - consumerId     — only messages that include this consumer's delivery
+  //   - deliveryStatus — any delivery in this status (pending/delivered/failed)
+  //   - actionCode     — NEW,CNL,…
+  //   - flightDateFrom/To
+  //   - limit / offset
+  app.get('/schedule-messages/delivery-log', async (req, reply) => {
+    const q = req.query as Record<string, string | undefined>
+    if (!q.operatorId) return reply.code(400).send({ error: 'operatorId required' })
+
+    const limit = Math.min(parseInt(q.limit ?? '50', 10) || 50, 200)
+    const offset = parseInt(q.offset ?? '0', 10) || 0
+
+    const filter: Record<string, unknown> = {
+      operatorId: q.operatorId,
+      direction: 'outbound',
+      status: { $in: ['pending', 'sent', 'partial', 'failed'] },
+    }
+    if (q.status) filter.status = q.status
+    if (q.actionCode) filter.actionCode = { $in: q.actionCode.split(',') }
+    if (q.consumerId) filter['deliveries.consumerId'] = q.consumerId
+    if (q.deliveryStatus) filter['deliveries.status'] = q.deliveryStatus
+    if (q.flightDateFrom || q.flightDateTo) {
+      const dateFilter: Record<string, string> = {}
+      if (q.flightDateFrom) dateFilter.$gte = q.flightDateFrom
+      if (q.flightDateTo) dateFilter.$lte = q.flightDateTo
+      filter.flightDate = dateFilter
+    }
+
+    const [entries, total] = await Promise.all([
+      ScheduleMessageLog.find(filter).sort({ updatedAtUtc: -1 }).skip(offset).limit(limit).lean(),
+      ScheduleMessageLog.countDocuments(filter),
+    ])
+
+    return { entries, total }
   })
 }

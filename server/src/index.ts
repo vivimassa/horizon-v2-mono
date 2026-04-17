@@ -36,10 +36,15 @@ import { contactSubmissionRoutes } from './routes/contact-submissions.js'
 import { worldMapRoutes } from './routes/world-map.js'
 import { disruptionRoutes } from './routes/disruptions.js'
 import { operatorDisruptionConfigRoutes } from './routes/operator-disruption-config.js'
+import { operatorMessagingConfigRoutes } from './routes/operator-messaging-config.js'
+import { asmSsmConsumerRoutes } from './routes/asm-ssm-consumers.js'
+import { integrationPullRoutes } from './routes/integration-pull.js'
 import { mlRoutes } from './routes/ml.js'
 import { weatherRoutes } from './routes/weather.js'
 import { nonCrewPeopleRoutes } from './routes/non-crew-people.js'
 import { startWeatherPoll } from './jobs/weather-poll.js'
+import { startAutoTransmitScheduler } from './jobs/mvt-auto-transmit.js'
+import { startAsmSsmDeliveryScheduler } from './jobs/asm-ssm-deliver.js'
 import { loadOurAirportsData, startAutoRefresh } from './data/ourairports-cache.js'
 
 const port = env.PORT
@@ -104,6 +109,9 @@ async function main(): Promise<void> {
   await app.register(worldMapRoutes)
   await app.register(disruptionRoutes)
   await app.register(operatorDisruptionConfigRoutes)
+  await app.register(operatorMessagingConfigRoutes)
+  await app.register(asmSsmConsumerRoutes)
+  await app.register(integrationPullRoutes)
   await app.register(mlRoutes)
   await app.register(weatherRoutes)
   await app.register(nonCrewPeopleRoutes)
@@ -114,6 +122,15 @@ async function main(): Promise<void> {
 
   // Live weather polling — fetches METAR observations for monitored airports every ~15 min.
   startWeatherPoll()
+
+  // Outbound auto-transmit scheduler — sweeps Held MVT/LDM per operator at their
+  // configured cadence. Disable with ENABLE_AUTO_TRANSMIT=false.
+  startAutoTransmitScheduler()
+
+  // 7.1.5.1 ASM/SSM delivery worker — drains pending SMTP/SFTP deliveries.
+  // pull_api deliveries are drained synchronously by the consumer's HTTP pull.
+  // Disable with ENABLE_ASM_SSM_DELIVERY=false.
+  startAsmSsmDeliveryScheduler()
 
   // ── OOOI Simulation — seed actual times on startup + every 15 minutes ──
   const OOOI_SIM_INTERVAL = 15 * 60_000 // 15 minutes

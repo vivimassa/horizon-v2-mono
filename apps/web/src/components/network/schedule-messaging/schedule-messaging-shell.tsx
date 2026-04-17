@@ -78,10 +78,10 @@ export function ScheduleMessagingShell() {
             {/* Content */}
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl" style={glassStyle}>
               {activeSection === 'receive' && (
-                <ReceivePanel operatorIataCode={operator?.iataCode || 'HZ'} onApplied={handleRefresh} />
+                <ReceivePanel operatorIataCode={operator?.iataCode ?? ''} onApplied={handleRefresh} />
               )}
               {activeSection === 'send' && (
-                <SendPanel operatorIataCode={operator?.iataCode || 'HZ'} onSent={handleRefresh} />
+                <SendPanel operatorIataCode={operator?.iataCode ?? ''} onSent={handleRefresh} />
               )}
               {activeSection === 'log' && <MessageLogTable />}
             </div>

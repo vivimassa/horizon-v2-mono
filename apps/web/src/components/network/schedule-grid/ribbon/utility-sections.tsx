@@ -1,9 +1,21 @@
 'use client'
 
-import { Search, Replace, Upload, Download, Save, SaveAll, GitBranch, MessageSquare, FileText } from 'lucide-react'
+import {
+  Search,
+  Replace,
+  Upload,
+  Download,
+  Save,
+  SaveAll,
+  GitBranch,
+  MessageSquare,
+  FileText,
+  HelpCircle,
+} from 'lucide-react'
 import { RibbonButton } from './ribbon-button'
 import { RibbonSection } from './flight-section'
 import { useTheme } from '@/components/theme-provider'
+import { useHelp } from '@/components/help'
 
 function Divider() {
   const { theme } = useTheme()
@@ -42,6 +54,7 @@ export function UtilitySections({
   hasDirty,
   saving,
 }: Props) {
+  const { openHelp } = useHelp()
   return (
     <>
       <RibbonSection label="Editing">
@@ -74,6 +87,12 @@ export function UtilitySections({
       <RibbonSection label="Message">
         <RibbonButton icon={MessageSquare} label="ASM/SSM" onClick={onMessage} />
         <RibbonButton icon={FileText} label="SSIM" onClick={onSsimExport} />
+      </RibbonSection>
+
+      <Divider />
+
+      <RibbonSection label="Help">
+        <RibbonButton icon={HelpCircle} label="Help" shortcut="F1" onClick={() => openHelp()} />
       </RibbonSection>
     </>
   )

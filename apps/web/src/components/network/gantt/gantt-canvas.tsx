@@ -778,6 +778,32 @@ export function GanttCanvas() {
                   </div>
                 )
               }
+              if (row.type === 'suspended' || row.type === 'cancelled') {
+                const accent = row.type === 'cancelled' ? '#FF3B3B' : palette.textTertiary
+                const bg =
+                  row.type === 'cancelled'
+                    ? isDark
+                      ? 'rgba(255,59,59,0.14)'
+                      : 'rgba(255,59,59,0.08)'
+                    : isDark
+                      ? 'rgba(143,144,166,0.12)'
+                      : 'rgba(143,144,166,0.08)'
+                return (
+                  <div
+                    key={`s${i}`}
+                    className="flex items-center px-3 select-none"
+                    style={{
+                      height: row.height,
+                      borderLeft: `3px solid ${accent}`,
+                      background: bg,
+                    }}
+                  >
+                    <span className="text-[13px] font-semibold truncate" style={{ color: palette.text }}>
+                      {row.label}
+                    </span>
+                  </div>
+                )
+              }
               return (
                 <div
                   key={`a${i}`}

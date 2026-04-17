@@ -140,7 +140,7 @@ export interface BarLayout {
 }
 
 export interface RowLayout {
-  type: 'group_header' | 'aircraft' | 'unassigned'
+  type: 'group_header' | 'aircraft' | 'unassigned' | 'suspended' | 'cancelled'
   registration?: string
   aircraftTypeIcao?: string
   aircraftTypeName?: string
@@ -150,6 +150,8 @@ export interface RowLayout {
   height: number
   color?: string
   aircraftCount?: number
+  /** Count of flights on this row; used for status summary rows */
+  flightCount?: number
 }
 
 export interface TickMark {

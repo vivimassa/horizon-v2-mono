@@ -178,11 +178,11 @@ export function MessagesTab({ data }: { data: FlightDetail }) {
                       </pre>
                       <div className="mt-2 flex justify-end">
                         <Link
-                          href={`/flight-ops/control/movement-messages`}
+                          href={`/flight-ops/control/communication-deck`}
                           className="inline-flex items-center gap-1 text-[13px] hover:underline"
                           style={{ color: accent }}
                         >
-                          View in Movement Messages
+                          View in Communication Deck
                           <ExternalLink className="w-3 h-3" />
                         </Link>
                       </div>

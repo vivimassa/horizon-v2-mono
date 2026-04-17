@@ -1,0 +1,7 @@
+export { HelpPanel } from './help-panel'
+export { HelpButton } from './help-button'
+export { HelpProvider, useHelp, type HelpOpenInput } from './help-provider'
+export { Term } from './term'
+export { GLOSSARY, lookupTerm, type GlossaryEntry } from './glossary'
+export { HELP_REGISTRY, resolveHelp, pathnameToCode, type HelpEntry, type HelpMeta } from './help-registry'
+export { Kbd, Step, Callout, Shortcut, ShortcutList } from './help-mdx-primitives'

@@ -9,6 +9,7 @@ import { DisplayProvider } from '@/components/display-provider'
 import { UserProvider } from '@/components/user-provider'
 import { AuthProvider } from '@/components/auth-provider'
 import { QueryProvider } from '@/components/query-provider'
+import { HelpProvider } from '@/components/help'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -30,7 +31,9 @@ export default function RootLayout({
             <DisplayProvider>
               <AuthProvider>
                 <UserProvider>
-                  <AppShell>{children}</AppShell>
+                  <HelpProvider>
+                    <AppShell>{children}</AppShell>
+                  </HelpProvider>
                 </UserProvider>
               </AuthProvider>
             </DisplayProvider>

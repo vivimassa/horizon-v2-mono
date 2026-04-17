@@ -28,6 +28,7 @@ import {
   Radio,
   SlidersHorizontal,
   Activity,
+  HelpCircle,
 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { colors } from '@skyhub/ui/theme'
@@ -42,6 +43,7 @@ import { MvtMessageDialog } from './mvt-message-dialog'
 import { CompareDialog } from '@/components/network/gantt/compare-dialog'
 import { ScenarioPanel } from '@/components/network/schedule-grid/scenario-panel'
 import { ScenarioSaveDialog } from './scenario-save-dialog'
+import { useHelp } from '@/components/help'
 import { useOperatorStore, getOperatorId } from '@/stores/use-operator-store'
 import { api } from '@skyhub/api'
 import { listOptimizerRuns } from '@/lib/gantt/api'
@@ -57,6 +59,7 @@ export function OpsToolbar({
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const palette = isDark ? colors.dark : colors.light
+  const { openHelp } = useHelp()
 
   const barLabelMode = useGanttStore((s) => s.barLabelMode)
   const selectedFlightIds = useGanttStore((s) => s.selectedFlightIds)
@@ -656,6 +659,15 @@ export function OpsToolbar({
           {/* ── Execute ── */}
           <RibbonSection label="Execute">
             <RibbonBtn
+              icon={Plus}
+              label="Add"
+              onClick={onAddFlight}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Add a new flight"
+            />
+            <RibbonBtn
               icon={Link}
               label="Assign"
               onClick={() => setBulkAssignOpen(true)}
@@ -663,20 +675,6 @@ export function OpsToolbar({
               hoverBg={hoverBg}
               activeBg={activeBg}
               tooltip="Bulk assign/deassign aircraft"
-            />
-            <RibbonBtn
-              icon={CalendarClock}
-              label="Reschedule"
-              onClick={() => {
-                if (singleSelectedFlightId) useGanttStore.getState().openRescheduleDialog(singleSelectedFlightId)
-              }}
-              isDark={isDark}
-              hoverBg={hoverBg}
-              activeBg={activeBg}
-              disabled={!singleSelectedFlightId}
-              tooltip={
-                singleSelectedFlightId ? 'Reschedule the selected flight' : 'Select one flight on the chart first'
-              }
             />
             <RibbonBtn
               icon={AlertTriangle}
@@ -695,13 +693,18 @@ export function OpsToolbar({
               }
             />
             <RibbonBtn
-              icon={Plus}
-              label="Add"
-              onClick={onAddFlight}
+              icon={CalendarClock}
+              label="Reschedule"
+              onClick={() => {
+                if (singleSelectedFlightId) useGanttStore.getState().openRescheduleDialog(singleSelectedFlightId)
+              }}
               isDark={isDark}
               hoverBg={hoverBg}
               activeBg={activeBg}
-              tooltip="Add a new flight"
+              disabled={!singleSelectedFlightId}
+              tooltip={
+                singleSelectedFlightId ? 'Reschedule the selected flight' : 'Select one flight on the chart first'
+              }
             />
           </RibbonSection>
           <Divider isDark={isDark} />
@@ -816,6 +819,20 @@ export function OpsToolbar({
               hoverBg={hoverBg}
               activeBg={activeBg}
               tooltip="Search flights (Ctrl+F)"
+            />
+          </RibbonSection>
+          <Divider isDark={isDark} />
+
+          {/* ── Help ── */}
+          <RibbonSection label="Help">
+            <RibbonBtn
+              icon={HelpCircle}
+              label="Help"
+              onClick={() => openHelp()}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Open help for this page (F1)"
             />
           </RibbonSection>
 

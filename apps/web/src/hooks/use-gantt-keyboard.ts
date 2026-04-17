@@ -69,7 +69,9 @@ export function useGanttKeyboard() {
         return
       }
 
-      if (e.key === 'F1') {
+      // F1 is reserved globally for Help — do not intercept here.
+
+      if (e.key === 'F2') {
         e.preventDefault()
         // Context menu open → open info for that flight
         if (state.contextMenu) {
@@ -83,7 +85,7 @@ export function useGanttKeyboard() {
         }
       }
 
-      if (e.key === 'F2') {
+      if (e.key === 'F3') {
         e.preventDefault()
         if (state.aircraftContextMenu) {
           const { x, y, registration, aircraftTypeIcao } = state.aircraftContextMenu
@@ -92,7 +94,7 @@ export function useGanttKeyboard() {
         }
       }
 
-      if (e.key === 'F3') {
+      if (e.key === 'F4') {
         e.preventDefault()
         if (state.dayContextMenu) {
           const { x, y, date } = state.dayContextMenu
@@ -101,7 +103,7 @@ export function useGanttKeyboard() {
         }
       }
 
-      if (e.key === 'F4') {
+      if (e.key === 'F5') {
         e.preventDefault()
         if (state.rowContextMenu) {
           const { x, y, registration, aircraftTypeIcao, date } = state.rowContextMenu

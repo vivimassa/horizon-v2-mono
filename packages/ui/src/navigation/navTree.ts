@@ -38,6 +38,7 @@ import {
   Radio,
   LayoutDashboard,
   SlidersHorizontal,
+  Plug,
 } from 'lucide-react-native'
 
 export interface NavPage {
@@ -220,10 +221,10 @@ export const NAV_TREE: NavModule[] = [
             icon: Radar,
           },
           {
-            key: 'movement-messages',
-            label: 'Movement Messages',
+            key: 'communication-deck',
+            label: 'Communication Deck',
             num: '2.1.4',
-            route: '/flight-ops/control/movement-messages',
+            route: '/flight-ops/control/communication-deck',
             icon: Radio,
           },
           { key: 'world-map', label: 'World Map', num: '2.1.5', route: '/flight-ops/control/world-map', icon: Map },
@@ -476,6 +477,13 @@ export const NAV_TREE: NavModule[] = [
             icon: Building2,
           },
           { key: 'reports', label: 'Reports', num: '6.2.5', route: '/settings/admin/reports', icon: FileText },
+          {
+            key: 'integration',
+            label: 'Integration',
+            num: '6.2.6',
+            route: '/settings/admin/integration',
+            icon: Plug,
+          },
         ],
       },
     ],

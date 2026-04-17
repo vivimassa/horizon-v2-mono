@@ -3,6 +3,7 @@
 import type { ComponentType, ReactNode } from 'react'
 import { ChevronLeft, Pencil, Save, X, Trash2, Loader2 } from 'lucide-react'
 import { Text } from './Text'
+import { HelpButton } from '@/components/help'
 
 type IconComponent = ComponentType<any>
 
@@ -34,6 +35,10 @@ interface DetailScreenHeaderProps {
   onDelete?: () => void
   saving?: boolean
   status?: StatusDescriptor
+  helpCode?: string
+  helpTitle?: string
+  helpSubtitle?: string
+  hideHelp?: boolean
 }
 
 export function DetailScreenHeader({
@@ -49,6 +54,10 @@ export function DetailScreenHeader({
   onDelete,
   saving = false,
   status,
+  helpCode,
+  helpTitle,
+  helpSubtitle,
+  hideHelp,
 }: DetailScreenHeaderProps) {
   return (
     <div className="flex items-center gap-3 px-6 py-4">
@@ -149,6 +158,8 @@ export function DetailScreenHeader({
             ) : null}
           </>
         )}
+
+        {!hideHelp ? <HelpButton code={helpCode} title={helpTitle ?? title} subtitle={helpSubtitle} /> : null}
       </div>
     </div>
   )

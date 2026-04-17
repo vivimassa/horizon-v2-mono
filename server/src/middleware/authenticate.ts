@@ -16,6 +16,12 @@ const PUBLIC_PATHS = [
   '/auth/forgot-password',
   '/auth/reset-password',
   '/contact-submissions',
+  // Inbound ACARS/MVT/LDM webhook — authenticates itself via the per-operator
+  // bearer token rotated from 7.1.5.2. External systems don't have JWTs.
+  '/movement-messages/inbound',
+  // 7.1.5.1 ASM/SSM outbox — authenticates itself via X-Consumer-Key.
+  // External vendors (GDS, partners) have no SkyHub JWT.
+  '/integration/asm-ssm/outbox',
 ]
 const PUBLIC_PREFIXES = ['/uploads/']
 

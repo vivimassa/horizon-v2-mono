@@ -146,7 +146,7 @@ export function GanttContextMenu() {
         <MenuItem
           icon={Info}
           label="Flight Information"
-          shortcut="F1"
+          shortcut="F2"
           disabled={!isSingle}
           onClick={() => {
             openFlightInfo(ctx.flightId)

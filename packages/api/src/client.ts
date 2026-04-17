@@ -1455,6 +1455,70 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  // Generate ASM/SSM from a scenario-vs-production diff AND persist as held.
+  // Backs the "Generate & Hold" button in Movement Control 2.1.1.
+  generateAndHoldScheduleMessages: (data: {
+    operatorId: string
+    dateFrom?: string
+    dateTo?: string
+    targetScenarioId?: string
+    operatorIataCode: string
+  }) =>
+    request<{ held: number; neutralized: number }>('/schedule-messages/generate-and-hold', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getDeliveryLog: (params: {
+    operatorId: string
+    status?: string
+    actionCode?: string
+    consumerId?: string
+    deliveryStatus?: AsmSsmDeliveryStatus
+    flightDateFrom?: string
+    flightDateTo?: string
+    limit?: number
+    offset?: number
+  }) => {
+    const p = new URLSearchParams({ operatorId: params.operatorId })
+    if (params.status) p.set('status', params.status)
+    if (params.actionCode) p.set('actionCode', params.actionCode)
+    if (params.consumerId) p.set('consumerId', params.consumerId)
+    if (params.deliveryStatus) p.set('deliveryStatus', params.deliveryStatus)
+    if (params.flightDateFrom) p.set('flightDateFrom', params.flightDateFrom)
+    if (params.flightDateTo) p.set('flightDateTo', params.flightDateTo)
+    if (params.limit != null) p.set('limit', String(params.limit))
+    if (params.offset != null) p.set('offset', String(params.offset))
+    return request<{ entries: DeliveryLogEntry[]; total: number }>(`/schedule-messages/delivery-log?${p.toString()}`)
+  },
+
+  // ─── 7.1.5.1 ASM/SSM Consumers ─────────────────────────
+  getAsmSsmConsumers: (operatorId: string, includeInactive = false) => {
+    const p = new URLSearchParams({ operatorId })
+    if (includeInactive) p.set('includeInactive', 'true')
+    return request<{ consumers: AsmSsmConsumerRef[] }>(`/asm-ssm-consumers?${p.toString()}`)
+  },
+
+  createAsmSsmConsumer: (data: AsmSsmConsumerUpsert) =>
+    request<{
+      consumer: AsmSsmConsumerRef
+      apiKey: string | null
+      apiKeyMasked: string | null
+    }>('/asm-ssm-consumers', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateAsmSsmConsumer: (id: string, patch: Partial<Omit<AsmSsmConsumerUpsert, 'operatorId'>>) =>
+    request<{ consumer: AsmSsmConsumerRef }>(`/asm-ssm-consumers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+
+  deleteAsmSsmConsumer: (id: string) => request<{ ok: boolean }>(`/asm-ssm-consumers/${id}`, { method: 'DELETE' }),
+
+  rotateAsmSsmConsumerKey: (id: string) =>
+    request<{ apiKey: string; apiKeyMasked: string; rotatedAtUtc: string }>(`/asm-ssm-consumers/${id}/rotate-key`, {
+      method: 'POST',
+    }),
+
   // ─── Movement Messages (MVT/LDM) ─────────────────────────
 
   getMovementMessages: (params: MovementMessageQuery) => {
@@ -2190,6 +2254,33 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  // ── 7.1.5.2 Communication Deck / Messaging config ──
+  getOperatorMessagingConfig: (operatorId: string) =>
+    request<OperatorMessagingConfig | null>(
+      `/operator-messaging-config?operatorId=${encodeURIComponent(operatorId)}`,
+    ).catch((err) => {
+      if (err instanceof Error && /^API 404/.test(err.message)) return null
+      throw err
+    }),
+
+  upsertOperatorMessagingConfig: (body: OperatorMessagingConfigUpsert) =>
+    request<OperatorMessagingConfig>('/operator-messaging-config', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  getInboundMessageToken: () =>
+    request<{ exists: boolean; masked: string | null; rotatedAt: string | null }>(
+      '/operator-messaging-config/inbound-token',
+    ),
+
+  rotateInboundMessageToken: () =>
+    request<{ token: string; masked: string; rotatedAt: string }>('/operator-messaging-config/inbound-token/rotate', {
+      method: 'POST',
+    }),
+
+  getAutoTransmitStatus: () => request<AutoTransmitStatus>('/movement-messages/auto-transmit/status'),
+
   resolveFlight: (q: { operatorId: string; flightNumber: string; date: string; dep?: string; arr?: string }) => {
     const params = new URLSearchParams({ operatorId: q.operatorId, flightNumber: q.flightNumber, date: q.date })
     if (q.dep) params.set('dep', q.dep)
@@ -2380,6 +2471,195 @@ export interface OperatorDisruptionConfigUpsert {
   notifications?: unknown
   coverage?: unknown
   overrides?: unknown
+}
+
+// ── 7.1.5.2 Messaging config (Communication Deck) ──
+
+export type MessageActionCode = 'AD' | 'AA' | 'ED' | 'EA' | 'NI' | 'RR' | 'FR'
+
+export interface AutoTransmitConfig {
+  enabled: boolean
+  intervalMin: number
+  ageGateMin: number
+  actionAllow: MessageActionCode[]
+  respectFilter: boolean
+  lastRunAtUtc?: number | null
+  lastMatched?: number
+  lastSent?: number
+  lastFailed?: number
+}
+
+export interface ValidationConfig {
+  rejectFutureTs: boolean
+  futureTsToleranceMin: number
+  rejectExcessiveDelay: boolean
+  delayThresholdHours: number
+  enforceSequence: boolean
+  touchAndGoGuardSec: number
+  blockTimeDiscrepancyPct: number
+  matchByReg: boolean
+}
+
+export interface OverwritePolicy {
+  acarsOverwriteManual: boolean
+  acarsOverwriteMvt: boolean
+  mvtOverwriteManual: boolean
+}
+
+export interface OperatorMessagingConfig {
+  _id: string
+  operatorId: string
+  autoTransmit: AutoTransmitConfig
+  validation: ValidationConfig
+  overwrite: OverwritePolicy
+  asmSsm?: AsmSsmConfig
+  createdAt: string
+  updatedAt: string
+}
+
+export interface OperatorMessagingConfigUpsert {
+  operatorId: string
+  autoTransmit?: Partial<Omit<AutoTransmitConfig, 'lastRunAtUtc' | 'lastMatched' | 'lastSent' | 'lastFailed'>>
+  validation?: Partial<ValidationConfig>
+  overwrite?: Partial<OverwritePolicy>
+  asmSsm?: AsmSsmConfigUpsert
+}
+
+// ── 7.1.5.1 ASM/SSM Transmission ──
+
+export type AsmSsmActionCode = 'NEW' | 'CNL' | 'TIM' | 'EQT' | 'RPL' | 'RRT' | 'CON' | 'RIN' | 'FLT' | 'SKD' | 'ADM'
+
+export interface AsmSsmGenerationConfig {
+  asmEnabled: boolean
+  ssmEnabled: boolean
+  triggerOnCommit: boolean
+  triggerOnPlaygroundCommit: boolean
+  messageTypeAllow: AsmSsmActionCode[]
+  priority: 'high' | 'medium' | 'low'
+}
+
+export interface AsmSsmAutoReleaseConfig {
+  enabled: boolean
+  intervalMin: number
+  ageGateMin: number
+  actionAllow: AsmSsmActionCode[]
+  lastRunAtUtc?: number | null
+  lastMatched?: number
+  lastReleased?: number
+  lastFailed?: number
+}
+
+export interface AsmSsmConfig {
+  generation: AsmSsmGenerationConfig
+  autoRelease: AsmSsmAutoReleaseConfig
+}
+
+export interface AsmSsmConfigUpsert {
+  generation?: Partial<AsmSsmGenerationConfig>
+  autoRelease?: Partial<Omit<AsmSsmAutoReleaseConfig, 'lastRunAtUtc' | 'lastMatched' | 'lastReleased' | 'lastFailed'>>
+}
+
+export type AsmSsmDeliveryMode = 'pull_api' | 'sftp' | 'smtp'
+export type AsmSsmDeliveryStatus = 'pending' | 'delivered' | 'failed' | 'retrying'
+
+export interface AsmSsmConsumerRef {
+  _id: string
+  operatorId: string
+  name: string
+  contactEmail: string | null
+  deliveryMode: AsmSsmDeliveryMode
+  pullApi: {
+    hasKey: boolean
+    ipAllowlist: string[]
+  }
+  sftp: {
+    host?: string | null
+    port?: number
+    user?: string | null
+    authType?: 'password' | 'key'
+    secretRef?: string | null
+    targetPath?: string
+    filenamePattern?: string
+  }
+  smtp: {
+    to?: string | null
+    cc?: string[]
+    bcc?: string[]
+    subjectTemplate?: string
+    asAttachment?: boolean
+    bounceCount?: number
+  }
+  active: boolean
+  lastDeliveryAtUtc: string | null
+  totalMessagesConsumed: number
+  consecutiveFailures: number
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export interface AsmSsmConsumerUpsert {
+  operatorId: string
+  name: string
+  contactEmail?: string | null
+  deliveryMode: AsmSsmDeliveryMode
+  pullApi?: { ipAllowlist?: string[] }
+  sftp?: {
+    host: string
+    port?: number
+    user: string
+    authType?: 'password' | 'key'
+    secretRef?: string
+    targetPath?: string
+    filenamePattern?: string
+  }
+  smtp?: {
+    to: string
+    cc?: string[]
+    bcc?: string[]
+    subjectTemplate?: string
+    asAttachment?: boolean
+  }
+  active?: boolean
+}
+
+export interface AsmSsmDeliveryEntry {
+  consumerId: string
+  consumerName?: string | null
+  deliveryMode: AsmSsmDeliveryMode
+  status: AsmSsmDeliveryStatus
+  attemptCount: number
+  lastAttemptAtUtc?: string | null
+  deliveredAtUtc?: string | null
+  errorDetail?: string | null
+  externalRef?: string | null
+}
+
+export interface DeliveryLogEntry {
+  _id: string
+  operatorId: string
+  messageType: 'ASM' | 'SSM'
+  actionCode: string
+  direction: 'inbound' | 'outbound'
+  status: string
+  flightNumber: string | null
+  flightDate: string | null
+  depStation: string | null
+  arrStation: string | null
+  summary: string | null
+  rawMessage: string | null
+  deliveries: AsmSsmDeliveryEntry[]
+  createdAtUtc: string | null
+  updatedAtUtc: string | null
+}
+
+export interface AutoTransmitStatus {
+  enabled: boolean
+  intervalMin: number
+  lastRunAtUtc: number | null
+  nextRunAtUtc: number | null
+  lastMatched: number
+  lastSent: number
+  lastFailed: number
 }
 
 export type WeatherAlertTier = 'none' | 'caution' | 'warn'

@@ -7,7 +7,8 @@
  */
 
 import { useState, useCallback } from 'react'
-import { MessageSquare, X, RefreshCw, Copy, Check } from 'lucide-react'
+import { MessageSquare, X, RefreshCw, Copy, Check, PauseCircle } from 'lucide-react'
+import Link from 'next/link'
 import { getOperatorId } from '@/stores/use-operator-store'
 import { useOperatorStore } from '@/stores/use-operator-store'
 import { useGanttStore } from '@/stores/use-gantt-store'
@@ -34,11 +35,16 @@ export function AsmMessageDialog({ onClose }: { onClose: () => void }) {
   const periodFrom = useGanttStore((s) => s.periodFrom)
   const periodTo = useGanttStore((s) => s.periodTo)
   const scenarioId = useOperatorStore((s) => s.activeScenarioId)
+  const operatorIataCode = useOperatorStore((s) => s.operator?.iataCode)
 
   const [messages, setMessages] = useState<ScheduleMessage[]>([])
   const [loading, setLoading] = useState(false)
   const [generated, setGenerated] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [holding, setHolding] = useState(false)
+  // After a successful hold we show a confirmation banner with a link to 7.1.5.1.
+  const [holdResult, setHoldResult] = useState<{ held: number; neutralized: number } | null>(null)
+  const [holdError, setHoldError] = useState<string | null>(null)
 
   const handleGenerate = useCallback(async () => {
     setLoading(true)
@@ -57,6 +63,29 @@ export function AsmMessageDialog({ onClose }: { onClose: () => void }) {
       setLoading(false)
     }
   }, [periodFrom, periodTo, scenarioId])
+
+  const handleHold = useCallback(async () => {
+    if (!operatorIataCode) {
+      setHoldError('Operator IATA code is not configured — cannot emit ASM/SSM.')
+      return
+    }
+    setHolding(true)
+    setHoldError(null)
+    try {
+      const result = await api.generateAndHoldScheduleMessages({
+        operatorId: getOperatorId(),
+        dateFrom: periodFrom,
+        dateTo: periodTo,
+        targetScenarioId: scenarioId ?? undefined,
+        operatorIataCode,
+      })
+      setHoldResult(result)
+    } catch (e) {
+      setHoldError(e instanceof Error ? e.message : 'Hold failed')
+    } finally {
+      setHolding(false)
+    }
+  }, [periodFrom, periodTo, scenarioId, operatorIataCode])
 
   const handleCopy = useCallback(() => {
     const text = messages.map((m) => m.summary).join('\n')
@@ -104,18 +133,67 @@ export function AsmMessageDialog({ onClose }: { onClose: () => void }) {
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between shrink-0">
+            <div className="flex items-center justify-between gap-2 shrink-0">
               <span className="text-[13px] text-hz-text-secondary">
                 {messages.length} message{messages.length !== 1 ? 's' : ''}
               </span>
-              <button
-                onClick={handleCopy}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-hz-text-secondary hover:bg-hz-border/30 transition-colors"
-              >
-                {copied ? <Check size={13} className="text-[#06C270]" /> : <Copy size={13} />}
-                {copied ? 'Copied!' : 'Copy All'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCopy}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium text-hz-text-secondary hover:bg-hz-border/30 transition-colors"
+                >
+                  {copied ? <Check size={13} className="text-[#06C270]" /> : <Copy size={13} />}
+                  {copied ? 'Copied!' : 'Copy All'}
+                </button>
+                {!holdResult && (
+                  <button
+                    onClick={handleHold}
+                    disabled={holding || messages.length === 0}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white bg-module-accent hover:opacity-90 disabled:opacity-40 transition-colors"
+                  >
+                    {holding ? <RefreshCw size={13} className="animate-spin" /> : <PauseCircle size={13} />}
+                    {holding ? 'Holding…' : 'Hold for Review'}
+                  </button>
+                )}
+              </div>
             </div>
+
+            {holdResult && (
+              <div
+                className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg"
+                style={{
+                  background: 'rgba(6,194,112,0.10)',
+                  border: '1px solid rgba(6,194,112,0.28)',
+                }}
+              >
+                <span className="text-[13px] text-hz-text">
+                  <Check size={13} className="inline text-[#06C270] mr-1" />
+                  {holdResult.held} message{holdResult.held === 1 ? '' : 's'} held for review
+                  {holdResult.neutralized > 0 ? ` · ${holdResult.neutralized} neutralized` : ''}
+                </span>
+                <Link
+                  href="/settings/admin/integration/asm-ssm-transmission"
+                  className="text-[12px] font-semibold text-module-accent hover:underline shrink-0"
+                >
+                  Open 7.1.5.1 →
+                </Link>
+              </div>
+            )}
+
+            {holdError && (
+              <div
+                className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg"
+                style={{
+                  background: 'rgba(230,53,53,0.08)',
+                  border: '1px solid rgba(230,53,53,0.28)',
+                }}
+              >
+                <span className="text-[13px] text-[#E63535]">{holdError}</span>
+                <button onClick={() => setHoldError(null)} className="text-[12px] text-hz-text-tertiary">
+                  Dismiss
+                </button>
+              </div>
+            )}
 
             <div className="flex-1 overflow-y-auto space-y-1">
               {messages.length === 0 ? (

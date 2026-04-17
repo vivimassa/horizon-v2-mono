@@ -124,8 +124,9 @@ export function GanttFilterPanel({
     // Sync drafts to store, then commit.
     setPeriod(draftFrom, draftTo)
     setAcTypeFilter(selectedTypes && selectedTypes.length < acTypeKeys.length ? selectedTypes : null)
-    const allStatuses = selectedStatuses.length === SCHEDULE_STATUS_KEYS.length
-    setStatusFilter(allStatuses ? null : selectedStatuses)
+    // Always pass the explicit status list — the server's `statusFilter === null`
+    // default excludes cancelled, which would hide the synthetic Cancelled row.
+    setStatusFilter(selectedStatuses)
     // Defer commit so the store updates above land first.
     setTimeout(() => {
       ;(onGo ?? commitPeriod)()

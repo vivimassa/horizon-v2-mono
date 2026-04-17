@@ -3,6 +3,7 @@
 import type { ComponentType, ReactNode } from 'react'
 import { ChevronLeft, Plus } from 'lucide-react'
 import { Text } from './Text'
+import { HelpButton } from '@/components/help'
 
 type IconComponent = ComponentType<any>
 
@@ -16,6 +17,10 @@ interface ListScreenHeaderProps {
   onAdd?: () => void
   addLabel?: string
   rightAction?: ReactNode
+  helpCode?: string
+  helpTitle?: string
+  helpSubtitle?: string
+  hideHelp?: boolean
 }
 
 export function ListScreenHeader({
@@ -28,6 +33,10 @@ export function ListScreenHeader({
   onAdd,
   addLabel = 'New',
   rightAction,
+  helpCode,
+  helpTitle,
+  helpSubtitle,
+  hideHelp,
 }: ListScreenHeaderProps) {
   const plural = count === 1 ? countLabel : `${countLabel}s`
   const subtitle =
@@ -75,6 +84,8 @@ export function ListScreenHeader({
           </Text>
         </button>
       ) : null}
+
+      {!hideHelp ? <HelpButton code={helpCode} title={helpTitle ?? title} subtitle={helpSubtitle} /> : null}
     </div>
   )
 }

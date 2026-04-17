@@ -51,6 +51,12 @@ const operatorSchema = new Schema(
       propagationMultiplier: { type: Number, default: 1.5 },
       minImprovementUsd: { type: Number, default: 0 },
     },
+    // Bearer token used by external systems to POST inbound ACARS/MVT/LDM
+    // messages to /movement-messages/inbound. Null until the operator
+    // generates one from 7.1.5.2. Rotating issues a fresh token and the
+    // previous value becomes invalid on next request.
+    inboundMessageToken: { type: String, default: null },
+    inboundMessageTokenRotatedAt: { type: String, default: null },
     isActive: { type: Boolean, default: true },
     createdAt: { type: String, default: null },
     updatedAt: { type: String, default: null },

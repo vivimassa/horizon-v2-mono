@@ -85,7 +85,7 @@ export function RowContextMenu() {
         <RotateCcw size={14} className="shrink-0" strokeWidth={1.8} />
         <span className="flex-1 text-left">Daily Rotation</span>
         <span className="text-[11px] font-mono" style={{ color: textMuted }}>
-          F4
+          F5
         </span>
       </button>
     </div>,

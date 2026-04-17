@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, LogOut, UserCircle, type LucideIcon } from 'lucide-react'
+import { ChevronDown, HelpCircle, LogOut, UserCircle, type LucideIcon } from 'lucide-react'
 import { colors, type Palette as PaletteType } from '@skyhub/ui/theme'
 import { useAuth } from './auth-provider'
 import { useTheme } from './theme-provider'
@@ -191,6 +191,14 @@ export function UserMenu({ tone = 'palette', align = 'right' }: UserMenuProps) {
             onClick={() => {
               setOpen(false)
               router.push('/settings/account/profile')
+            }}
+          />
+          <MenuItem
+            icon={HelpCircle}
+            label="Help Center"
+            onClick={() => {
+              setOpen(false)
+              router.push('/help')
             }}
           />
           <div style={{ borderTop: `1px solid ${dividerBorder}` }}>

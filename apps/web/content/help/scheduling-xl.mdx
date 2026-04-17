@@ -1,0 +1,215 @@
+import { Term, Kbd, Step, Callout } from '@/components/help'
+
+Scheduling XL is the Excel-style bulk editor **Commercial Planners** use to build an airline's flying program — one row per rotation leg, with inline editing, bulk selection, and auto-populate for the fields you'd otherwise type a thousand times.
+
+<Callout tone="tip" title="If you're new to this page">
+Start by reading the column reference below so you know which fields are editable and which are computed. Then try the **Adding flights** section — the smart-chain behavior removes most of the manual work.
+</Callout>
+
+## Who uses this page
+
+Commercial Planning teams. This is where the next season's schedule is drafted, reviewed, and — once finalized — published downstream to Flight Ops (and to external vendors via <Term>SSIM</Term> or <Term>ASM</Term> / <Term>SSM</Term> messages). Operators who only license the Network module use this page to hand schedules to their existing Flight Ops system.
+
+## The columns
+
+Fifteen columns, grouped by whether you enter the value or the grid computes it for you.
+
+### Editable — you type these
+
+- **AC TYPE** — 4-character <Term>ICAO</Term> aircraft type (e.g. `A320`, `A333`). Uppercased automatically.
+- **FROM** / **TO** — effective period for the leg. Dates are clamped to the filter period so you can't draft outside the loaded range.
+- **DEP** / **ARR** — 4-letter <Term>ICAO</Term> station codes (e.g. `VVTS` for Tan Son Nhat, `RPLL` for NAIA).
+- **FLIGHT** — flight number, up to 8 characters.
+- **STD** / **STA** — <Term>STD</Term> and <Term>STA</Term> as `HH:MM`.
+- **OFFSET** — departure day within the rotation pattern. Starts at `1` for the first leg. Increments to `2`, `3`… when subsequent legs depart after midnight on later days of the pattern. For example, a flight whose **STD** falls at `00:40` on the second day of the rotation is `OFFSET 2`. BLOCK is computed with midnight wrap automatically, so you don't use OFFSET to flag overnight flights — only to anchor which pattern day the leg departs on.
+- **SVC** — service type from a dropdown: `J` (Jet scheduled passenger), `F` (Freight), `C` (Charter).
+- **FREQUENCY** — days of week this leg operates. See the next section.
+
+### Auto-populated — the grid fills these
+
+- **AC** — the rotation label (e.g. `A320-01`). Built from `AC TYPE` + sequence.
+- **BLOCK** — <Term>Block</Term> time, computed `STA − STD` with midnight wrap handled via OFFSET.
+- **TAT** — <Term>TAT</Term> from Master Data → Aircraft Types (module **5.2.1**). The grid picks the right value from the DOM→DOM / DOM→INT / INT→DOM / INT→INT matrix based on DEP/ARR country.
+
+### Status lifecycle
+
+**STATUS** is updated manually — the grid never changes it for you.
+
+- `Draft` (orange) — work in progress, not published
+- `Active` (green) — live in the schedule
+- `Suspended` (gray) — temporarily off-schedule but retained
+- `Cancelled` (red) — permanently removed
+
+### Frequency encoding
+
+A 7-digit string, positional: position 1 = Monday, position 7 = Sunday. Use the day number if the flight operates that day, `0` (or leave blank) if it doesn't.
+
+- `1234567` — operates every day
+- `12345` — Monday to Friday, weekends off
+- `67` — weekends only
+
+## Adding flights
+
+The grid has a **smart-chain**: when you add a row after an existing rotation leg, it auto-fills the fields that usually repeat.
+
+<Step n={1}>
+Click **Add** in the Flight ribbon, press <Kbd>Insert</Kbd>, or <Kbd>Ctrl</Kbd> + <Kbd>N</Kbd>. A new row appears below the selected one.
+</Step>
+
+<Step n={2}>
+The grid copies forward from the previous row:
+- **DEP** ← previous **ARR** (the aircraft continues from where it landed)
+- **AC TYPE** ← previous AC TYPE
+- **SVC**, **FREQUENCY**, **FROM**, **TO** ← previous row
+- **STD** ← previous **STA** + **TAT** (based on aircraft type and route mix)
+</Step>
+
+<Step n={3}>
+You only need to enter the new **ARR**, **FLIGHT**, and **STA**. Tab through the row with <Kbd>Tab</Kbd>, commit with <Kbd>Enter</Kbd>.
+</Step>
+
+<Callout tone="info" title="Closing a rotation">
+When the rotation loops back (ARR = the rotation's original DEP), smart-chain stops carrying forward and starts the next rotation. A thin divider separates rotations in the grid.
+</Callout>
+
+## Bulk editing
+
+Scheduling XL behaves like a spreadsheet. You can select ranges, fill, copy, paste, and cut across many rows.
+
+### Selection
+
+- **Single cell** — click it
+- **Range** — click and drag, or click + <Kbd>Shift</Kbd>-click the end cell
+- **Extend selection** — <Kbd>Shift</Kbd> + any arrow key
+- **Entire row** — <Kbd>Shift</Kbd> + <Kbd>Space</Kbd>
+- **Entire column** — <Kbd>Ctrl</Kbd> + <Kbd>Space</Kbd>
+- **All rows** — <Kbd>Ctrl</Kbd> + <Kbd>A</Kbd>
+
+### Copy, cut, paste
+
+- <Kbd>Ctrl</Kbd> + <Kbd>C</Kbd> / <Kbd>Ctrl</Kbd> + <Kbd>X</Kbd> / <Kbd>Ctrl</Kbd> + <Kbd>V</Kbd>. Paste shapes itself to the paste target — one cell pastes a range; a range pastes row-by-row.
+- **Format painter** (in the Clipboard ribbon) copies only the visual formatting, not the underlying values.
+
+### Fill down
+
+Select a range that includes a populated top cell and empty cells below. Press <Kbd>Ctrl</Kbd> + <Kbd>D</Kbd> — the top cell fills down through the selection.
+
+### Insert / remove rows
+
+- <Kbd>Insert</Kbd> or <Kbd>Ctrl</Kbd> + <Kbd>Shift</Kbd> + <Kbd>=</Kbd> inserts as many rows as your current selection spans.
+- <Kbd>Ctrl</Kbd> + <Kbd>-</Kbd> deletes the selected rows.
+
+## Search & replace
+
+- **Find** — <Kbd>Ctrl</Kbd> + <Kbd>F</Kbd>. Searches across all visible cells.
+- **Replace** — <Kbd>Ctrl</Kbd> + <Kbd>H</Kbd>. Scoped to the current column or all columns.
+
+Both respect column filters — if a column is filtered, results exclude the hidden rows.
+
+## Scenarios
+
+A scenario is a **named snapshot of the schedule** that you can edit without affecting the live (production) version. Use scenarios when you want to try a change safely — drop a route, swap an aircraft family, shift times for a season — and compare the result against the live schedule before deciding whether to publish.
+
+### Save as scenario
+
+Press <Kbd>F12</Kbd> or click **Save As** in the Record ribbon. Name the scenario, choose whether to copy current flights in, and save. The grid switches into the scenario — any edits stay inside it.
+
+### Compare scenarios
+
+A dedicated comparison view is being scaffolded. Once live, it will show two scenarios side-by-side with NEW / CANCELLED / MODIFIED row counts, so planners can review the delta before publishing.
+
+<Callout tone="info" title="Scenarios vs. production">
+The **Save** button writes to whichever scenario is currently loaded. To return to the live schedule, open the **Scenario** panel and switch back to `Production`.
+</Callout>
+
+## Messaging — ASM / SSM vs. SSIM
+
+Two buttons, two audiences.
+
+### ASM / SSM — delta messages
+
+Click **ASM/SSM** in the Message ribbon to generate the change messages for the loaded date range. The dialog previews each line with an action code:
+
+- **NEW** — new flight
+- **CNL** — cancellation
+- **TIM** — time change
+- **EQT** — equipment swap
+- **RRT** — re-routing
+
+Who receives it:
+- If the operator has only the Network module, messages go to their external **Flight Ops system**.
+- If the operator also has Sky Hub Flight Ops, messages flow between modules internally — and can optionally be forwarded to external vendors (ground handlers, codeshare partners, slot coordinators) for integration.
+
+Use ASM for a single ad-hoc change, SSM for a block of scheduled changes (typically at season publication).
+
+### SSIM — full export
+
+Click **SSIM** to export the complete schedule in the IATA <Term>SSIM</Term> binary format. Choose the time mode:
+
+- **LOCAL** — times in each station's local time zone
+- **UTC** — times in Coordinated Universal Time
+
+File pattern: `SSIM_{IATA}_{season}_{MODE}_{YYYYMMDD}.ssim`. Use SSIM for full schedule distribution — airport authorities, IATA slot filings, partner carrier bulk loads.
+
+<Callout tone="tip" title="Which do I send?">
+Delta (ASM/SSM) for incremental updates between publications. Full (SSIM) for the seasonal drop and for parties that expect a complete picture.
+</Callout>
+
+## Import / Export
+
+### Upload a schedule
+
+Click **Upload** in the Import ribbon. Accepts SSIM files. The server validates each row and returns either a success count or a list of `{ row, message }` errors. Fix them in the source file and re-upload, or cancel and type the problem rows in manually.
+
+### Download
+
+Click **Download** for an XLSX export of the currently loaded grid (respects filters). Filename pattern: `Schedule_{DDMMYYYY}_{DDMMYYYY}.xlsx`.
+
+## Keyboard shortcuts
+
+<ShortcutList>
+  <Shortcut combo="Ctrl + S">Save</Shortcut>
+  <Shortcut combo="F12">Save As (scenario)</Shortcut>
+  <Shortcut combo="Ctrl + Z">Undo</Shortcut>
+  <Shortcut combo="Ctrl + Y">Redo</Shortcut>
+  <Shortcut combo="Ctrl + N or Insert">Add flight</Shortcut>
+  <Shortcut combo="Ctrl + -">Remove selected rows</Shortcut>
+  <Shortcut combo="Ctrl + F">Find</Shortcut>
+  <Shortcut combo="Ctrl + H">Replace</Shortcut>
+  <Shortcut combo="Ctrl + A">Select all</Shortcut>
+  <Shortcut combo="Ctrl + C / X / V">Copy / Cut / Paste</Shortcut>
+  <Shortcut combo="Ctrl + D">Fill down</Shortcut>
+  <Shortcut combo="Ctrl + B / I / U">Bold / Italic / Underline</Shortcut>
+  <Shortcut combo="Shift + Space">Select entire row</Shortcut>
+  <Shortcut combo="Ctrl + Space">Select entire column</Shortcut>
+  <Shortcut combo="Ctrl + ↓">Jump to last row</Shortcut>
+  <Shortcut combo="Tab / Shift + Tab">Move right / left while editing</Shortcut>
+  <Shortcut combo="Enter">Commit and move down</Shortcut>
+  <Shortcut combo="Esc">Cancel edit</Shortcut>
+  <Shortcut combo="F1">Toggle this help</Shortcut>
+</ShortcutList>
+
+## Common gotchas
+
+### Wrong DEP or ARR
+
+Smart-chain auto-fills **DEP** from the previous row's ARR. If you edited the previous row's ARR after adding this row, the chain won't re-propagate — the DEP still has the old value. Check adjacent rows whenever you change an ARR mid-rotation.
+
+### Illogical times (depart before arrive)
+
+Easy to create by accident when typing or pasting in bulk — swapping STD and STA, mistyping a digit, etc. BLOCK auto-wraps midnight, so a genuine overnight flight will still compute correctly; but a typo (e.g. pasting an STA into the STD column) shows up as a BLOCK value that's clearly too long (e.g. `22:00` for a one-hour leg).
+
+<Callout tone="warning" title="Quick check">
+Scan the BLOCK column after any bulk paste. Unreasonable values (too long, too short, or negative) are almost always swapped or mistyped STD/STA cells.
+</Callout>
+
+### Wrong OFFSET
+
+OFFSET represents the **departure day** within the rotation pattern. Forgetting to increment it breaks rotation continuity for downstream tools:
+
+- If leg A departs at `22:50` on pattern day 1 (OFFSET `1`) and leg B departs at `00:40` on pattern day 2, leg B's OFFSET should be `2` — not `1`.
+- After a bulk paste that shifts multiple legs across midnight, re-check OFFSETs on the affected rows.
+
+### FREQUENCY gaps
+
+`1034567` and `1234567` look similar but the first omits Tuesdays (position 2 is `0`). Read left-to-right: Mon, Tue, Wed, Thu, Fri, Sat, Sun. A `0` in any position means "not that day".

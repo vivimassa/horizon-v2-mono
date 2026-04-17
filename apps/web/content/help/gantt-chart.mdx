@@ -1,0 +1,188 @@
+import { Term, Kbd, Step, Callout, Shortcut, ShortcutList } from '@/components/help'
+
+The Gantt Chart is the visual rotation planner — one row per tail, flights drawn as bars across a time axis. Commercial Planners use it to review tail assignments, run the optimizer, compare alternatives, and hand-tune rotations before publishing.
+
+<Callout tone="tip" title="Relationship to Scheduling XL">
+Scheduling XL (1.1.1) authors the flights; Gantt Chart assigns them to tails and lets you visually rearrange. Both read and write the same underlying schedule.
+</Callout>
+
+## Filters panel
+
+The left panel controls what the canvas renders. Nothing draws until you click **Go** with a valid period.
+
+- **Period** — From/To dates. Both required. Drives which flights load.
+- **Aircraft Type** — restrict to one or more <Term>ICAO</Term> types (`A320`, `A321`, `A333`…). Empty = all types.
+- **Schedule Status** — include rows where flight status matches: `Draft`, `Active`, `Suspended`, `Cancelled`. All selected by default.
+- **Fleet Sort Order** — how aircraft rows stack:
+  - `Type` — alphabetic by type, then registration
+  - `Reg` — alphabetic by registration
+  - `Util` — busiest tails first (by daily block hours)
+- **Color Mode** — how bars are colored:
+  - `Status` — by flight state (see colors below)
+  - `AC Type` — by aircraft type, using the color assigned in Master Data
+
+The panel collapses to a thin icon rail; click the chevron to expand.
+
+## Reading the canvas
+
+### Row headers
+
+Each row is one aircraft:
+
+- **Registration** (e.g. `SK-H401`) in bold mono
+- **Seat capacity** below it in the format `F/C/J/Y` (e.g. `0/0/0/180` for an all-economy A320). See the LOPA page in Master Data for seat layout details.
+
+Aircraft are grouped by type (`A320 (10 aircraft)`, `A321 (40 aircraft)`) with collapsible headers — click the chevron to hide a whole type.
+
+### Bar colors (Status mode)
+
+- **Gray** — flight completed (both ATD and ATA recorded)
+- **Green** — airborne (ATD recorded, ATA not yet) or Active + assigned to tail
+- **Orange** — Active but not yet assigned to a tail
+- **Red** — Cancelled
+- **Blue** — Draft + assigned
+- **Slate** — Draft + unassigned
+- **Gray (muted)** — Suspended
+
+### Bar indicators
+
+- **Red region on the left of a bar** — departure is late. Width ≈ delay as a fraction of block time. Appears when ATD or ETD is past STD.
+- **Orange bottom border** — overlap: the next flight on this tail departs before the current one arrives. Must be resolved.
+- **Red "ø" circle, top-right of bar** — flight is **protected**. Used for VVIP/VIP movements where delay is not acceptable. Optimizer and assignment tools treat protected flights as locked.
+- **Orange corner triangles** — missing <Term>OOOI</Term> actuals (ATD/ATA) past grace period. Toggled by OOOI in Display.
+
+### Inter-bar labels
+
+- **`SGN • 9:29`** — station night-stop label. Appears between bars when the ground gap is ≥ 4 hours. Shows the station code and the duration the aircraft is on the ground.
+- **`02:44`** — <Term>TAT</Term> label. Appears between bars when the ground gap is between 25 minutes and 3 hours. Toggled by TAT in Display.
+
+## Adding flights
+
+Click **Add** in the Flight ribbon, fill the side panel, save. The flight appears on the selected tail (or unassigned if no tail chosen). For bulk schedule authoring, use Scheduling XL instead — the Gantt is for fine-tuning, not data entry.
+
+## Selection and drag
+
+### Selection
+
+- **Click a bar** — select that flight
+- <Kbd>Ctrl</Kbd> **+ click** — add to selection (or remove if already selected)
+- **Drag on empty canvas** — rubberband select all bars in the rectangle
+
+### Drag to rearrange tails
+
+Press and hold on a bar for ~200 ms, then drag vertically to another aircraft row. Drop to swap assignments. This is a **virtual rearrange** — the drop itself doesn't save until you confirm via the resulting dialog or trigger an assignment action.
+
+<Callout tone="warning" title="Drag is virtual">
+Dragging alone doesn't persist. Use Alt+A / Alt+D or the context-menu actions to commit a tail change, or drop onto a target row to trigger the swap dialog.
+</Callout>
+
+## Context menu actions
+
+Right-click a bar to open:
+
+- **Flight Information** (<Kbd>F2</Kbd>) — detailed dialog: pax, cargo, crew, rotation history, messages, delays, audit.
+- **Swap Mode** (<Kbd>Alt</Kbd> + <Kbd>S</Kbd>) — see below.
+- **Reschedule** — shift STD/STA.
+- **Diversion** — record a diversion to an alternate airport.
+- **Jumpseater** — add a jumpseater record for this leg.
+- **Protect / Unprotect** — mark the flight as protected. Protected flights show the red ø badge and are excluded from optimizer changes and drag-rearrange.
+- **Cancel** (<Kbd>Delete</Kbd>) — cancel the flight with an impact preview.
+
+Right-click a row header, a day column, or an aircraft badge to get row-, day-, or aircraft-level menus.
+
+## Swap Mode
+
+Swap Mode exchanges tail assignments between two sets of flights. Two ways to trigger:
+
+### Two-row smart swap
+
+Select flights from exactly **two aircraft rows** (multi-select with <Kbd>Ctrl</Kbd>), press <Kbd>Alt</Kbd> + <Kbd>S</Kbd>. The swap dialog opens directly. Source and target are auto-detected; the grid also includes any other flights on the target row on the same operating dates, so the swap is date-aware.
+
+### Single-row then pick target
+
+Select flights from **one row**, press <Kbd>Alt</Kbd> + <Kbd>S</Kbd>. The grid enters waiting mode. Click any flight on a different row — that becomes the target. Dialog opens.
+
+Selecting flights across **3 or more rows** is ambiguous — Alt+S does nothing. Reduce the selection to 1 or 2 rows.
+
+## Optimizer
+
+The Optimizer is a **tail-assignment optimizer**: given the schedule and the fleet, it decides which aircraft flies which flight, balancing block hours and avoiding chain breaks. Protected flights are respected; Cancelled flights are skipped.
+
+<Step n={1}>
+Click **Optimizer** in the Actions ribbon. Configure parameters in the dialog (fleet scope, date window, constraints).
+</Step>
+
+<Step n={2}>
+Run. The optimizer produces a proposed assignment with summary stats: flights assigned, overflow (unassignable), chain breaks, fuel savings estimate.
+</Step>
+
+<Step n={3}>
+Accept the result to apply it, or save the run and continue. Saved runs live in the Compare view.
+</Step>
+
+The **red "1" badge** on the Optimizer button is the count of **saved optimizer runs** for the current period. Click Compare to review them.
+
+## Compare
+
+Opens a grid of saved optimizer runs for the loaded period, with stats side-by-side (assigned count, overflow, chain breaks, fuel savings). The best run in each category is highlighted. Click **Apply** on any row to load that run's assignments into the canvas.
+
+## Bulk Assign
+
+Assign or deassign flights to a specific aircraft for a date/time window. Useful when you know "flights 100–105 tomorrow should all go on SK-H401". Pick the target registration, the window, and the direction (assign or deassign).
+
+## Display toggles
+
+Each button toggles a layer on the canvas.
+
+- **Utilization** — configure target block hours/day per AC type (5–20h); drives the utilization overlay.
+- **Format** — row height (`−` / `+`) and timeline zoom (`1D`–`28D`). Narrow zoom = detail; wide zoom = overview.
+- **Flight / Sector** — swap bar label between the flight number (`100`) and the sector (`SGN-HAN`).
+- **TAT** — show/hide turnaround labels between bars (only appears when gap is 25min–3h).
+- **Slot** — show/hide slot-risk lines below bars. Green = safe (≥85% compliant), orange = close (80–85%), red = at risk (below 80%).
+- **OOOI** — show/hide orange corner flags for missing ATD/ATA past the grace period.
+- **Center** — lock the canvas to the current time; auto-recenters every 30 seconds.
+- **Fullscreen** — browser fullscreen.
+
+The **Actual** toggle is better explained in the Movement Control help (module 2.x) where it's more relevant to live operations.
+
+## Scenarios
+
+Same mechanism as Scheduling XL — a scenario is a named branch of the schedule. Click **Scenario** in Settings to open the panel. When viewing a scenario, the canvas has a subtle yellow tint; the button stays highlighted. All changes made while in a scenario persist to that scenario, not to production.
+
+## Keyboard shortcuts
+
+<ShortcutList>
+  <Shortcut combo="F1">Toggle this help</Shortcut>
+  <Shortcut combo="F2">Flight Information (for selected flight)</Shortcut>
+  <Shortcut combo="F3">Aircraft Info (when aircraft context menu open)</Shortcut>
+  <Shortcut combo="F4">Daily Summary (when day context menu open)</Shortcut>
+  <Shortcut combo="F5">Daily Rotation (when row context menu open)</Shortcut>
+  <Shortcut combo="Ctrl + F">Search flights</Shortcut>
+  <Shortcut combo="Alt + A">Assign selected flights to row's aircraft</Shortcut>
+  <Shortcut combo="Alt + D">Unassign selected flights</Shortcut>
+  <Shortcut combo="Alt + S">Enter swap mode</Shortcut>
+  <Shortcut combo="Delete">Cancel selected flight(s)</Shortcut>
+  <Shortcut combo="Esc">Close active overlay / exit swap mode</Shortcut>
+</ShortcutList>
+
+## Common gotchas
+
+### Orange bottom border won't go away
+
+The aircraft has back-to-back flights where the second departs before the first arrives. Either reschedule one of them, swap the second to a different tail, or accept the overlap if operations will resolve it. Ignoring overlaps breaks downstream utilization math.
+
+### Bar stays orange (unassigned)
+
+Active flight with no aircraft assigned. Either drag it to a row, use **Bulk Assign**, or run the **Optimizer** to auto-place it.
+
+### Dragged a flight but it reverted
+
+Drag is virtual until committed. Drop onto a target row to trigger the swap dialog, or use <Kbd>Alt</Kbd> + <Kbd>A</Kbd> after selecting and clicking on the destination row.
+
+### Optimizer won't move a flight
+
+Protected flights (red ø badge) are locked. Unprotect via the context menu if the flight should be re-optimizable.
+
+### Canvas is blank after clicking Go
+
+No flights match the active filters. Check Aircraft Type, Status, and Period. A common cause is leaving Schedule Status set to only `Active` when reviewing a `Draft` scenario.

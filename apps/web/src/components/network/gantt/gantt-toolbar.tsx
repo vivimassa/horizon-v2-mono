@@ -25,6 +25,7 @@ import {
   Clock,
   AlertTriangle,
   Hourglass,
+  HelpCircle,
 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { colors } from '@skyhub/ui/theme'
@@ -38,6 +39,7 @@ import { useOperatorStore } from '@/stores/use-operator-store'
 import { listOptimizerRuns } from '@/lib/gantt/api'
 import { ROW_HEIGHT_LEVELS } from '@/lib/gantt/types'
 import type { ZoomLevel } from '@/lib/gantt/types'
+import { useHelp } from '@/components/help'
 
 const ZOOMS: ZoomLevel[] = ['1D', '2D', '3D', '4D', '5D', '6D', '7D', '14D', '21D', '28D']
 
@@ -50,6 +52,7 @@ export function GanttToolbar({
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const palette = isDark ? colors.dark : colors.light
+  const { openHelp } = useHelp()
 
   const zoomLevel = useGanttStore((s) => s.zoomLevel)
   const rowHeightLevel = useGanttStore((s) => s.rowHeightLevel)
@@ -581,6 +584,20 @@ export function GanttToolbar({
               hoverBg={hoverBg}
               activeBg={activeBg}
               tooltip="ASM/SSM transmission settings"
+            />
+          </RibbonSection>
+          <Divider isDark={isDark} />
+
+          {/* ── Help ── */}
+          <RibbonSection label="Help">
+            <RibbonBtn
+              icon={HelpCircle}
+              label="Help"
+              onClick={() => openHelp()}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Open help for this page (F1)"
             />
           </RibbonSection>
 

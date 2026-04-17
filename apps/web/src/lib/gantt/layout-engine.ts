@@ -256,10 +256,21 @@ export function computeLayout(input: LayoutInput): LayoutResult {
 
   const acTypeColorMap = buildAcTypeColorMap(aircraftTypes)
 
-  // Separate assigned vs unassigned flights
+  // Split out suspended / cancelled — they render on dedicated synthetic rows at the
+  // bottom and do not participate in tail assignment.
+  const suspendedFlights: GanttFlight[] = []
+  const cancelledFlights: GanttFlight[] = []
+  const activeFlights: GanttFlight[] = []
+  for (const f of flights) {
+    if (f.status === 'suspended') suspendedFlights.push(f)
+    else if (f.status === 'cancelled') cancelledFlights.push(f)
+    else activeFlights.push(f)
+  }
+
+  // Separate assigned vs unassigned flights (active only)
   const assignedByReg = new Map<string, GanttFlight[]>()
   const unassignedFlights: GanttFlight[] = []
-  for (const f of flights) {
+  for (const f of activeFlights) {
     if (f.aircraftReg) {
       const list = assignedByReg.get(f.aircraftReg) ?? []
       list.push(f)
@@ -436,6 +447,45 @@ export function computeLayout(input: LayoutInput): LayoutResult {
       })
       y += rowH
     }
+  }
+
+  // Synthetic status rows — Suspended and Cancelled each get a single dedicated track
+  // at the bottom of the canvas. Bars can overlap since these flights aren't flying.
+  const statusSections: Array<{ status: 'suspended' | 'cancelled'; flights: GanttFlight[]; label: string }> = [
+    { status: 'suspended', flights: suspendedFlights, label: 'Suspended' },
+    { status: 'cancelled', flights: cancelledFlights, label: 'Cancelled' },
+  ]
+  for (const section of statusSections) {
+    if (section.flights.length === 0) continue
+    rows.push({
+      type: section.status,
+      label: section.label,
+      y,
+      height: rowH,
+      flightCount: section.flights.length,
+    })
+    for (const f of section.flights) {
+      const { depMs, arrMs } = getDisplayTimes(f)
+      const x = utcToX(depMs, startMs, pph)
+      const xEnd = utcToX(arrMs, startMs, pph)
+      const width = Math.max(2, xEnd - x)
+      const { bg, text } = getBarColor(f, colorMode, acTypeColorMap, isDark)
+      const label =
+        barLabelMode === 'flightNo' ? f.flightNumber.replace(AIRLINE_PREFIX_RE, '') : `${f.depStation}-${f.arrStation}`
+      bars.push({
+        flightId: f.id,
+        x,
+        y: y + (rowH - barH) / 2,
+        width,
+        height: barH,
+        color: bg,
+        textColor: text,
+        label,
+        row: rows.length - 1,
+        flight: f,
+      })
+    }
+    y += rowH
   }
 
   const ticks = computeTicks(startMs, periodDays, pph, zoom)

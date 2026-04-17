@@ -105,8 +105,8 @@ export function ComposeMvtPanel({ data, onClose, onSent }: Props) {
 
   // Live telex preview
   const preview = useMemo(() => {
-    const airline = data.airlineCode || data.flightNumber.match(/^([A-Z]{2})/)?.[1] || 'HZ'
-    const flightDigits = data.flightNumber.replace(/^[A-Z]{2}/i, '')
+    const airline = (operator?.iataCode || data.airlineCode || '').toUpperCase()
+    const flightDigits = data.flightNumber.replace(/^[A-Z]{2,3}/i, '')
     const dayOfMonth = (data.operatingDate ?? '').slice(8, 10) || '01'
     const station = actionCode === 'AA' || actionCode === 'FR' ? data.arrStation : data.depStation
 
@@ -601,7 +601,7 @@ export function ComposeMvtPanel({ data, onClose, onSent }: Props) {
             Hold for review
           </button>
           <span className="mt-2 text-[13px] text-hz-text-tertiary text-center">
-            Lands in /flight-ops/control/movement-messages under the Held tab.
+            Lands in the Communication Deck under Held status.
           </span>
         </div>
       </div>

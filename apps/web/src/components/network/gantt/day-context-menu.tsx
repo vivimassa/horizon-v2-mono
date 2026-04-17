@@ -85,7 +85,7 @@ export function DayContextMenu() {
         <CalendarDays size={14} className="shrink-0" strokeWidth={1.8} />
         <span className="flex-1 text-left">Daily Summary</span>
         <span className="text-[11px] font-mono" style={{ color: textMuted }}>
-          F3
+          F4
         </span>
       </button>
     </div>,

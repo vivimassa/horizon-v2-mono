@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHash } from 'node:crypto'
 import { z } from 'zod'
 import { MovementMessageLog } from '../models/MovementMessageLog.js'
 import { FlightInstance } from '../models/FlightInstance.js'
@@ -10,6 +10,7 @@ import { getTransmissionAdapter } from '../services/mvt-transmission.js'
 import { buildMvtApplyDelta } from '../services/mvt-apply.js'
 import { encodeMvtMessage, parseMessage } from '@skyhub/logic/src/iata/index'
 import type { ParsedMvt } from '@skyhub/logic/src/iata/types'
+import { OperatorMessagingConfig } from '../models/OperatorMessagingConfig.js'
 
 // ── RBAC ──────────────────────────────────────────────────
 
@@ -104,6 +105,19 @@ const inboundParseSchema = z.object({ rawMessage: z.string().min(3) })
 const inboundApplySchema = z.object({
   rawMessage: z.string().min(3),
   flightInstanceId: z.string().min(1),
+})
+
+// Body schema for the public inbound webhook.
+const inboundWebhookSchema = z.object({
+  rawMessage: z.string().min(3),
+  envelope: z
+    .object({
+      priority: z.string().optional(),
+      addresses: z.array(z.string()).optional(),
+      originator: z.string().optional(),
+      timestamp: z.string().optional(),
+    })
+    .optional(),
 })
 
 // ── Helpers ────────────────────────────────────────────────
@@ -304,9 +318,15 @@ export async function movementMessageRoutes(app: FastifyInstance): Promise<void>
     const cachedDelays = body.delays ? await hydrateDelayCodes(req.operatorId, body.delays, delayStandard) : []
 
     // Build encoder input from flight + request
+    const airline = operator?.iataCode?.toUpperCase()
+    if (!airline) {
+      return reply.code(400).send({
+        error: 'operator_iata_code_missing',
+        message: 'Operator IATA code is not configured — cannot encode MVT message.',
+      })
+    }
     const dayOfMonth = (flight.operatingDate ?? '').slice(8, 10)
-    const flightDigits = flight.flightNumber.replace(/^[A-Z]{2}/i, '')
-    const airline = flight.flightNumber.match(/^([A-Z]{2})/i)?.[1]?.toUpperCase() ?? 'HZ'
+    const flightDigits = flight.flightNumber.replace(/^[A-Z]{2,3}/i, '')
     const station =
       body.actionCode === 'AA' || body.actionCode === 'FR'
         ? (flight.arr?.iata ?? flight.arr?.icao ?? '')
@@ -615,6 +635,186 @@ export async function movementMessageRoutes(app: FastifyInstance): Promise<void>
 
     return { message: applied.toObject(), delta }
   })
+
+  // ── POST /movement-messages/inbound — external systems push raw telex ──
+  // Authenticates via a per-operator bearer token (rotated from 7.1.5.2).
+  // Public path (bypasses JWT) — but the handler validates the token on every
+  // call. Creates a `direction: 'inbound'` message in `status: 'held'` (or
+  // `'rejected'` if an active validation rule trips). Idempotent via a hash
+  // of (operatorId, rawMessage).
+  app.post('/movement-messages/inbound', async (req, reply) => {
+    const parsed = inboundWebhookSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Validation failed', details: parsed.error.issues })
+    }
+
+    // 1) Auth via Bearer token → resolve operator
+    const authHeader = req.headers['authorization'] ?? ''
+    const m = /^Bearer\s+(.+)$/i.exec(typeof authHeader === 'string' ? authHeader : '')
+    if (!m) return reply.code(401).send({ error: 'Missing Bearer token' })
+    const presentedToken = m[1].trim()
+    if (!presentedToken) return reply.code(401).send({ error: 'Empty token' })
+
+    const op = (await Operator.findOne({ inboundMessageToken: presentedToken }, { _id: 1 }).lean()) as {
+      _id: string
+    } | null
+    if (!op) return reply.code(401).send({ error: 'Invalid token' })
+    const operatorId = op._id
+
+    // 2) Idempotency — if we've already logged this exact raw for this operator
+    //    within the last 24 h, return the existing row instead of duplicating.
+    const bodyHash = createHash('sha256').update(`${operatorId}|${parsed.data.rawMessage}`).digest('hex')
+    const deterministicId = `inbound-${bodyHash.slice(0, 32)}`
+    const existing = await MovementMessageLog.findById(deterministicId).lean()
+    if (existing) return reply.code(200).send({ ok: true, duplicate: true, messageId: deterministicId })
+
+    // 3) Parse
+    const parsedMsg = parseMessage(parsed.data.rawMessage)
+    const nowIso = new Date().toISOString()
+    const nowMs = Date.now()
+
+    // 4) Validation rules from OperatorMessagingConfig
+    const cfgDoc = (await OperatorMessagingConfig.findOne({ operatorId }, { validation: 1 }).lean()) as {
+      validation?: Record<string, unknown>
+    } | null
+    const v = (cfgDoc?.validation ?? {}) as {
+      rejectFutureTs?: boolean
+      futureTsToleranceMin?: number
+      enforceSequence?: boolean
+      touchAndGoGuardSec?: number
+    }
+
+    // Skeleton message fields
+    const messageType: 'MVT' | 'LDM' = parsedMsg.type === 'LDM' ? 'LDM' : 'MVT'
+    const fid = 'flightId' in parsedMsg ? parsedMsg.flightId : null
+    const flightNumber = fid ? `${fid.airline}${fid.flightNumber}` : null
+    const registration = fid?.registration ?? null
+    const depStation = fid?.station ?? null
+    const actionCode: string = parsedMsg.type === 'MVT' && 'actionCode' in parsedMsg ? parsedMsg.actionCode : 'AA'
+
+    let rejectedReason: string | null = null
+
+    if (parsedMsg.type === 'UNKNOWN') {
+      rejectedReason = 'unrecognized_format'
+    }
+
+    // Future-timestamp check — applies to any HHMM fields in the MVT.
+    // We use today's UTC date to construct a candidate timestamp; anything
+    // beyond `futureTsToleranceMin` minutes ahead of now is rejected.
+    if (!rejectedReason && v.rejectFutureTs !== false && parsedMsg.type === 'MVT') {
+      const tolMs = (v.futureTsToleranceMin ?? 5) * 60_000
+      const mvt = parsedMsg as ParsedMvt
+      const candidates = [
+        mvt.offBlocks,
+        mvt.airborne,
+        mvt.touchdown,
+        mvt.onBlocks,
+        mvt.estimatedDeparture,
+        mvt.returnTime,
+        mvt.nextInfoTime,
+      ].filter((x): x is string => typeof x === 'string' && x.length >= 4)
+      for (const raw of candidates) {
+        const { ms } = hhmmToToday(raw, nowMs)
+        if (ms !== null && ms - nowMs > tolMs) {
+          rejectedReason = 'future_timestamp'
+          break
+        }
+      }
+    }
+
+    // Touch-and-go guard — reject if a same-(flight, action) message was logged
+    // within the window. Applies only to repeat AD/AA messages.
+    if (
+      !rejectedReason &&
+      (v.touchAndGoGuardSec ?? 120) > 0 &&
+      flightNumber &&
+      (actionCode === 'AD' || actionCode === 'AA')
+    ) {
+      const windowIso = new Date(nowMs - (v.touchAndGoGuardSec ?? 120) * 1000).toISOString()
+      const recent = await MovementMessageLog.findOne({
+        operatorId,
+        direction: 'inbound',
+        flightNumber,
+        actionCode,
+        createdAtUtc: { $gte: windowIso },
+      }).lean()
+      if (recent) rejectedReason = 'touch_and_go_duplicate'
+    }
+
+    // Sequence enforcement — AA requires a prior AD on the same flight.
+    if (!rejectedReason && v.enforceSequence !== false && flightNumber && actionCode === 'AA') {
+      const priorAd = await MovementMessageLog.findOne({
+        operatorId,
+        flightNumber,
+        actionCode: 'AD',
+        status: { $in: ['sent', 'applied', 'held'] },
+      })
+        .sort({ createdAtUtc: -1 })
+        .lean()
+      if (!priorAd) rejectedReason = 'sequence_violation_aa_before_ad'
+    }
+
+    // 5) Persist
+    const summary =
+      parsedMsg.type === 'MVT'
+        ? `${flightNumber ?? '—'} ${actionCode} @ ${depStation ?? '—'}`
+        : parsedMsg.type === 'LDM'
+          ? `LDM ${flightNumber ?? '—'}`
+          : 'Unrecognized message'
+
+    await MovementMessageLog.create({
+      _id: deterministicId,
+      operatorId,
+      messageType,
+      actionCode: actionCode as 'AD' | 'AA' | 'ED' | 'EA' | 'NI' | 'RR' | 'FR',
+      direction: 'inbound',
+      status: rejectedReason ? 'rejected' : 'held',
+      flightNumber,
+      flightDate: null,
+      registration,
+      depStation,
+      arrStation: null,
+      summary,
+      rawMessage: parsed.data.rawMessage,
+      envelope: parsed.data.envelope ?? null,
+      parsed: parsedMsg,
+      errorReason: rejectedReason,
+      createdAtUtc: nowIso,
+      updatedAtUtc: nowIso,
+    })
+
+    return reply.code(rejectedReason ? 202 : 201).send({
+      ok: !rejectedReason,
+      messageId: deterministicId,
+      status: rejectedReason ? 'rejected' : 'held',
+      errorReason: rejectedReason,
+    })
+  })
+}
+
+// Interpret an HHMM or DDHHMM string as a UTC timestamp "today" (or the
+// specified day of this month). Returns null if the string is malformed.
+function hhmmToToday(raw: string, nowMs: number): { ms: number | null } {
+  if (!raw) return { ms: null }
+  const now = new Date(nowMs)
+  let dd = now.getUTCDate()
+  let hh: number
+  let mm: number
+  if (raw.length === 6) {
+    dd = parseInt(raw.slice(0, 2), 10)
+    hh = parseInt(raw.slice(2, 4), 10)
+    mm = parseInt(raw.slice(4, 6), 10)
+  } else if (raw.length === 4) {
+    hh = parseInt(raw.slice(0, 2), 10)
+    mm = parseInt(raw.slice(2, 4), 10)
+  } else {
+    return { ms: null }
+  }
+  if (!Number.isFinite(hh) || !Number.isFinite(mm) || !Number.isFinite(dd)) return { ms: null }
+  const year = now.getUTCFullYear()
+  const month = now.getUTCMonth()
+  const utc = Date.UTC(year, month, dd, hh, mm, 0, 0)
+  return { ms: utc }
 }
 
 // ── Delay hydration helper ──────────────────────────────────

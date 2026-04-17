@@ -54,7 +54,7 @@ const STATUS_OPTIONS: MultiSelectOption[] = [
 
 interface Props {
   values: MessageFilterValues
-  onChange: (next: MessageFilterValues) => void
+  onChange: React.Dispatch<React.SetStateAction<MessageFilterValues>>
   onGo: () => void
   loading: boolean
   stationOptions: MultiSelectOption[]
@@ -79,7 +79,7 @@ export function MessageFilterPanel({ values, onChange, onGo, loading, stationOpt
     [values],
   )
 
-  const patch = (p: Partial<MessageFilterValues>) => onChange({ ...values, ...p })
+  const patch = (p: Partial<MessageFilterValues>) => onChange((prev) => ({ ...prev, ...p }))
 
   return (
     <FilterPanel

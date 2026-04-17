@@ -308,7 +308,17 @@ export function ScheduleGrid({
             state={ctxMenu}
             onClose={() => setCtxMenu(null)}
             onInsertRow={() => onAddFlight(ctxMenu.rowIdx)}
-            onDeleteRow={() => onDeleteFlight(ctxMenu.rowIdx)}
+            onDeleteRow={() => {
+              const range = useScheduleGridStore.getState().selectionRange
+              if (range) {
+                const r1 = Math.min(range.startRow, range.endRow)
+                const r2 = Math.max(range.startRow, range.endRow)
+                // Delete in reverse so earlier indices stay valid as rows shift up.
+                for (let i = r2; i >= r1; i--) onDeleteFlight(i)
+              } else {
+                onDeleteFlight(ctxMenu.rowIdx)
+              }
+            }}
             onSeparateCycle={() => {
               const r = processedRows[ctxMenu.rowIdx]
               if (r) addSeparator(r._id)

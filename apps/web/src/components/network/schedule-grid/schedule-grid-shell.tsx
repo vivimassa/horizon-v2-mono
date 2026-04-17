@@ -68,7 +68,8 @@ export function ScheduleGridShell() {
   const [scenarioAutoCreate, setScenarioAutoCreate] = useState(false)
   const [showMessages, setShowMessages] = useState(false)
   const activeScenarioId = useOperatorStore((s) => s.activeScenarioId)
-  const setActiveScenarioId = useOperatorStore((s) => s.setActiveScenarioId)
+  const activeScenarioName = useOperatorStore((s) => s.activeScenarioName)
+  const setActiveScenario = useOperatorStore((s) => s.setActiveScenario)
 
   // Hydrate cellFormats and separators from row formatting data
   const hydrateFormats = useCallback((data: ScheduledFlightRef[]) => {
@@ -110,7 +111,37 @@ export function ScheduleGridShell() {
     } catch (e) {
       console.error('Failed to load flights:', e)
     }
-  }, [setRows, runway, hydrateFormats])
+  }, [setRows, runway, hydrateFormats, activeScenarioId])
+
+  // Refetch + discard local edits when the scenario context switches.
+  // Without this, stale rows from the previous context stay on-screen and
+  // subsequent saves PATCH the wrong _ids — the classic "edits leak to Production" bug.
+  useEffect(() => {
+    if (!hasLoaded) return
+    clearDirty()
+    clearNewRows()
+    clearDeleted()
+    fetchFlights()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeScenarioId])
+
+  // If we arrive with a scenario id but no cached name (e.g. from another module
+  // that used the single-arg setter), look up the name so the banner renders.
+  useEffect(() => {
+    if (!activeScenarioId || activeScenarioName) return
+    let cancelled = false
+    api
+      .getScenarios({ operatorId: getOperatorId() })
+      .then((list) => {
+        if (cancelled) return
+        const match = list.find((s) => s._id === activeScenarioId)
+        if (match) setActiveScenario(activeScenarioId, match.name)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [activeScenarioId, activeScenarioName, setActiveScenario])
 
   const handleSave = useCallback(async () => {
     setSaving(true)
@@ -290,7 +321,9 @@ export function ScheduleGridShell() {
             const order = sortOrderMap.get(row._id) ?? 0
             const rot = rotationMap.get(row._id) ?? {}
             const base = dirty ? { ...row, ...dirty } : { ...row }
-            return { ...base, formatting: fmt, sortOrder: order, ...rot }
+            // Force the scenario context from the active view — never rely on whatever
+            // scenarioId the row was created with. Production = null, scenario = _id.
+            return { ...base, formatting: fmt, sortOrder: order, ...rot, scenarioId: activeScenarioId ?? null }
           })
           .filter((r) => {
             // Skip rows with empty required fields (e.g., blank rows from paste)
@@ -330,7 +363,7 @@ export function ScheduleGridShell() {
     } finally {
       setSaving(false)
     }
-  }, [clearDirty, clearNewRows, clearDeleted, setRows])
+  }, [clearDirty, clearNewRows, clearDeleted, setRows, activeScenarioId, hydrateFormats])
 
   const handleDiscard = useCallback(() => {
     clearDirty()
@@ -347,6 +380,7 @@ export function ScheduleGridShell() {
         filterDateFrom: filterDateFrom || undefined,
         filterDateTo: filterDateTo || undefined,
         airlineCode: operator?.iataCode || undefined,
+        scenarioId: activeScenarioId,
       }
 
       if (insertAtIdx != null && insertAtIdx < visibleRows.length) {
@@ -392,6 +426,11 @@ export function ScheduleGridShell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasLoaded, runway.active])
 
+  const inScenario = activeScenarioId !== null
+  // Subtle yellow tint on the main content when editing a scenario.
+  // #FDDD48 is the XD semantic yellow; we use a very low alpha so grid contrast is preserved.
+  const scenarioTint = inScenario ? (isDark ? 'rgba(253, 221, 72, 0.04)' : 'rgba(253, 221, 72, 0.08)') : 'transparent'
+
   return (
     <div className="flex h-full overflow-hidden gap-3 p-3">
       {/* Left filter panel */}
@@ -404,7 +443,14 @@ export function ScheduleGridShell() {
       />
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden gap-3 min-w-0 relative">
+      <div
+        className="flex-1 flex flex-col overflow-hidden gap-3 min-w-0 relative rounded-2xl"
+        style={{
+          backgroundColor: scenarioTint,
+          transition: 'background-color 200ms ease',
+          padding: inScenario ? 6 : 0,
+        }}
+      >
         {/* ── Empty state: before first load ── */}
         {!hasLoaded && !runway.active && <EmptyPanel />}
 
@@ -451,7 +497,7 @@ export function ScheduleGridShell() {
               <ScenarioPanel
                 seasonCode=""
                 activeScenarioId={activeScenarioId}
-                onSelectScenario={setActiveScenarioId}
+                onSelectScenario={setActiveScenario}
                 onClose={() => {
                   setShowScenarios(false)
                   setScenarioAutoCreate(false)
@@ -460,18 +506,22 @@ export function ScheduleGridShell() {
               />
             )}
 
-            {/* Message dialog */}
+            {/* Message dialog — intentionally does NOT forward the grid's date filter.
+                That filter is a view control; ASM/SSM generation should cover every flight
+                in the scenario vs production, and scoping should be requested explicitly
+                in the dialog if needed. */}
             {showMessages && (
               <MessageDialog
-                dateFrom={filterDateFrom || undefined}
-                dateTo={filterDateTo || undefined}
                 targetScenarioId={activeScenarioId ?? undefined}
+                hasDirty={dirtyMap.size > 0 || newRowIds.size > 0 || deletedIds.size > 0}
                 onClose={() => setShowMessages(false)}
               />
             )}
 
             {/* Ribbon toolbar */}
             <RibbonToolbar
+              activeScenarioName={activeScenarioName}
+              onExitScenario={() => setActiveScenario(null, null)}
               onAddFlight={() => handleAddFlight()}
               onInsertFlight={() => {
                 const { selectedCell: sel, selectionRange: range } = useScheduleGridStore.getState()

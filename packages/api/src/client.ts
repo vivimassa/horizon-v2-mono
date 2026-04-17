@@ -422,6 +422,13 @@ export interface ScenarioRef {
   updatedAt: string | null
 }
 
+export interface ScenarioEnvelopeRef {
+  scenarioId: string
+  effectiveFromUtc: string
+  effectiveUntilUtc: string
+  flightCount: number
+}
+
 export interface MppLeadTimeGroupRef {
   _id: string
   operatorId: string
@@ -1309,6 +1316,13 @@ export const api = {
     return request<ScenarioRef[]>(`/scenarios?${p.toString()}`)
   },
 
+  /** Flight-date envelope per scenario — used for date-range cascade in Scenario Compare */
+  getScenarioEnvelopes: (params: { operatorId?: string } = {}) => {
+    const p = new URLSearchParams()
+    if (params.operatorId) p.set('operatorId', params.operatorId)
+    return request<ScenarioEnvelopeRef[]>(`/scenarios/envelopes?${p.toString()}`)
+  },
+
   createScenario: (data: Partial<ScenarioRef>) =>
     request<ScenarioRef>('/scenarios', { method: 'POST', body: JSON.stringify(data) }),
 
@@ -1347,6 +1361,17 @@ export const api = {
     }),
 
   deleteScenario: (id: string) => request<{ success: boolean }>(`/scenarios/${id}`, { method: 'DELETE' }),
+
+  /** Bulk wipe all scenarios (and their scoped flights). Pass no params to wipe every operator. */
+  deleteAllScenarios: (params: { operatorId?: string; seasonCode?: string } = {}) => {
+    const p = new URLSearchParams()
+    if (params.operatorId) p.set('operatorId', params.operatorId)
+    if (params.seasonCode) p.set('seasonCode', params.seasonCode)
+    const qs = p.toString()
+    return request<{ scenariosDeleted: number; flightsDeleted: number }>(`/scenarios${qs ? `?${qs}` : ''}`, {
+      method: 'DELETE',
+    })
+  },
 
   // ─── SSIM Import/Export ────────────────────────────────
   exportSsim: (params: {

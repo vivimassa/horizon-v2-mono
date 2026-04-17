@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { CharterContract } from '../models/CharterContract.js'
 import { CharterFlight } from '../models/CharterFlight.js'
 import { ScheduledFlight } from '../models/ScheduledFlight.js'
+import { normalizeDate } from '../utils/normalize-date.js'
 
 // ── Zod Schemas ──
 
@@ -179,8 +180,8 @@ export async function charterRoutes(app: FastifyInstance): Promise<void> {
       serviceType: body.legType === 'positioning' ? 'P' : 'C',
       source: 'charter',
       status: 'draft',
-      effectiveFrom: body.flightDate,
-      effectiveUntil: body.flightDate,
+      effectiveFrom: normalizeDate(body.flightDate) ?? body.flightDate,
+      effectiveUntil: normalizeDate(body.flightDate) ?? body.flightDate,
       isActive: true,
       createdAt: now,
       updatedAt: now,

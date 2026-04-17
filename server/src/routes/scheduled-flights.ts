@@ -2,6 +2,21 @@ import crypto from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { ScheduledFlight } from '../models/ScheduledFlight.js'
+import { normalizeDate } from '../utils/normalize-date.js'
+
+const isoDateRe = /^\d{4}-\d{2}-\d{2}$/
+const dateFields = ['effectiveFrom', 'effectiveUntil'] as const
+
+/** Mutates `raw` in place so effective dates are always ISO YYYY-MM-DD before Zod sees them. */
+function normalizeDateFields(raw: Record<string, unknown>): void {
+  for (const key of dateFields) {
+    const v = raw[key]
+    if (typeof v === 'string') {
+      const norm = normalizeDate(v)
+      if (norm) raw[key] = norm
+    }
+  }
+}
 
 const createSchema = z
   .object({
@@ -24,8 +39,8 @@ const createSchema = z
     aircraftReg: z.string().nullable().optional(),
     serviceType: z.string().max(3).optional().default('J'),
     status: z.enum(['draft', 'active', 'suspended', 'cancelled']).optional().default('draft'),
-    effectiveFrom: z.string().min(10).max(10),
-    effectiveUntil: z.string().min(10).max(10),
+    effectiveFrom: z.string().regex(isoDateRe, 'effectiveFrom must be ISO YYYY-MM-DD'),
+    effectiveUntil: z.string().regex(isoDateRe, 'effectiveUntil must be ISO YYYY-MM-DD'),
     cockpitCrewRequired: z.number().int().nullable().optional(),
     cabinCrewRequired: z.number().int().nullable().optional(),
     isEtops: z.boolean().optional().default(false),
@@ -79,6 +94,7 @@ export async function scheduledFlightRoutes(app: FastifyInstance): Promise<void>
     if (raw.depStation) raw.depStation = (raw.depStation as string).toUpperCase()
     if (raw.arrStation) raw.arrStation = (raw.arrStation as string).toUpperCase()
     if (raw.flightNumber) raw.flightNumber = (raw.flightNumber as string).toUpperCase()
+    normalizeDateFields(raw)
     const parsed = createSchema.safeParse(raw)
     if (!parsed.success) {
       return reply.code(400).send({
@@ -105,6 +121,7 @@ export async function scheduledFlightRoutes(app: FastifyInstance): Promise<void>
       if (raw.depStation) raw.depStation = (raw.depStation as string).toUpperCase()
       if (raw.arrStation) raw.arrStation = (raw.arrStation as string).toUpperCase()
       if (raw.flightNumber) raw.flightNumber = (raw.flightNumber as string).toUpperCase()
+      normalizeDateFields(raw)
       return { _id: crypto.randomUUID(), ...raw, isActive: true, createdAt: now }
     })
     const result = await ScheduledFlight.insertMany(docs)
@@ -118,6 +135,7 @@ export async function scheduledFlightRoutes(app: FastifyInstance): Promise<void>
     if (raw.depStation) raw.depStation = (raw.depStation as string).toUpperCase()
     if (raw.arrStation) raw.arrStation = (raw.arrStation as string).toUpperCase()
     if (raw.flightNumber) raw.flightNumber = (raw.flightNumber as string).toUpperCase()
+    normalizeDateFields(raw)
     const parsed = updateSchema.safeParse(raw)
     if (!parsed.success) {
       return reply.code(400).send({
@@ -139,9 +157,12 @@ export async function scheduledFlightRoutes(app: FastifyInstance): Promise<void>
     const updates = req.body as { id: string; changes: Record<string, unknown> }[]
     if (!Array.isArray(updates)) return reply.code(400).send({ error: 'Body must be an array of {id, changes}' })
     const now = new Date().toISOString()
-    const ops = updates.map((u) => ({
-      updateOne: { filter: { _id: u.id }, update: { $set: { ...u.changes, updatedAt: now } } },
-    }))
+    const ops = updates.map((u) => {
+      normalizeDateFields(u.changes)
+      return {
+        updateOne: { filter: { _id: u.id }, update: { $set: { ...u.changes, updatedAt: now } } },
+      }
+    })
     const result = await ScheduledFlight.bulkWrite(ops)
     return { modifiedCount: result.modifiedCount }
   })

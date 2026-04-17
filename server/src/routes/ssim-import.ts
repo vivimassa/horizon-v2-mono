@@ -18,6 +18,7 @@ import { buildRotations, type RotationMode } from '@skyhub/logic/src/utils/rotat
 import { lookupAirportByIata } from '@skyhub/logic/src/utils/airport-lookup'
 import { ScheduledFlight } from '../models/ScheduledFlight.js'
 import { Airport } from '../models/Airport.js'
+import { normalizeDate } from '../utils/normalize-date.js'
 import { CityPair } from '../models/CityPair.js'
 import { AircraftType } from '../models/AircraftType.js'
 
@@ -416,8 +417,8 @@ export async function ssimImportRoutes(app: FastifyInstance): Promise<void> {
         aircraftTypeIcao: acRef?.icao ?? f.aircraftType.toUpperCase(),
         serviceType: f.serviceType || 'J',
         status: 'draft' as const,
-        effectiveFrom: f.effectiveFrom,
-        effectiveUntil: f.effectiveUntil,
+        effectiveFrom: normalizeDate(f.effectiveFrom) ?? f.effectiveFrom,
+        effectiveUntil: normalizeDate(f.effectiveUntil) ?? f.effectiveUntil,
         isActive: true,
         rotationId: rot.rotationId,
         rotationSequence: rot.rotationSequence,

@@ -6,7 +6,7 @@ import { ScheduleMessageLog } from '../models/ScheduleMessageLog.js'
 import { FlightInstance } from '../models/FlightInstance.js'
 import { AircraftType } from '../models/AircraftType.js'
 import { AsmSsmConsumer } from '../models/AsmSsmConsumer.js'
-import { computeScheduleDiff } from '../utils/schedule-diff-engine.js'
+import { computeScheduleDiff, computeScenarioDiff } from '../utils/schedule-diff-engine.js'
 import { computeAsmDiff, findNeutralizablePairs } from '@skyhub/logic/src/messaging/asm-diff-engine'
 import { generateAsmMessage } from '@skyhub/logic/src/messaging/asm-parser'
 import type { InstanceSnapshot, AsmDiffResult, HeldMessageRef } from '@skyhub/types'
@@ -494,34 +494,57 @@ export async function scheduleMessageRoutes(app: FastifyInstance): Promise<void>
       ScheduledFlight.find(targetFilter).lean(),
     ])
 
-    const messages = computeScheduleDiff(
-      baseFlights.map((f) => ({
-        _id: f._id as string,
-        flightNumber: `${f.airlineCode}${f.flightNumber}`,
-        depStation: f.depStation as string,
-        arrStation: f.arrStation as string,
-        stdUtc: f.stdUtc as string,
-        staUtc: f.staUtc as string,
-        aircraftTypeIcao: f.aircraftTypeIcao as string | null,
-        daysOfWeek: f.daysOfWeek as string,
-        effectiveFrom: f.effectiveFrom as string,
-        effectiveUntil: f.effectiveUntil as string,
-        status: f.status as string,
-      })),
-      targetFlights.map((f) => ({
-        _id: f._id as string,
-        flightNumber: `${f.airlineCode}${f.flightNumber}`,
-        depStation: f.depStation as string,
-        arrStation: f.arrStation as string,
-        stdUtc: f.stdUtc as string,
-        staUtc: f.staUtc as string,
-        aircraftTypeIcao: f.aircraftTypeIcao as string | null,
-        daysOfWeek: f.daysOfWeek as string,
-        effectiveFrom: f.effectiveFrom as string,
-        effectiveUntil: f.effectiveUntil as string,
-        status: f.status as string,
-      })),
-    )
+    const baseSnap = baseFlights.map((f) => ({
+      _id: f._id as string,
+      flightNumber: `${f.airlineCode}${f.flightNumber}`,
+      depStation: f.depStation as string,
+      arrStation: f.arrStation as string,
+      stdUtc: f.stdUtc as string,
+      staUtc: f.staUtc as string,
+      aircraftTypeIcao: f.aircraftTypeIcao as string | null,
+      daysOfWeek: f.daysOfWeek as string,
+      effectiveFrom: f.effectiveFrom as string,
+      effectiveUntil: f.effectiveUntil as string,
+      status: f.status as string,
+    }))
+
+    // When comparing a scenario against production, match via sourceFlightId —
+    // scenario clones have new _ids so _id-matching would report everything as
+    // NEW+CNL. computeScenarioDiff is the correct engine for that case.
+    const messages = targetScenarioId
+      ? computeScenarioDiff(
+          baseSnap,
+          targetFlights.map((f) => ({
+            _id: f._id as string,
+            flightNumber: `${f.airlineCode}${f.flightNumber}`,
+            depStation: f.depStation as string,
+            arrStation: f.arrStation as string,
+            stdUtc: f.stdUtc as string,
+            staUtc: f.staUtc as string,
+            aircraftTypeIcao: f.aircraftTypeIcao as string | null,
+            daysOfWeek: f.daysOfWeek as string,
+            effectiveFrom: f.effectiveFrom as string,
+            effectiveUntil: f.effectiveUntil as string,
+            status: f.status as string,
+            sourceFlightId: (f.sourceFlightId as string | null) ?? null,
+          })),
+        )
+      : computeScheduleDiff(
+          baseSnap,
+          targetFlights.map((f) => ({
+            _id: f._id as string,
+            flightNumber: `${f.airlineCode}${f.flightNumber}`,
+            depStation: f.depStation as string,
+            arrStation: f.arrStation as string,
+            stdUtc: f.stdUtc as string,
+            staUtc: f.staUtc as string,
+            aircraftTypeIcao: f.aircraftTypeIcao as string | null,
+            daysOfWeek: f.daysOfWeek as string,
+            effectiveFrom: f.effectiveFrom as string,
+            effectiveUntil: f.effectiveUntil as string,
+            status: f.status as string,
+          })),
+        )
 
     return { messages, baseCount: baseFlights.length, targetCount: targetFlights.length }
   })
@@ -566,34 +589,54 @@ export async function scheduleMessageRoutes(app: FastifyInstance): Promise<void>
       ScheduledFlight.find(targetFilter).lean(),
     ])
 
-    const diffs = computeScheduleDiff(
-      baseFlights.map((f) => ({
-        _id: f._id as string,
-        flightNumber: `${f.airlineCode}${f.flightNumber}`,
-        depStation: f.depStation as string,
-        arrStation: f.arrStation as string,
-        stdUtc: f.stdUtc as string,
-        staUtc: f.staUtc as string,
-        aircraftTypeIcao: f.aircraftTypeIcao as string | null,
-        daysOfWeek: f.daysOfWeek as string,
-        effectiveFrom: f.effectiveFrom as string,
-        effectiveUntil: f.effectiveUntil as string,
-        status: f.status as string,
-      })),
-      targetFlights.map((f) => ({
-        _id: f._id as string,
-        flightNumber: `${f.airlineCode}${f.flightNumber}`,
-        depStation: f.depStation as string,
-        arrStation: f.arrStation as string,
-        stdUtc: f.stdUtc as string,
-        staUtc: f.staUtc as string,
-        aircraftTypeIcao: f.aircraftTypeIcao as string | null,
-        daysOfWeek: f.daysOfWeek as string,
-        effectiveFrom: f.effectiveFrom as string,
-        effectiveUntil: f.effectiveUntil as string,
-        status: f.status as string,
-      })),
-    )
+    const baseSnap = baseFlights.map((f) => ({
+      _id: f._id as string,
+      flightNumber: `${f.airlineCode}${f.flightNumber}`,
+      depStation: f.depStation as string,
+      arrStation: f.arrStation as string,
+      stdUtc: f.stdUtc as string,
+      staUtc: f.staUtc as string,
+      aircraftTypeIcao: f.aircraftTypeIcao as string | null,
+      daysOfWeek: f.daysOfWeek as string,
+      effectiveFrom: f.effectiveFrom as string,
+      effectiveUntil: f.effectiveUntil as string,
+      status: f.status as string,
+    }))
+
+    const diffs = targetScenarioId
+      ? computeScenarioDiff(
+          baseSnap,
+          targetFlights.map((f) => ({
+            _id: f._id as string,
+            flightNumber: `${f.airlineCode}${f.flightNumber}`,
+            depStation: f.depStation as string,
+            arrStation: f.arrStation as string,
+            stdUtc: f.stdUtc as string,
+            staUtc: f.staUtc as string,
+            aircraftTypeIcao: f.aircraftTypeIcao as string | null,
+            daysOfWeek: f.daysOfWeek as string,
+            effectiveFrom: f.effectiveFrom as string,
+            effectiveUntil: f.effectiveUntil as string,
+            status: f.status as string,
+            sourceFlightId: (f.sourceFlightId as string | null) ?? null,
+          })),
+        )
+      : computeScheduleDiff(
+          baseSnap,
+          targetFlights.map((f) => ({
+            _id: f._id as string,
+            flightNumber: `${f.airlineCode}${f.flightNumber}`,
+            depStation: f.depStation as string,
+            arrStation: f.arrStation as string,
+            stdUtc: f.stdUtc as string,
+            staUtc: f.staUtc as string,
+            aircraftTypeIcao: f.aircraftTypeIcao as string | null,
+            daysOfWeek: f.daysOfWeek as string,
+            effectiveFrom: f.effectiveFrom as string,
+            effectiveUntil: f.effectiveUntil as string,
+            status: f.status as string,
+          })),
+        )
 
     if (diffs.length === 0) return { held: 0, neutralized: 0 }
 

@@ -31,6 +31,7 @@ import type {
   UserData,
   ScheduledFlightRef,
   ScenarioRef,
+  ScenarioEnvelopeRef,
   MovementMessageRef,
   MovementMessageQuery,
   MovementMessageStats,
@@ -168,6 +169,14 @@ export function useScenarios(params: Parameters<typeof api.getScenarios>[0] = {}
   return useQuery<ScenarioRef[]>({
     queryKey: queryKeys.scenarios.list((params as { operatorId?: string }).operatorId),
     queryFn: () => api.getScenarios(params),
+    staleTime: OPERATIONAL_STALE,
+  })
+}
+
+export function useScenarioEnvelopes(params: Parameters<typeof api.getScenarioEnvelopes>[0] = {}) {
+  return useQuery<ScenarioEnvelopeRef[]>({
+    queryKey: queryKeys.scenarios.envelopes(params.operatorId),
+    queryFn: () => api.getScenarioEnvelopes(params),
     staleTime: OPERATIONAL_STALE,
   })
 }

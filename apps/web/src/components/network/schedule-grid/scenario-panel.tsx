@@ -2,14 +2,15 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { api, type ScenarioRef } from '@skyhub/api'
-import { GitBranch, Plus, Copy, Trash2, X, Check, Upload, MoreHorizontal } from 'lucide-react'
+import { GitBranch, Plus, Copy, Trash2, X, Check, Upload, MoreHorizontal, AlertTriangle } from 'lucide-react'
 import { getOperatorId } from '@/stores/use-operator-store'
 import { useTheme } from '@/components/theme-provider'
 
 interface ScenarioPanelProps {
   seasonCode?: string
   activeScenarioId: string | null
-  onSelectScenario: (id: string | null) => void
+  /** Called with the scenario _id and display name (null for Production). */
+  onSelectScenario: (id: string | null, name: string | null) => void
   onClose: () => void
   /** Open with create form pre-expanded and copy flights on */
   autoCreate?: boolean
@@ -43,6 +44,10 @@ export function ScenarioPanel({
   } | null>(null)
   const [loadingDiff, setLoadingDiff] = useState(false)
   const [publishResult, setPublishResult] = useState<string | null>(null)
+  const [wipeOpen, setWipeOpen] = useState(false)
+  const [wipeConfirmText, setWipeConfirmText] = useState('')
+  const [wiping, setWiping] = useState(false)
+  const [wipeResult, setWipeResult] = useState<string | null>(null)
 
   const bg = isDark ? '#1C1C28' : '#FAFAFC'
   const border = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)'
@@ -69,18 +74,22 @@ export function ScenarioPanel({
     if (!createName.trim()) return
     setCreating(true)
     try {
+      const name = createName.trim()
+      let newId: string | null = null
       if (copyFlights && activeScenarioId) {
         // Clone from current scenario
-        await api.cloneScenario(activeScenarioId, createName.trim(), 'admin')
+        const cloned = await api.cloneScenario(activeScenarioId, name, 'admin')
+        newId = cloned.id
       } else {
         // Create scenario
         const scenario = await api.createScenario({
           operatorId: getOperatorId(),
           seasonCode,
-          name: createName.trim(),
+          name,
           description: createDesc.trim() || null,
           createdBy: 'admin',
         })
+        newId = scenario._id
         // Copy production flights if requested
         if (copyFlights) {
           const statuses = [...copyStatuses]
@@ -90,11 +99,17 @@ export function ScenarioPanel({
       setCreateName('')
       setCreateDesc('')
       setShowCreate(false)
-      fetchScenarios()
+      await fetchScenarios()
+      // Auto-switch to the newly created scenario and close the panel so
+      // subsequent edits land on the scenario, not on Production.
+      if (newId) {
+        onSelectScenario(newId, name)
+        onClose()
+      }
     } finally {
       setCreating(false)
     }
-  }, [createName, createDesc, copyFlights, activeScenarioId, seasonCode, fetchScenarios])
+  }, [createName, createDesc, copyFlights, activeScenarioId, seasonCode, fetchScenarios, onSelectScenario, onClose])
 
   const handlePublishClick = useCallback(async (id: string, name: string) => {
     setPublishConfirm({ id, name })
@@ -132,12 +147,32 @@ export function ScenarioPanel({
   const handleDelete = useCallback(
     async (id: string) => {
       await api.deleteScenario(id)
-      if (activeScenarioId === id) onSelectScenario(null)
+      if (activeScenarioId === id) onSelectScenario(null, null)
       fetchScenarios()
       setMenuOpen(null)
     },
     [activeScenarioId, onSelectScenario, fetchScenarios],
   )
+
+  const handleWipeAll = useCallback(async () => {
+    setWiping(true)
+    setWipeResult(null)
+    try {
+      const res = await api.deleteAllScenarios()
+      setWipeResult(`Wiped ${res.scenariosDeleted} scenario(s) and ${res.flightsDeleted} scenario flight(s).`)
+      onSelectScenario(null, null)
+      setTimeout(() => {
+        setWipeOpen(false)
+        setWipeConfirmText('')
+        setWipeResult(null)
+        fetchScenarios()
+      }, 1500)
+    } catch (e) {
+      setWipeResult(`Failed: ${(e as Error).message}`)
+    } finally {
+      setWiping(false)
+    }
+  }, [fetchScenarios, onSelectScenario])
 
   const handleClone = useCallback(
     async (id: string, name: string) => {
@@ -183,25 +218,51 @@ export function ScenarioPanel({
               <p className="text-[12px] text-hz-text-tertiary">Schedule planning variants</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg transition-colors"
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = hoverBg
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent'
-            }}
-          >
-            <X size={15} className="text-hz-text-tertiary" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            {scenarios.length > 0 && (
+              <button
+                onClick={() => {
+                  setWipeOpen(true)
+                  setWipeConfirmText('')
+                  setWipeResult(null)
+                }}
+                className="h-8 px-2.5 rounded-lg flex items-center gap-1.5 text-[12px] font-medium transition-colors"
+                style={{
+                  color: '#E63535',
+                  border: `1px solid ${isDark ? 'rgba(230,53,53,0.30)' : 'rgba(230,53,53,0.25)'}`,
+                  backgroundColor: isDark ? 'rgba(230,53,53,0.08)' : 'rgba(230,53,53,0.04)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(230,53,53,0.14)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = isDark ? 'rgba(230,53,53,0.08)' : 'rgba(230,53,53,0.04)'
+                }}
+                title="Delete every scenario (all operators)"
+              >
+                <Trash2 size={13} /> Delete All
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg transition-colors"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = hoverBg
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+              }}
+            >
+              <X size={15} className="text-hz-text-tertiary" />
+            </button>
+          </div>
         </div>
 
         {/* Production row */}
         <div className="px-6 pb-3 shrink-0">
           <button
             onClick={() => {
-              onSelectScenario(null)
+              onSelectScenario(null, null)
               onClose()
             }}
             className="w-full text-left px-4 py-3 rounded-xl transition-all"
@@ -270,7 +331,7 @@ export function ScenarioPanel({
                   <div className="flex items-center justify-between">
                     <button
                       onClick={() => {
-                        onSelectScenario(s._id)
+                        onSelectScenario(s._id, s.name)
                         onClose()
                       }}
                       className="text-left flex-1 min-w-0"
@@ -585,6 +646,102 @@ export function ScenarioPanel({
                 }}
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Wipe-all confirmation overlay */}
+      {wipeOpen && (
+        <div
+          className="absolute inset-0 flex items-center justify-center rounded-2xl"
+          style={{ background: isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)' }}
+        >
+          <div
+            className="w-full max-w-sm mx-6 rounded-xl p-5 space-y-4"
+            style={{ background: bg, border: `1px solid ${border}`, boxShadow: shadow }}
+          >
+            <div className="flex items-start gap-2.5">
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                style={{ backgroundColor: 'rgba(230,53,53,0.12)' }}
+              >
+                <AlertTriangle size={16} style={{ color: '#E63535' }} />
+              </div>
+              <div>
+                <h3 className="text-[15px] font-bold text-hz-text">Delete all scenarios?</h3>
+                <p className="text-[12px] text-hz-text-tertiary mt-1">
+                  This permanently removes every scenario across all operators, along with their scoped flights.
+                  Production flights are not affected.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[12px] font-medium text-hz-text-secondary">
+                Type{' '}
+                <span className="font-bold" style={{ color: '#E63535' }}>
+                  DELETE ALL
+                </span>{' '}
+                to confirm
+              </label>
+              <input
+                type="text"
+                value={wipeConfirmText}
+                onChange={(e) => setWipeConfirmText(e.target.value)}
+                placeholder="DELETE ALL"
+                autoFocus
+                className="w-full h-10 px-3 rounded-lg text-[13px] outline-none text-hz-text"
+                style={{
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.8)',
+                  border: `1px solid ${border}`,
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#E63535'
+                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(230,53,53,0.15)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = border
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              />
+            </div>
+
+            {wipeResult && (
+              <p
+                className="text-[12px] font-medium text-center"
+                style={{ color: wipeResult.startsWith('Failed') ? '#E63535' : '#06C270' }}
+              >
+                {wipeResult}
+              </p>
+            )}
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setWipeOpen(false)
+                  setWipeConfirmText('')
+                  setWipeResult(null)
+                }}
+                className="h-10 px-4 rounded-lg text-[13px] font-medium text-hz-text-secondary transition-colors"
+                style={{ border: `1px solid ${border}` }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = hoverBg
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent'
+                }}
+              >
+                No, Cancel
+              </button>
+              <button
+                onClick={handleWipeAll}
+                disabled={wipeConfirmText !== 'DELETE ALL' || wiping}
+                className="flex-1 h-10 rounded-lg text-[13px] font-semibold text-white transition-colors disabled:opacity-40"
+                style={{ background: '#E63535' }}
+              >
+                {wiping ? 'Deleting...' : 'Yes, Delete All'}
               </button>
             </div>
           </div>

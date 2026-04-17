@@ -1,5 +1,9 @@
-import { ComingSoon } from '@/components/coming-soon'
+import { ScenarioCompareShell } from '@/components/network/scenario-compare/scenario-compare-shell'
 
 export default function Page() {
-  return <ComingSoon />
+  return (
+    <div className="h-full">
+      <ScenarioCompareShell />
+    </div>
+  )
 }

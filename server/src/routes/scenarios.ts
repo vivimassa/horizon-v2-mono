@@ -35,6 +35,37 @@ export async function scenarioRoutes(app: FastifyInstance): Promise<void> {
     return Scenario.find(filter).sort({ createdAt: -1 }).lean()
   })
 
+  // ── Envelopes — flight-date min/max per scenario (for date-range cascade).
+  // Production flights (scenarioId: null) are surfaced as '__production__' so
+  // the client can compare any scenario against live production.
+  app.get('/scenarios/envelopes', async (req) => {
+    const q = req.query as Record<string, string>
+    const match: Record<string, unknown> = {}
+    if (q.operatorId) match.operatorId = q.operatorId
+    const rows = await ScheduledFlight.aggregate<{
+      _id: string | null
+      effectiveFromUtc: string
+      effectiveUntilUtc: string
+      flightCount: number
+    }>([
+      { $match: match },
+      {
+        $group: {
+          _id: '$scenarioId',
+          effectiveFromUtc: { $min: '$effectiveFrom' },
+          effectiveUntilUtc: { $max: '$effectiveUntil' },
+          flightCount: { $sum: 1 },
+        },
+      },
+    ])
+    return rows.map((r) => ({
+      scenarioId: r._id ?? '__production__',
+      effectiveFromUtc: r.effectiveFromUtc,
+      effectiveUntilUtc: r.effectiveUntilUtc,
+      flightCount: r.flightCount,
+    }))
+  })
+
   // ── Get one ──
   app.get('/scenarios/:id', async (req, reply) => {
     const { id } = req.params as { id: string }
@@ -396,5 +427,23 @@ export async function scenarioRoutes(app: FastifyInstance): Promise<void> {
     await ScheduledFlight.deleteMany({ scenarioId: id })
     await Scenario.findByIdAndDelete(id)
     return { success: true }
+  })
+
+  // ── Bulk delete — wipe all scenarios (optionally scoped by operatorId/seasonCode) ──
+  app.delete('/scenarios', async (req) => {
+    const q = req.query as Record<string, string>
+    const filter: Record<string, unknown> = {}
+    if (q.operatorId) filter.operatorId = q.operatorId
+    if (q.seasonCode) filter.seasonCode = q.seasonCode
+
+    const ids = (await Scenario.find(filter, { _id: 1 }).lean()).map((s) => s._id as string)
+    if (ids.length === 0) return { scenariosDeleted: 0, flightsDeleted: 0 }
+
+    const flightsResult = await ScheduledFlight.deleteMany({ scenarioId: { $in: ids } })
+    const scenariosResult = await Scenario.deleteMany({ _id: { $in: ids } })
+    return {
+      scenariosDeleted: scenariosResult.deletedCount ?? 0,
+      flightsDeleted: flightsResult.deletedCount ?? 0,
+    }
   })
 }

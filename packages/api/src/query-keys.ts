@@ -107,6 +107,7 @@ export const queryKeys = {
     all: ['scenarios'] as const,
     list: (operatorId?: string) => ['scenarios', 'list', operatorId ?? ''] as const,
     detail: (id: string) => ['scenarios', 'detail', id] as const,
+    envelopes: (operatorId?: string) => ['scenarios', 'envelopes', operatorId ?? ''] as const,
   },
 
   // ─── FDTL ───

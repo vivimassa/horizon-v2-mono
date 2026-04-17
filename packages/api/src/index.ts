@@ -19,6 +19,7 @@ export type {
   DutyPatternRef,
   ScheduledFlightRef,
   ScenarioRef,
+  ScenarioEnvelopeRef,
   MppLeadTimeGroupRef,
   MppLeadTimeItemRef,
   FdtlFrameworkRef,

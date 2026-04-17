@@ -45,6 +45,7 @@ export * as OpsTailAssignment from './utils/ops-tail-assignment'
 export * as OpsTailAssignmentSA from './utils/ops-tail-assignment-sa'
 export * from './utils/ssim-generator'
 export * from './utils/ssim-parser'
+export * from './utils/ssim-comparison'
 // NOTE: utils/rotation-builder and utils/airport-lookup are intentionally
 // NOT re-exported here. They depend on Node built-ins (node:crypto,
 // node:fs, node:path) and are server-only. Re-exporting from this

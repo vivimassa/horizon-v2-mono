@@ -138,7 +138,18 @@
       "Bash(../node_modules/.bin/tsc --noEmit -p apps/web)",
       "Bash(../../node_modules/.bin/tsc --noEmit --listFilesOnly)",
       "Bash(git -C C:/Users/ADMIN/horizon-v2-mono log --all --oneline -- apps/web/src/components/admin/form-primitives.tsx)",
-      "Read(//c/c/Users/ADMIN/horizon-v2-mono/apps/web/**)"
+      "Read(//c/c/Users/ADMIN/horizon-v2-mono/apps/web/**)",
+      "Bash(bunx tsc *)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(echo \"---exit=$?\")",
+      "Bash(npx tsc *)",
+      "Read(//tmp/**)",
+      "Bash(python3 *)",
+      "Bash(npx turbo *)",
+      "Bash(python -c \"import sys, json; p = json.load\\(sys.stdin\\); print\\(json.dumps\\(p.get\\('scripts', {}\\), indent=2\\)\\)\")",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(python -c \"import sys, json; print\\(json.dumps\\(json.load\\(sys.stdin\\).get\\('scripts', {}\\), indent=2\\)\\)\")",
+      "Bash(echo \"LINT_EXIT=$?\")"
     ]
   },
   "enableAllProjectMcpServers": true,

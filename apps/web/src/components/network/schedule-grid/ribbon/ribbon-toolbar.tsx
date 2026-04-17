@@ -24,6 +24,7 @@ import {
   FileText,
   ChevronUp,
   ChevronDown,
+  FlaskConical,
 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { Tooltip } from '@/components/ui/tooltip'
@@ -51,6 +52,9 @@ interface RibbonToolbarProps {
   saving: boolean
   rowHeight: number
   onRowHeightChange: (h: number) => void
+  /** When set, a scenario banner appears in the toolbar and editing is marked as scenario-scoped. */
+  activeScenarioName?: string | null
+  onExitScenario?: () => void
 }
 
 export function RibbonToolbar({
@@ -71,6 +75,8 @@ export function RibbonToolbar({
   saving,
   rowHeight,
   onRowHeightChange,
+  activeScenarioName,
+  onExitScenario,
 }: RibbonToolbarProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -138,106 +144,97 @@ export function RibbonToolbar({
   ]
 
   return (
-    <div
-      ref={containerRef}
-      className="flex items-stretch gap-0 rounded-2xl shrink-0 overflow-hidden"
-      style={{
-        background: glassBg,
-        border: `1px solid ${glassBorder}`,
-        backdropFilter: 'blur(20px)',
-        height: isCollapsed ? 52 : undefined,
-        minHeight: isCollapsed ? 52 : 100,
-        transition: 'min-height 250ms cubic-bezier(0.4, 0, 0.2, 1), height 250ms cubic-bezier(0.4, 0, 0.2, 1)',
-      }}
-    >
-      {isCollapsed ? (
-        /* ── Collapsed: icon-only row with inline font controls ── */
+    <>
+      {activeScenarioName && (
         <div
-          className="flex items-center gap-0.5 px-2 w-full"
-          style={{ height: 52, animation: 'bc-dropdown-in 150ms ease-out' }}
+          className="flex items-center gap-2.5 rounded-2xl shrink-0 px-4 py-2.5"
+          style={{
+            background: isDark ? 'rgba(253,221,72,0.10)' : 'rgba(253,221,72,0.18)',
+            border: `1px solid ${isDark ? 'rgba(253,221,72,0.25)' : 'rgba(230,122,0,0.30)'}`,
+          }}
         >
-          {collapsedItems.map((item, i) => (
-            <span key={i} className="contents">
-              <Tooltip content={item.tooltip}>
-                <button
-                  onClick={item.onClick}
-                  disabled={item.disabled}
-                  className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all duration-150 ${item.disabled ? 'opacity-30 pointer-events-none' : ''}`}
-                  style={{ color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }}
-                  onMouseEnter={(e) => {
-                    if (!item.disabled) e.currentTarget.style.background = hoverBg
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent'
-                  }}
-                >
-                  <item.icon size={18} strokeWidth={1.6} />
-                </button>
-              </Tooltip>
-              {/* Insert font controls right after Underline (index 7) */}
-              {i === 7 && <CollapsedFontControls isDark={isDark} hasSelection={hasSelection} />}
-            </span>
-          ))}
-          <div className="flex-1" />
-          <Tooltip content="Expand toolbar">
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+            style={{ backgroundColor: isDark ? 'rgba(253,221,72,0.20)' : 'rgba(253,221,72,0.30)' }}
+          >
+            <FlaskConical size={14} style={{ color: '#E67A00' }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: '#E67A00' }}>
+              Editing scenario
+            </div>
+            <div className="text-[14px] font-semibold text-hz-text truncate">{activeScenarioName}</div>
+          </div>
+          {onExitScenario && (
             <button
-              onClick={() => {
-                setCollapsed(false)
-                setAutoCollapsed(false)
+              onClick={onExitScenario}
+              className="h-8 px-3 rounded-lg text-[12px] font-medium transition-colors"
+              style={{
+                color: isDark ? '#F5F2FD' : '#1C1C28',
+                border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'}`,
+                backgroundColor: 'transparent',
               }}
-              className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
-              style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)' }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = hoverBg
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent'
               }}
+              title="Switch back to Production"
             >
-              <ChevronDown size={16} />
+              Exit to Production
             </button>
-          </Tooltip>
+          )}
         </div>
-      ) : (
-        /* ── Expanded: full ribbon ── */
-        <div
-          className="flex items-stretch gap-0 w-full overflow-x-auto"
-          style={{ minHeight: 100, animation: 'bc-dropdown-in 150ms ease-out' }}
-        >
-          <FlightSection onAdd={onAddFlight} onRemove={onDeleteFlight} hasSelection={hasSelection} />
-          <Divider isDark={isDark} />
-          <ClipboardSection hasSelection={hasSelection} />
-          <Divider isDark={isDark} />
-          <FontSection hasSelection={hasSelection} />
-          <Divider isDark={isDark} />
-          <CellsSection
-            onInsert={onInsertFlight}
-            onDelete={onDeleteFlight}
-            hasSelection={hasSelection}
-            rowHeight={rowHeight}
-            onRowHeightChange={onRowHeightChange}
-          />
-          <Divider isDark={isDark} />
-          <UtilitySections
-            onSave={onSave}
-            onImport={onImport}
-            onExport={onExport}
-            onScenario={onScenario}
-            onMessage={onMessage}
-            onSsimExport={onSsimExport}
-            onFind={onFind}
-            onReplace={onReplace}
-            onSaveAs={onSaveAs}
-            hasDirty={hasDirty}
-            saving={saving}
-          />
-
-          {/* Collapse chevron */}
-          <div className="flex items-start pt-2 pr-2 ml-auto">
-            <Tooltip content="Collapse toolbar">
+      )}
+      <div
+        ref={containerRef}
+        className="flex items-stretch gap-0 rounded-2xl shrink-0 overflow-hidden"
+        style={{
+          background: glassBg,
+          border: `1px solid ${glassBorder}`,
+          backdropFilter: 'blur(20px)',
+          height: isCollapsed ? 52 : undefined,
+          minHeight: isCollapsed ? 52 : 100,
+          transition: 'min-height 250ms cubic-bezier(0.4, 0, 0.2, 1), height 250ms cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      >
+        {isCollapsed ? (
+          /* ── Collapsed: icon-only row with inline font controls ── */
+          <div
+            className="flex items-center gap-0.5 px-2 w-full"
+            style={{ height: 52, animation: 'bc-dropdown-in 150ms ease-out' }}
+          >
+            {collapsedItems.map((item, i) => (
+              <span key={i} className="contents">
+                <Tooltip content={item.tooltip}>
+                  <button
+                    onClick={item.onClick}
+                    disabled={item.disabled}
+                    className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all duration-150 ${item.disabled ? 'opacity-30 pointer-events-none' : ''}`}
+                    style={{ color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }}
+                    onMouseEnter={(e) => {
+                      if (!item.disabled) e.currentTarget.style.background = hoverBg
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent'
+                    }}
+                  >
+                    <item.icon size={18} strokeWidth={1.6} />
+                  </button>
+                </Tooltip>
+                {/* Insert font controls right after Underline (index 7) */}
+                {i === 7 && <CollapsedFontControls isDark={isDark} hasSelection={hasSelection} />}
+              </span>
+            ))}
+            <div className="flex-1" />
+            <Tooltip content="Expand toolbar">
               <button
-                onClick={() => setCollapsed(true)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
+                onClick={() => {
+                  setCollapsed(false)
+                  setAutoCollapsed(false)
+                }}
+                className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
                 style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)' }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = hoverBg
@@ -246,13 +243,66 @@ export function RibbonToolbar({
                   e.currentTarget.style.background = 'transparent'
                 }}
               >
-                <ChevronUp size={14} />
+                <ChevronDown size={16} />
               </button>
             </Tooltip>
           </div>
-        </div>
-      )}
-    </div>
+        ) : (
+          /* ── Expanded: full ribbon ── */
+          <div
+            className="flex items-stretch gap-0 w-full overflow-x-auto"
+            style={{ minHeight: 100, animation: 'bc-dropdown-in 150ms ease-out' }}
+          >
+            <FlightSection onAdd={onAddFlight} onRemove={onDeleteFlight} hasSelection={hasSelection} />
+            <Divider isDark={isDark} />
+            <ClipboardSection hasSelection={hasSelection} />
+            <Divider isDark={isDark} />
+            <FontSection hasSelection={hasSelection} />
+            <Divider isDark={isDark} />
+            <CellsSection
+              onInsert={onInsertFlight}
+              onDelete={onDeleteFlight}
+              hasSelection={hasSelection}
+              rowHeight={rowHeight}
+              onRowHeightChange={onRowHeightChange}
+            />
+            <Divider isDark={isDark} />
+            <UtilitySections
+              onSave={onSave}
+              onImport={onImport}
+              onExport={onExport}
+              onScenario={onScenario}
+              onMessage={onMessage}
+              onSsimExport={onSsimExport}
+              onFind={onFind}
+              onReplace={onReplace}
+              onSaveAs={onSaveAs}
+              hasDirty={hasDirty}
+              saving={saving}
+            />
+
+            {/* Collapse chevron */}
+            <div className="flex items-start pt-2 pr-2 ml-auto">
+              <Tooltip content="Collapse toolbar">
+                <button
+                  onClick={() => setCollapsed(true)}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
+                  style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = hoverBg
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent'
+                  }}
+                >
+                  <ChevronUp size={14} />
+                </button>
+              </Tooltip>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 

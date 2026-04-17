@@ -116,6 +116,8 @@ export interface SmartRowOptions {
   filterDateTo?: string
   seasonCode?: string
   airlineCode?: string
+  /** Scenario context for the new row. null = Production, string = scenario _id. Must be set explicitly. */
+  scenarioId?: string | null
 }
 
 /**
@@ -218,7 +220,7 @@ export function createSmartRow(
     isEtops: false,
     isOverwater: false,
     isActive: true,
-    scenarioId: lastRow?.scenarioId ?? null,
+    scenarioId: options?.scenarioId !== undefined ? options.scenarioId : (lastRow?.scenarioId ?? null),
     rotationId: null,
     rotationSequence: null,
     rotationLabel: null,
@@ -370,6 +372,7 @@ export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
         filterDateFrom: filterDateFrom || undefined,
         filterDateTo: filterDateTo || undefined,
         airlineCode: opStore.operator?.iataCode || undefined,
+        scenarioId: opStore.activeScenarioId,
       })
       addNewRow(smart)
       row = smart
@@ -415,6 +418,7 @@ export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
         filterDateFrom: filterDateFrom || undefined,
         filterDateTo: filterDateTo || undefined,
         airlineCode: opStore.operator?.iataCode || undefined,
+        scenarioId: opStore.activeScenarioId,
       })
       addNewRow(smart)
       row = smart
@@ -693,6 +697,7 @@ export const useScheduleGridStore = create<ScheduleGridState>((set, get) => ({
         const smart = createSmartRow(currentAll, get().dirtyMap, getTat, {
           seasonCode: templateRow.seasonCode,
           airlineCode: templateRow.airlineCode,
+          scenarioId: useOperatorStore.getState().activeScenarioId,
         })
         addNewRow(smart)
         targetRow = smart

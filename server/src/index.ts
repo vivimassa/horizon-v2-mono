@@ -41,6 +41,7 @@ import { asmSsmConsumerRoutes } from './routes/asm-ssm-consumers.js'
 import { integrationPullRoutes } from './routes/integration-pull.js'
 import { mlRoutes } from './routes/ml.js'
 import { weatherRoutes } from './routes/weather.js'
+import { feedRoutes } from './routes/feeds.js'
 import { nonCrewPeopleRoutes } from './routes/non-crew-people.js'
 import { startWeatherPoll } from './jobs/weather-poll.js'
 import { startAutoTransmitScheduler } from './jobs/mvt-auto-transmit.js'
@@ -114,6 +115,7 @@ async function main(): Promise<void> {
   await app.register(integrationPullRoutes)
   await app.register(mlRoutes)
   await app.register(weatherRoutes)
+  await app.register(feedRoutes)
   await app.register(nonCrewPeopleRoutes)
 
   // Start

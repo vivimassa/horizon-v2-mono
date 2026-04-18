@@ -22,6 +22,9 @@ const PUBLIC_PATHS = [
   // 7.1.5.1 ASM/SSM outbox — authenticates itself via X-Consumer-Key.
   // External vendors (GDS, partners) have no SkyHub JWT.
   '/integration/asm-ssm/outbox',
+  // Feed heartbeat — external gateways ping here every N seconds using the
+  // per-operator inboundMessageToken. Feeds GET /feed-status on the OCC wall.
+  '/feeds/heartbeat',
 ]
 const PUBLIC_PREFIXES = ['/uploads/']
 

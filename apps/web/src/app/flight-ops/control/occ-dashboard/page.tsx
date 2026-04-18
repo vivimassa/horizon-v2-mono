@@ -1,5 +1,5 @@
-import { ComingSoon } from '@/components/coming-soon'
+import { OccDashboardShell } from '@/components/flight-ops/control/occ-dashboard/occ-dashboard-shell'
 
-export default function Page() {
-  return <ComingSoon />
+export default function OccDashboardPage() {
+  return <OccDashboardShell />
 }

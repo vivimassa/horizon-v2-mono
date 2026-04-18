@@ -32,6 +32,8 @@ export interface ScenarioStats {
   uniqueStations: number
   uniqueRoutes: number
   aircraftTypes: string[]
+  /** Flight counts per aircraft type — used for side-by-side fleet comparison. */
+  aircraftCounts: Record<string, number>
   statusBreakdown: Record<FlightStatus, number>
 }
 

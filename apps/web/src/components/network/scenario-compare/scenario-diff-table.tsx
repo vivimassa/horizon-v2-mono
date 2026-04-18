@@ -68,19 +68,25 @@ function StatusBadge({ status }: { status: DiffStatus }) {
   )
 }
 
-function dayLetters(dow: string): string[] {
-  // Input like "1234567" or "SMTWTFS" — normalise to SMTWTFS with active/inactive.
-  const letters = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+// Commercial Planning convention: 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat, 7=Sun.
+// Returns the digit for active days, '·' for inactive — index 0 is Monday.
+function dayDigits(dow: string): string[] {
+  const digits = ['1', '2', '3', '4', '5', '6', '7']
   const active = new Set<number>()
   for (const ch of dow) {
     const n = parseInt(ch, 10)
-    if (!Number.isNaN(n) && n >= 1 && n <= 7) active.add(n % 7)
+    if (!Number.isNaN(n) && n >= 1 && n <= 7) active.add(n)
   }
+  // Fallback: legacy SMTWTFS letter strings (S-index0 = Sunday → 7, M-index1 = Monday → 1).
   if (active.size === 0) {
-    const letterSet = new Set(dow.toUpperCase().split(''))
-    return letters.map((l, i) => (letterSet.has(l) ? letters[i] : '·'))
+    const legacy = [7, 1, 2, 3, 4, 5, 6]
+    const expected = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+    const chars = dow.toUpperCase().split('')
+    for (let i = 0; i < expected.length && i < chars.length; i++) {
+      if (chars[i] === expected[i]) active.add(legacy[i])
+    }
   }
-  return letters.map((_, i) => (active.has(i) ? letters[i] : '·'))
+  return digits.map((d) => (active.has(parseInt(d, 10)) ? d : '·'))
 }
 
 export function ScenarioDiffTable({ rows, scenarios }: ScenarioDiffTableProps) {
@@ -327,10 +333,8 @@ function DiffTableRow({
         <StatusBadge status={row.overallStatus} />
       </td>
       <td className="px-3 py-2 font-bold tabular-nums text-hz-text align-top">{row.flightNumber}</td>
-      <td className="px-3 py-2 text-hz-text align-top">
-        <span className="font-mono">
-          {row.depStation} → {row.arrStation}
-        </span>
+      <td className="px-3 py-2 font-bold tabular-nums text-hz-text align-top">
+        {row.depStation} → {row.arrStation}
       </td>
       {scenarios.map((s) => {
         const cell = row.perScenario.find((c) => c.scenarioId === s._id)
@@ -381,22 +385,28 @@ function ScenarioCell({
           {snap.aircraftTypeIcao ?? '—'}
         </span>
         <span
-          className="inline-flex items-center font-mono text-[13px] tabular-nums rounded px-1.5 py-0.5"
+          className="inline-flex items-center gap-0.5 rounded px-1 py-0.5"
           style={{ background: daysChanged ? tintBg : 'transparent' }}
-          title="Days of week"
+          title="Frequency — 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat, 7=Sun"
         >
-          {dayLetters(snap.daysOfWeek).map((l, i) => (
-            <span
-              key={i}
-              className="inline-block w-3.5 text-center"
-              style={{
-                color: l === '·' ? 'var(--hz-text-tertiary)' : 'var(--hz-text)',
-                fontWeight: l === '·' ? 400 : 600,
-              }}
-            >
-              {l}
-            </span>
-          ))}
+          {dayDigits(snap.daysOfWeek).map((d, i) => {
+            const active = d !== '·'
+            return (
+              <span
+                key={i}
+                className="inline-flex items-center justify-center w-5 h-5 rounded-[4px] text-[13px] font-semibold tabular-nums"
+                style={{
+                  color: active ? 'var(--color-hz-text)' : 'var(--color-hz-text-secondary)',
+                  background: active ? 'color-mix(in srgb, var(--module-accent) 18%, transparent)' : 'transparent',
+                  border: active
+                    ? '1px solid color-mix(in srgb, var(--module-accent) 55%, transparent)'
+                    : '1px solid var(--color-hz-border)',
+                }}
+              >
+                {active ? d : ''}
+              </span>
+            )
+          })}
         </span>
       </div>
     </td>

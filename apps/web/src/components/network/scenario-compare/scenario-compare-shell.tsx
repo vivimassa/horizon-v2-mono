@@ -6,11 +6,11 @@ import { useOperatorStore, getOperatorId } from '@/stores/use-operator-store'
 import { useRunwayLoading } from '@/hooks/use-runway-loading'
 import { RunwayLoadingPanel } from '@/components/ui/runway-loading-panel'
 import { EmptyPanel } from '@/components/ui/empty-panel'
-import { api, useScenarios, useScenarioEnvelopes } from '@skyhub/api'
+import { api, useScenarios, useScenarioEnvelopes, useAircraftTypes } from '@skyhub/api'
 import type { ScheduledFlightRef, ScenarioRef } from '@skyhub/api'
 import { ScenarioCompareFilterPanel } from './scenario-compare-filter-panel'
 import { ScenarioCompareHeader } from './scenario-compare-header'
-import { ScenarioStatsGrid } from './scenario-stats-grid'
+import { ScenarioCompareOverview } from './scenario-compare-overview'
 import { ScenarioDiffTable } from './scenario-diff-table'
 import { computeScenarioCompare } from './compute-scenario-compare'
 import type { ScenarioCompareFilterState, ScenarioCompareResult, ScenarioWithEnvelope } from './scenario-compare-types'
@@ -29,6 +29,18 @@ export function ScenarioCompareShell() {
   const operatorId = operator?._id ?? ''
   const scenariosQuery = useScenarios({ operatorId: operatorId || undefined })
   const envelopesQuery = useScenarioEnvelopes({ operatorId: operatorId || undefined })
+  const aircraftTypesQuery = useAircraftTypes(operatorId)
+
+  // Aircraft-type color map — sourced from the operator's Aircraft Types DB
+  // so the "Flights by aircraft type" donut uses the same colors as the
+  // rest of SkyHub (gantt, rotation, fleet widgets).
+  const typeColors = useMemo(() => {
+    const m: Record<string, string> = {}
+    for (const t of aircraftTypesQuery.data ?? []) {
+      if (t.color) m[t.icaoType] = t.color
+    }
+    return m
+  }, [aircraftTypesQuery.data])
 
   const merged: ScenarioWithEnvelope[] = useMemo(() => {
     const list = scenariosQuery.data ?? []
@@ -145,7 +157,7 @@ export function ScenarioCompareShell() {
     <div className="flex h-full overflow-hidden gap-3 p-3">
       <ScenarioCompareFilterPanel loading={runway.active} scenarios={merged} onGo={handleGo} />
 
-      <div className="flex-1 flex flex-col overflow-hidden gap-3 min-w-0 relative">
+      <div className="flex-1 flex flex-col overflow-y-auto gap-3 min-w-0 min-h-0 relative">
         {!hasLoaded && !runway.active && (
           <EmptyPanel message="Pick 2 or 3 scenarios, set a period, and click Go to compare." />
         )}
@@ -177,10 +189,15 @@ export function ScenarioCompareShell() {
             </div>
 
             <div className="shrink-0">
-              <ScenarioStatsGrid scenarios={selectedScenarios} perScenario={result.perScenario} />
+              <ScenarioCompareOverview
+                scenarios={selectedScenarios}
+                perScenario={result.perScenario}
+                rows={result.rows}
+                typeColors={typeColors}
+              />
             </div>
 
-            <div className="flex-1 min-h-0 rounded-2xl overflow-hidden" style={glassStyle}>
+            <div className="shrink-0 h-[560px] rounded-2xl overflow-hidden" style={glassStyle}>
               <ScenarioDiffTable rows={result.rows} scenarios={selectedScenarios} />
             </div>
           </>

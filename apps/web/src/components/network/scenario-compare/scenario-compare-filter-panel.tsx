@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { FilterPanel, FilterSection, PeriodField, MultiSelectField, FilterGoButton } from '@/components/filter-panel'
 import type { ScenarioCompareFilterState, ScenarioWithEnvelope } from './scenario-compare-types'
 
@@ -12,6 +12,45 @@ interface ScenarioCompareFilterPanelProps {
 
 const MIN_SCENARIOS = 2
 const MAX_SCENARIOS = 3
+
+// localStorage key — per-browser/user, shared across operators. Scenario IDs
+// are reconciled against the currently available list on mount so stale picks
+// from a different operator simply get dropped by the existing `validSelected`.
+const STORAGE_KEY = 'skyhub.scenarioCompare.filters.v1'
+
+interface PersistedFilters {
+  periodFrom: string
+  periodTo: string
+  scenarioIds: string[]
+}
+
+function loadPersisted(): PersistedFilters | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<PersistedFilters>
+    if (
+      typeof parsed?.periodFrom === 'string' &&
+      typeof parsed?.periodTo === 'string' &&
+      Array.isArray(parsed?.scenarioIds)
+    ) {
+      return {
+        periodFrom: parsed.periodFrom,
+        periodTo: parsed.periodTo,
+        scenarioIds: parsed.scenarioIds.filter((id): id is string => typeof id === 'string'),
+      }
+    }
+  } catch {}
+  return null
+}
+
+function savePersisted(filters: PersistedFilters) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(filters))
+  } catch {}
+}
 
 function defaultPeriod(): { from: string; to: string } {
   const now = new Date()
@@ -28,10 +67,25 @@ function intersects(env: ScenarioWithEnvelope['envelope'], from: string, to: str
 }
 
 export function ScenarioCompareFilterPanel({ loading = false, scenarios, onGo }: ScenarioCompareFilterPanelProps) {
-  const initial = useMemo(defaultPeriod, [])
+  // Read persisted filters once on mount so the user doesn't have to reset
+  // the date range every visit. Scenario IDs get reconciled against the
+  // available options below (stale IDs simply fall out).
+  const initial = useMemo(() => {
+    const persisted = loadPersisted()
+    if (persisted) {
+      return { from: persisted.periodFrom, to: persisted.periodTo, ids: persisted.scenarioIds }
+    }
+    const p = defaultPeriod()
+    return { from: p.from, to: p.to, ids: [] as string[] }
+  }, [])
   const [periodFrom, setPeriodFrom] = useState(initial.from)
   const [periodTo, setPeriodTo] = useState(initial.to)
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [selectedIds, setSelectedIds] = useState<string[]>(initial.ids)
+
+  // Persist on every change so even an unsubmitted tweak sticks across visits.
+  useEffect(() => {
+    savePersisted({ periodFrom, periodTo, scenarioIds: selectedIds })
+  }, [periodFrom, periodTo, selectedIds])
 
   const availableScenarios = useMemo(
     () => scenarios.filter((s) => s.envelope && intersects(s.envelope, periodFrom, periodTo)),

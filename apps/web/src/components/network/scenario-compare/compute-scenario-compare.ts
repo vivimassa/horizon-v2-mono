@@ -49,7 +49,7 @@ const EMPTY_BREAKDOWN: Record<FlightStatus, number> = { draft: 0, active: 0, sus
 export function computeScenarioStats(flights: FlightSnapshot[]): ScenarioStats {
   const stations = new Set<string>()
   const routes = new Set<string>()
-  const types = new Set<string>()
+  const typeCounts = new Map<string, number>()
   const breakdown: Record<FlightStatus, number> = { ...EMPTY_BREAKDOWN }
   let blockMinutes = 0
   let sectors = 0
@@ -57,20 +57,36 @@ export function computeScenarioStats(flights: FlightSnapshot[]): ScenarioStats {
     stations.add(f.depStation)
     stations.add(f.arrStation)
     routes.add(`${f.depStation}-${f.arrStation}`)
-    if (f.aircraftTypeIcao) types.add(f.aircraftTypeIcao)
+    if (f.aircraftTypeIcao) {
+      typeCounts.set(f.aircraftTypeIcao, (typeCounts.get(f.aircraftTypeIcao) ?? 0) + 1)
+    }
     breakdown[f.status] = (breakdown[f.status] ?? 0) + 1
     if (f.status !== 'cancelled') sectors += 1
     blockMinutes += f.blockMinutes ?? 0
   }
+  const aircraftCounts: Record<string, number> = {}
+  for (const [type, count] of typeCounts) aircraftCounts[type] = count
   return {
     totalFlights: flights.length,
     totalSectors: sectors,
     totalBlockHours: Math.round((blockMinutes / 60) * 10) / 10,
     uniqueStations: stations.size,
     uniqueRoutes: routes.size,
-    aircraftTypes: [...types].sort(),
+    aircraftTypes: [...typeCounts.keys()].sort(),
+    aircraftCounts,
     statusBreakdown: breakdown,
   }
+}
+
+// 'draft' and 'active' are both "the flight is planned to operate" — the only
+// user-visible difference is publishing state, which isn't a schedule change.
+// We only flag a status diff when one side is suspended/cancelled and the
+// other isn't. Otherwise every scenario copied from production would be
+// reported as 582+ Modified rows just because the copy resets status to draft.
+function normalizeStatus(s: FlightStatus): 'operating' | 'suspended' | 'cancelled' {
+  if (s === 'suspended') return 'suspended'
+  if (s === 'cancelled') return 'cancelled'
+  return 'operating'
 }
 
 function diffFields(a: FlightSnapshot, b: FlightSnapshot): ChangeField[] {
@@ -81,7 +97,7 @@ function diffFields(a: FlightSnapshot, b: FlightSnapshot): ChangeField[] {
   if ((a.blockMinutes ?? 0) !== (b.blockMinutes ?? 0)) out.push('blockMinutes')
   if (a.daysOfWeek !== b.daysOfWeek) out.push('daysOfWeek')
   if ((a.serviceType ?? '') !== (b.serviceType ?? '')) out.push('serviceType')
-  if (a.status !== b.status) out.push('status')
+  if (normalizeStatus(a.status) !== normalizeStatus(b.status)) out.push('status')
   return out
 }
 

@@ -1,5 +1,5 @@
-import { ComingSoon } from '@/components/coming-soon'
+import { ScheduleSummaryShell } from '@/components/network/schedule-summary/schedule-summary-shell'
 
 export default function Page() {
-  return <ComingSoon />
+  return <ScheduleSummaryShell />
 }

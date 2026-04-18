@@ -1,5 +1,9 @@
-import { ComingSoon } from '@/components/coming-soon'
+import { FrequencyAnalysisShell } from '@/components/network/frequency-analysis/frequency-analysis-shell'
 
 export default function Page() {
-  return <ComingSoon />
+  return (
+    <div className="h-full">
+      <FrequencyAnalysisShell />
+    </div>
+  )
 }

@@ -1,5 +1,5 @@
-import { ComingSoon } from '@/components/coming-soon'
+import { PublicTimetableShell } from '@/components/network/public-timetable/public-timetable-shell'
 
 export default function Page() {
-  return <ComingSoon />
+  return <PublicTimetableShell />
 }

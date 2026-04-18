@@ -117,8 +117,32 @@ export interface Flight {
   dep: { icao: string; iata: string }
   arr: { icao: string; iata: string }
   schedule: { stdUtc: number; staUtc: number }
-  actual: { atdUtc: number | null; ataUtc: number | null }
+  actual: {
+    atdUtc: number | null
+    offUtc: number | null
+    onUtc: number | null
+    ataUtc: number | null
+  }
+  estimated?: { etdUtc: number | null; etaUtc: number | null }
   tail: { registration: string | null; icaoType: string | null }
+  pax?: {
+    adultExpected: number | null
+    adultActual: number | null
+    childExpected: number | null
+    childActual: number | null
+    infantExpected: number | null
+    infantActual: number | null
+  }
+  fuel?: {
+    initial: number | null
+    uplift: number | null
+    burn: number | null
+    flightPlan: number | null
+  }
+  lopa?: {
+    cabins: { classCode: string; seats: number }[]
+    totalSeats: number
+  } | null
   crew: { employeeId: string; role: string; name: string }[]
   delays: { code: string; minutes: number; reason: string }[]
   status: 'scheduled' | 'departed' | 'onTime' | 'delayed' | 'cancelled' | 'diverted'
@@ -1570,6 +1594,9 @@ export const api = {
     if (params?.flightDateTo) p.set('flightDateTo', params.flightDateTo)
     return request<MovementMessageStats>(`/movement-messages/stats?${p.toString()}`)
   },
+
+  /** Real-time health of the four OCC dashboard feeds. */
+  getFeedStatus: () => request<FeedStatus>('/feed-status'),
 
   getHeldMovementMessages: (operatorId: string) =>
     request<{ messages: MovementMessageRef[] }>(`/movement-messages/held?operatorId=${operatorId}`),
@@ -3399,6 +3426,30 @@ export interface MovementMessageStats {
   rejected: number
   discarded: number
   failed: number
+}
+
+/** Per-feed OCC Dashboard health, returned by GET /feed-status. */
+export type FeedState = 'online' | 'stale' | 'offline' | 'unconfigured'
+
+export interface HeartbeatFeedStatus {
+  state: FeedState
+  lastHeartbeatAtUtc: string | null
+  source: string | null
+  expectedIntervalSec: number
+}
+
+export interface WxFeedStatus {
+  state: 'online' | 'stale' | 'offline'
+  lastPollAtUtc: string | null
+  pollIntervalMin: number
+}
+
+export interface FeedStatus {
+  acars: HeartbeatFeedStatus
+  mvt: HeartbeatFeedStatus
+  asmSsm: HeartbeatFeedStatus
+  wx: WxFeedStatus
+  computedAtUtc: string
 }
 
 export interface MvtEtaInput {

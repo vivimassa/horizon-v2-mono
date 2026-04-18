@@ -128,6 +128,12 @@ export const queryKeys = {
     byFlight: (flightInstanceId: string) => ['movementMessages', 'byFlight', flightInstanceId] as const,
   },
 
+  // ─── Maintenance ───
+  maintenanceEvents: {
+    all: ['maintenanceEvents'] as const,
+    list: (params?: Record<string, unknown>) => ['maintenanceEvents', 'list', params ?? {}] as const,
+  },
+
   // ─── Slots ───
   slots: {
     airports: ['slots', 'airports'] as const,

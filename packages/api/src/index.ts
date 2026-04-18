@@ -127,6 +127,10 @@ export type {
   DisruptionActivityRef,
   NonCrewPersonRef,
   NonCrewPersonCreate,
+  FeedState,
+  FeedStatus,
+  HeartbeatFeedStatus,
+  WxFeedStatus,
 } from './client'
 
 // ─── React Query layer ───

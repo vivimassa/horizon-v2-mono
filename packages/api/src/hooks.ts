@@ -39,6 +39,7 @@ import type {
   CreateMovementMessageResult,
   ParseInboundResult,
   ApplyInboundResult,
+  FeedStatus,
 } from './client'
 
 // ─── Stale time constants ───
@@ -273,6 +274,20 @@ export function useMovementMessageStats(
   })
 }
 
+/**
+ * Real-time health of the four OCC dashboard feeds (ACARS / MVT / ASM-SSM / WX).
+ * Refetches every 15 seconds so the dashboard dots flip within one poll cycle
+ * of an upstream gateway going down.
+ */
+export function useFeedStatus() {
+  return useQuery<FeedStatus>({
+    queryKey: ['feed-status'],
+    queryFn: () => api.getFeedStatus(),
+    refetchInterval: 15_000,
+    staleTime: 10_000,
+  })
+}
+
 export function useHeldMovementMessages(operatorId: string) {
   return useQuery<{ messages: MovementMessageRef[] }>({
     queryKey: queryKeys.movementMessages.held(operatorId),
@@ -339,6 +354,25 @@ export function useTransmitMovementMessage() {
 export function useParseInboundTelex() {
   return useMutation<ParseInboundResult, Error, string>({
     mutationFn: (rawMessage: string) => api.parseInboundTelex(rawMessage),
+  })
+}
+
+// ─── Maintenance events ───
+export function useMaintenanceEvents(params: {
+  operatorId: string
+  dateFrom: string
+  dateTo: string
+  aircraftTypeId?: string
+  base?: string
+  checkTypeId?: string
+  status?: string
+  sortBy?: string
+}) {
+  return useQuery({
+    queryKey: queryKeys.maintenanceEvents.list(params as unknown as Record<string, unknown>),
+    queryFn: () => api.getMaintenanceEvents(params),
+    enabled: !!params.operatorId && !!params.dateFrom && !!params.dateTo,
+    staleTime: OPERATIONAL_STALE,
   })
 }
 

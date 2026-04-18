@@ -11,6 +11,8 @@ export async function fetchGanttFlights(params: {
   scenarioId?: string
   acTypeFilter?: string[]
   statusFilter?: string[]
+  /** When true, response includes delays[], depGate, arrGate, disruptionKind for OCC Dashboard. */
+  includeOcc?: boolean
 }): Promise<GanttApiResponse> {
   const qs = new URLSearchParams({
     operatorId: params.operatorId,
@@ -20,6 +22,7 @@ export async function fetchGanttFlights(params: {
   if (params.scenarioId) qs.set('scenarioId', params.scenarioId)
   if (params.acTypeFilter?.length) qs.set('acTypeFilter', params.acTypeFilter.join(','))
   if (params.statusFilter?.length) qs.set('statusFilter', params.statusFilter.join(','))
+  if (params.includeOcc) qs.set('includeOcc', '1')
 
   const res = await authedFetch(`${API_BASE}/gantt/flights?${qs}`)
   if (!res.ok) {

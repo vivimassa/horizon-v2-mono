@@ -328,6 +328,86 @@ function CellContent({
         </span>
       )
     }
+    case 'atd':
+    case 'tkof':
+    case 'tdown':
+    case 'ata': {
+      const ms =
+        colId === 'atd'
+          ? flight.actual?.atdUtc
+          : colId === 'tkof'
+            ? flight.actual?.offUtc
+            : colId === 'tdown'
+              ? flight.actual?.onUtc
+              : flight.actual?.ataUtc
+      if (!ms) return <span className="text-[13px] text-hz-text-tertiary">-</span>
+      const utcHhmm = utcMsToHhmm(ms)
+      const stationIcao = colId === 'atd' || colId === 'tkof' ? flight.dep.icao : flight.arr.icao
+      const stationOffset = airportMap[stationIcao]?.utcOffset ?? 0
+      return (
+        <TimeCell
+          utcHhmm={utcHhmm}
+          activeModes={activeModes}
+          homeBaseOffset={homeBaseOffset}
+          stationOffset={stationOffset}
+        />
+      )
+    }
+    case 'paxExp':
+    case 'paxAct': {
+      const isExp = colId === 'paxExp'
+      const p = flight.pax
+      const total =
+        p &&
+        ((isExp ? p.adultExpected : p.adultActual) ?? 0) +
+          ((isExp ? p.childExpected : p.childActual) ?? 0) +
+          ((isExp ? p.infantExpected : p.infantActual) ?? 0)
+      const lopa = flight.lopa?.cabins ?? []
+      const lopaStr = lopa.length ? lopa.map((c) => c.seats).join('/') : '—'
+      if (!total && total !== 0) {
+        return (
+          <span className="text-[13px] text-hz-text-tertiary">
+            <span className="text-hz-text-tertiary">-</span>
+            <span className="ml-1.5 text-[13px] text-hz-text-tertiary">({lopaStr})</span>
+          </span>
+        )
+      }
+      return (
+        <span className="text-[13px] text-hz-text font-medium">
+          {total}
+          <span className="ml-1.5 text-hz-text-tertiary font-normal">({lopaStr})</span>
+        </span>
+      )
+    }
+    case 'lf': {
+      const p = flight.pax
+      const act = (p?.adultActual ?? 0) + (p?.childActual ?? 0) + (p?.infantActual ?? 0) || 0
+      const seats = flight.lopa?.totalSeats ?? 0
+      if (!seats) return <span className="text-[13px] text-hz-text-tertiary">-</span>
+      const pct = Math.round((act / seats) * 1000) / 10
+      const color = pct >= 85 ? '#06C270' : pct >= 65 ? '#FF8800' : '#FF3B3B'
+      return (
+        <span className="text-[13px] font-semibold" style={{ color }}>
+          {pct}%
+        </span>
+      )
+    }
+    case 'fuelInitial':
+    case 'fuelUplift':
+    case 'fuelBurn':
+    case 'fuelPlan': {
+      const f = flight.fuel
+      const v =
+        colId === 'fuelInitial'
+          ? f?.initial
+          : colId === 'fuelUplift'
+            ? f?.uplift
+            : colId === 'fuelBurn'
+              ? f?.burn
+              : f?.flightPlan
+      if (v == null) return <span className="text-[13px] text-hz-text-tertiary">-</span>
+      return <span className="text-[13px] text-hz-text font-medium">{Math.round(v).toLocaleString()}</span>
+    }
     default:
       return null
   }

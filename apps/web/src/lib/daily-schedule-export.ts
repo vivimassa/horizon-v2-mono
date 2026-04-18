@@ -80,6 +80,57 @@ function buildCellValue(flight: Flight, colId: ColumnId, ctx: ExportContext): st
       const arrC = ctx.airportMap[flight.arr.icao]?.countryId
       return depC != null && depC === arrC ? 'DOM' : 'INT'
     }
+    case 'atd':
+    case 'tkof':
+    case 'tdown':
+    case 'ata': {
+      const ms =
+        colId === 'atd'
+          ? flight.actual?.atdUtc
+          : colId === 'tkof'
+            ? flight.actual?.offUtc
+            : colId === 'tdown'
+              ? flight.actual?.onUtc
+              : flight.actual?.ataUtc
+      if (!ms) return ''
+      return utcMsToHhmm(ms)
+    }
+    case 'paxExp':
+    case 'paxAct': {
+      const isExp = colId === 'paxExp'
+      const p = flight.pax
+      const total =
+        ((isExp ? p?.adultExpected : p?.adultActual) ?? 0) +
+        ((isExp ? p?.childExpected : p?.childActual) ?? 0) +
+        ((isExp ? p?.infantExpected : p?.infantActual) ?? 0)
+      const lopa = flight.lopa?.cabins ?? []
+      const lopaStr = lopa.length ? lopa.map((c) => c.seats).join('/') : ''
+      if (!total) return lopaStr ? `0 (${lopaStr})` : ''
+      return lopaStr ? `${total} (${lopaStr})` : String(total)
+    }
+    case 'lf': {
+      const p = flight.pax
+      const act = (p?.adultActual ?? 0) + (p?.childActual ?? 0) + (p?.infantActual ?? 0)
+      const seats = flight.lopa?.totalSeats ?? 0
+      if (!seats) return ''
+      return `${Math.round((act / seats) * 1000) / 10}%`
+    }
+    case 'fuelInitial':
+    case 'fuelUplift':
+    case 'fuelBurn':
+    case 'fuelPlan': {
+      const f = flight.fuel
+      const v =
+        colId === 'fuelInitial'
+          ? f?.initial
+          : colId === 'fuelUplift'
+            ? f?.uplift
+            : colId === 'fuelBurn'
+              ? f?.burn
+              : f?.flightPlan
+      if (v == null) return ''
+      return String(Math.round(v))
+    }
     default:
       return ''
   }

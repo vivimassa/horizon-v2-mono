@@ -25,6 +25,8 @@ const flightsQuerySchema = z.object({
   scenarioId: z.string().optional(),
   acTypeFilter: z.string().optional(),
   statusFilter: z.string().optional(),
+  /** When '1', include delays[], gate, and disruption on each flight for OCC Dashboard use. */
+  includeOcc: z.string().optional(),
 })
 
 const assignSchema = z.object({
@@ -76,7 +78,8 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
         details: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
       })
     }
-    const { operatorId, from, to, scenarioId, acTypeFilter, statusFilter } = parsed.data
+    const { operatorId, from, to, scenarioId, acTypeFilter, statusFilter, includeOcc } = parsed.data
+    const occ = includeOcc === '1'
 
     // Build ScheduledFlight filter
     // Date range filtering done in JS expansion loop (DB stores DD/MM/YYYY and ISO inconsistently)
@@ -105,19 +108,38 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
               $lte: to,
             },
           },
-          {
-            _id: 1,
-            'tail.registration': 1,
-            'tail.icaoType': 1,
-            status: 1,
-            'actual.atdUtc': 1,
-            'actual.offUtc': 1,
-            'actual.onUtc': 1,
-            'actual.ataUtc': 1,
-            'estimated.etdUtc': 1,
-            'estimated.etaUtc': 1,
-            isProtected: 1,
-          },
+          occ
+            ? {
+                _id: 1,
+                'tail.registration': 1,
+                'tail.icaoType': 1,
+                status: 1,
+                'actual.atdUtc': 1,
+                'actual.offUtc': 1,
+                'actual.onUtc': 1,
+                'actual.ataUtc': 1,
+                'estimated.etdUtc': 1,
+                'estimated.etaUtc': 1,
+                isProtected: 1,
+                delays: 1,
+                'depInfo.gate': 1,
+                'arrInfo.gate': 1,
+                'disruption.kind': 1,
+                'disruption.appliedAt': 1,
+              }
+            : {
+                _id: 1,
+                'tail.registration': 1,
+                'tail.icaoType': 1,
+                status: 1,
+                'actual.atdUtc': 1,
+                'actual.offUtc': 1,
+                'actual.onUtc': 1,
+                'actual.ataUtc': 1,
+                'estimated.etdUtc': 1,
+                'estimated.etaUtc': 1,
+                isProtected: 1,
+              },
         ).lean(),
         Operator.findById(operatorId, { countryIso2: 1 }).lean(),
         LopaConfig.find({ operatorId, isActive: true }, { _id: 1, aircraftType: 1, cabins: 1, isDefault: 1 }).lean(),
@@ -126,7 +148,7 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
 
     const operatorCountry = (operator?.countryIso2 as string) ?? null
 
-    // Build instance overlay map: compositeId → { reg, cancelled, actual/estimated times }
+    // Build instance overlay map: compositeId → { reg, cancelled, actual/estimated times, + OCC extras }
     const instanceMap = new Map<
       string,
       {
@@ -139,6 +161,11 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
         etdUtc: number | null
         etaUtc: number | null
         isProtected: boolean
+        delays?: { code: string; minutes: number; category: string }[]
+        depGate?: string | null
+        arrGate?: string | null
+        disruptionKind?: 'none' | 'divert' | 'airReturn' | 'rampReturn'
+        disruptionAppliedAt?: number | null
       }
     >()
     for (const inst of instances) {
@@ -146,6 +173,8 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       const a = (inst as any).actual
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const e = (inst as any).estimated
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const anyInst = inst as any
       instanceMap.set(inst._id as string, {
         reg: inst.tail?.registration ?? null,
         cancelled: inst.status === 'cancelled',
@@ -155,7 +184,22 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
         ataUtc: a?.ataUtc ?? null,
         etdUtc: e?.etdUtc ?? null,
         etaUtc: e?.etaUtc ?? null,
-        isProtected: !!(inst as any).isProtected,
+        isProtected: !!anyInst.isProtected,
+        ...(occ
+          ? {
+              delays: Array.isArray(anyInst.delays)
+                ? anyInst.delays.map((d: { code?: string; minutes?: number; category?: string }) => ({
+                    code: d.code ?? '',
+                    minutes: Number(d.minutes ?? 0),
+                    category: d.category ?? '',
+                  }))
+                : [],
+              depGate: anyInst.depInfo?.gate ?? null,
+              arrGate: anyInst.arrInfo?.gate ?? null,
+              disruptionKind: anyInst.disruption?.kind ?? 'none',
+              disruptionAppliedAt: anyInst.disruption?.appliedAt ?? null,
+            }
+          : {}),
       })
     }
 
@@ -240,6 +284,15 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
           etdUtc: inst?.etdUtc ?? null,
           etaUtc: inst?.etaUtc ?? null,
           isProtected: inst?.isProtected ?? false,
+          ...(occ
+            ? {
+                delays: inst?.delays ?? [],
+                depGate: inst?.depGate ?? null,
+                arrGate: inst?.arrGate ?? null,
+                disruptionKind: inst?.disruptionKind ?? 'none',
+                disruptionAppliedAt: inst?.disruptionAppliedAt ?? null,
+              }
+            : {}),
         })
       }
     }

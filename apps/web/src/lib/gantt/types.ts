@@ -41,6 +41,18 @@ export interface GanttFlight {
   slotSeriesId?: string | null
   /** Flight protected from disruption solver — will never be delayed/cancelled/swapped */
   isProtected?: boolean
+
+  // ── OCC Dashboard extras (present only when fetched with includeOcc=1) ──
+  /** Delay entries captured against this flight — code is AHM 730/731 or 732 depending on operator config. */
+  delays?: { code: string; minutes: number; category: string }[]
+  /** Departure gate (free-text). */
+  depGate?: string | null
+  /** Arrival gate (free-text). */
+  arrGate?: string | null
+  /** Applied disruption kind from Flight Information Dialog. */
+  disruptionKind?: 'none' | 'divert' | 'airReturn' | 'rampReturn'
+  /** Epoch ms when a disruption was applied (null if none). */
+  disruptionAppliedAt?: number | null
 }
 
 export interface GanttAircraft {

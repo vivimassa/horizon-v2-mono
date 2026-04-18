@@ -21,6 +21,20 @@ export const COLUMN_DEFS = [
   { id: 'svc', label: 'Flight Service Type', flex: 1.3 },
   { id: 'block', label: 'Block', flex: 0.7 },
   { id: 'route', label: 'Route', flex: 0.7 },
+  // OOOI
+  { id: 'atd', label: 'ATD', flex: 0.7 },
+  { id: 'tkof', label: 'TKOF', flex: 0.7 },
+  { id: 'tdown', label: 'TDOWN', flex: 0.7 },
+  { id: 'ata', label: 'ATA', flex: 0.7 },
+  // Load factor
+  { id: 'paxExp', label: 'Pax Exp (LOPA)', flex: 1.4 },
+  { id: 'paxAct', label: 'Pax Act (LOPA)', flex: 1.4 },
+  { id: 'lf', label: 'LF%', flex: 0.7 },
+  // Fuel
+  { id: 'fuelInitial', label: 'Fuel Init', flex: 0.8 },
+  { id: 'fuelUplift', label: 'Fuel Uplift', flex: 0.8 },
+  { id: 'fuelBurn', label: 'Fuel Burn', flex: 0.8 },
+  { id: 'fuelPlan', label: 'Fuel Plan', flex: 0.8 },
 ] as const
 
 export type ColumnId = (typeof COLUMN_DEFS)[number]['id']
@@ -141,7 +155,21 @@ export const useDailyScheduleStore = create<DailyScheduleState>((set, get) => ({
   timeModes: new Set<TimeMode>(['utc']),
   sortSequence: 'date-reg-std',
   columnOrder: [...DEFAULT_COLUMN_ORDER],
-  hiddenColumns: new Set<ColumnId>(['dow']),
+  hiddenColumns: new Set<ColumnId>([
+    'dow',
+    // OOOI / pax / fuel — hidden by default, user can toggle via Columns menu
+    'atd',
+    'tkof',
+    'tdown',
+    'ata',
+    'paxExp',
+    'paxAct',
+    'lf',
+    'fuelInitial',
+    'fuelUplift',
+    'fuelBurn',
+    'fuelPlan',
+  ]),
   compactMode: false,
 
   setFlights: (flights, airports, regs, acTypes) => {
@@ -219,7 +247,20 @@ export const useDailyScheduleStore = create<DailyScheduleState>((set, get) => ({
       timeModes: new Set<TimeMode>(['utc']),
       sortSequence: 'date-reg-std',
       columnOrder: [...DEFAULT_COLUMN_ORDER],
-      hiddenColumns: new Set<ColumnId>(['dow']),
+      hiddenColumns: new Set<ColumnId>([
+        'dow',
+        'atd',
+        'tkof',
+        'tdown',
+        'ata',
+        'paxExp',
+        'paxAct',
+        'lf',
+        'fuelInitial',
+        'fuelUplift',
+        'fuelBurn',
+        'fuelPlan',
+      ]),
       compactMode: false,
     }),
 }))

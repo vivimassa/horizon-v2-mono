@@ -5,7 +5,6 @@ import { useAuth } from './auth-provider'
 import { AnimatedBodyBg } from './AnimatedBodyBg'
 import { SpotlightDock } from './SpotlightDock'
 import { TopProgressBar } from './top-progress-bar'
-import { WelcomeOverlay } from './welcome-overlay'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
@@ -27,7 +26,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <TopProgressBar />
       <main className={`flex-1 overflow-y-auto ${isHome ? '' : 'pt-3'}`}>{children}</main>
       {!isHome && <SpotlightDock />}
-      <WelcomeOverlay />
     </>
   )
 }

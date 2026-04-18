@@ -169,17 +169,6 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
     module: 'network',
     level: 2,
   },
-  {
-    code: '1.2.5',
-    name: 'Change Log',
-    description: 'Timeline of schedule modifications',
-    icon: 'History',
-    route: '/network/tools/change-log',
-    parent_code: '1.2',
-    module: 'network',
-    level: 2,
-  },
-
   // 1.3 Reports
   {
     code: '1.3',

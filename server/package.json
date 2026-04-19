@@ -10,6 +10,8 @@
     "start": "node dist/index.js",
     "seed": "tsx src/seed.ts",
     "seed:user": "tsx src/seed-user.ts",
+    "seed:crew-a320-cp": "tsx src/seed-crew-a320-cp.ts",
+    "seed:crew-all-fleets": "tsx src/seed-crew-all-fleets.ts",
     "migrate": "tsx src/migrate-from-supabase.ts"
   },
   "dependencies": {

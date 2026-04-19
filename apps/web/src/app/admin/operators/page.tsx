@@ -1,10 +1,8 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { api, setApiBaseUrl, type OperatorRef } from '@skyhub/api'
+import { api, type OperatorRef } from '@skyhub/api'
 import { DataTable, type Column } from '@/components/admin/data-table'
-
-setApiBaseUrl('http://localhost:3002')
 
 const columns: Column<OperatorRef>[] = [
   {

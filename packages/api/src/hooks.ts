@@ -40,6 +40,13 @@ import type {
   ParseInboundResult,
   ApplyInboundResult,
   FeedStatus,
+  CrewListFilters,
+  CrewMemberListItemRef,
+  FullCrewProfileRef,
+  CrewDocumentFolderWithCountsRef,
+  CrewDocumentRef,
+  CrewDocumentStatusFilters,
+  CrewDocumentStatusRef,
 } from './client'
 
 // ─── Stale time constants ───
@@ -391,4 +398,201 @@ export function useApplyInboundMvtMessage() {
       }
     },
   })
+}
+
+// ─── Crew Profile (4.1.1) ───
+
+export function useCrewList(filters?: CrewListFilters) {
+  return useQuery<CrewMemberListItemRef[]>({
+    queryKey: queryKeys.crew.list(filters as Record<string, unknown> | undefined),
+    queryFn: () => api.getCrew(filters),
+    staleTime: REFERENCE_STALE,
+  })
+}
+
+export function useCrewProfile(id: string | null | undefined) {
+  return useQuery<FullCrewProfileRef>({
+    queryKey: queryKeys.crew.detail(id ?? ''),
+    queryFn: () => api.getCrewById(id as string),
+    enabled: !!id,
+    staleTime: 0,
+  })
+}
+
+export function useInvalidateCrew() {
+  const qc = useQueryClient()
+  return {
+    invalidateList: () => qc.invalidateQueries({ queryKey: queryKeys.crew.all }),
+    invalidateDetail: (id: string) => qc.invalidateQueries({ queryKey: queryKeys.crew.detail(id) }),
+  }
+}
+
+// ─── Crew Documents (4.1.2) ───
+
+export function useCrewDocumentFolders(crewId: string | null | undefined, parentId?: string | null) {
+  return useQuery<CrewDocumentFolderWithCountsRef[]>({
+    queryKey: queryKeys.crewDocuments.folders(crewId ?? '', parentId),
+    queryFn: () => api.getCrewDocumentFolders(crewId as string, parentId),
+    enabled: !!crewId,
+    staleTime: 30 * 1000, // 30s — folders change only on upload/delete which invalidates
+  })
+}
+
+export function useCrewDocuments(
+  crewId: string | null | undefined,
+  filters?: { folderId?: string; expiryCodeId?: string },
+) {
+  return useQuery<CrewDocumentRef[]>({
+    queryKey: queryKeys.crewDocuments.list(crewId ?? '', filters as Record<string, unknown> | undefined),
+    queryFn: () => api.getCrewDocuments(crewId as string, filters),
+    enabled: !!crewId && !!(filters?.folderId || filters?.expiryCodeId),
+    staleTime: 30 * 1000,
+  })
+}
+
+export function useCrewDocumentStatus(filters?: CrewDocumentStatusFilters) {
+  return useQuery<CrewDocumentStatusRef[]>({
+    queryKey: queryKeys.crewDocuments.status(filters as Record<string, unknown> | undefined),
+    queryFn: () => api.getCrewDocumentStatus(filters),
+    staleTime: 30 * 1000,
+  })
+}
+
+export function useInvalidateCrewDocuments() {
+  const qc = useQueryClient()
+  return {
+    invalidateAll: () => qc.invalidateQueries({ queryKey: queryKeys.crewDocuments.all }),
+    invalidateForCrew: (crewId: string) =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.crewDocuments.all }),
+        // Crew profile depends on the expiry rows too — refresh it so the
+        // Qualifications & Expiries tab reflects any new lastDone/expiryDate.
+        qc.invalidateQueries({ queryKey: queryKeys.crew.detail(crewId) }),
+      ]),
+  }
+}
+
+// ─── Manpower Planning (4.1.4) ───
+
+import type {
+  ManpowerPlanRef,
+  ManpowerPlanSettingsRef,
+  ManpowerPositionSettingsRef,
+  ManpowerFleetOverrideRef,
+  ManpowerFleetUtilizationRef,
+  ManpowerEventRef,
+  MppLeadTimeGroupRef,
+  MppLeadTimeItemRef,
+} from './client'
+
+export function useManpowerPlans(enabled = true) {
+  return useQuery<ManpowerPlanRef[]>({
+    queryKey: queryKeys.manpower.plans(''),
+    queryFn: () => api.getManpowerPlans(),
+    enabled,
+    staleTime: 30 * 1000,
+  })
+}
+
+export function useManpowerPlanSettings(planId: string | null | undefined) {
+  return useQuery<{
+    settings: ManpowerPlanSettingsRef | null
+    positionSettings: ManpowerPositionSettingsRef[]
+  }>({
+    queryKey: queryKeys.manpower.settings(planId ?? ''),
+    queryFn: () => api.getManpowerPlanSettings(planId as string),
+    enabled: !!planId,
+    staleTime: 30 * 1000,
+  })
+}
+
+export function useManpowerFleetOverrides(planId: string | null | undefined, year: number) {
+  return useQuery<ManpowerFleetOverrideRef[]>({
+    queryKey: queryKeys.manpower.fleetOverrides(planId ?? '', year),
+    queryFn: () => api.getManpowerFleetOverrides(planId as string, year),
+    enabled: !!planId,
+    staleTime: 30 * 1000,
+  })
+}
+
+export function useManpowerFleetUtilization(planId: string | null | undefined) {
+  return useQuery<ManpowerFleetUtilizationRef[]>({
+    queryKey: queryKeys.manpower.fleetUtilization(planId ?? ''),
+    queryFn: () => api.getManpowerFleetUtilization(planId as string),
+    enabled: !!planId,
+    staleTime: 30 * 1000,
+  })
+}
+
+export function useManpowerEvents(planId: string | null | undefined, year: number) {
+  return useQuery<ManpowerEventRef[]>({
+    queryKey: queryKeys.manpower.events(planId ?? '', year),
+    queryFn: () => api.getManpowerEvents(planId as string, year),
+    enabled: !!planId,
+    staleTime: 30 * 1000,
+  })
+}
+
+export function useManpowerScheduleBh(planId: string | null | undefined, year: number, enabled = true) {
+  return useQuery<Record<string, number[]>>({
+    queryKey: queryKeys.manpower.scheduleBh(planId ?? '', year),
+    queryFn: () => api.getManpowerScheduleBh(planId as string, year),
+    enabled: !!planId && enabled,
+    staleTime: 60 * 1000,
+  })
+}
+
+export function useManpowerCrewHeadcount(planId: string | null | undefined, year: number, enabled = true) {
+  return useQuery<Record<string, Record<string, number[]>>>({
+    queryKey: queryKeys.manpower.crewHeadcount(planId ?? '', year),
+    queryFn: () => api.getManpowerCrewHeadcount(planId as string, year),
+    enabled: !!planId && enabled,
+    staleTime: 60 * 1000,
+  })
+}
+
+export function useManpowerMonthlyAcCount(planId: string | null | undefined, year: number, enabled = true) {
+  return useQuery<Record<string, number[]>>({
+    queryKey: queryKeys.manpower.monthlyAcCount(planId ?? '', year),
+    queryFn: () => api.getManpowerMonthlyAcCount(planId as string, year),
+    enabled: !!planId && enabled,
+    staleTime: 60 * 1000,
+  })
+}
+
+export function useManpowerStandardComplements(planId: string | null | undefined) {
+  return useQuery<Record<string, Record<string, number>>>({
+    queryKey: queryKeys.manpower.standardComplements(planId ?? ''),
+    queryFn: () => api.getManpowerStandardComplements(planId as string),
+    enabled: !!planId,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useMppLeadTimeGroups(operatorId = '') {
+  return useQuery<MppLeadTimeGroupRef[]>({
+    queryKey: queryKeys.mppLeadTime.groups(operatorId),
+    queryFn: () => api.getMppLeadTimeGroups(operatorId),
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useMppLeadTimeItems(operatorId = '', groupId?: string) {
+  return useQuery<MppLeadTimeItemRef[]>({
+    queryKey: queryKeys.mppLeadTime.items(operatorId, groupId),
+    queryFn: () => api.getMppLeadTimeItems(operatorId, groupId),
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useInvalidateManpower() {
+  const qc = useQueryClient()
+  return {
+    invalidateAll: () => qc.invalidateQueries({ queryKey: queryKeys.manpower.all }),
+    invalidatePlan: (planId: string) => {
+      qc.invalidateQueries({ queryKey: queryKeys.manpower.settings(planId) })
+      qc.invalidateQueries({ queryKey: ['manpower', 'fleetOverrides', planId] })
+      qc.invalidateQueries({ queryKey: ['manpower', 'events', planId] })
+    },
+  }
 }

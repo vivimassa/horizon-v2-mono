@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo } from 'react'
-import { api, setApiBaseUrl } from '@skyhub/api'
+import { api } from '@skyhub/api'
 import type { AircraftTypeRef } from '@skyhub/api'
 import { useOperatorStore, getOperatorId } from '@/stores/use-operator-store'
 import { useScheduleRefStore } from '@/stores/use-schedule-ref-store'
@@ -27,8 +27,6 @@ import { FrequencyAnalysisPatternChart } from './frequency-analysis-pattern-char
 import { FrequencyAnalysisHeatmap } from './frequency-analysis-heatmap'
 import { FrequencyAnalysisRouteTable } from './frequency-analysis-route-table'
 import { exportCsv, exportPdf, exportXlsx } from '@/lib/frequency-analysis-export'
-
-setApiBaseUrl('http://localhost:3002')
 
 /**
  * Fallback colors when an aircraft type has no DB color configured. Curated

@@ -2,14 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, FileDown, FileSpreadsheet, FileText, ChevronDown } from 'lucide-react'
-import {
-  api,
-  setApiBaseUrl,
-  type AirportRef,
-  type AircraftTypeRef,
-  type CityPairRef,
-  type ScheduledFlightRef,
-} from '@skyhub/api'
+import { api, type AirportRef, type AircraftTypeRef, type CityPairRef, type ScheduledFlightRef } from '@skyhub/api'
 import { useOperatorStore, getOperatorId } from '@/stores/use-operator-store'
 import { useTheme } from '@/components/theme-provider'
 import { useRunwayLoading } from '@/hooks/use-runway-loading'
@@ -27,8 +20,6 @@ import { PublicTimetableFilterPanel } from './public-timetable-filter-panel'
 import { PublicTimetableTicket } from './public-timetable-ticket'
 import { PublicTimetableStub } from './public-timetable-stub'
 import { PublicTimetableFlightRow } from './public-timetable-flight-row'
-
-setApiBaseUrl('http://localhost:3002')
 
 export function PublicTimetableShell() {
   const { theme } = useTheme()

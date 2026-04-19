@@ -1,13 +1,11 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { api, setApiBaseUrl, type ActivityCodeGroupRef, type ActivityCodeRef } from '@skyhub/api'
+import { api, type ActivityCodeGroupRef, type ActivityCodeRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import { getOperatorId } from '@/stores/use-operator-store'
 import { ActivityCodeList } from './activity-code-list'
 import { ActivityCodeDetail } from './activity-code-detail'
-
-setApiBaseUrl('http://localhost:3002')
 
 export function ActivityCodesShell() {
   const [groups, setGroups] = useState<ActivityCodeGroupRef[]>([])

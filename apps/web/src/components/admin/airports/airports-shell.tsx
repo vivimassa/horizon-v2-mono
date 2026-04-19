@@ -1,12 +1,10 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { api, setApiBaseUrl, type AirportRef } from '@skyhub/api'
+import { api, type AirportRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import { AirportList } from './airport-list'
 import { AirportDetail } from './airport-detail'
-
-setApiBaseUrl('http://localhost:3002')
 
 export function AirportsShell() {
   const [airports, setAirports] = useState<AirportRef[]>([])

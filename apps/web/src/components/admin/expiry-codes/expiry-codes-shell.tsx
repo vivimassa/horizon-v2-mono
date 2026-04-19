@@ -1,15 +1,13 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { api, setApiBaseUrl, type ExpiryCodeRef, type ExpiryCodeCategoryRef } from '@skyhub/api'
+import { api, type ExpiryCodeRef, type ExpiryCodeCategoryRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import { accentTint } from '@skyhub/ui/theme'
 import { getOperatorId } from '@/stores/use-operator-store'
 import { FileCheck, Plus, Sparkles } from 'lucide-react'
 import { ExpiryCodeList } from './expiry-code-list'
 import { ExpiryCodeDetail } from './expiry-code-detail'
-
-setApiBaseUrl('http://localhost:3002')
 
 export const ACCENT = '#16a34a' // Crew Ops qualifications green
 

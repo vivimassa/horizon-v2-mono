@@ -14,6 +14,8 @@ type Tone = 'palette' | 'overlay'
 interface UserMenuProps {
   tone?: Tone
   align?: 'left' | 'right'
+  /** Phone variant: hide the name/role text, show only the avatar + chevron pill. */
+  compact?: boolean
 }
 
 /**
@@ -21,7 +23,7 @@ interface UserMenuProps {
  * Use tone="overlay" when placed over imagery (e.g. home hero); tone="palette" (default)
  * uses theme palette colors for standard topbar placement.
  */
-export function UserMenu({ tone = 'palette', align = 'right' }: UserMenuProps) {
+export function UserMenu({ tone = 'palette', align = 'right', compact = false }: UserMenuProps) {
   const router = useRouter()
   const { theme, toggle: toggleTheme } = useTheme()
   const isDark = theme === 'dark'
@@ -98,7 +100,7 @@ export function UserMenu({ tone = 'palette', align = 'right' }: UserMenuProps) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-3.5 rounded-full pl-5 pr-2 py-1.5 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] focus:outline-none"
+        className={`flex items-center rounded-full py-1.5 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] focus:outline-none ${compact ? 'gap-2 pl-2 pr-2' : 'gap-3.5 pl-5 pr-2'}`}
         style={{
           background: triggerBg,
           border: `1px solid ${triggerBorder}`,
@@ -114,21 +116,24 @@ export function UserMenu({ tone = 'palette', align = 'right' }: UserMenuProps) {
         }}
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label={compact ? fullName || 'Account menu' : undefined}
       >
-        <div className="text-right">
-          <div
-            className={`text-[13px] font-semibold leading-tight tracking-wide ${triggerName}`}
-            style={overlay ? undefined : { color: palette.text }}
-          >
-            {fullName}
+        {!compact && (
+          <div className="text-right">
+            <div
+              className={`text-[13px] font-semibold leading-tight tracking-wide ${triggerName}`}
+              style={overlay ? undefined : { color: palette.text }}
+            >
+              {fullName}
+            </div>
+            <div
+              className={`text-[11px] leading-tight capitalize mt-0.5 ${triggerRole}`}
+              style={overlay ? undefined : { color: palette.textSecondary }}
+            >
+              {userRole}
+            </div>
           </div>
-          <div
-            className={`text-[11px] leading-tight capitalize mt-0.5 ${triggerRole}`}
-            style={overlay ? undefined : { color: palette.textSecondary }}
-          >
-            {userRole}
-          </div>
-        </div>
+        )}
         <div
           className="w-9 h-9 rounded-full flex items-center justify-center relative"
           style={{

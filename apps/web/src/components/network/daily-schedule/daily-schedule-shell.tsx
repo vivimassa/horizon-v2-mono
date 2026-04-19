@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { api, setApiBaseUrl } from '@skyhub/api'
+import { api } from '@skyhub/api'
 import {
   useDailyScheduleStore,
   getFilteredFlights,
@@ -18,8 +18,6 @@ import { exportCsv, exportXlsx, exportPdf } from '@/lib/daily-schedule-export'
 import { FilterPanel } from './filter-panel'
 import { ReportToolbar } from './report-toolbar'
 import { ReportTable } from './report-table'
-
-setApiBaseUrl('http://localhost:3002')
 
 export function DailyScheduleShell() {
   const [hasLoaded, setHasLoaded] = useState(false)

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { api, setApiBaseUrl, type ScheduledFlightRef } from '@skyhub/api'
+import { api, type ScheduledFlightRef } from '@skyhub/api'
 import { useScheduleGridStore, createSmartRow, EMPTY_BUFFER_ROWS } from '@/stores/use-schedule-grid-store'
 import { useScheduleRefStore } from '@/stores/use-schedule-ref-store'
 import { useOperatorStore, getOperatorId } from '@/stores/use-operator-store'
@@ -21,8 +21,6 @@ import { SsimExportDialog } from './ssim-export-dialog'
 import { ScenarioPanel } from './scenario-panel'
 import { MessageDialog } from './message-dialog'
 import { Plus, RefreshCw } from 'lucide-react'
-
-setApiBaseUrl('http://localhost:3002')
 
 export function ScheduleGridShell() {
   const [saving, setSaving] = useState(false)

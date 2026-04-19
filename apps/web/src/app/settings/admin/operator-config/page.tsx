@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { api, getApiBaseUrl, setApiBaseUrl, type OperatorRef } from '@skyhub/api'
+import { api, getApiBaseUrl, type OperatorRef } from '@skyhub/api'
 import { authedFetch } from '@/lib/authed-fetch'
 import { MasterDetailLayout } from '@/components/layout'
 import { collapseDock } from '@/lib/dock-store'
@@ -30,8 +30,6 @@ import {
   Tag,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-
-setApiBaseUrl('http://localhost:3002')
 
 /* ── Section definitions ── */
 interface SectionDef {
@@ -499,7 +497,7 @@ function LogoUploadSection({
 
   const logoSrc = operator.logoUrl
     ? operator.logoUrl.startsWith('/uploads/')
-      ? `http://localhost:3002${operator.logoUrl}`
+      ? `${getApiBaseUrl()}${operator.logoUrl}`
       : operator.logoUrl
     : null
 

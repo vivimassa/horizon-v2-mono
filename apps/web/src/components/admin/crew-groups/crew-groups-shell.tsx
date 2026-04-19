@@ -1,15 +1,13 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { api, setApiBaseUrl, type CrewGroupRef } from '@skyhub/api'
+import { api, type CrewGroupRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import { accentTint } from '@skyhub/ui/theme'
 import { getOperatorId } from '@/stores/use-operator-store'
 import { Users, Plus, Sparkles } from 'lucide-react'
 import { CrewGroupList } from './crew-group-list'
 import { CrewGroupDetail } from './crew-group-detail'
-
-setApiBaseUrl('http://localhost:3002')
 
 export const ACCENT = '#7c3aed' // Crew Ops purple
 

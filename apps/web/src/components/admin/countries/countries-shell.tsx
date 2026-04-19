@@ -1,12 +1,10 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { api, setApiBaseUrl, type CountryRef } from '@skyhub/api'
+import { api, type CountryRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import { CountryList } from './country-list'
 import { CountryDetail } from './country-detail'
-
-setApiBaseUrl('http://localhost:3002')
 
 export function CountriesShell() {
   const [countries, setCountries] = useState<CountryRef[]>([])

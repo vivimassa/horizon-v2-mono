@@ -1,9 +1,22 @@
 /**
  * Sky Hub — API Client
- * Platform-agnostic. Base URL is injected by the consuming app.
+ * Platform-agnostic. Base URL is injected by the consuming app at startup
+ * (web: apps/web/src/lib/env.ts; mobile: apps/mobile/utils/api-url.ts).
+ *
+ * The default below reads build-time env vars as a safety net — if a module
+ * happens to import `api` before the startup bootstrap runs, requests still
+ * go to the right host in production instead of silently hitting localhost.
  */
 
-let _baseUrl = 'http://localhost:3002'
+function resolveDefaultBaseUrl(): string {
+  if (typeof process !== 'undefined' && process.env) {
+    const url = process.env.NEXT_PUBLIC_API_URL || process.env.EXPO_PUBLIC_API_URL
+    if (url) return url.replace(/\/$/, '')
+  }
+  return 'http://localhost:3002'
+}
+
+let _baseUrl = resolveDefaultBaseUrl()
 
 /** Call once at app startup to set the API base URL */
 export function setApiBaseUrl(url: string) {
@@ -2375,6 +2388,286 @@ export const api = {
     request<{ success: boolean }>(`/non-crew-people/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     }),
+
+  // ─── Crew (4.1.1 Crew Profile) ─────────────────────────
+  getCrew: (filters?: CrewListFilters) => {
+    const qs = new URLSearchParams()
+    if (filters?.base) qs.set('base', filters.base)
+    if (filters?.position) qs.set('position', filters.position)
+    if (filters?.status) qs.set('status', filters.status)
+    if (filters?.aircraftType) qs.set('aircraftType', filters.aircraftType)
+    if (filters?.search) qs.set('search', filters.search)
+    if (filters?.groupId) qs.set('groupId', filters.groupId)
+    const qstr = qs.toString()
+    return request<CrewMemberListItemRef[]>(`/crew${qstr ? `?${qstr}` : ''}`)
+  },
+  getCrewById: (id: string) => request<FullCrewProfileRef>(`/crew/${encodeURIComponent(id)}`),
+  createCrewMember: (data: CrewMemberCreate) =>
+    request<CrewMemberRef>('/crew', { method: 'POST', body: JSON.stringify(data) }),
+  updateCrewMember: (id: string, data: Partial<CrewMemberRef>) =>
+    request<CrewMemberRef>(`/crew/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteCrewMember: (id: string) =>
+    request<{ success: boolean }>(`/crew/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  syncCrewExpiries: (id: string) =>
+    request<{ success: boolean }>(`/crew/${encodeURIComponent(id)}/sync-expiries`, { method: 'POST' }),
+  deleteCrewAvatar: (id: string) =>
+    request<{ success: boolean }>(`/crew/${encodeURIComponent(id)}/avatar`, { method: 'DELETE' }),
+
+  // Sub-entity CRUD — each takes (crewId, payload) / (crewId, rowId) pattern.
+  addCrewPhone: (crewId: string, data: CrewPhoneInput) =>
+    request<CrewPhoneRef>(`/crew/${encodeURIComponent(crewId)}/phones`, { method: 'POST', body: JSON.stringify(data) }),
+  updateCrewPhone: (crewId: string, phoneId: string, data: Partial<CrewPhoneInput>) =>
+    request<CrewPhoneRef>(`/crew/${encodeURIComponent(crewId)}/phones/${phoneId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteCrewPhone: (crewId: string, phoneId: string) =>
+    request<{ success: boolean }>(`/crew/${encodeURIComponent(crewId)}/phones/${phoneId}`, { method: 'DELETE' }),
+
+  addCrewPassport: (crewId: string, data: CrewPassportInput) =>
+    request<CrewPassportRef>(`/crew/${encodeURIComponent(crewId)}/passports`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateCrewPassport: (crewId: string, passportId: string, data: Partial<CrewPassportInput>) =>
+    request<CrewPassportRef>(`/crew/${encodeURIComponent(crewId)}/passports/${passportId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteCrewPassport: (crewId: string, passportId: string) =>
+    request<{ success: boolean }>(`/crew/${encodeURIComponent(crewId)}/passports/${passportId}`, { method: 'DELETE' }),
+
+  addCrewLicense: (crewId: string, data: CrewLicenseInput) =>
+    request<CrewLicenseRef>(`/crew/${encodeURIComponent(crewId)}/licenses`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateCrewLicense: (crewId: string, licenseId: string, data: Partial<CrewLicenseInput>) =>
+    request<CrewLicenseRef>(`/crew/${encodeURIComponent(crewId)}/licenses/${licenseId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteCrewLicense: (crewId: string, licenseId: string) =>
+    request<{ success: boolean }>(`/crew/${encodeURIComponent(crewId)}/licenses/${licenseId}`, { method: 'DELETE' }),
+
+  addCrewVisa: (crewId: string, data: CrewVisaInput) =>
+    request<CrewVisaRef>(`/crew/${encodeURIComponent(crewId)}/visas`, { method: 'POST', body: JSON.stringify(data) }),
+  updateCrewVisa: (crewId: string, visaId: string, data: Partial<CrewVisaInput>) =>
+    request<CrewVisaRef>(`/crew/${encodeURIComponent(crewId)}/visas/${visaId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteCrewVisa: (crewId: string, visaId: string) =>
+    request<{ success: boolean }>(`/crew/${encodeURIComponent(crewId)}/visas/${visaId}`, { method: 'DELETE' }),
+
+  addCrewQualification: (crewId: string, data: CrewQualificationInput) =>
+    request<CrewQualificationRef>(`/crew/${encodeURIComponent(crewId)}/qualifications`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateCrewQualification: (crewId: string, qualId: string, data: Partial<CrewQualificationInput>) =>
+    request<CrewQualificationRef>(`/crew/${encodeURIComponent(crewId)}/qualifications/${qualId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteCrewQualification: (crewId: string, qualId: string) =>
+    request<{ success: boolean }>(`/crew/${encodeURIComponent(crewId)}/qualifications/${qualId}`, { method: 'DELETE' }),
+
+  updateCrewExpiryDate: (crewId: string, expiryId: string, data: CrewExpiryDateUpdate) =>
+    request<CrewExpiryDateRef>(`/crew/${encodeURIComponent(crewId)}/expiry-dates/${expiryId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  upsertCrewBlockHours: (crewId: string, data: CrewBlockHoursInput) =>
+    request<CrewBlockHoursRef>(`/crew/${encodeURIComponent(crewId)}/block-hours`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deleteCrewBlockHours: (crewId: string, rowId: string) =>
+    request<{ success: boolean }>(`/crew/${encodeURIComponent(crewId)}/block-hours/${rowId}`, { method: 'DELETE' }),
+
+  addCrewOnOffPattern: (crewId: string, data: CrewOnOffPatternInput) =>
+    request<CrewOnOffPatternRef>(`/crew/${encodeURIComponent(crewId)}/on-off-patterns`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deleteCrewOnOffPattern: (crewId: string, patternId: string) =>
+    request<{ success: boolean }>(`/crew/${encodeURIComponent(crewId)}/on-off-patterns/${patternId}`, {
+      method: 'DELETE',
+    }),
+
+  addCrewAirportRestriction: (crewId: string, data: CrewAirportRestrictionInput) =>
+    request<CrewAirportRestrictionRef>(`/crew/${encodeURIComponent(crewId)}/airport-restrictions`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deleteCrewAirportRestriction: (crewId: string, restrictionId: string) =>
+    request<{ success: boolean }>(`/crew/${encodeURIComponent(crewId)}/airport-restrictions/${restrictionId}`, {
+      method: 'DELETE',
+    }),
+
+  addCrewPairing: (crewId: string, data: CrewPairingInput) =>
+    request<CrewPairingRef>(`/crew/${encodeURIComponent(crewId)}/pairings`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deleteCrewPairing: (crewId: string, pairingId: string) =>
+    request<{ success: boolean }>(`/crew/${encodeURIComponent(crewId)}/pairings/${pairingId}`, { method: 'DELETE' }),
+
+  addCrewRuleset: (crewId: string, data: CrewRulesetInput) =>
+    request<CrewRulesetRef>(`/crew/${encodeURIComponent(crewId)}/rulesets`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deleteCrewRuleset: (crewId: string, rulesetId: string) =>
+    request<{ success: boolean }>(`/crew/${encodeURIComponent(crewId)}/rulesets/${rulesetId}`, { method: 'DELETE' }),
+
+  addCrewGroupAssignment: (crewId: string, data: CrewGroupAssignmentInput) =>
+    request<CrewGroupAssignmentRef>(`/crew/${encodeURIComponent(crewId)}/group-assignments`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deleteCrewGroupAssignment: (crewId: string, assignmentId: string) =>
+    request<{ success: boolean }>(`/crew/${encodeURIComponent(crewId)}/group-assignments/${assignmentId}`, {
+      method: 'DELETE',
+    }),
+
+  // ─── Crew Documents (4.1.2) ───────────────────────────
+  // NB: the upload endpoint is multipart/form-data; consumers should POST
+  // directly via `authedFetch` + FormData, using `getApiBaseUrl()`. The
+  // JSON-only helpers below cover list/folders/delete.
+  getCrewDocumentFolders: (crewId: string, parentId?: string | null) => {
+    const qs = parentId ? `?parentId=${encodeURIComponent(parentId)}` : ''
+    return request<CrewDocumentFolderWithCountsRef[]>(`/crew/${encodeURIComponent(crewId)}/document-folders${qs}`)
+  },
+  getCrewDocuments: (crewId: string, params?: { folderId?: string; expiryCodeId?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.folderId) qs.set('folderId', params.folderId)
+    if (params?.expiryCodeId) qs.set('expiryCodeId', params.expiryCodeId)
+    const qstr = qs.toString()
+    return request<CrewDocumentRef[]>(`/crew/${encodeURIComponent(crewId)}/documents${qstr ? `?${qstr}` : ''}`)
+  },
+  deleteCrewDocument: (crewId: string, docId: string) =>
+    request<{ success: boolean }>(`/crew/${encodeURIComponent(crewId)}/documents/${encodeURIComponent(docId)}`, {
+      method: 'DELETE',
+    }),
+  createCrewSubfolder: (crewId: string, data: { parentId: string; name: string }) =>
+    request<CrewDocumentFolderRef>(`/crew/${encodeURIComponent(crewId)}/document-folders`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getCrewDocumentStatus: (filters?: CrewDocumentStatusFilters) => {
+    const qs = new URLSearchParams()
+    if (filters?.base) qs.set('base', filters.base)
+    if (filters?.position) qs.set('position', filters.position)
+    if (filters?.status) qs.set('status', filters.status)
+    if (filters?.groupId) qs.set('groupId', filters.groupId)
+    if (filters?.documentStatus && filters.documentStatus.length > 0)
+      qs.set('documentStatus', filters.documentStatus.join(','))
+    if (filters?.expiryFrom) qs.set('expiryFrom', filters.expiryFrom)
+    if (filters?.expiryTo) qs.set('expiryTo', filters.expiryTo)
+    if (filters?.search) qs.set('search', filters.search)
+    const qstr = qs.toString()
+    return request<CrewDocumentStatusRef[]>(`/crew-document-status${qstr ? `?${qstr}` : ''}`)
+  },
+
+  // ─── Manpower Planning (4.1.4) ───────────────────────
+  getManpowerPlans: () => request<ManpowerPlanRef[]>('/manpower/plans'),
+  createManpowerPlan: (data: { name: string; color?: string; sourceId?: string; year?: number }) =>
+    request<ManpowerPlanRef>('/manpower/plans', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateManpowerPlan: (id: string, data: Partial<Omit<ManpowerPlanRef, '_id' | 'operatorId'>>) =>
+    request<ManpowerPlanRef>(`/manpower/plans/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteManpowerPlan: (id: string) =>
+    request<{ success: boolean }>(`/manpower/plans/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+  getManpowerPlanSettings: (planId: string) =>
+    request<{
+      settings: ManpowerPlanSettingsRef | null
+      positionSettings: ManpowerPositionSettingsRef[]
+    }>(`/manpower/plans/${encodeURIComponent(planId)}/settings`),
+  saveManpowerPlanSettings: (
+    planId: string,
+    data: Partial<Pick<ManpowerPlanSettingsRef, 'wetLeaseActive' | 'naOtherIsDrain'>>,
+  ) =>
+    request<ManpowerPlanSettingsRef>(`/manpower/plans/${encodeURIComponent(planId)}/settings`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  saveManpowerPositionSettings: (
+    planId: string,
+    positionId: string,
+    data: Partial<Omit<ManpowerPositionSettingsRef, '_id' | 'planId' | 'operatorId' | 'positionId'>>,
+  ) =>
+    request<ManpowerPositionSettingsRef>(
+      `/manpower/plans/${encodeURIComponent(planId)}/position-settings/${encodeURIComponent(positionId)}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+    ),
+  getManpowerFleetOverrides: (planId: string, year: number) =>
+    request<ManpowerFleetOverrideRef[]>(`/manpower/plans/${encodeURIComponent(planId)}/fleet-overrides?year=${year}`),
+  upsertManpowerFleetOverride: (
+    planId: string,
+    data: { aircraftTypeIcao: string; monthIndex: number; planYear: number; acCount: number },
+  ) =>
+    request<ManpowerFleetOverrideRef>(`/manpower/plans/${encodeURIComponent(planId)}/fleet-overrides`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deleteManpowerFleetOverride: (planId: string, overrideId: string) =>
+    request<{ success: boolean }>(
+      `/manpower/plans/${encodeURIComponent(planId)}/fleet-overrides/${encodeURIComponent(overrideId)}`,
+      { method: 'DELETE' },
+    ),
+  getManpowerFleetUtilization: (planId: string) =>
+    request<ManpowerFleetUtilizationRef[]>(`/manpower/plans/${encodeURIComponent(planId)}/fleet-utilization`),
+  saveManpowerFleetUtilization: (planId: string, data: { aircraftTypeIcao: string; dailyUtilizationHours: number }) =>
+    request<ManpowerFleetUtilizationRef>(`/manpower/plans/${encodeURIComponent(planId)}/fleet-utilization`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  getManpowerEvents: (planId: string, year: number) =>
+    request<ManpowerEventRef[]>(`/manpower/plans/${encodeURIComponent(planId)}/events?year=${year}`),
+  createManpowerEvent: (
+    planId: string,
+    data: Omit<ManpowerEventRef, '_id' | 'planId' | 'operatorId' | 'createdAt' | 'updatedAt'>,
+  ) =>
+    request<ManpowerEventRef>(`/manpower/plans/${encodeURIComponent(planId)}/events`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateManpowerEvent: (
+    planId: string,
+    eventId: string,
+    data: Partial<Omit<ManpowerEventRef, '_id' | 'planId' | 'operatorId' | 'createdAt' | 'updatedAt'>>,
+  ) =>
+    request<ManpowerEventRef>(`/manpower/plans/${encodeURIComponent(planId)}/events/${encodeURIComponent(eventId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteManpowerEvent: (planId: string, eventId: string) =>
+    request<{ success: boolean }>(
+      `/manpower/plans/${encodeURIComponent(planId)}/events/${encodeURIComponent(eventId)}`,
+      { method: 'DELETE' },
+    ),
+  getManpowerScheduleBh: (planId: string, year: number) =>
+    request<Record<string, number[]>>(`/manpower/plans/${encodeURIComponent(planId)}/schedule-bh?year=${year}`),
+  getManpowerCrewHeadcount: (planId: string, year: number) =>
+    request<Record<string, Record<string, number[]>>>(
+      `/manpower/plans/${encodeURIComponent(planId)}/crew-headcount?year=${year}`,
+    ),
+  getManpowerMonthlyAcCount: (planId: string, year: number) =>
+    request<Record<string, number[]>>(`/manpower/plans/${encodeURIComponent(planId)}/monthly-ac-count?year=${year}`),
+  getManpowerStandardComplements: (planId: string) =>
+    request<Record<string, Record<string, number>>>(
+      `/manpower/plans/${encodeURIComponent(planId)}/standard-complements`,
+    ),
 }
 
 // ── Non-Crew Person types ──
@@ -3549,4 +3842,455 @@ export interface ScheduleMessageSnapshot {
   staUtc: string
   aircraftTypeIcao: string
   status: string
+}
+
+// ─── Crew Profile Types (4.1.1) ───────────────────────────
+
+export interface CrewListFilters {
+  base?: string
+  position?: string
+  status?: string
+  aircraftType?: string
+  search?: string
+  groupId?: string
+}
+
+export interface CrewMemberRef {
+  _id: string
+  operatorId: string
+  employeeId: string
+  firstName: string
+  middleName: string | null
+  lastName: string
+  shortCode: string | null
+  gender: 'male' | 'female' | 'other' | null
+  dateOfBirth: string | null
+  nationality: string | null
+  base: string | null
+  position: string | null
+  status: 'active' | 'inactive' | 'suspended' | 'terminated'
+  employmentDate: string | null
+  exitDate: string | null
+  exitReason: string | null
+  contractType: string | null
+  seniority: number | null
+  seniorityGroup: number
+  languages: string[]
+  apisAlias: string | null
+  countryOfResidence: string | null
+  residencePermitNo: string | null
+  emailPrimary: string | null
+  emailSecondary: string | null
+  addressLine1: string | null
+  addressLine2: string | null
+  addressCity: string | null
+  addressState: string | null
+  addressZip: string | null
+  addressCountry: string | null
+  emergencyName: string | null
+  emergencyRelationship: string | null
+  emergencyPhone: string | null
+  noAccommodationAirports: string[]
+  transportRequired: boolean
+  hotelAtHomeBase: boolean
+  travelTimeMinutes: number | null
+  payrollNumber: string | null
+  minGuarantee: string | null
+  flyWithSeniorUntil: string | null
+  doNotScheduleAltPosition: string | null
+  standbyExempted: boolean
+  crewUnderTraining: boolean
+  noDomesticFlights: boolean
+  noInternationalFlights: boolean
+  maxLayoverStops: number | null
+  photoUrl: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CrewMemberCreate {
+  employeeId: string
+  firstName: string
+  lastName: string
+  middleName?: string | null
+  shortCode?: string | null
+  gender?: 'male' | 'female' | 'other' | null
+  dateOfBirth?: string | null
+  nationality?: string | null
+  base?: string | null
+  position?: string | null
+  status?: 'active' | 'inactive' | 'suspended' | 'terminated'
+  employmentDate?: string | null
+}
+
+export interface CrewMemberListItemRef extends CrewMemberRef {
+  acTypes: string[]
+  expiryAlertCount: number
+  baseLabel: string | null
+}
+
+export interface CrewPhoneRef {
+  _id: string
+  operatorId: string
+  crewId: string
+  priority: number
+  type: string
+  number: string
+  smsEnabled: boolean
+}
+export type CrewPhoneInput = Omit<CrewPhoneRef, '_id' | 'operatorId' | 'crewId'>
+
+export interface CrewPassportRef {
+  _id: string
+  operatorId: string
+  crewId: string
+  number: string
+  country: string
+  nationality: string | null
+  placeOfIssue: string | null
+  issueDate: string | null
+  expiry: string
+  isActive: boolean
+}
+export type CrewPassportInput = Omit<CrewPassportRef, '_id' | 'operatorId' | 'crewId'>
+
+export interface CrewLicenseRef {
+  _id: string
+  operatorId: string
+  crewId: string
+  number: string
+  type: string
+  country: string | null
+  placeOfIssue: string | null
+  issueDate: string | null
+  temporary: boolean
+}
+export type CrewLicenseInput = Omit<CrewLicenseRef, '_id' | 'operatorId' | 'crewId'>
+
+export interface CrewVisaRef {
+  _id: string
+  operatorId: string
+  crewId: string
+  country: string
+  type: string | null
+  number: string | null
+  issueDate: string | null
+  expiry: string
+}
+export type CrewVisaInput = Omit<CrewVisaRef, '_id' | 'operatorId' | 'crewId'>
+
+export interface CrewQualificationRef {
+  _id: string
+  operatorId: string
+  crewId: string
+  base: string | null
+  aircraftType: string
+  position: string
+  startDate: string
+  endDate: string | null
+  isPrimary: boolean
+  acFamilyQualified: boolean
+  trainingQuals: string[]
+}
+export type CrewQualificationInput = Omit<CrewQualificationRef, '_id' | 'operatorId' | 'crewId'>
+
+export interface CrewExpiryDateRef {
+  _id: string
+  operatorId: string
+  crewId: string
+  expiryCodeId: string
+  aircraftType: string
+  lastDone: string | null
+  baseMonth: string | null
+  expiryDate: string | null
+  nextPlanned: string | null
+  notes: string | null
+  isManualOverride: boolean
+}
+export interface CrewExpiryDateFullRef extends CrewExpiryDateRef {
+  codeLabel: string
+  codeName: string
+  categoryKey: string
+  categoryLabel: string
+  categoryColor: string
+  status: 'valid' | 'warning' | 'expired' | 'unknown'
+}
+export interface CrewExpiryDateUpdate {
+  expiryDate?: string | null
+  lastDone?: string | null
+  baseMonth?: string | null
+  nextPlanned?: string | null
+  notes?: string | null
+}
+
+export interface CrewGroupAssignmentRef {
+  _id: string
+  operatorId: string
+  crewId: string
+  groupId: string
+  startDate: string | null
+  endDate: string | null
+}
+export interface CrewGroupAssignmentFullRef extends CrewGroupAssignmentRef {
+  groupName: string
+}
+export type CrewGroupAssignmentInput = Omit<CrewGroupAssignmentRef, '_id' | 'operatorId' | 'crewId'>
+
+export interface CrewBlockHoursRef {
+  _id: string
+  operatorId: string
+  crewId: string
+  aircraftType: string
+  position: string
+  blockHours: string | null
+  trainingHours: string | null
+  firstFlight: string | null
+  lastFlight: string | null
+}
+export type CrewBlockHoursInput = Omit<CrewBlockHoursRef, '_id' | 'operatorId' | 'crewId'>
+
+export interface CrewOnOffPatternRef {
+  _id: string
+  operatorId: string
+  crewId: string
+  patternType: string
+  startDate: string
+  endDate: string | null
+  startingDay: number
+}
+export type CrewOnOffPatternInput = Omit<CrewOnOffPatternRef, '_id' | 'operatorId' | 'crewId'>
+
+export interface CrewAirportRestrictionRef {
+  _id: string
+  operatorId: string
+  crewId: string
+  airport: string
+  type: 'RESTRICTED' | 'PREFERRED'
+  startDate: string | null
+  endDate: string | null
+}
+export type CrewAirportRestrictionInput = Omit<CrewAirportRestrictionRef, '_id' | 'operatorId' | 'crewId'>
+
+export interface CrewPairingRef {
+  _id: string
+  operatorId: string
+  crewId: string
+  type: 'Same' | 'Not same'
+  what: 'Flights' | 'Offs'
+  pairedCrewId: string
+  startDate: string | null
+  endDate: string | null
+}
+export interface CrewPairingFullRef extends CrewPairingRef {
+  pairedCrewName: string
+}
+export type CrewPairingInput = Omit<CrewPairingRef, '_id' | 'operatorId' | 'crewId'>
+
+export interface CrewRulesetRef {
+  _id: string
+  operatorId: string
+  crewId: string
+  name: string
+  startDate: string
+  endDate: string | null
+}
+export type CrewRulesetInput = Omit<CrewRulesetRef, '_id' | 'operatorId' | 'crewId'>
+
+export interface FullCrewProfileRef {
+  member: CrewMemberRef
+  baseLabel: string | null
+  phones: CrewPhoneRef[]
+  passports: CrewPassportRef[]
+  licenses: CrewLicenseRef[]
+  visas: CrewVisaRef[]
+  qualifications: CrewQualificationRef[]
+  expiryDates: CrewExpiryDateFullRef[]
+  groupAssignments: CrewGroupAssignmentFullRef[]
+  rulesets: CrewRulesetRef[]
+  onOffPatterns: CrewOnOffPatternRef[]
+  airportRestrictions: CrewAirportRestrictionRef[]
+  pairings: CrewPairingFullRef[]
+  blockHours: CrewBlockHoursRef[]
+}
+
+// ─── Crew Documents Types (4.1.2) ─────────────────────────
+
+export interface CrewDocumentFolderRef {
+  _id: string
+  operatorId: string
+  parentId: string | null
+  name: string
+  slug: string
+  isSystem: boolean
+  sortOrder: number
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface CrewDocumentFolderWithCountsRef extends CrewDocumentFolderRef {
+  documentCount: number
+  subfolderCount: number
+  /** True when this entry is a virtual sub-folder synthesised from an
+   *  ExpiryCode (e.g. *CRM Training* under Training Documents). */
+  isVirtual: boolean
+  /** Only set on virtual sub-folders — matches `ExpiryCode._id`. */
+  expiryCodeId?: string
+  /** Only set on virtual sub-folders — the ExpiryCodeCategory key. */
+  expiryCategoryKey?: string | null
+}
+
+export interface CrewDocumentRef {
+  _id: string
+  operatorId: string
+  crewId: string
+  folderId: string
+  expiryCodeId: string | null
+  documentType: 'photo' | 'passport' | 'license' | 'medical' | 'training' | 'other'
+  fileName: string
+  storagePath: string
+  fileUrl: string // relative `/uploads/...` path; prefix with getApiBaseUrl() to render
+  fileSize: number
+  mimeType: string | null
+  description: string | null
+  uploadedAt: string
+  uploadedBy: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CrewDocumentUploadResult {
+  document: CrewDocumentRef
+  updatedExpiry: {
+    _id: string
+    operatorId: string
+    crewId: string
+    expiryCodeId: string
+    aircraftType: string
+    lastDone: string | null
+    expiryDate: string | null
+    baseMonth: string | null
+    nextPlanned: string | null
+    notes: string | null
+    isManualOverride: boolean
+  } | null
+}
+
+export type CrewDocumentStatusKey =
+  | 'missing_photo'
+  | 'missing_passport'
+  | 'missing_medical'
+  | 'missing_training'
+  | 'complete'
+
+export interface CrewDocumentStatusFilters {
+  base?: string
+  position?: string
+  status?: string
+  groupId?: string
+  /** Multi-select — server applies OR-semantics across selected keys. */
+  documentStatus?: CrewDocumentStatusKey[]
+  /** ISO YYYY-MM-DD. Narrows the list to crew whose *soonest training
+   *  expiry* falls in the given inclusive range. */
+  expiryFrom?: string
+  expiryTo?: string
+  search?: string
+}
+
+export interface CrewDocumentStatusRef {
+  _id: string
+  employeeId: string
+  firstName: string
+  middleName: string | null
+  lastName: string
+  position: string | null // crew position CODE (e.g. 'CP')
+  status: 'active' | 'inactive' | 'suspended' | 'terminated'
+  photoUrl: string | null
+  baseLabel: string | null
+  hasPhoto: boolean
+  hasPassport: boolean
+  hasMedical: boolean
+  hasTraining: boolean
+  coverage: number // 0..100
+  /** ISO YYYY-MM-DD of the soonest training-code expiry the crew is
+   *  approaching or has missed. null when no training expiry rows exist. */
+  soonestTrainingExpiry: string | null
+  expiredTrainingCount: number
+  warningTrainingCount: number
+}
+
+// ─── Manpower Planning Types (4.1.4) ──────────────────────
+
+export interface ManpowerPlanRef {
+  _id: string
+  operatorId: string
+  name: string
+  color: string
+  isBasePlan: boolean
+  sortOrder: number
+  year: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ManpowerPlanSettingsRef {
+  _id: string
+  planId: string
+  operatorId: string
+  wetLeaseActive: boolean
+  naOtherIsDrain: boolean
+  updatedAt: string
+}
+
+export interface ManpowerPositionSettingsRef {
+  _id: string
+  planId: string
+  positionId: string
+  operatorId: string
+  bhTarget: number
+  naSick: number
+  naAnnual: number
+  naTraining: number
+  naMaternity: number
+  naAttrition: number
+  naOther: number
+  updatedAt: string
+}
+
+export interface ManpowerFleetOverrideRef {
+  _id: string
+  planId: string
+  operatorId: string
+  aircraftTypeIcao: string
+  monthIndex: number
+  planYear: number
+  acCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ManpowerFleetUtilizationRef {
+  _id: string
+  planId: string
+  operatorId: string
+  aircraftTypeIcao: string
+  dailyUtilizationHours: number
+  updatedAt: string
+}
+
+export type ManpowerEventType = 'AOC' | 'CUG' | 'CCQ' | 'ACMI' | 'DRY' | 'DOWNSIZE' | 'RESIGN' | 'DELIVERY'
+
+export interface ManpowerEventRef {
+  _id: string
+  planId: string
+  operatorId: string
+  eventType: ManpowerEventType
+  monthIndex: number
+  planYear: number
+  count: number
+  fleetIcao: string | null
+  positionName: string | null
+  leadMonths: number
+  notes: string | null
+  createdAt: string
+  updatedAt: string
 }

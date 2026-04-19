@@ -43,6 +43,11 @@ import { mlRoutes } from './routes/ml.js'
 import { weatherRoutes } from './routes/weather.js'
 import { feedRoutes } from './routes/feeds.js'
 import { nonCrewPeopleRoutes } from './routes/non-crew-people.js'
+import { crewRoutes } from './routes/crew.js'
+import { crewDocumentsRoutes } from './routes/crew-documents.js'
+import { ensureSystemFolders } from './services/ensure-crew-document-folders.js'
+import { manpowerRoutes } from './routes/manpower.js'
+import { ensureManpowerBasePlan } from './services/ensure-manpower-base-plan.js'
 import { startWeatherPoll } from './jobs/weather-poll.js'
 import { startAutoTransmitScheduler } from './jobs/mvt-auto-transmit.js'
 import { startAsmSsmDeliveryScheduler } from './jobs/asm-ssm-deliver.js'
@@ -63,7 +68,7 @@ async function main(): Promise<void> {
   await app.register(jwt, {
     secret: env.JWT_SECRET,
   })
-  await app.register(multipart, { limits: { fileSize: 2 * 1024 * 1024 } }) // 2MB
+  await app.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } }) // 20MB — covers crew documents (PDFs, scans)
   await app.register(fastifyStatic, {
     root: uploadsDir,
     prefix: '/uploads/',
@@ -117,6 +122,23 @@ async function main(): Promise<void> {
   await app.register(weatherRoutes)
   await app.register(feedRoutes)
   await app.register(nonCrewPeopleRoutes)
+  await app.register(crewRoutes)
+  await app.register(crewDocumentsRoutes)
+  await app.register(manpowerRoutes)
+
+  // ── Bootstrap: ensure every active operator has the 4 system document
+  // folders (Crew Photos / Passports & Licenses / Medical Certificates /
+  // Training Documents). Idempotent; safe to run on every boot.
+  try {
+    const { Operator: Op } = await import('./models/Operator.js')
+    const operators = await Op.find({ isActive: { $ne: false } }, { _id: 1 }).lean()
+    for (const op of operators) await ensureSystemFolders(op._id as string)
+    console.log(`✓ Ensured system document folders for ${operators.length} operator(s)`)
+    for (const op of operators) await ensureManpowerBasePlan(op._id as string)
+    console.log(`✓ Ensured manpower base plans for ${operators.length} operator(s)`)
+  } catch (e) {
+    console.error('  ensureSystemFolders bootstrap error:', (e as Error).message)
+  }
 
   // Start
   await app.listen({ port, host: '0.0.0.0' })

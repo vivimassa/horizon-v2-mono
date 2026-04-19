@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import type { AircraftRegistrationRef, AircraftTypeRef, LopaConfigRef, CabinClassRef } from '@skyhub/api'
-import { api } from '@skyhub/api'
+import { api, getApiBaseUrl } from '@skyhub/api'
 import { FieldRow } from '../airports/field-row'
 import { AircraftSeatMap } from '../lopa/aircraft-seat-map'
 import { getOperatorId } from '@/stores/use-operator-store'
@@ -986,7 +986,7 @@ function ImageDropZone({
   const [uploading, setUploading] = useState(false)
   const hasCustomImage = !!registration.imageUrl
   const imgSrc = hasCustomImage
-    ? `http://localhost:3002${registration.imageUrl}`
+    ? `${getApiBaseUrl()}${registration.imageUrl}`
     : `/assets/aircraft/${acType.icaoType}.png`
 
   const handleUpload = async (file: File) => {

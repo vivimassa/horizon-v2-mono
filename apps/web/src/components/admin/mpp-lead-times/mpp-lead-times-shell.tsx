@@ -1,12 +1,10 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { api, setApiBaseUrl, type MppLeadTimeGroupRef, type MppLeadTimeItemRef } from '@skyhub/api'
+import { api, type MppLeadTimeGroupRef, type MppLeadTimeItemRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import { MppGroupList } from './mpp-group-list'
 import { MppGroupDetail } from './mpp-group-detail'
-
-setApiBaseUrl('http://localhost:3002')
 
 export function MppLeadTimesShell() {
   const [groups, setGroups] = useState<MppLeadTimeGroupRef[]>([])

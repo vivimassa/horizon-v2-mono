@@ -17,10 +17,13 @@ interface ThemeState {
 }
 
 export const useThemeStore = create<ThemeState>((set) => ({
-  colorMode: 'light',
+  // Dark-first default — the SkyHub hub, wallpapers, glass and accent glows
+  // are all designed against a dark background. Consumers on web still flip
+  // to light via `setColorMode('light')`.
+  colorMode: 'dark',
   accentColor: colors.defaultAccent,
   backgroundPreset: 'aurora',
-  palette: colors.light,
+  palette: colors.dark,
   setColorMode: (mode) => set({ colorMode: mode, palette: colors[mode] }),
   toggleColorMode: () =>
     set((s) => {

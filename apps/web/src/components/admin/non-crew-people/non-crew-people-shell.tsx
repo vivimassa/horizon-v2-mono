@@ -1,12 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { api, setApiBaseUrl, type NonCrewPersonCreate, type NonCrewPersonRef } from '@skyhub/api'
+import { api, type NonCrewPersonCreate, type NonCrewPersonRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import { NonCrewPeopleList } from './non-crew-people-list'
 import { NonCrewPeopleDetail } from './non-crew-people-detail'
-
-setApiBaseUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002')
 
 // Sentinel id for an unsaved draft row.
 export const DRAFT_ID = '__draft__'

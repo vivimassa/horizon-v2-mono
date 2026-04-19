@@ -23,15 +23,18 @@ interface TabBarProps {
 }
 
 export function TabBar({ tabs, activeTab, onTabChange, stretch = false }: TabBarProps) {
-  const { palette, accentColor } = useTheme()
+  const { palette, accentColor, isDark } = useTheme()
+
+  // Inactive text/icon — bump contrast on dark mode so labels don't fade out.
+  const inactiveColor = isDark ? 'rgba(255,255,255,0.55)' : palette.textSecondary
+  const indicatorHeight = 3
 
   const content = (
     <View
       style={{
         flexDirection: 'row',
-        gap: 4,
         borderBottomWidth: 1,
-        borderBottomColor: palette.border,
+        borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : palette.border,
       }}
     >
       {tabs.map((tab) => {
@@ -45,32 +48,41 @@ export function TabBar({ tabs, activeTab, onTabChange, stretch = false }: TabBar
             accessibilityState={{ selected: active }}
             style={({ pressed }) => ({
               flex: stretch ? 1 : undefined,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
-              paddingHorizontal: 14,
-              paddingVertical: 10,
-              borderBottomWidth: 2,
+              borderBottomWidth: indicatorHeight,
               borderBottomColor: active ? accentColor : 'transparent',
               marginBottom: -1,
               backgroundColor: pressed
-                ? accentTint(accentColor, 0.06)
+                ? accentTint(accentColor, isDark ? 0.12 : 0.08)
                 : active
-                  ? accentTint(accentColor, 0.04)
+                  ? accentTint(accentColor, isDark ? 0.1 : 0.05)
                   : 'transparent',
             })}
           >
-            {Icon ? (
-              <Icon size={15} color={active ? accentColor : palette.textSecondary} strokeWidth={active ? 2 : 1.75} />
-            ) : null}
-            <Text
-              variant="panelHeader"
-              color={active ? accentColor : palette.textSecondary}
-              style={{ fontWeight: active ? '700' : '500' }}
+            {/* Inner static View forces icon+label onto a single row — the
+               Pressable's style-as-function was dropping flexDirection on
+               some RN versions, stacking them vertically. Also gives a large
+               54px+ tap target (paddingVertical 16 + content ~22px). */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                paddingHorizontal: 18,
+                paddingVertical: 16,
+              }}
             >
-              {tab.label}
-            </Text>
+              {Icon ? (
+                <Icon size={17} color={active ? accentColor : inactiveColor} strokeWidth={active ? 2.25 : 1.9} />
+              ) : null}
+              <Text
+                variant="cardTitle"
+                color={active ? accentColor : inactiveColor}
+                style={{ fontWeight: active ? '700' : '600', letterSpacing: 0.2 }}
+              >
+                {tab.label}
+              </Text>
+            </View>
           </Pressable>
         )
       })}

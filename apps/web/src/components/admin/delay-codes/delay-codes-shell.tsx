@@ -1,15 +1,13 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { api, setApiBaseUrl, type DelayCodeRef } from '@skyhub/api'
+import { api, type DelayCodeRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import { useTheme } from '@/components/theme-provider'
 import { accentTint } from '@skyhub/ui/theme'
 import { FieldRow } from '../airports/field-row'
 import { getOperatorId } from '@/stores/use-operator-store'
 import { Search, Plus, Pencil, Save, X, Trash2, ChevronRight, Link, HelpCircle } from 'lucide-react'
-
-setApiBaseUrl('http://localhost:3002')
 
 // ── Category config ──
 const CATEGORY_COLORS: Record<string, string> = {

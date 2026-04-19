@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { api, setApiBaseUrl, type CarrierCodeRef } from '@skyhub/api'
+import { api, type CarrierCodeRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import {
   FieldRow,
@@ -14,8 +14,6 @@ import {
 } from '@/components/ui'
 import { getOperatorId } from '@/stores/use-operator-store'
 import { Building2, Info, Phone, Settings2, Clock, Plus, X } from 'lucide-react'
-
-setApiBaseUrl('http://localhost:3002')
 
 const CATEGORY_OPTIONS = [
   { label: 'Air', value: 'Air' },

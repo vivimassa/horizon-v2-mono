@@ -14,6 +14,10 @@ interface DockState {
   collapse: () => void
   expand: () => void
   toggle: () => void
+  /** Seed the initial collapse state from viewport width: tablet/desktop
+     (≥768) land collapsed so the hub isn't dominated by nav chrome; phone
+     (<768) stays expanded because the dock is the primary navigation. */
+  initForViewport: (width: number) => void
 }
 
 export const useDockStore = create<DockState>((set) => ({
@@ -22,6 +26,7 @@ export const useDockStore = create<DockState>((set) => ({
   collapse: () => set({ collapsed: true }),
   expand: () => set({ collapsed: false }),
   toggle: () => set((s) => ({ collapsed: !s.collapsed })),
+  initForViewport: (width) => set({ collapsed: width >= 768 }),
 }))
 
 /** Imperative helper for non-React callers (event handlers, utilities). */

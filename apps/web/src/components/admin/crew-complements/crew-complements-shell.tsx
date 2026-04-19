@@ -1,15 +1,13 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { api, setApiBaseUrl, type AircraftTypeRef, type CrewComplementRef, type CrewPositionRef } from '@skyhub/api'
+import { api, type AircraftTypeRef, type CrewComplementRef, type CrewPositionRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import { CrewComplementTypeList } from './crew-complement-type-list'
 import { CrewComplementTable } from './crew-complement-table'
 import { accentTint } from '@skyhub/ui/theme'
 import { getOperatorId } from '@/stores/use-operator-store'
 import { Users, Sparkles, Plus } from 'lucide-react'
-
-setApiBaseUrl('http://localhost:3002')
 
 export const ACCENT = '#7c3aed' // Crew Ops purple
 

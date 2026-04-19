@@ -1,15 +1,13 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { api, setApiBaseUrl, type AirportRef } from '@skyhub/api'
+import { api, type AirportRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import { useTheme } from '@/components/theme-provider'
 import { accentTint } from '@skyhub/ui/theme'
 import { FieldRow } from '../airports/field-row'
 import { AirportMap } from '../airports/airport-map'
 import { Search, Plus, Pencil, Save, X, Trash2, ChevronRight, MapPin, Clock, Building2 } from 'lucide-react'
-
-setApiBaseUrl('http://localhost:3002')
 
 const ACCENT = '#7c3aed' // Crew Ops purple
 

@@ -1,13 +1,11 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { api, setApiBaseUrl, type FlightServiceTypeRef } from '@skyhub/api'
+import { api, type FlightServiceTypeRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import { FieldRow } from '../airports/field-row'
 import { getOperatorId } from '@/stores/use-operator-store'
 import { Search, Plus, Info, Pencil, Save, X, Trash2 } from 'lucide-react'
-
-setApiBaseUrl('http://localhost:3002')
 
 export function ServiceTypesShell() {
   const [types, setTypes] = useState<FlightServiceTypeRef[]>([])

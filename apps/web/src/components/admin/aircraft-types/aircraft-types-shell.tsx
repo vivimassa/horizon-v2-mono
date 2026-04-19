@@ -1,12 +1,10 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { api, setApiBaseUrl, type AircraftTypeRef } from '@skyhub/api'
+import { api, type AircraftTypeRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import { AircraftTypeList } from './aircraft-type-list'
 import { AircraftTypeDetail } from './aircraft-type-detail'
-
-setApiBaseUrl('http://localhost:3002')
 
 const CATEGORY_ORDER: Record<string, number> = {
   narrow_body: 0,

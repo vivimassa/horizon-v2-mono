@@ -1,12 +1,10 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { api, setApiBaseUrl, type AircraftRegistrationRef, type AircraftTypeRef } from '@skyhub/api'
+import { api, type AircraftRegistrationRef, type AircraftTypeRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import { AircraftRegistrationList } from './aircraft-registration-list'
 import { AircraftRegistrationDetail } from './aircraft-registration-detail'
-
-setApiBaseUrl('http://localhost:3002')
 
 export function AircraftRegistrationsShell() {
   const [registrations, setRegistrations] = useState<AircraftRegistrationRef[]>([])

@@ -134,6 +134,44 @@ export const queryKeys = {
     list: (params?: Record<string, unknown>) => ['maintenanceEvents', 'list', params ?? {}] as const,
   },
 
+  // ─── Crew Profile (4.1.1) ───
+  crew: {
+    all: ['crew'] as const,
+    list: (filters?: Record<string, unknown>) => ['crew', 'list', filters ?? {}] as const,
+    detail: (id: string) => ['crew', 'detail', id] as const,
+  },
+
+  // ─── Crew Documents (4.1.2) ───
+  crewDocuments: {
+    all: ['crewDocuments'] as const,
+    folders: (crewId: string, parentId: string | null | undefined) =>
+      ['crewDocuments', 'folders', crewId, parentId ?? null] as const,
+    list: (crewId: string, filters?: Record<string, unknown>) =>
+      ['crewDocuments', 'list', crewId, filters ?? {}] as const,
+    status: (filters?: Record<string, unknown>) => ['crewDocuments', 'status', filters ?? {}] as const,
+  },
+
+  // ─── Manpower Planning (4.1.4) ───
+  manpower: {
+    all: ['manpower'] as const,
+    plans: (operatorId: string) => ['manpower', 'plans', operatorId] as const,
+    settings: (planId: string) => ['manpower', 'settings', planId] as const,
+    fleetOverrides: (planId: string, year: number) => ['manpower', 'fleetOverrides', planId, year] as const,
+    fleetUtilization: (planId: string) => ['manpower', 'fleetUtilization', planId] as const,
+    events: (planId: string, year: number) => ['manpower', 'events', planId, year] as const,
+    scheduleBh: (planId: string, year: number) => ['manpower', 'scheduleBh', planId, year] as const,
+    crewHeadcount: (planId: string, year: number) => ['manpower', 'crewHeadcount', planId, year] as const,
+    monthlyAcCount: (planId: string, year: number) => ['manpower', 'monthlyAcCount', planId, year] as const,
+    standardComplements: (planId: string) => ['manpower', 'standardComplements', planId] as const,
+  },
+
+  // ─── MPP Lead Time (5.4.9) ───
+  mppLeadTime: {
+    all: ['mppLeadTime'] as const,
+    groups: (operatorId: string) => ['mppLeadTime', 'groups', operatorId] as const,
+    items: (operatorId: string, groupId?: string) => ['mppLeadTime', 'items', operatorId, groupId ?? null] as const,
+  },
+
   // ─── Slots ───
   slots: {
     airports: ['slots', 'airports'] as const,

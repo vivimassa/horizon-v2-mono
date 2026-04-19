@@ -1,12 +1,10 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { api, setApiBaseUrl, type CityPairRef } from '@skyhub/api'
+import { api, type CityPairRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import { CityPairList } from './citypair-list'
 import { CityPairDetail } from './citypair-detail'
-
-setApiBaseUrl('http://localhost:3002')
 
 const ROUTE_TYPE_ORDER: Record<string, number> = {
   domestic: 0,

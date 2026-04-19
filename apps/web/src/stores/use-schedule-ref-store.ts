@@ -1,11 +1,9 @@
 'use client'
 
 import { create } from 'zustand'
-import { api, setApiBaseUrl } from '@skyhub/api'
+import { api } from '@skyhub/api'
 import type { AircraftTypeRef, FlightServiceTypeRef, CityPairRef, CarrierCodeRef } from '@skyhub/api'
 import { useOperatorStore, getOperatorId } from './use-operator-store'
-
-setApiBaseUrl('http://localhost:3002')
 
 interface ScheduleRefState {
   aircraftTypes: AircraftTypeRef[]

@@ -1,5 +1,5 @@
-import { ComingSoon } from '@/components/coming-soon'
+import { CrewProfileShell } from '@/components/crew-ops/crew-profile/crew-profile-shell'
 
 export default function Page() {
-  return <ComingSoon />
+  return <CrewProfileShell />
 }

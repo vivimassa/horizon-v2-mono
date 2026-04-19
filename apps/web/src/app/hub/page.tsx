@@ -109,6 +109,20 @@ function getIcon(name: string): LucideIcons.LucideIcon {
   return iconMap[name] ?? LucideIcons.Box
 }
 
+/* Web-side viewport hook. `packages/ui` useResponsive uses react-native's
+   useWindowDimensions, which isn't available in Next. Mirror the 768/1024
+   thresholds so mobile + web stay consistent. */
+function useViewport() {
+  const [w, setW] = useState<number>(1440)
+  useEffect(() => {
+    const read = () => setW(window.innerWidth)
+    read()
+    window.addEventListener('resize', read)
+    return () => window.removeEventListener('resize', read)
+  }, [])
+  return { isPhone: w < 768, isTablet: w >= 768 && w < 1024, isDesktop: w >= 1024 }
+}
+
 /* ═══════════════════════════════════════════════
    Page
    ═══════════════════════════════════════════════ */
@@ -118,6 +132,7 @@ export default function HomePage() {
   const searchParams = useSearchParams()
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+  const { isPhone } = useViewport()
 
   /* ── carousel ──
      If the user lands on Home with ?domain=<key> in the URL (e.g. from the
@@ -311,243 +326,272 @@ export default function HomePage() {
       )}
 
       {/* ── Header ── */}
-      <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-5 pt-3 pb-1">
+      <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-3 sm:px-5 pt-3 pb-1">
         <img
           src="/skyhub-logo.png"
           alt="SkyHub"
           style={{
-            height: 52,
+            height: isPhone ? 36 : 52,
             filter: isOpen ? 'brightness(0) invert(1) drop-shadow(0 1px 8px rgba(0,0,0,.4))' : logoFilter,
           }}
         />
-        <UserMenu tone={isDark || isOpen ? 'overlay' : 'palette'} align="right" />
+        <UserMenu tone={isDark || isOpen ? 'overlay' : 'palette'} align="right" compact={isPhone} />
       </div>
 
       {/* ═════════════════════════════════════
          CAROUSEL + PANEL LAYOUT
          ═════════════════════════════════════ */}
       <div className="relative z-10 h-full flex">
-        {/* ── LEFT: Carousel ── */}
-        <div
-          className="flex items-center justify-center transition-all duration-500 ease-[cubic-bezier(.4,0,.2,1)] relative"
-          style={{ width: isOpen ? '42%' : '100%', minWidth: isOpen ? '42%' : undefined }}
-        >
-          {/* Cards container with perspective */}
-          <div className="relative" style={{ width: 440, height: 600, perspective: 1200 }}>
-            {DOMAINS.map((domain, i) => {
-              const accent = MODULE_THEMES[domain.module]?.accent ?? '#64748b'
-              const Icon = getIcon(domain.icon)
-              const count = MODULE_REGISTRY.filter((m) => m.module === domain.module && m.level === 2).length
+        {/* ── LEFT: Carousel ──
+           On phone when a module is open, collapse this column entirely so the
+           right panel gets the full viewport — phone doesn't show the card
+           preview while inside a module (only the wallpaper behind the panel). */}
+        {!(isPhone && isOpen) && (
+          <div
+            className="flex items-center justify-center transition-all duration-500 ease-[cubic-bezier(.4,0,.2,1)] relative"
+            style={{ width: isOpen ? '42%' : '100%', minWidth: isOpen ? '42%' : undefined }}
+          >
+            {/* Cards container with perspective. On phone, shrink to viewport and
+             drop perspective depth so the single visible card reads cleanly. */}
+            <div
+              className="relative"
+              style={
+                isPhone
+                  ? { width: 'min(86vw, 340px)', height: 'min(120vw, 480px)', perspective: 800 }
+                  : { width: 440, height: 600, perspective: 1200 }
+              }
+            >
+              {DOMAINS.map((domain, i) => {
+                const accent = MODULE_THEMES[domain.module]?.accent ?? '#64748b'
+                const Icon = getIcon(domain.icon)
+                const count = MODULE_REGISTRY.filter((m) => m.module === domain.module && m.level === 2).length
 
-              let offset = i - cur
-              if (offset > 2) offset -= DOMAINS.length
-              if (offset < -2) offset += DOMAINS.length
-              const isCenter = offset === 0
-              const abs = Math.abs(offset)
+                let offset = i - cur
+                if (offset > 2) offset -= DOMAINS.length
+                if (offset < -2) offset += DOMAINS.length
+                const isCenter = offset === 0
+                const abs = Math.abs(offset)
 
-              // Compute transform
-              let tx: number, sc: number, ry: number, op: number, bl: number
-              if (isOpen) {
-                // When open: center card stays, others gone
-                if (i === sel) {
-                  tx = 0
-                  sc = 1.12
-                  ry = 0
-                  op = 1
-                  bl = 0
-                } else {
-                  tx = 0
-                  sc = 0.7
+                // Phone: only render the active / selected card. Rendering the 3D
+                // peek siblings at <768px overflows the viewport and steals taps.
+                if (isPhone) {
+                  if (isOpen && i !== sel) return null
+                  if (!isOpen && !isCenter) return null
+                }
+
+                // Compute transform
+                let tx: number, sc: number, ry: number, op: number, bl: number
+                if (isOpen) {
+                  // When open: center card stays, others gone
+                  if (i === sel) {
+                    tx = 0
+                    sc = 1.12
+                    ry = 0
+                    op = 1
+                    bl = 0
+                  } else {
+                    tx = 0
+                    sc = 0.7
+                    ry = 0
+                    op = 0
+                    bl = 0
+                  }
+                } else if (abs > 2) {
+                  tx = offset * 400
+                  sc = 0.5
                   ry = 0
                   op = 0
-                  bl = 0
+                  bl = 5
+                } else {
+                  tx = offset * 370
+                  sc = isCenter ? 1 : abs === 1 ? 0.85 : 0.68
+                  ry = isCenter ? 0 : offset > 0 ? -8 : 8
+                  op = isCenter ? 1 : abs === 1 ? 0.5 : 0.2
+                  bl = isCenter ? 0 : abs === 1 ? 2 : 5
                 }
-              } else if (abs > 2) {
-                tx = offset * 400
-                sc = 0.5
-                ry = 0
-                op = 0
-                bl = 5
-              } else {
-                tx = offset * 370
-                sc = isCenter ? 1 : abs === 1 ? 0.85 : 0.68
-                ry = isCenter ? 0 : offset > 0 ? -8 : 8
-                op = isCenter ? 1 : abs === 1 ? 0.5 : 0.2
-                bl = isCenter ? 0 : abs === 1 ? 2 : 5
-              }
 
-              return (
-                <button
-                  key={domain.key}
-                  type="button"
-                  className="absolute inset-0 rounded-[20px] overflow-hidden focus:outline-none"
-                  style={{
-                    transform: `translateX(${tx}px) scale(${sc}) rotateY(${ry}deg)`,
-                    opacity: op,
-                    filter: bl ? `blur(${bl}px) brightness(.65)` : 'none',
-                    zIndex: isCenter ? 10 : 10 - abs,
-                    transition: 'all 500ms cubic-bezier(.4,0,.2,1)',
-                    transformStyle: 'preserve-3d',
-                    border: isCenter ? `1px solid ${accent}40` : '1px solid rgba(255,255,255,.06)',
-                    boxShadow: isCenter
-                      ? `0 20px 60px rgba(0,0,0,.4), 0 0 60px ${accent}12`
-                      : '0 8px 32px rgba(0,0,0,.3)',
-                    cursor: isCenter ? 'pointer' : 'pointer',
-                    pointerEvents: (abs > 2 && !isOpen) || (isOpen && i !== sel) ? 'none' : 'auto',
-                  }}
-                  onClick={() => select(i)}
-                >
-                  {/* BG image */}
-                  <div
-                    className="absolute inset-0 bg-cover bg-center"
-                    style={{
-                      backgroundImage: `url(${domain.image})`,
-                      transform: isCenter ? 'scale(1.05)' : 'scale(1)',
-                      transition: 'transform 700ms ease',
-                    }}
-                  />
-                  {/* Darken */}
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      background: isCenter
-                        ? 'linear-gradient(180deg, rgba(0,0,0,.08) 0%, rgba(0,0,0,.25) 50%, rgba(0,0,0,.80) 100%)'
-                        : 'linear-gradient(180deg, rgba(0,0,0,.30) 0%, rgba(0,0,0,.70) 100%)',
-                    }}
-                  />
-                  {/* Glow */}
-                  {isCenter && (
-                    <div
-                      className="absolute bottom-0 left-0 right-0 h-40"
-                      style={{
-                        background: `linear-gradient(0deg, ${accent}20 0%, transparent 100%)`,
-                        animation: 'hzGlow 4s ease-in-out infinite',
-                      }}
-                    />
-                  )}
-                  {/* Top line */}
-                  {isCenter && (
-                    <div
-                      className="absolute top-0 left-0 right-0 h-[2px]"
-                      style={{ background: `linear-gradient(90deg, transparent 5%, ${accent} 50%, transparent 95%)` }}
-                    />
-                  )}
-
-                  {/* Content — all inside the button */}
-                  <div className="absolute inset-0 flex flex-col p-5">
-                    {/* Top */}
-                    <div className="flex items-start justify-between">
-                      <div
-                        className="flex items-center justify-center rounded-full text-[14px] font-bold"
-                        style={{
-                          width: 36,
-                          height: 36,
-                          background: isCenter ? accent : 'rgba(255,255,255,.10)',
-                          color: '#fff',
-                          boxShadow: isCenter ? `0 4px 20px ${accent}50` : 'none',
-                          transition: 'all 500ms ease',
-                        }}
-                      >
-                        {String(i + 1).padStart(2, '0')}
-                      </div>
-                      <div
-                        className="flex items-center justify-center rounded-xl"
-                        style={{
-                          width: 42,
-                          height: 42,
-                          background: 'rgba(0,0,0,.25)',
-                          backdropFilter: 'blur(12px)',
-                          border: isCenter ? `1px solid ${accent}40` : '1px solid rgba(255,255,255,.08)',
-                        }}
-                      >
-                        <Icon size={20} strokeWidth={1.5} color="#fff" />
-                      </div>
-                    </div>
-
-                    <div className="flex-1" />
-
-                    {/* Bottom */}
-                    <div className="text-left">
-                      <div className="text-[22px] font-bold tracking-tight text-white mb-1.5 drop-shadow-lg">
-                        {domain.label}
-                      </div>
-                      {isCenter && (
-                        <div className="text-[13px] leading-[1.5] text-white/55 mb-3">{domain.description}</div>
-                      )}
-                      {isCenter && (
-                        <div className="flex items-center gap-3">
-                          <span
-                            className="text-[12px] font-semibold px-3 py-1 rounded-full"
-                            style={{ background: `${accent}25`, color: '#fff', border: `1px solid ${accent}30` }}
-                          >
-                            {count} modules
-                          </span>
-                          <span className="text-[12px] text-white/30">Click to explore</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Nav arrows — only when not open */}
-          {!isOpen && (
-            <>
-              <button
-                onClick={prev}
-                className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
-                style={{
-                  background: isDark ? 'rgba(0,0,0,.25)' : 'rgba(255,255,255,.55)',
-                  backdropFilter: 'blur(12px)',
-                  border: `1px solid ${isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'}`,
-                }}
-              >
-                <LucideIcons.ChevronLeft size={20} color={isDark ? 'rgba(255,255,255,.6)' : 'rgba(15,23,42,.65)'} />
-              </button>
-              <button
-                onClick={next}
-                className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
-                style={{
-                  background: isDark ? 'rgba(0,0,0,.25)' : 'rgba(255,255,255,.55)',
-                  backdropFilter: 'blur(12px)',
-                  border: `1px solid ${isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'}`,
-                }}
-              >
-                <LucideIcons.ChevronRight size={20} color={isDark ? 'rgba(255,255,255,.6)' : 'rgba(15,23,42,.65)'} />
-              </button>
-            </>
-          )}
-
-          {/* Dots — only when not open. Lifted off the bottom edge so a
-             small copyright line can sit comfortably below them. */}
-          {!isOpen && (
-            <div className="absolute bottom-14 left-1/2 -translate-x-1/2 z-20 flex gap-2">
-              {DOMAINS.map((d, i) => {
-                const ac = MODULE_THEMES[d.module]?.accent ?? '#64748b'
                 return (
                   <button
-                    key={i}
-                    onClick={() => setCur(i)}
-                    className="rounded-full transition-all duration-500"
+                    key={domain.key}
+                    type="button"
+                    className="absolute inset-0 rounded-[20px] overflow-hidden focus:outline-none"
                     style={{
-                      width: i === cur ? 28 : 8,
-                      height: 8,
-                      background: i === cur ? ac : isDark ? 'rgba(255,255,255,.20)' : 'rgba(15,23,42,.25)',
-                      boxShadow: i === cur ? `0 0 12px ${ac}60` : 'none',
+                      transform: `translateX(${tx}px) scale(${sc}) rotateY(${ry}deg)`,
+                      opacity: op,
+                      filter: bl ? `blur(${bl}px) brightness(.65)` : 'none',
+                      zIndex: isCenter ? 10 : 10 - abs,
+                      transition: 'all 500ms cubic-bezier(.4,0,.2,1)',
+                      transformStyle: 'preserve-3d',
+                      border: isCenter ? `1px solid ${accent}40` : '1px solid rgba(255,255,255,.06)',
+                      boxShadow: isCenter
+                        ? `0 20px 60px rgba(0,0,0,.4), 0 0 60px ${accent}12`
+                        : '0 8px 32px rgba(0,0,0,.3)',
+                      cursor: isCenter ? 'pointer' : 'pointer',
+                      pointerEvents: (abs > 2 && !isOpen) || (isOpen && i !== sel) ? 'none' : 'auto',
                     }}
-                  />
+                    onClick={() => select(i)}
+                  >
+                    {/* BG image */}
+                    <div
+                      className="absolute inset-0 bg-cover bg-center"
+                      style={{
+                        backgroundImage: `url(${domain.image})`,
+                        transform: isCenter ? 'scale(1.05)' : 'scale(1)',
+                        transition: 'transform 700ms ease',
+                      }}
+                    />
+                    {/* Darken */}
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        background: isCenter
+                          ? 'linear-gradient(180deg, rgba(0,0,0,.08) 0%, rgba(0,0,0,.25) 50%, rgba(0,0,0,.80) 100%)'
+                          : 'linear-gradient(180deg, rgba(0,0,0,.30) 0%, rgba(0,0,0,.70) 100%)',
+                      }}
+                    />
+                    {/* Glow */}
+                    {isCenter && (
+                      <div
+                        className="absolute bottom-0 left-0 right-0 h-40"
+                        style={{
+                          background: `linear-gradient(0deg, ${accent}20 0%, transparent 100%)`,
+                          animation: 'hzGlow 4s ease-in-out infinite',
+                        }}
+                      />
+                    )}
+                    {/* Top line */}
+                    {isCenter && (
+                      <div
+                        className="absolute top-0 left-0 right-0 h-[2px]"
+                        style={{ background: `linear-gradient(90deg, transparent 5%, ${accent} 50%, transparent 95%)` }}
+                      />
+                    )}
+
+                    {/* Content — all inside the button */}
+                    <div className="absolute inset-0 flex flex-col p-5">
+                      {/* Top */}
+                      <div className="flex items-start justify-between">
+                        <div
+                          className="flex items-center justify-center rounded-full text-[14px] font-bold"
+                          style={{
+                            width: 36,
+                            height: 36,
+                            background: isCenter ? accent : 'rgba(255,255,255,.10)',
+                            color: '#fff',
+                            boxShadow: isCenter ? `0 4px 20px ${accent}50` : 'none',
+                            transition: 'all 500ms ease',
+                          }}
+                        >
+                          {String(i + 1).padStart(2, '0')}
+                        </div>
+                        <div
+                          className="flex items-center justify-center rounded-xl"
+                          style={{
+                            width: 42,
+                            height: 42,
+                            background: 'rgba(0,0,0,.25)',
+                            backdropFilter: 'blur(12px)',
+                            border: isCenter ? `1px solid ${accent}40` : '1px solid rgba(255,255,255,.08)',
+                          }}
+                        >
+                          <Icon size={20} strokeWidth={1.5} color="#fff" />
+                        </div>
+                      </div>
+
+                      <div className="flex-1" />
+
+                      {/* Bottom */}
+                      <div className="text-left">
+                        <div className="text-[22px] font-bold tracking-tight text-white mb-1.5 drop-shadow-lg">
+                          {domain.label}
+                        </div>
+                        {isCenter && (
+                          <div className="text-[13px] leading-[1.5] text-white/55 mb-3">{domain.description}</div>
+                        )}
+                        {isCenter && (
+                          <div className="flex items-center gap-3">
+                            <span
+                              className="text-[12px] font-semibold px-3 py-1 rounded-full"
+                              style={{ background: `${accent}25`, color: '#fff', border: `1px solid ${accent}30` }}
+                            >
+                              {count} modules
+                            </span>
+                            <span className="text-[12px] text-white/30">Click to explore</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </button>
                 )
               })}
             </div>
-          )}
-        </div>
+
+            {/* Nav arrows — only when not open */}
+            {!isOpen && (
+              <>
+                <button
+                  onClick={prev}
+                  className={`absolute top-1/2 -translate-y-1/2 z-20 rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-transform ${isPhone ? 'left-2 w-9 h-9' : 'left-4 w-11 h-11'}`}
+                  style={{
+                    background: isDark ? 'rgba(0,0,0,.25)' : 'rgba(255,255,255,.55)',
+                    backdropFilter: 'blur(12px)',
+                    border: `1px solid ${isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'}`,
+                  }}
+                >
+                  <LucideIcons.ChevronLeft
+                    size={isPhone ? 18 : 20}
+                    color={isDark ? 'rgba(255,255,255,.6)' : 'rgba(15,23,42,.65)'}
+                  />
+                </button>
+                <button
+                  onClick={next}
+                  className={`absolute top-1/2 -translate-y-1/2 z-20 rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-transform ${isPhone ? 'right-2 w-9 h-9' : 'right-4 w-11 h-11'}`}
+                  style={{
+                    background: isDark ? 'rgba(0,0,0,.25)' : 'rgba(255,255,255,.55)',
+                    backdropFilter: 'blur(12px)',
+                    border: `1px solid ${isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'}`,
+                  }}
+                >
+                  <LucideIcons.ChevronRight
+                    size={isPhone ? 18 : 20}
+                    color={isDark ? 'rgba(255,255,255,.6)' : 'rgba(15,23,42,.65)'}
+                  />
+                </button>
+              </>
+            )}
+
+            {/* Dots — only when not open. Lifted off the bottom edge so a
+             small copyright line can sit comfortably below them. On phone
+             the dock occupies the bottom row, so lift the dots above it. */}
+            {!isOpen && (
+              <div
+                className={`absolute left-1/2 -translate-x-1/2 z-20 flex gap-2 ${isPhone ? 'bottom-24' : 'bottom-14'}`}
+              >
+                {DOMAINS.map((d, i) => {
+                  const ac = MODULE_THEMES[d.module]?.accent ?? '#64748b'
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => setCur(i)}
+                      className="rounded-full transition-all duration-500"
+                      style={{
+                        width: i === cur ? 28 : 8,
+                        height: 8,
+                        background: i === cur ? ac : isDark ? 'rgba(255,255,255,.20)' : 'rgba(15,23,42,.25)',
+                        boxShadow: i === cur ? `0 0 12px ${ac}60` : 'none',
+                      }}
+                    />
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── RIGHT: Sub-module panel ── */}
         {isOpen && selDomain && (
           <div
-            className="flex-1 min-w-0 flex flex-col py-20 pr-5 pl-2"
+            className={`flex-1 min-w-0 flex flex-col ${isPhone ? 'pt-14 pb-24 px-4' : 'py-20 pr-5 pl-2'}`}
             style={{ animation: 'hzSlide 400ms cubic-bezier(.4,0,.2,1) both' }}
           >
             {/* Back button — neutral glass chip */}
@@ -797,8 +841,9 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* ── Copyright footer — only when not in cinematic focus state ── */}
-      {!isOpen && (
+      {/* ── Copyright footer — only on tablet/desktop landing. Phone always
+         shows the bottom dock in its place; inside a module we hide it too. ── */}
+      {!isOpen && !isPhone && (
         <div
           className="fixed bottom-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none select-none"
           style={{

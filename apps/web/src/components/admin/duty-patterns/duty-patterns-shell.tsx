@@ -1,12 +1,10 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { api, setApiBaseUrl, type DutyPatternRef } from '@skyhub/api'
+import { api, type DutyPatternRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import { DutyPatternList } from './duty-pattern-list'
 import { DutyPatternDetail } from './duty-pattern-detail'
-
-setApiBaseUrl('http://localhost:3002')
 
 export function DutyPatternsShell() {
   const [patterns, setPatterns] = useState<DutyPatternRef[]>([])

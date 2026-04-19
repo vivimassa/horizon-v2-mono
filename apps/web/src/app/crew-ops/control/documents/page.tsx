@@ -1,5 +1,5 @@
-import { ComingSoon } from '@/components/coming-soon'
+import { CrewDocumentsShell } from '@/components/crew-ops/crew-documents/crew-documents-shell'
 
 export default function Page() {
-  return <ComingSoon />
+  return <CrewDocumentsShell />
 }

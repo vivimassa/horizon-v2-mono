@@ -55,15 +55,21 @@ function hexToRgba(hex: string, a: number): string {
   return `rgba(${r},${g},${b},${a})`
 }
 
-function useIsDesktop() {
-  const [desktop, setDesktop] = useState(true)
+/** Returns which size bucket the current viewport falls into. Tablet (≥768)
+   now uses the same collapse behaviour as desktop — only phone (<768) gets
+   the legacy full-width always-expanded bottom bar. */
+function useViewport() {
+  const [state, setState] = useState({ isPhone: false, isTabletUp: true })
   useEffect(() => {
-    setDesktop(window.innerWidth >= 1024)
-    const onResize = () => setDesktop(window.innerWidth >= 1024)
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
+    const read = () => {
+      const w = window.innerWidth
+      setState({ isPhone: w < 768, isTabletUp: w >= 768 })
+    }
+    read()
+    window.addEventListener('resize', read)
+    return () => window.removeEventListener('resize', read)
   }, [])
-  return desktop
+  return state
 }
 
 export function SpotlightDock() {
@@ -73,7 +79,10 @@ export function SpotlightDock() {
   const isDark = theme === 'dark'
   const accent = ACCENT_DEFAULT
   const activeIndex = getActiveIndex(pathname)
-  const isDesktop = useIsDesktop()
+  const { isPhone, isTabletUp } = useViewport()
+  // Tablet (≥768) now shares the desktop collapse UX. The "isDesktop" name
+  // stays for the internal style branch that toggles pill vs. bottom bar.
+  const isDesktop = isTabletUp
 
   // Collapse state is now driven by a global store — any component on any
   // page can fold the dock via collapseDock() (typical use: page-level "Go"
@@ -82,13 +91,29 @@ export function SpotlightDock() {
   const collapsed = useDockStore((s) => s.collapsed)
   const setCollapsed = useDockStore((s) => s.setCollapsed)
   const expand = useDockStore((s) => s.expand)
+  const initForViewport = useDockStore((s) => s.initForViewport)
 
   const isHome = pathname === '/hub'
 
-  // Auto-expand whenever the user navigates to a new page.
+  // One-shot: seed the collapse state from the initial viewport so tablet +
+  // desktop land with the dock tucked away (matches the design spec).
   useEffect(() => {
-    expand()
-  }, [pathname, expand])
+    if (typeof window !== 'undefined') initForViewport(window.innerWidth)
+  }, [initForViewport])
+
+  // Phone has no collapse affordance — the dock is the primary nav, always
+  // visible at the bottom row. Force-expand so any residual collapsed state
+  // from a previous tablet/desktop session doesn't leak across resize.
+  useEffect(() => {
+    if (isPhone && collapsed) expand()
+  }, [isPhone, collapsed, expand])
+
+  // Auto-expand whenever the user navigates to a new page — but only on
+  // phone, where the dock is the navigation surface. On tablet/desktop we
+  // respect the user's collapsed preference across route changes.
+  useEffect(() => {
+    if (isPhone) expand()
+  }, [pathname, isPhone, expand])
 
   // Mirror the collapse state onto <body> so CSS can reclaim bottom padding
   // on collapse. The dock is always visible on non-home pages; the padding

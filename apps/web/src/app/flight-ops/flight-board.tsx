@@ -1,9 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { api, setApiBaseUrl, type Flight } from '@skyhub/api'
-
-setApiBaseUrl('http://localhost:3002')
+import { api, type Flight } from '@skyhub/api'
 
 /* ── Status config ─────────────────────────────────── */
 

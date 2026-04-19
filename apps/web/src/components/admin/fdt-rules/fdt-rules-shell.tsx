@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   api,
-  setApiBaseUrl,
   type FdtlFrameworkRef,
   type FdtlSchemeRef,
   type FdtlRuleRef,
@@ -35,8 +34,6 @@ import {
   Radio,
   Globe,
 } from 'lucide-react'
-
-setApiBaseUrl('http://localhost:3002')
 
 export const ACCENT = '#7c3aed'
 

@@ -1,12 +1,10 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { api, setApiBaseUrl, type MaintenanceCheckTypeRef } from '@skyhub/api'
+import { api, type MaintenanceCheckTypeRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import { MaintenanceCheckList } from './maintenance-check-list'
 import { MaintenanceCheckDetail } from './maintenance-check-detail'
-
-setApiBaseUrl('http://localhost:3002')
 
 export function MaintenanceChecksShell() {
   const [checkTypes, setCheckTypes] = useState<MaintenanceCheckTypeRef[]>([])

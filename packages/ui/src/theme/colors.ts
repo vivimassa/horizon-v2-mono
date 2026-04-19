@@ -200,7 +200,11 @@ export function modeColor(hex: string, isDark: boolean): string {
 }
 
 export function getStatusColors(statusKey: StatusKey, isDark: boolean): { bg: string; text: string } {
-  const s = colors.status[statusKey]
+  // Fall back to `scheduled` when the caller passes a value that isn't in the
+  // StatusKey union (e.g. API returns a new string the UI hasn't mapped yet).
+  // Prevents the `Cannot read property 'darkBg' of undefined` crash that
+  // used to bubble up from FlightCard / other status-chip consumers.
+  const s = colors.status[statusKey] ?? colors.status.scheduled
   return isDark ? { bg: s.darkBg, text: s.darkText } : { bg: s.bg, text: s.text }
 }
 

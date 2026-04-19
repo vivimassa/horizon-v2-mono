@@ -2,13 +2,11 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Armchair, Plane } from 'lucide-react'
-import { api, setApiBaseUrl, type CabinClassRef, type LopaConfigRef, type AircraftTypeRef } from '@skyhub/api'
+import { api, type CabinClassRef, type LopaConfigRef, type AircraftTypeRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import { LopaList } from './lopa-list'
 import { CabinClassDetail } from './cabin-class-detail'
 import { LopaConfigDetail } from './lopa-config-detail'
-
-setApiBaseUrl('http://localhost:3002')
 
 type ViewMode = 'cabin-classes' | 'lopa-configs'
 

@@ -1,11 +1,9 @@
 'use client'
 
 import { create } from 'zustand'
-import { api, setApiBaseUrl } from '@skyhub/api'
+import { api } from '@skyhub/api'
 import type { OperatorRef } from '@skyhub/api'
 import type { DateFormatType } from '@/lib/date-format'
-
-setApiBaseUrl('http://localhost:3002')
 
 interface OperatorState {
   operator: OperatorRef | null

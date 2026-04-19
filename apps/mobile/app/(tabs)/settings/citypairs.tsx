@@ -1,13 +1,14 @@
 import { useState, useMemo, useCallback, memo } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
-import { Text, View, SectionList, TextInput, Pressable } from 'react-native'
+import { View, SectionList, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { api, type CityPairRef } from '@skyhub/api'
-import { Search, ChevronLeft, ChevronRight, ArrowLeftRight } from 'lucide-react-native'
-import { accentTint, type Palette } from '@skyhub/ui/theme'
+import { ChevronRight, ArrowLeftRight } from 'lucide-react-native'
+import { type Palette } from '@skyhub/ui/theme'
+import { ListScreenHeader, SearchInput, Text } from '@skyhub/ui'
 import { useAppTheme } from '../../../providers/ThemeProvider'
-import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
+import { useHubBack } from '../../../lib/use-hub-back'
 
 const ROUTE_TYPE_ORDER: Record<string, number> = {
   domestic: 0,
@@ -34,6 +35,8 @@ interface RouteSection {
 
 export default function CityPairsList() {
   const { palette, isDark, accent } = useAppTheme()
+  // Swipe-back lands on hub home with Master Database pre-opened.
+  useHubBack('settings')
   const [cityPairs, setCityPairs] = useState<CityPairRef[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -96,51 +99,17 @@ export default function CityPairsList() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
-      <BreadcrumbHeader moduleCode="6" />
-      <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
-        {/* Header */}
-        <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
-          <View className="flex-row items-center mb-3">
-            <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
-              <ChevronLeft size={24} color={accent} strokeWidth={2} />
-            </Pressable>
-            <View
-              className="items-center justify-center rounded-lg mr-3"
-              style={{ width: 36, height: 36, backgroundColor: accentTint(accent, isDark ? 0.15 : 0.1) }}
-            >
-              <ArrowLeftRight size={18} color={accent} strokeWidth={1.8} />
-            </View>
-            <View className="flex-1">
-              <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>Citypairs</Text>
-              <Text style={{ fontSize: 13, color: palette.textSecondary }}>
-                {filteredCount === cityPairs.length
-                  ? `${cityPairs.length} citypairs`
-                  : `${filteredCount} / ${cityPairs.length} citypairs`}
-              </Text>
-            </View>
-          </View>
-
-          {/* Search */}
-          <View
-            className="flex-row items-center rounded-xl"
-            style={{
-              backgroundColor: palette.card,
-              borderWidth: 1,
-              borderColor: palette.cardBorder,
-              paddingHorizontal: 12,
-            }}
-          >
-            <Search size={16} color={palette.textTertiary} strokeWidth={1.8} />
-            <TextInput
-              className="flex-1 py-2.5 ml-2"
-              style={{ fontSize: 14, color: palette.text }}
-              placeholder="Search IATA, ICAO, city, route type…"
-              placeholderTextColor={palette.textTertiary}
-              value={search}
-              onChangeText={setSearch}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+      <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: palette.border, paddingBottom: 12, paddingTop: 4 }}>
+          <ListScreenHeader
+            icon={ArrowLeftRight}
+            title="Citypairs"
+            count={cityPairs.length}
+            filteredCount={filteredCount}
+            countLabel="citypair"
+          />
+          <View style={{ paddingHorizontal: 16 }}>
+            <SearchInput placeholder="Search IATA, ICAO, city, route type…" value={search} onChangeText={setSearch} />
           </View>
         </View>
 

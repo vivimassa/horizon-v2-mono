@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { View, Text, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button, Card, useTheme, useAuthStore } from '@skyhub/ui'
-import { api } from '@skyhub/api'
+import { api, getApiBaseUrl } from '@skyhub/api'
 import { tokenStorage } from '../src/lib/token-storage'
 
 export default function LoginScreen() {
@@ -27,9 +27,16 @@ export default function LoginScreen() {
       useAuthStore.getState().setTokens(accessToken, refreshToken)
       useAuthStore.getState().setUser(user as any)
     } catch (e) {
+      // Debug: surface the real error + API base URL so Metro logs show
+      // exactly why login failed (network vs. credentials vs. parse).
+      // Remove once login is stable.
+      // eslint-disable-next-line no-console
+      console.log('[login] API base:', getApiBaseUrl())
+      // eslint-disable-next-line no-console
+      console.log('[login] error:', e)
       const msg = e instanceof Error ? e.message : 'Login failed'
       const parsed = msg.match(/API \d+:\s*(.*)$/)?.[1]
-      let friendly = 'Login failed. Please try again.'
+      let friendly = msg || 'Login failed. Please try again.'
       if (parsed) {
         try {
           const body = JSON.parse(parsed)

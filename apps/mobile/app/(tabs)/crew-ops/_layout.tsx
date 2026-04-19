@@ -10,6 +10,7 @@ export default function CrewOpsLayout() {
         gestureEnabled: true,
         gestureDirection: 'horizontal',
         animation: 'slide_from_right',
+        animationDuration: 180,
         fullScreenGestureEnabled: true,
         contentStyle: { backgroundColor: palette.background },
       }}

@@ -1,11 +1,11 @@
 import { useState, useMemo, useCallback, memo } from 'react'
-import { View, SectionList, Pressable } from 'react-native'
+import { View, SectionList, Pressable, Text as RNText } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAirports, type AirportRef } from '@skyhub/api'
 import { ListScreenHeader, SearchInput, Text, Divider, EmptyState, domainIcons } from '@skyhub/ui'
 import { useAppTheme } from '../../../providers/ThemeProvider'
-import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useHubBack } from '../../../lib/use-hub-back'
 
 const PlaneTakeoff = domainIcons.takeoff
 const ChevronRight = domainIcons.chevronRight
@@ -21,6 +21,8 @@ export default function AirportsList() {
   const [search, setSearch] = useState('')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const router = useRouter()
+  // Swipe-back lands on hub home with Master Database pre-opened.
+  useHubBack('settings')
 
   const toggleGroup = useCallback((title: string) => {
     setCollapsed((prev) => {
@@ -63,16 +65,14 @@ export default function AirportsList() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
-      <BreadcrumbHeader moduleCode="6" />
-      <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
-        <View style={{ borderBottomWidth: 1, borderBottomColor: palette.border, paddingBottom: 12 }}>
+      <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: palette.border, paddingBottom: 12, paddingTop: 4 }}>
           <ListScreenHeader
             icon={PlaneTakeoff}
             title="Airports"
             count={airports.length}
             filteredCount={filteredCount}
             countLabel="airport"
-            onBack={() => router.back()}
             onAdd={() => router.push('/(tabs)/settings/airport-add' as any)}
           />
           <View style={{ paddingHorizontal: 16 }}>
@@ -120,16 +120,24 @@ export default function AirportsList() {
                 >
                   <ChevronRight
                     size={14}
-                    color={palette.textTertiary}
+                    color={palette.textSecondary}
                     strokeWidth={2}
                     style={{ transform: [{ rotate: isCollapsed ? '0deg' : '90deg' }], marginRight: 8 }}
                   />
-                  <Text variant="sectionHeading" muted style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  <RNText
+                    style={{
+                      fontSize: 12,
+                      fontWeight: '700',
+                      letterSpacing: 0.8,
+                      textTransform: 'uppercase',
+                      color: palette.text,
+                    }}
+                  >
                     {section.title}
-                  </Text>
-                  <Text variant="secondary" muted style={{ marginLeft: 6 }}>
+                  </RNText>
+                  <RNText style={{ marginLeft: 6, fontSize: 12, fontWeight: '500', color: palette.textSecondary }}>
                     ({count})
-                  </Text>
+                  </RNText>
                   <View className="flex-1 ml-3">
                     <Divider />
                   </View>
@@ -159,26 +167,28 @@ const AirportRow = memo(function AirportRow({ airport, onPress }: { airport: Air
       className="flex-row items-center active:opacity-70"
       style={{
         paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingVertical: 14,
         borderBottomWidth: 1,
         borderBottomColor: palette.border,
       }}
     >
-      <Text variant="body" color={accent} style={{ width: 44, fontWeight: '700', fontFamily: 'monospace' }}>
+      {/* Using raw RN Text with palette colours — the shared `Text variant="body" muted`
+         combo was rendering at ~35% opacity on dark mode which was unreadable. */}
+      <RNText style={{ width: 48, fontSize: 15, fontWeight: '700', fontFamily: 'monospace', color: accent }}>
         {airport.iataCode ?? '—'}
-      </Text>
+      </RNText>
       <View className="flex-1 ml-2">
-        <Text variant="body" style={{ fontWeight: '500' }} numberOfLines={1}>
+        <RNText style={{ fontSize: 15, fontWeight: '600', color: palette.text }} numberOfLines={1}>
           {airport.name}
-        </Text>
-        <Text variant="secondary" muted style={{ marginTop: 1 }}>
+        </RNText>
+        <RNText style={{ fontSize: 13, color: palette.textSecondary, marginTop: 2 }} numberOfLines={1}>
           {airport.city}
-        </Text>
+        </RNText>
       </View>
-      <View className="flex-row items-center" style={{ gap: 6 }}>
-        <Text variant="secondary" muted style={{ fontFamily: 'monospace' }}>
+      <View className="flex-row items-center" style={{ gap: 8 }}>
+        <RNText style={{ fontSize: 13, fontWeight: '500', fontFamily: 'monospace', color: palette.textSecondary }}>
           {airport.icaoCode}
-        </Text>
+        </RNText>
         <ChevronRight size={14} color={palette.textTertiary} strokeWidth={1.8} />
       </View>
     </Pressable>

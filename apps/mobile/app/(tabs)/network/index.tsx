@@ -20,7 +20,6 @@ import {
 import type { LucideIcon } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
-import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
 
 interface CardDef {
   code: string
@@ -83,7 +82,6 @@ export default function NetworkHub() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
-      <BreadcrumbHeader moduleCode="1" />
       <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
         {/* Header */}
         <View

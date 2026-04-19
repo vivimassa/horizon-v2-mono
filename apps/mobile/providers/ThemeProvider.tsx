@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { useColorScheme, Appearance, useWindowDimensions } from 'react-native'
+import { Appearance, useWindowDimensions } from 'react-native'
 import { colors, accentTint, darkAccent, type Palette } from '@skyhub/ui/theme'
+import { useThemeStore } from '@skyhub/ui'
 
 /** Resolve accent color for current mode — same hue, 80% saturation, 70% lightness */
 function resolveAccent(hex: string, isDark: boolean): string {
@@ -63,19 +64,13 @@ export function useAppTheme() {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const systemScheme = useColorScheme()
-  const [isDark, setIsDark] = useState(systemScheme === 'dark')
+  // Default to dark mode for every user on every launch — the SkyHub hub is
+  // designed dark-first (wallpapers, glass, accent glows all read strongest
+  // on dark). Users can still flip via the UserMenu toggle.
+  const [isDark, setIsDark] = useState(true)
   const [accent, setAccent] = useState('#1e40af')
-  const [manualOverride, setManualOverride] = useState(false)
   const { width } = useWindowDimensions()
   const isTablet = width >= TABLET_WIDTH
-
-  // Only sync from system when user hasn't manually toggled
-  useEffect(() => {
-    if (!manualOverride) {
-      setIsDark(systemScheme === 'dark')
-    }
-  }, [systemScheme, manualOverride])
 
   const palette = isDark ? colors.dark : colors.light
   const resolvedAccent = resolveAccent(accent, isDark)
@@ -83,9 +78,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const scale = isTablet ? 1.2 : 1
   const fs = useCallback((size: number) => Math.round(size * scale), [scale])
 
+  // Sync the shared Zustand useThemeStore whenever the context mode flips.
+  // Shared components in `packages/ui` (Text, ListScreenHeader, etc.) read
+  // palette from that store — without this bridge they always render in
+  // light mode and become invisible on the mobile dark background.
+  useEffect(() => {
+    useThemeStore.getState().setColorMode(isDark ? 'dark' : 'light')
+  }, [isDark])
+
+  useEffect(() => {
+    useThemeStore.getState().setAccentColor(accent)
+  }, [accent])
+
   const toggleDark = useCallback(() => {
     const next = !isDark
-    setManualOverride(true)
     setIsDark(next)
     Appearance.setColorScheme(next ? 'dark' : 'light')
   }, [isDark])

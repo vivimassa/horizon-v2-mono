@@ -1,7 +1,6 @@
 import { Text, View, Pressable } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Package, Truck } from 'lucide-react-native'
-import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { accentTint } from '@skyhub/ui/theme'
 
@@ -11,7 +10,6 @@ export default function GroundOps() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
-      <BreadcrumbHeader moduleCode="5" />
       <View className="px-4 pt-4">
         <Text style={{ fontSize: fonts.xl, fontWeight: '700', color: palette.text, marginBottom: 4 }}>Ground Ops</Text>
         <Text style={{ fontSize: fonts.sm, color: palette.textSecondary, marginBottom: 20 }}>

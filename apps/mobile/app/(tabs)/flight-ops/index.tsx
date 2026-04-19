@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Text, View, FlatList, RefreshControl } from 'react-native'
 import { api, type Flight } from '@skyhub/api'
-import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { getStatusColors, type StatusKey, type Palette } from '@skyhub/ui/theme'
 
@@ -140,7 +139,6 @@ export default function FlightOps() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
-      <BreadcrumbHeader moduleCode="2" />
       <FlatList
         data={flights}
         keyExtractor={(item) => item._id}

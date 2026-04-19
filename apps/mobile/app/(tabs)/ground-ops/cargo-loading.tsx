@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { View, ScrollView, Pressable, Text, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ChevronUp, ChevronDown, PlaneTakeoff } from 'lucide-react-native'
-import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { useCargoState } from '../../../hooks/useCargoState'
 import { FlightPickerBar } from '../../../components/cargo/FlightPickerBar'
@@ -26,8 +25,6 @@ export default function CargoLoading() {
   if (isTablet)
     return (
       <View className="flex-1" style={{ backgroundColor: palette.background }}>
-        <BreadcrumbHeader moduleCode="5.1.1" />
-
         {/* Full-screen aircraft workspace */}
         <View className="flex-1" style={{ position: 'relative' }}>
           <AircraftWorkspace
@@ -206,7 +203,6 @@ export default function CargoLoading() {
   // ── Phone layout ──
   return (
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
-      <BreadcrumbHeader moduleCode="5.1.1" />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
         <FlightPickerBar
           selectedFlight={state.selectedFlight}

@@ -1,20 +1,23 @@
 import { useState, useMemo, useCallback, memo } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
-import { Text, View, FlatList, TextInput, Pressable, Alert } from 'react-native'
+import { Text, View, FlatList, Pressable, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { api, type DutyPatternRef } from '@skyhub/api'
-import { Search, ChevronLeft, ChevronDown, Timer, Plus, RefreshCw, Sparkles, Pencil } from 'lucide-react-native'
+import { ChevronDown, Timer, Plus, RefreshCw, Sparkles, Pencil } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
+import { ListScreenHeader, SearchInput } from '@skyhub/ui'
 import { useAppTheme } from '../../../providers/ThemeProvider'
-import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
 import { useOperatorId } from '../../../hooks/useOperatorId'
+import { useHubBack } from '../../../lib/use-hub-back'
 
 const ON_COLOR = '#06C270'
 const OFF_COLOR = '#FF5C5C'
 
 export default function DutyPatternsList() {
   const { palette, isDark, accent } = useAppTheme()
+  // Swipe-back lands on hub home with Master Database pre-opened.
+  useHubBack('settings')
   const operatorId = useOperatorId()
   const [patterns, setPatterns] = useState<DutyPatternRef[]>([])
   const [search, setSearch] = useState('')
@@ -69,56 +72,18 @@ export default function DutyPatternsList() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
-      <BreadcrumbHeader moduleCode="6" />
-      <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
-        <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
-          <View className="flex-row items-center mb-3">
-            <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
-              <ChevronLeft size={24} color={accent} strokeWidth={2} />
-            </Pressable>
-            <View
-              className="items-center justify-center rounded-lg mr-3"
-              style={{ width: 36, height: 36, backgroundColor: accentTint(accent, isDark ? 0.15 : 0.1) }}
-            >
-              <Timer size={18} color={accent} strokeWidth={1.8} />
-            </View>
-            <View className="flex-1">
-              <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>Off/Duty Patterns</Text>
-              <Text style={{ fontSize: 15, color: palette.textSecondary }}>
-                {filtered.length === patterns.length
-                  ? `${patterns.length} pattern${patterns.length !== 1 ? 's' : ''}`
-                  : `${filtered.length} / ${patterns.length} patterns`}
-              </Text>
-            </View>
-            <Pressable
-              onPress={() => router.push('/(tabs)/settings/duty-pattern-add' as any)}
-              className="flex-row items-center px-3 py-2 rounded-lg active:opacity-70"
-              style={{ backgroundColor: accent, gap: 4 }}
-            >
-              <Plus size={16} color="#fff" strokeWidth={2} />
-              <Text style={{ fontSize: 15, fontWeight: '600', color: '#fff' }}>Add</Text>
-            </Pressable>
-          </View>
-          <View
-            className="flex-row items-center rounded-xl"
-            style={{
-              backgroundColor: palette.card,
-              borderWidth: 1,
-              borderColor: palette.cardBorder,
-              paddingHorizontal: 12,
-            }}
-          >
-            <Search size={16} color={palette.textTertiary} strokeWidth={1.8} />
-            <TextInput
-              className="flex-1 py-2.5 ml-2"
-              style={{ fontSize: 15, color: palette.text }}
-              placeholder="Search code, description..."
-              placeholderTextColor={palette.textTertiary}
-              value={search}
-              onChangeText={setSearch}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+      <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: palette.border, paddingBottom: 12, paddingTop: 4 }}>
+          <ListScreenHeader
+            icon={Timer}
+            title="Off/Duty Patterns"
+            count={patterns.length}
+            filteredCount={filtered.length}
+            countLabel="pattern"
+            onAdd={() => router.push('/(tabs)/settings/duty-pattern-add' as any)}
+          />
+          <View style={{ paddingHorizontal: 16 }}>
+            <SearchInput placeholder="Search code, description..." value={search} onChangeText={setSearch} />
           </View>
         </View>
 

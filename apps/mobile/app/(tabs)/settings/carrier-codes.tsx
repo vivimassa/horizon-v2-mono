@@ -6,14 +6,16 @@ import { useRouter } from 'expo-router'
 import { api, type CarrierCodeRef } from '@skyhub/api'
 import { ListScreenHeader, SearchInput, Text, Button, EmptyState, Badge, domainIcons } from '@skyhub/ui'
 import { useAppTheme } from '../../../providers/ThemeProvider'
-import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
 import { useOperatorId } from '../../../hooks/useOperatorId'
+import { useHubBack } from '../../../lib/use-hub-back'
 
 const Building2 = domainIcons.airport
 const ChevronRight = domainIcons.chevronRight
 
 export default function CarrierCodesList() {
   const { palette, isDark, accent } = useAppTheme()
+  // Swipe-back lands on hub home with Master Database pre-opened.
+  useHubBack('settings')
   const operatorId = useOperatorId()
   const [carriers, setCarriers] = useState<CarrierCodeRef[]>([])
   const [search, setSearch] = useState('')
@@ -51,9 +53,8 @@ export default function CarrierCodesList() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
-      <BreadcrumbHeader moduleCode="6" />
-      <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
-        <View style={{ borderBottomWidth: 1, borderBottomColor: palette.border, paddingBottom: 12 }}>
+      <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: palette.border, paddingBottom: 12, paddingTop: 4 }}>
           <ListScreenHeader
             icon={Building2}
             title="Carrier Codes"
@@ -61,7 +62,6 @@ export default function CarrierCodesList() {
             filteredCount={filtered.length}
             countLabel="carrier"
             addLabel="Add"
-            onBack={() => router.back()}
             onAdd={() => router.push('/(tabs)/settings/carrier-code-add' as any)}
           />
           <View style={{ paddingHorizontal: 16 }}>

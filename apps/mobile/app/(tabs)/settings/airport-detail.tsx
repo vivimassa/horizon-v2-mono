@@ -221,7 +221,9 @@ export default function AirportDetailScreen() {
       )}
 
       <View style={{ paddingHorizontal: 12, paddingTop: 4 }}>
-        <TabBar tabs={TABS} activeTab={activeTab} onTabChange={(k) => setActiveTab(k as TabKey)} />
+        {/* `stretch` distributes the 4 tabs across the full width so each has
+           a generous full-width tap target — matches the web tab pattern. */}
+        <TabBar tabs={TABS} activeTab={activeTab} onTabChange={(k) => setActiveTab(k as TabKey)} stretch />
       </View>
 
       <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>

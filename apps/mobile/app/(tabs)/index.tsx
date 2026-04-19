@@ -1,165 +1,154 @@
-import React, { memo } from 'react'
-import { View, Text, FlatList, Image } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { Animated, Easing, Image, StyleSheet, useWindowDimensions, View } from 'react-native'
+import { Image as ExpoImage } from 'expo-image'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react-native'
-import { getStatusColors, type StatusKey, type Palette } from '@skyhub/ui/theme'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAppTheme } from '../../providers/ThemeProvider'
-
-const ACCENT = '#1e40af'
-
-const MOCK_KPIS = [
-  { label: "Today's Flights", value: '284', change: '+12', trend: 'up' as const, color: ACCENT },
-  { label: 'On-Time Rate', value: '91.2%', change: '+2.1%', trend: 'up' as const, color: '#16a34a' },
-  { label: 'Active Disruptions', value: '7', change: '+3', trend: 'up' as const, color: '#dc2626' },
-  { label: 'Crew Available', value: '1,842', change: '+28', trend: 'up' as const, color: '#7c3aed' },
-  { label: 'Aircraft Serviceable', value: '98/102', change: '\u2014', trend: 'neutral' as const, color: '#0f766e' },
-  { label: 'Avg Delay', value: '14m', change: '-3m', trend: 'down' as const, color: '#b45309' },
-]
-
-const MOCK_FLIGHTS: { id: string; flight: string; route: string; std: string; status: StatusKey }[] = [
-  { id: '1', flight: 'VJ-123', route: 'SGN \u2192 HAN', std: '06:30', status: 'onTime' },
-  { id: '2', flight: 'VJ-456', route: 'SGN \u2192 DAD', std: '07:15', status: 'delayed' },
-  { id: '3', flight: 'VJ-789', route: 'HAN \u2192 SGN', std: '08:00', status: 'departed' },
-  { id: '4', flight: 'VJ-321', route: 'DAD \u2192 HAN', std: '09:45', status: 'onTime' },
-  { id: '5', flight: 'VJ-654', route: 'SGN \u2192 CXR', std: '10:30', status: 'cancelled' },
-  { id: '6', flight: 'VJ-987', route: 'HAN \u2192 DAD', std: '11:00', status: 'scheduled' },
-]
-
-const TrendIcon = ({ trend }: { trend: 'up' | 'down' | 'neutral' }) => {
-  if (trend === 'up') return <TrendingUp size={12} color="#16a34a" strokeWidth={2} />
-  if (trend === 'down') return <TrendingDown size={12} color="#dc2626" strokeWidth={2} />
-  return <Minus size={12} color="#888888" strokeWidth={2} />
-}
-
-const KpiCard = memo(function KpiCard({ item, palette }: { item: (typeof MOCK_KPIS)[number]; palette: Palette }) {
-  return (
-    <View
-      className="flex-1 rounded-xl border p-3 m-1 shadow-sm"
-      style={{ backgroundColor: palette.card, borderColor: palette.cardBorder, minWidth: '45%' }}
-    >
-      <Text className="text-[18px] font-semibold mb-1" style={{ color: item.color }}>
-        {item.value}
-      </Text>
-      <Text className="text-[12px] mb-1.5" style={{ color: palette.textSecondary }}>
-        {item.label}
-      </Text>
-      <View className="flex-row items-center gap-1">
-        <TrendIcon trend={item.trend} />
-        <Text className="text-[11px]" style={{ color: palette.textSecondary }}>
-          {item.change}
-        </Text>
-      </View>
-    </View>
-  )
-})
-
-const FlightRow = memo(function FlightRow({
-  item,
-  palette,
-  isDark,
-}: {
-  item: (typeof MOCK_FLIGHTS)[number]
-  palette: Palette
-  isDark: boolean
-}) {
-  const s = getStatusColors(item.status, isDark)
-  const statusLabels: Record<StatusKey, string> = {
-    onTime: 'On Time',
-    delayed: 'Delayed',
-    cancelled: 'Cancelled',
-    departed: 'Departed',
-    diverted: 'Diverted',
-    scheduled: 'Scheduled',
-  }
-  return (
-    <View className="flex-row items-center px-3 py-2.5 min-h-[44px]">
-      <Text className="text-[13px] font-bold w-16" style={{ color: palette.text }}>
-        {item.flight}
-      </Text>
-      <Text className="text-[13px] flex-1" style={{ color: palette.textSecondary }}>
-        {item.route}
-      </Text>
-      <Text className="text-[12px] mr-3" style={{ color: palette.textSecondary }}>
-        {item.std}
-      </Text>
-      <View className="rounded-md px-2 py-0.5" style={{ backgroundColor: s.bg }}>
-        <Text className="text-[11px] font-semibold" style={{ color: s.text }}>
-          {statusLabels[item.status]}
-        </Text>
-      </View>
-    </View>
-  )
-})
+import { HubCarousel, HUB_DOMAINS, type HubDomain } from '../../components/hub/hub-carousel'
+import { HubModulePanel } from '../../components/hub/hub-module-panel'
+import { HubPreviewCard } from '../../components/hub/hub-preview-card'
+import { WallpaperBg } from '../../components/hub/wallpaper-bg'
+import { UserMenu } from '../../components/user-menu'
 
 export default function HomeScreen() {
   const { isDark, palette } = useAppTheme()
+  const { width: viewportW } = useWindowDimensions()
+  const isPhone = viewportW < 768
+  const router = useRouter()
+  // `?domain=<key>` auto-opens that domain's module panel. Mirrors the web
+  // app's `/hub?domain=settings` query flow — this is how the Database and
+  // Admin tabs land the user directly inside a module panel, and also how
+  // swipe-back from a sub-screen (e.g. Airports) returns to the hub with
+  // Master Database already expanded.
+  const params = useLocalSearchParams<{ domain?: string }>()
 
-  const today = new Date().toLocaleDateString('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  const [sel, setSel] = useState<string | null>(null)
+  const selDomain: HubDomain | undefined = sel ? HUB_DOMAINS.find((d) => d.key === sel) : undefined
+
+  // Apply ?domain= once on mount and whenever the param changes. We strip
+  // the param from the URL after reading so tapping the same tab again
+  // doesn't retrigger the panel if the user has since pressed Back.
+  useEffect(() => {
+    const next = typeof params.domain === 'string' ? params.domain : null
+    if (!next) return
+    const match = HUB_DOMAINS.find((d) => d.key === next)
+    if (!match) return
+    setSel(match.key)
+    router.setParams({ domain: undefined })
+  }, [params.domain, router])
+
+  // Entry animation for the content area — re-runs whenever the selection
+  // flips (carousel → module view, or module view → back). Gives the premium
+  // slide-and-fade feel instead of the jarring snap we had before.
+  const fadeAnim = useRef(new Animated.Value(0)).current
+  const slideAnim = useRef(new Animated.Value(24)).current
+  useEffect(() => {
+    fadeAnim.setValue(0)
+    slideAnim.setValue(sel ? 36 : -36)
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 240,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start()
+  }, [sel, fadeAnim, slideAnim])
+
+  const animatedStyle = {
+    opacity: fadeAnim,
+    transform: [{ translateX: slideAnim }],
+  }
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
-      <View className="flex-row items-center justify-between px-4 pt-3 pb-2">
-        <View>
-          <Text className="text-[20px] font-semibold" style={{ color: palette.text }}>
-            Home
-          </Text>
-          <Text className="text-[12px]" style={{ color: palette.textSecondary }}>
-            {today} {'\u2022'} Sky Hub
-          </Text>
-        </View>
-        <Image
-          source={require('../../assets/skyhub-logo.png')}
-          style={{
-            width: 150,
-            height: 40,
-            opacity: isDark ? 0.85 : 0.9,
-            marginRight: -30,
-            tintColor: isDark ? '#ffffff' : undefined,
-          }}
-          resizeMode="contain"
-        />
-      </View>
-
-      <FlatList
-        data={MOCK_FLIGHTS}
-        keyExtractor={(item) => item.id}
-        contentContainerClassName="px-4 pb-4 pt-2"
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          <View>
-            <View className="flex-row flex-wrap mb-6">
-              {MOCK_KPIS.map((kpi) => (
-                <View key={kpi.label} className="w-1/2">
-                  <KpiCard item={kpi} palette={palette} />
-                </View>
-              ))}
-            </View>
-
-            <View className="flex-row items-center mt-2 mb-2">
-              <View className="w-[3px] h-4 rounded-full mr-2" style={{ backgroundColor: ACCENT }} />
-              <Text className="text-[15px] font-bold" style={{ color: palette.text, letterSpacing: -0.3 }}>
-                Today's Flights
-              </Text>
-            </View>
-          </View>
-        }
-        renderItem={({ item, index }) => (
+    <View style={{ flex: 1, backgroundColor: palette.background }}>
+      {/* Background layer — rotating aviation wallpaper while on the carousel,
+         swaps to the selected domain's cover (blurred) when inside a module. */}
+      {selDomain ? (
+        <View style={StyleSheet.absoluteFill}>
+          <ExpoImage
+            source={selDomain.image}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            blurRadius={18}
+            style={[StyleSheet.absoluteFill, { opacity: 0.55 }]}
+          />
           <View
-            className={`border-l border-r ${index === 0 ? 'rounded-t-xl border-t' : ''} ${index === MOCK_FLIGHTS.length - 1 ? 'rounded-b-xl border-b' : ''}`}
-            style={{ backgroundColor: palette.card, borderColor: palette.cardBorder }}
-          >
-            <FlightRow item={item} palette={palette} isDark={isDark} />
-            {index < MOCK_FLIGHTS.length - 1 && (
-              <View className="ml-3 mr-3" style={{ height: 0.5, backgroundColor: palette.border }} />
-            )}
-          </View>
-        )}
-      />
-    </SafeAreaView>
+            style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(6,6,12,0.55)' : 'rgba(15,15,25,0.35)' }]}
+          />
+        </View>
+      ) : (
+        <WallpaperBg isDark={isDark} overlayOpacity={isDark ? 0.55 : 0.35} />
+      )}
+
+      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        {/* Header — logo flush left, user menu right. */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingLeft: 0,
+            paddingRight: isPhone ? 12 : 20,
+            paddingTop: 6,
+            paddingBottom: 4,
+          }}
+        >
+          <Image
+            source={require('../../assets/skyhub-logo.png')}
+            style={{
+              width: isPhone ? 170 : 210,
+              height: isPhone ? 46 : 56,
+              marginLeft: isPhone ? -22 : -28,
+              // White on dark, black on light — follows theme, independent of
+              // whether a module is selected.
+              tintColor: isDark ? '#ffffff' : '#000000',
+              opacity: isDark ? 0.9 : 0.85,
+            }}
+            resizeMode="contain"
+          />
+          <UserMenu overlay compact={isPhone} />
+        </View>
+
+        {/* Body — three modes:
+           1. No selection → carousel
+           2. Selection + phone → full-width module panel
+           3. Selection + tablet → split view (card left, module panel right) */}
+        <Animated.View
+          style={[
+            {
+              flex: 1,
+              paddingHorizontal: isPhone ? 12 : 20,
+              paddingTop: isPhone ? 8 : 16,
+              paddingBottom: 8,
+            },
+            animatedStyle,
+          ]}
+        >
+          {!selDomain ? (
+            <HubCarousel onSelect={setSel} isDark={isDark} />
+          ) : isPhone ? (
+            <HubModulePanel domain={selDomain} onBack={() => setSel(null)} isDark={isDark} />
+          ) : (
+            <View style={{ flex: 1, flexDirection: 'row', gap: 20 }}>
+              {/* LEFT: pinned preview card (~42% like web) */}
+              <View style={{ flex: 42, justifyContent: 'center' }}>
+                <HubPreviewCard domain={selDomain} />
+              </View>
+              {/* RIGHT: module tree panel (~58%) */}
+              <View style={{ flex: 58 }}>
+                <HubModulePanel domain={selDomain} onBack={() => setSel(null)} isDark={isDark} />
+              </View>
+            </View>
+          )}
+        </Animated.View>
+      </SafeAreaView>
+    </View>
   )
 }

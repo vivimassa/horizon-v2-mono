@@ -23,13 +23,12 @@ import {
   Activity,
   PackageOpen,
   ChevronRight,
-  ChevronLeft,
   Database,
 } from 'lucide-react-native'
 import type { LucideIcon } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
-import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
+import { useHubBack } from '../../../lib/use-hub-back'
 
 // ── Section & card definitions ──
 
@@ -214,21 +213,17 @@ const SECTIONS: SectionDef[] = [
 export default function MasterDatabaseScreen() {
   const router = useRouter()
   const { isDark, palette, accent, isTablet } = useAppTheme()
+  // Swipe-back lands on hub home with Master Database pre-opened.
+  useHubBack('settings')
 
   return (
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
-      <BreadcrumbHeader moduleCode="6" />
-      <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
-        {/* Header — hide back button on tablet (breadcrumb handles navigation) */}
+      <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
+        {/* Header */}
         <View
           className="flex-row items-center px-4 pt-2 pb-3"
           style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}
         >
-          {!isTablet && (
-            <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
-              <ChevronLeft size={24} color={accent} strokeWidth={2} />
-            </Pressable>
-          )}
           <View
             className="items-center justify-center rounded-lg mr-3"
             style={{ width: 36, height: 36, backgroundColor: accentTint(accent, isDark ? 0.15 : 0.1) }}

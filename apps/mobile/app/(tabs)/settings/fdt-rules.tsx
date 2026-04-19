@@ -11,7 +11,6 @@ import {
   type FdtlTabGroup,
 } from '@skyhub/api'
 import {
-  ChevronLeft,
   ChevronRight,
   ShieldCheck,
   Sparkles,
@@ -33,8 +32,8 @@ import {
 import type { LucideIcon } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
-import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
 import { useOperatorId } from '../../../hooks/useOperatorId'
+import { useHubBack } from '../../../lib/use-hub-back'
 
 const TAB_ICONS: Record<string, LucideIcon> = {
   fdp: Clock,
@@ -57,6 +56,8 @@ const TAB_ICONS: Record<string, LucideIcon> = {
 
 export default function FdtRulesScreen() {
   const { palette, isDark, accent } = useAppTheme()
+  // Swipe-back lands on hub home with Master Database pre-opened.
+  useHubBack('settings')
   const operatorId = useOperatorId()
   const router = useRouter()
 
@@ -134,7 +135,6 @@ export default function FdtRulesScreen() {
   if (loading) {
     return (
       <View className="flex-1" style={{ backgroundColor: palette.background }}>
-        <BreadcrumbHeader moduleCode="6" />
         <View className="flex-1 justify-center items-center">
           <Text style={{ fontSize: 15, color: palette.textTertiary }}>Loading FDTL configuration...</Text>
         </View>
@@ -146,13 +146,9 @@ export default function FdtRulesScreen() {
   if (!scheme) {
     return (
       <View className="flex-1" style={{ backgroundColor: palette.background }}>
-        <BreadcrumbHeader moduleCode="6" />
-        <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
+        <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
           <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
             <View className="flex-row items-center">
-              <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
-                <ChevronLeft size={24} color={accent} strokeWidth={2} />
-              </Pressable>
               <View
                 className="items-center justify-center rounded-lg mr-3"
                 style={{ width: 36, height: 36, backgroundColor: accentTint(accent, isDark ? 0.15 : 0.1) }}
@@ -237,13 +233,9 @@ export default function FdtRulesScreen() {
   // ── Tab Navigation Hub (scheme exists) ──
   return (
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
-      <BreadcrumbHeader moduleCode="6" />
-      <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
+      <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
         <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
           <View className="flex-row items-center">
-            <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
-              <ChevronLeft size={24} color={accent} strokeWidth={2} />
-            </Pressable>
             <View
               className="items-center justify-center rounded-lg mr-3"
               style={{

@@ -1,13 +1,16 @@
 import { useState, useMemo, useCallback, memo } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
-import { Text, View, SectionList, TextInput, Pressable } from 'react-native'
+import { View, SectionList, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { api, type AirportRef } from '@skyhub/api'
-import { Search, ChevronLeft, ChevronRight, MapPin, Plus, Building2, RefreshCw } from 'lucide-react-native'
+import { ChevronRight, MapPin, Plus, Building2, RefreshCw } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
+import { ListScreenHeader, SearchInput, Text, domainIcons } from '@skyhub/ui'
 import { useAppTheme } from '../../../providers/ThemeProvider'
-import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
+import { useHubBack } from '../../../lib/use-hub-back'
+
+const LocationIcon = domainIcons.location
 
 interface CountrySection {
   title: string
@@ -16,6 +19,8 @@ interface CountrySection {
 
 export default function CrewBasesList() {
   const { palette, isDark, accent } = useAppTheme()
+  // Swipe-back lands on hub home with Master Database pre-opened.
+  useHubBack('settings')
   const [bases, setBases] = useState<AirportRef[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -81,58 +86,21 @@ export default function CrewBasesList() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
-      <BreadcrumbHeader moduleCode="6" />
-      <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
-        {/* Header */}
-        <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
-          <View className="flex-row items-center mb-3">
-            <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
-              <ChevronLeft size={24} color={accent} strokeWidth={2} />
-            </Pressable>
-            <View
-              className="items-center justify-center rounded-lg mr-3"
-              style={{ width: 36, height: 36, backgroundColor: accentTint(accent, isDark ? 0.15 : 0.1) }}
-            >
-              <MapPin size={18} color={accent} strokeWidth={1.8} />
-            </View>
-            <View className="flex-1">
-              <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>Crew Bases</Text>
-              <Text style={{ fontSize: 15, color: palette.textSecondary }}>
-                {filteredCount === bases.length
-                  ? `${bases.length} base${bases.length !== 1 ? 's' : ''}`
-                  : `${filteredCount} / ${bases.length} bases`}
-              </Text>
-            </View>
-            <Pressable
-              onPress={() => router.push('/(tabs)/settings/crew-base-add' as any)}
-              className="flex-row items-center px-3 py-2 rounded-lg active:opacity-70"
-              style={{ backgroundColor: accent, gap: 4 }}
-            >
-              <Plus size={16} color="#fff" strokeWidth={2} />
-              <Text style={{ fontSize: 15, fontWeight: '600', color: '#fff' }}>Add Base</Text>
-            </Pressable>
-          </View>
-
-          {/* Search */}
-          <View
-            className="flex-row items-center rounded-xl"
-            style={{
-              backgroundColor: palette.card,
-              borderWidth: 1,
-              borderColor: palette.cardBorder,
-              paddingHorizontal: 12,
-            }}
-          >
-            <Search size={16} color={palette.textTertiary} strokeWidth={1.8} />
-            <TextInput
-              className="flex-1 py-2.5 ml-2"
-              style={{ fontSize: 15, color: palette.text }}
+      <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: palette.border, paddingBottom: 12, paddingTop: 4 }}>
+          <ListScreenHeader
+            icon={LocationIcon}
+            title="Crew Bases"
+            count={bases.length}
+            filteredCount={filteredCount}
+            countLabel="base"
+            onAdd={() => router.push('/(tabs)/settings/crew-base-add' as any)}
+          />
+          <View style={{ paddingHorizontal: 16 }}>
+            <SearchInput
               placeholder="Search IATA, ICAO, name, city, country..."
-              placeholderTextColor={palette.textTertiary}
               value={search}
               onChangeText={setSearch}
-              autoCapitalize="none"
-              autoCorrect={false}
             />
           </View>
         </View>

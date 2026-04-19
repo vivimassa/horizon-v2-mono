@@ -1,13 +1,14 @@
 import { useState, useMemo, useCallback, memo } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
-import { Text, View, FlatList, SectionList, TextInput, Pressable } from 'react-native'
+import { Text, View, FlatList, SectionList, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { api, type CabinClassRef, type LopaConfigRef } from '@skyhub/api'
-import { Search, ChevronLeft, ChevronRight, Armchair, Plus, Plane, Star } from 'lucide-react-native'
+import { ChevronRight, Armchair, Plane, Star } from 'lucide-react-native'
 import { accentTint, modeColor, type Palette } from '@skyhub/ui/theme'
+import { ListScreenHeader, SearchInput } from '@skyhub/ui'
 import { useAppTheme } from '../../../providers/ThemeProvider'
-import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
+import { useHubBack } from '../../../lib/use-hub-back'
 
 type ViewMode = 'cabin-classes' | 'lopa-configs'
 
@@ -18,6 +19,8 @@ interface ConfigSection {
 
 export default function LopaScreen() {
   const { palette, isDark, accent } = useAppTheme()
+  // Swipe-back lands on hub home with Master Database pre-opened.
+  useHubBack('settings')
   const router = useRouter()
 
   const [cabinClasses, setCabinClasses] = useState<CabinClassRef[]>([])
@@ -99,42 +102,28 @@ export default function LopaScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
-      <BreadcrumbHeader moduleCode="6" />
-      <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
-        {/* Header */}
-        <View className="px-4 pt-2 pb-3" style={{ borderBottomWidth: 1, borderBottomColor: palette.border }}>
-          <View className="flex-row items-center mb-3">
-            <Pressable onPress={() => router.back()} className="mr-3 active:opacity-60">
-              <ChevronLeft size={24} color={accent} strokeWidth={2} />
-            </Pressable>
-            <View
-              className="items-center justify-center rounded-lg mr-3"
-              style={{ width: 36, height: 36, backgroundColor: accentTint(accent, isDark ? 0.15 : 0.1) }}
-            >
-              <Armchair size={18} color={accent} strokeWidth={1.8} />
-            </View>
-            <View className="flex-1">
-              <Text style={{ fontSize: 20, fontWeight: '700', color: palette.text }}>LOPA</Text>
-              <Text style={{ fontSize: 13, color: palette.textSecondary }}>
-                {filteredCount === totalCount
-                  ? `${totalCount} ${isCabinMode ? 'classes' : 'configs'}`
-                  : `${filteredCount} / ${totalCount}`}
-              </Text>
-            </View>
-            <Pressable
-              onPress={handleNew}
-              className="flex-row items-center px-3 py-2 rounded-lg active:opacity-70"
-              style={{ backgroundColor: accent, gap: 4 }}
-            >
-              <Plus size={16} color="#fff" strokeWidth={2} />
-              <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>New</Text>
-            </Pressable>
+      <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={['top']}>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: palette.border, paddingBottom: 12, paddingTop: 4 }}>
+          <ListScreenHeader
+            icon={Armchair}
+            title="LOPA"
+            count={totalCount}
+            filteredCount={filteredCount}
+            countLabel={isCabinMode ? 'class' : 'config'}
+            onAdd={handleNew}
+          />
+          <View style={{ paddingHorizontal: 16 }}>
+            <SearchInput
+              placeholder={isCabinMode ? 'Search code or name...' : 'Search aircraft type or config...'}
+              value={search}
+              onChangeText={setSearch}
+            />
           </View>
 
           {/* Segment toggle */}
           <View
-            className="flex-row rounded-lg overflow-hidden mb-3"
-            style={{ borderWidth: 1, borderColor: palette.cardBorder }}
+            className="flex-row rounded-lg overflow-hidden"
+            style={{ borderWidth: 1, borderColor: palette.cardBorder, marginHorizontal: 16, marginTop: 8 }}
           >
             <Pressable
               onPress={() => handleViewChange('cabin-classes')}
@@ -166,29 +155,6 @@ export default function LopaScreen() {
                 Configurations
               </Text>
             </Pressable>
-          </View>
-
-          {/* Search */}
-          <View
-            className="flex-row items-center rounded-xl"
-            style={{
-              backgroundColor: palette.card,
-              borderWidth: 1,
-              borderColor: palette.cardBorder,
-              paddingHorizontal: 12,
-            }}
-          >
-            <Search size={16} color={palette.textTertiary} strokeWidth={1.8} />
-            <TextInput
-              className="flex-1 py-2.5 ml-2"
-              style={{ fontSize: 15, color: palette.text }}
-              placeholder={isCabinMode ? 'Search code or name...' : 'Search aircraft type or config...'}
-              placeholderTextColor={palette.textTertiary}
-              value={search}
-              onChangeText={setSearch}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
           </View>
         </View>
 

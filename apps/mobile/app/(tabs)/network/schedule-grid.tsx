@@ -3,13 +3,12 @@ import { useFocusEffect } from '@react-navigation/native'
 import { Text, View, Pressable, Alert } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { api, type ScheduledFlightRef, type ScenarioRef, type AirportRef } from '@skyhub/api'
+import { api, getApiBaseUrl, type ScheduledFlightRef, type ScenarioRef, type AirportRef } from '@skyhub/api'
 import { LayoutGrid } from 'lucide-react-native'
 import { accentTint } from '@skyhub/ui/theme'
 import { FilterPanel, FilterSection, DateRangePicker, DropdownSelect, MultiSelect } from '@skyhub/ui'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { useDevice } from '../../../hooks/useDevice'
-import { BreadcrumbHeader } from '../../../components/breadcrumb-header'
 import { useOperatorId } from '../../../hooks/useOperatorId'
 import { ScheduleToolbar } from '../../../components/schedule/schedule-toolbar'
 import { RibbonToolbar } from '../../../components/schedule/ribbon-toolbar'
@@ -386,7 +385,6 @@ export default function ScheduleGridScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: palette.background }}>
-      <BreadcrumbHeader moduleCode="1" />
       <SafeAreaView className="flex-1" style={{ backgroundColor: palette.background }} edges={[]}>
         {/* ── Phone layout: header + toolbar + card list ── */}
         {!isTablet && (
@@ -676,7 +674,7 @@ export default function ScheduleGridScreen() {
           palette={palette}
           accent={accent}
           isDark={isDark}
-          apiBaseUrl="http://localhost:3002"
+          apiBaseUrl={getApiBaseUrl()}
         />
         <ExportDialog
           visible={showExport}

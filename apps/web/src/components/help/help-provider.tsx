@@ -45,10 +45,12 @@ export function HelpProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'F1') {
-        e.preventDefault()
-        setState((s) => ({ ...s, open: !s.open }))
-      }
+      // Bare F1 only — Ctrl/Cmd/Alt/Shift + F1 is reserved for page-specific
+      // shortcuts (e.g. Ctrl+F1 opens Pairing Details in 4.1.5.x).
+      if (e.key !== 'F1') return
+      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return
+      e.preventDefault()
+      setState((s) => ({ ...s, open: !s.open }))
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)

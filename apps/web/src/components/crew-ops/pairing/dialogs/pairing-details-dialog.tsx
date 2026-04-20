@@ -17,11 +17,14 @@ import {
   UserX,
   Timer,
   Wrench,
-  Route,
+  HelpCircle,
 } from 'lucide-react'
+import { Tooltip } from '@/components/ui/tooltip'
 import { useTheme } from '@/components/theme-provider'
-import { usePairingStore } from '@/stores/use-pairing-store'
+import { usePairingStore, resolveComplementCounts } from '@/stores/use-pairing-store'
 import { useOperatorStore } from '@/stores/use-operator-store'
+import { COMPLEMENT_TEMPLATES, POSITION_DEFAULT_COLORS } from '@skyhub/logic'
+import type { CrewPositionRef } from '@skyhub/api'
 import { usePairingLegality, useFdtlRuleSet } from '../use-pairing-legality'
 import { PairingStatusBadge } from '../shared/pairing-status-badge'
 import type { Pairing, PairingFlight, PairingLegMeta } from '../types'
@@ -45,6 +48,18 @@ const ACCENT = '#7c3aed'
 interface PairingDetailsDialogProps {
   pairing: Pairing
   onClose: () => void
+  /**
+   * When the dialog is opened from a parent group card (summarising every
+   * replica of the same pairing pattern), pass the aggregate span + SSIM
+   * day-of-week pattern. The header then replaces the single-day `DATE`
+   * chip with a `PERIOD` range and a `FREQUENCY` chip.
+   */
+  periodOverride?: {
+    startDate: string
+    endDate: string
+    frequency: string
+    replicaCount: number
+  }
 }
 
 /**
@@ -52,7 +67,7 @@ interface PairingDetailsDialogProps {
  * list of legs and assigned crew. Ported in content from AIMS' "Details for
  * Crew Route" dialog, re-styled to SkyHub glass aesthetic.
  */
-export function PairingDetailsDialog({ pairing, onClose }: PairingDetailsDialogProps) {
+export function PairingDetailsDialog({ pairing, onClose, periodOverride }: PairingDetailsDialogProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
@@ -66,6 +81,8 @@ export function PairingDetailsDialog({ pairing, onClose }: PairingDetailsDialogP
   }, [onClose])
 
   const pool = usePairingStore((s) => s.flights)
+  const complements = usePairingStore((s) => s.complements)
+  const positions = usePairingStore((s) => s.positions)
   const pairingFlights = useMemo(() => resolvePairingFlights(pairing, pool), [pairing, pool])
 
   const { data: ruleSet } = useFdtlRuleSet()
@@ -87,13 +104,46 @@ export function PairingDetailsDialog({ pairing, onClose }: PairingDetailsDialogP
   const requiredRestMin = resolveRequiredRestMinutes(ruleSet ?? null, dutyMin)
   const nextPossibleDuty = formatNextPossibleDuty(pairing, ruleSet ?? null)
   const routeId = computeRouteId(pairing)
-  const complementStr = formatCrewComplement(pairing.crewCounts)
   // FDP — extract from the first FDP check the engine emitted.
   const fdpCheck = legality.checks.find(
     (c) => c.label === 'Flight Duty Period' || c.label.toUpperCase().includes('FDP'),
   )
   const fdpDisplay = fdpCheck?.actual ?? minutesToHM(Math.max(0, dutyMin - 30)) // rough fallback
-  const aircraftType = pairingFlights[0]?.aircraftType ?? pairing.legs[0]?.aircraftTypeIcao ?? '—'
+  const aircraftType =
+    pairing.aircraftTypeIcao ?? pairingFlights[0]?.aircraftType ?? pairing.legs[0]?.aircraftTypeIcao ?? '—'
+
+  // Crew complement resolution — prefer what was stored on the pairing, fall
+  // back to the 5.4.3 catalog so older pairings (created before auto-fill was
+  // wired) still render the correct breakdown.
+  //
+  // We filter the resolved map to positions that are currently active in 5.4.2
+  // because seeded complements may still contain codes for positions that have
+  // since been retired (e.g. an operator who started with PS/FA and later
+  // switched to PU/CA only — the old counts linger in the document but must
+  // not surface to the user, just like the admin screen filters them out).
+  const resolvedCrewCounts = useMemo(() => {
+    const raw =
+      pairing.crewCounts ??
+      resolveComplementCounts(
+        complements,
+        pairing.aircraftTypeIcao ?? pairing.legs[0]?.aircraftTypeIcao ?? null,
+        pairing.complementKey,
+      )
+    if (!raw) return null
+    if (positions.length === 0) return raw
+    const activeCodes = new Set(positions.filter((p) => p.isActive !== false).map((p) => p.code))
+    const filtered: Record<string, number> = {}
+    for (const [code, n] of Object.entries(raw)) {
+      if (activeCodes.has(code) && n > 0) filtered[code] = n
+    }
+    return filtered
+  }, [pairing, complements, positions])
+  const complementStr = formatCrewComplement(resolvedCrewCounts)
+  const complementTotal = useMemo(
+    () => (resolvedCrewCounts ? Object.values(resolvedCrewCounts).reduce((s, n) => s + (n || 0), 0) : 0),
+    [resolvedCrewCounts],
+  )
+  const complementTemplate = COMPLEMENT_TEMPLATES.find((t) => t.key === pairing.complementKey)
 
   // ── Styling ─────────────────────────────────────────────────────────
   const panelBg = isDark ? 'rgba(25,25,33,0.98)' : 'rgba(255,255,255,0.99)'
@@ -190,31 +240,46 @@ export function PairingDetailsDialog({ pairing, onClose }: PairingDetailsDialogP
               <X size={14} strokeWidth={2.2} />
             </button>
           </div>
-          <div className="flex items-center gap-3 flex-wrap" style={{ fontSize: 13, color: textSecondary }}>
-            <span className="inline-flex items-center gap-1.5">
-              <MapPin size={12} strokeWidth={2} style={{ opacity: 0.6 }} />
-              <span className="tabular-nums">{pairing.baseAirport || '—'}</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Plane size={12} strokeWidth={2} style={{ opacity: 0.6 }} />
-              <span className="tabular-nums">{aircraftType}</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Route size={12} strokeWidth={2} style={{ opacity: 0.6 }} />
-              <span className="truncate tabular-nums">{pairing.routeChain || '—'}</span>
-            </span>
-            <span style={{ opacity: 0.35 }}>|</span>
-            <span className="inline-flex items-center gap-1.5">
-              <CalendarDays size={12} strokeWidth={2} style={{ opacity: 0.6 }} />
-              <span className="tabular-nums">
-                {formatDMY(pairing.startDate)} → {formatDMY(pairing.endDate)}
-              </span>
-            </span>
-            <span style={{ opacity: 0.35 }}>|</span>
-            <span className="inline-flex items-center gap-1.5">
-              <UsersIcon size={12} strokeWidth={2} style={{ opacity: 0.6 }} />
-              <span className="tabular-nums">{complementStr}</span>
-            </span>
+          <div className="flex items-center gap-1.5 flex-wrap mt-2">
+            <MetaChip
+              icon={<MapPin size={11} strokeWidth={2.2} />}
+              label="Base"
+              value={pairing.baseAirport || '—'}
+              isDark={isDark}
+            />
+            <MetaChip
+              icon={<Plane size={11} strokeWidth={2.2} />}
+              label="Aircraft"
+              value={aircraftType}
+              isDark={isDark}
+            />
+            {periodOverride ? (
+              <>
+                <MetaChip
+                  icon={<CalendarDays size={11} strokeWidth={2.2} />}
+                  label={`Period · ${periodOverride.replicaCount} Instances`}
+                  value={`${formatDMY(periodOverride.startDate)} → ${formatDMY(periodOverride.endDate)}`}
+                  isDark={isDark}
+                />
+                <MetaChip
+                  icon={<CalendarDays size={11} strokeWidth={2.2} />}
+                  label="Frequency"
+                  value={periodOverride.frequency || '—'}
+                  isDark={isDark}
+                />
+              </>
+            ) : (
+              <MetaChip
+                icon={<CalendarDays size={11} strokeWidth={2.2} />}
+                label={pairing.pairingDays > 1 ? `${pairing.pairingDays}-day` : 'Date'}
+                value={
+                  pairing.startDate === pairing.endDate
+                    ? formatDMY(pairing.startDate)
+                    : `${formatDMY(pairing.startDate)} → ${formatDMY(pairing.endDate)}`
+                }
+                isDark={isDark}
+              />
+            )}
           </div>
         </div>
 
@@ -263,6 +328,12 @@ export function PairingDetailsDialog({ pairing, onClose }: PairingDetailsDialogP
                 label="Efficiency"
                 value={efficiency > 0 ? efficiency.toFixed(2) : '—'}
                 isDark={isDark}
+                help={
+                  "Block ÷ TAFB — how much of the crew's time away from base was spent flying vs sitting on the ground.\n\n" +
+                  '• Block = total flight time (OOOI) across every leg.\n' +
+                  '• TAFB = report time on the first leg through debrief on the last — the full "away from base" clock.\n\n' +
+                  'A value of 1.00 would mean every minute away was flown (never happens). 0.50 means the crew sat on the ground as long as they flew. Higher = more productive pairing.'
+                }
               />
               <MetricTile icon={<Timer size={13} />} label="TAFB" value={minutesToHM(tafbMin)} isDark={isDark} />
 
@@ -288,6 +359,20 @@ export function PairingDetailsDialog({ pairing, onClose }: PairingDetailsDialogP
                 mono
               />
             </div>
+          </section>
+
+          {/* Crew complement — required positions per 5.4.3 catalog */}
+          <section>
+            <SectionHeader icon={<UsersIcon size={13} strokeWidth={2} />} label="Crew Complement" isDark={isDark} />
+            <CrewComplementPanel
+              counts={resolvedCrewCounts}
+              total={complementTotal}
+              positions={positions}
+              templateLabel={complementTemplate?.label ?? pairing.complementKey}
+              templateBadge={complementTemplate?.badge ?? pairing.complementKey.toUpperCase()}
+              templateBadgeColor={complementTemplate?.badgeColor ?? '#6B7280'}
+              isDark={isDark}
+            />
           </section>
 
           {/* Crew list — placeholder for 3.2.x */}
@@ -356,6 +441,46 @@ export function PairingDetailsDialog({ pairing, onClose }: PairingDetailsDialogP
 }
 
 // ── Small visual primitives ──────────────────────────────────────────
+
+// Compact header-row metadata chip: tiny uppercase label + value, wrapped in
+// a subtle rounded pill so the row reads as a group of tags rather than a
+// pipe-delimited sentence.
+function MetaChip({
+  icon,
+  label,
+  value,
+  isDark,
+  truncate = false,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string
+  isDark: boolean
+  truncate?: boolean
+}) {
+  const bg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)'
+  const border = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)'
+  const labelColor = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(71,85,105,0.65)'
+  const valueColor = isDark ? '#F5F2FD' : '#1C1C28'
+  const iconColor = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(71,85,105,0.70)'
+  return (
+    <span
+      className={`inline-flex items-center gap-2 h-7 pl-2 pr-2.5 rounded-full ${truncate ? 'min-w-0 max-w-full' : ''}`}
+      style={{ background: bg, border: `1px solid ${border}` }}
+    >
+      <span style={{ color: iconColor }}>{icon}</span>
+      <span className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: labelColor }}>
+        {label}
+      </span>
+      <span
+        className={`text-[13px] font-semibold tabular-nums ${truncate ? 'truncate' : ''}`}
+        style={{ color: valueColor }}
+      >
+        {value}
+      </span>
+    </span>
+  )
+}
 
 function SectionHeader({
   icon,
@@ -433,6 +558,7 @@ function MetricTile({
   isDark,
   wide = false,
   mono = false,
+  help,
 }: {
   icon: React.ReactNode
   label: string
@@ -440,6 +566,8 @@ function MetricTile({
   isDark: boolean
   wide?: boolean
   mono?: boolean
+  /** Optional explainer — renders a small `(?)` after the label with a hover tooltip. */
+  help?: string
 }) {
   const textPrimary = isDark ? '#F5F2FD' : '#1C1C28'
   const textMuted = isDark ? '#8F90A6' : '#555770'
@@ -456,6 +584,25 @@ function MetricTile({
       >
         {icon}
         {label}
+        {help && (
+          <Tooltip content={help} multiline maxWidth={300}>
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-full transition-colors"
+              style={{
+                width: 14,
+                height: 14,
+                marginLeft: 2,
+                color: textMuted,
+                background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+              aria-label={`Learn more about ${label}`}
+            >
+              <HelpCircle size={10} strokeWidth={2.2} />
+            </button>
+          </Tooltip>
+        )}
       </div>
       <div
         className={`text-[15px] font-bold ${mono ? 'tabular-nums' : ''}`}
@@ -605,7 +752,11 @@ function LegsTable({
                   <span style={{ color: textPrimary }}>{minutesToHM(leg.blockMinutes ?? 0)}</span>
                 </Td>
                 <Td isDark={isDark}>
-                  <TailCell tail={f?.tailNumber ?? null} fallback={leg.aircraftTypeIcao ?? '—'} isDark={isDark} />
+                  <TailCell
+                    tail={leg.tailNumber ?? f?.tailNumber ?? null}
+                    fallback={leg.aircraftTypeIcao ?? '—'}
+                    isDark={isDark}
+                  />
                 </Td>
                 <Td isDark={isDark}>
                   {isDhc ? (
@@ -774,6 +925,197 @@ function formatDateInTz(utcIso: string, tz: string): string {
   } catch {
     return formatDMY(utcIso.slice(0, 10))
   }
+}
+
+// ── Crew Complement panel ───────────────────────────────────────────
+// Renders the per-position breakdown (CP/FO/PU/CA/…) for the pairing's
+// selected complement template. Order: cockpit positions first by rankOrder,
+// then cabin positions by rankOrder, then any extra unknown codes (so custom
+// operator positions still surface). Source of truth: `pairing.crewCounts`
+// when stored, else the 5.4.3 catalog lookup from the pairing store.
+
+function CrewComplementPanel({
+  counts,
+  total,
+  positions,
+  templateLabel,
+  templateBadge,
+  templateBadgeColor,
+  isDark,
+}: {
+  counts: Record<string, number> | null
+  total: number
+  positions: CrewPositionRef[]
+  templateLabel: string
+  templateBadge: string
+  templateBadgeColor: string
+  isDark: boolean
+}) {
+  const textPrimary = isDark ? '#F5F2FD' : '#1C1C28'
+  const textSecondary = isDark ? 'rgba(255,255,255,0.65)' : 'rgba(71,85,105,0.85)'
+  const textMuted = isDark ? '#8F90A6' : '#555770'
+  const subtleBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.025)'
+  const border = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)'
+
+  if (!counts || total === 0) {
+    return (
+      <div
+        className="flex items-center gap-2 px-3 py-2.5 rounded-xl mt-3"
+        style={{ background: subtleBg, border: `1px solid ${border}` }}
+      >
+        <UsersIcon size={14} strokeWidth={1.8} style={{ color: textMuted }} />
+        <span className="text-[12px]" style={{ color: textSecondary }}>
+          No complement configured for this aircraft type. Set it up in Admin → Crew Complements.
+        </span>
+      </div>
+    )
+  }
+
+  // Build the ordered list: known positions (cockpit first, then cabin) by
+  // rankOrder, then any unknown codes from the counts map.
+  const cockpit = positions.filter((p) => p.category === 'cockpit').sort((a, b) => a.rankOrder - b.rankOrder)
+  const cabin = positions.filter((p) => p.category === 'cabin').sort((a, b) => a.rankOrder - b.rankOrder)
+  const knownCodes = new Set([...cockpit, ...cabin].map((p) => p.code))
+  const extras = Object.keys(counts).filter((c) => !knownCodes.has(c) && (counts[c] ?? 0) > 0)
+
+  const cockpitItems = cockpit.filter((p) => (counts[p.code] ?? 0) > 0)
+  const cabinItems = cabin.filter((p) => (counts[p.code] ?? 0) > 0)
+
+  return (
+    <div className="mt-3 rounded-xl px-3 py-3" style={{ background: subtleBg, border: `1px solid ${border}` }}>
+      {/* Template header */}
+      <div className="flex items-center gap-2 mb-2.5">
+        <span
+          className="px-2 h-5 inline-flex items-center rounded text-[10px] font-bold tracking-[0.06em]"
+          style={{
+            background: `${templateBadgeColor}22`,
+            color: templateBadgeColor,
+            border: `1px solid ${templateBadgeColor}55`,
+          }}
+        >
+          {templateBadge}
+        </span>
+        <span className="text-[13px] font-semibold" style={{ color: textPrimary }}>
+          {templateLabel}
+        </span>
+        <span className="flex-1" />
+        <span
+          className="text-[11px] font-semibold tabular-nums px-2 h-5 inline-flex items-center rounded"
+          style={{
+            background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.06)',
+            color: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(71,85,105,0.90)',
+            border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'}`,
+          }}
+        >
+          {total} crew
+        </span>
+      </div>
+
+      {/* Position groups */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        {cockpitItems.length > 0 && (
+          <PositionGroup label="Flight Deck" labelColor={isDark ? '#60a5fa' : '#2563eb'} isDark={isDark}>
+            {cockpitItems.map((p) => (
+              <PositionPill
+                key={p.code}
+                code={p.code}
+                name={p.name}
+                count={counts[p.code] ?? 0}
+                color={p.color || POSITION_DEFAULT_COLORS[p.code] || '#3b82f6'}
+                isDark={isDark}
+              />
+            ))}
+          </PositionGroup>
+        )}
+        {cabinItems.length > 0 && (
+          <PositionGroup label="Cabin Crew" labelColor={isDark ? '#fbbf24' : '#d97706'} isDark={isDark}>
+            {cabinItems.map((p) => (
+              <PositionPill
+                key={p.code}
+                code={p.code}
+                name={p.name}
+                count={counts[p.code] ?? 0}
+                color={p.color || POSITION_DEFAULT_COLORS[p.code] || '#f59e0b'}
+                isDark={isDark}
+              />
+            ))}
+          </PositionGroup>
+        )}
+        {extras.length > 0 && (
+          <PositionGroup label="Other" labelColor={textMuted} isDark={isDark}>
+            {extras.map((code) => (
+              <PositionPill
+                key={code}
+                code={code}
+                name={code}
+                count={counts[code] ?? 0}
+                color={POSITION_DEFAULT_COLORS[code] || '#6b7280'}
+                isDark={isDark}
+              />
+            ))}
+          </PositionGroup>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function PositionGroup({
+  label,
+  labelColor,
+  children,
+  isDark: _isDark,
+}: {
+  label: string
+  labelColor: string
+  children: React.ReactNode
+  isDark: boolean
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className="text-[10px] font-semibold uppercase tracking-[0.08em]"
+        style={{ color: labelColor, minWidth: 74 }}
+      >
+        {label}
+      </span>
+      <div className="flex flex-wrap items-center gap-1.5">{children}</div>
+    </div>
+  )
+}
+
+function PositionPill({
+  code,
+  name,
+  count,
+  color,
+  isDark,
+}: {
+  code: string
+  name: string
+  count: number
+  color: string
+  isDark: boolean
+}) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 h-6 pl-1 pr-2 rounded-md text-[11px] font-semibold tabular-nums"
+      title={`${name} × ${count}`}
+      style={{
+        background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)',
+        border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)'}`,
+        color: isDark ? '#F5F2FD' : '#1C1C28',
+      }}
+    >
+      <span
+        className="inline-flex items-center justify-center rounded h-4 px-1 text-[10px] font-bold tracking-[0.04em]"
+        style={{ background: color, color: '#fff', minWidth: 22 }}
+      >
+        {code}
+      </span>
+      × {count}
+    </span>
+  )
 }
 
 // Re-export the leg type for callers that want it

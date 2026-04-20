@@ -9,9 +9,13 @@ interface TooltipProps {
   content: string
   children: React.ReactElement<{ onMouseEnter?: React.MouseEventHandler; onMouseLeave?: React.MouseEventHandler }>
   delay?: number
+  /** Let the tooltip wrap onto multiple lines. Content may contain `\n`. */
+  multiline?: boolean
+  /** Max width in px when multiline. Default 280. */
+  maxWidth?: number
 }
 
-export function Tooltip({ content, children, delay = 400 }: TooltipProps) {
+export function Tooltip({ content, children, delay = 400, multiline = false, maxWidth = 280 }: TooltipProps) {
   const [visible, setVisible] = useState(false)
   const [coords, setCoords] = useState({ x: 0, y: 0 })
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -56,12 +60,28 @@ export function Tooltip({ content, children, delay = 400 }: TooltipProps) {
           children.props.onMouseLeave?.(e)
         },
       })}
-      {visible && createPortal(<TooltipPortal x={coords.x} y={coords.y} content={content} />, document.body)}
+      {visible &&
+        createPortal(
+          <TooltipPortal x={coords.x} y={coords.y} content={content} multiline={multiline} maxWidth={maxWidth} />,
+          document.body,
+        )}
     </>
   )
 }
 
-function TooltipPortal({ x, y, content }: { x: number; y: number; content: string }) {
+function TooltipPortal({
+  x,
+  y,
+  content,
+  multiline,
+  maxWidth,
+}: {
+  x: number
+  y: number
+  content: string
+  multiline: boolean
+  maxWidth: number
+}) {
   const isDark = document.documentElement.classList.contains('dark')
 
   return (
@@ -78,15 +98,17 @@ function TooltipPortal({ x, y, content }: { x: number; y: number; content: strin
     >
       <div
         style={{
-          padding: '6px 12px',
+          padding: multiline ? '10px 12px' : '6px 12px',
           borderRadius: 8,
-          fontSize: 12,
-          fontWeight: 500,
+          fontSize: 13,
+          fontWeight: multiline ? 400 : 500,
+          lineHeight: multiline ? 1.45 : 1.2,
           fontFamily: 'Inter, system-ui, sans-serif',
-          whiteSpace: 'nowrap',
+          whiteSpace: multiline ? 'pre-line' : 'nowrap',
+          maxWidth: multiline ? maxWidth : undefined,
           boxShadow: isDark ? '0 4px 16px rgba(0,0,0,0.4)' : '0 4px 16px rgba(0,0,0,0.15)',
           backdropFilter: 'blur(20px) saturate(1.6)',
-          background: isDark ? 'rgba(244,244,245,0.92)' : 'rgba(24,24,27,0.88)',
+          background: isDark ? 'rgba(244,244,245,0.95)' : 'rgba(24,24,27,0.92)',
           color: isDark ? '#18181b' : '#fafafa',
         }}
       >

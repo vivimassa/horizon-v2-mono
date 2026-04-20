@@ -5,8 +5,8 @@ import { createPortal } from 'react-dom'
 import { CalendarDays, Copy, CheckCircle2, AlertTriangle, XCircle, X, Loader2 } from 'lucide-react'
 import { api, type PairingCreateInput } from '@skyhub/api'
 import { useTheme } from '@/components/theme-provider'
+import { Tooltip } from '@/components/ui/tooltip'
 import { usePairingStore } from '@/stores/use-pairing-store'
-import { usePairingLegality } from '../use-pairing-legality'
 import { pairingFromApi } from '../adapters'
 import type { Pairing, PairingFlight } from '../types'
 
@@ -177,6 +177,16 @@ export function ReplicatePairingDialog({ source, onClose }: ReplicatePairingDial
     return rows
   }, [periodFrom, periodTo, flights, source])
 
+  // SSIM frequency string (e.g. "1234567", "135") read off the source pairing's
+  // first leg via the flight pool. All legs of a replicable pairing share the
+  // same schedule pattern, so the first leg is representative.
+  const frequencySsim = useMemo(() => {
+    if (source.legs.length === 0) return ''
+    const firstLegSid = source.legs[0].flightId.split('__')[0]
+    const anyInstance = flights.find((f) => f.scheduledFlightId === firstLegSid)
+    return anyInstance?.daysOfWeek ?? ''
+  }, [flights, source])
+
   // ── Pre-select rows that are ready + match the frequency mask ────────
   const [selectedDates, setSelectedDates] = useState<Set<string>>(() => {
     const s = new Set<string>()
@@ -202,20 +212,6 @@ export function ReplicatePairingDialog({ source, onClose }: ReplicatePairingDial
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidates.length])
 
-  // ── Per-date legality preview (only runs against currently-selected rows) ─
-  const activeComplementKey = usePairingStore((s) => s.activeComplementKey)
-  const previewFlights = useMemo<PairingFlight[]>(() => {
-    // Use the first selected date's flights for a quick preview.
-    // Per-date recompute would require N hooks — deferred.
-    const first = candidates.find((r) => selectedDates.has(r.date))
-    return first?.flights ?? []
-  }, [candidates, selectedDates])
-  const { result: previewLegality } = usePairingLegality(previewFlights, {
-    complementKey: activeComplementKey,
-    facilityClass: activeComplementKey === 'standard' ? undefined : 'CLASS_1',
-    homeBase: previewFlights[0]?.departureAirport,
-  })
-
   const toggleDate = (date: string) => {
     setSelectedDates((prev) => {
       const next = new Set(prev)
@@ -234,6 +230,37 @@ export function ReplicatePairingDialog({ source, onClose }: ReplicatePairingDial
   }
 
   const clearSelection = () => setSelectedDates(new Set())
+
+  /** Toggle every ready row on the given SSIM weekday (1=Mon…7=Sun). */
+  const toggleWeekday = (ssimDay: number) => {
+    const wd = ssimDay - 1 // weekday 0..6 Mon..Sun matches DayRow.weekday
+    const matching = candidates.filter((r) => r.weekday === wd && r.status.startsWith('ready'))
+    if (matching.length === 0) return
+    const allSelected = matching.every((r) => selectedDates.has(r.date))
+    setSelectedDates((prev) => {
+      const next = new Set(prev)
+      for (const r of matching) {
+        if (allSelected) next.delete(r.date)
+        else next.add(r.date)
+      }
+      return next
+    })
+  }
+
+  /** Per-digit selection state that drives the frequency chip visuals. */
+  const weekdayChipState = useMemo(() => {
+    return [1, 2, 3, 4, 5, 6, 7].map((n) => {
+      const wd = n - 1
+      const ready = candidates.filter((r) => r.weekday === wd && r.status.startsWith('ready'))
+      const selected = ready.filter((r) => selectedDates.has(r.date))
+      return {
+        n,
+        readyCount: ready.length,
+        selectedCount: selected.length,
+        inSourcePattern: frequencySsim.includes(String(n)),
+      }
+    })
+  }, [candidates, selectedDates, frequencySsim])
 
   // Escape closes
   useEffect(() => {
@@ -256,46 +283,48 @@ export function ReplicatePairingDialog({ source, onClose }: ReplicatePairingDial
     setProgress({ done: 0, total: toCreate.length, failed: 0 })
     setError(null)
 
-    let failed = 0
-    for (let i = 0; i < toCreate.length; i += 1) {
-      const row = toCreate[i]
-      try {
-        const legs: PairingCreateInput['legs'] = row.flights.map((f, idx) => ({
-          flightId: f.id,
-          flightDate: f.instanceDate,
-          legOrder: idx,
-          isDeadhead: false,
-          dutyDay: 1,
-          depStation: f.departureAirport,
-          arrStation: f.arrivalAirport,
-          flightNumber: f.flightNumber,
-          stdUtcIso: f.stdUtc,
-          staUtcIso: f.staUtc,
-          blockMinutes: f.blockMinutes,
-          aircraftTypeIcao: f.aircraftType || null,
-        }))
-        const created = await api.createPairing({
-          pairingCode: source.pairingCode, // shared code — same duty pattern
-          baseAirport: source.baseAirport,
-          aircraftTypeIcao: source.legs[0]?.aircraftTypeIcao ?? row.flights[0]?.aircraftType ?? null,
-          complementKey: source.complementKey,
-          cockpitCount: source.cockpitCount,
-          facilityClass: source.facilityClass,
-          legs,
-          fdtlStatus: 'legal', // optimistic; the inspector will show the real result on click
-          workflowStatus: source.workflowStatus,
-        })
-        addPairing(pairingFromApi(created))
-      } catch (err) {
-        failed += 1
-        console.error('replicate failed for', row.date, err)
-      }
-      setProgress({ done: i + 1, total: toCreate.length, failed })
-    }
+    // Build the bulk payload — one round-trip for the whole replicate set
+    // instead of N sequential POSTs (was visibly slow at 30d periods).
+    const items = toCreate.map((row) => {
+      const legs: PairingCreateInput['legs'] = row.flights.map((f, idx) => ({
+        flightId: f.id,
+        flightDate: f.instanceDate,
+        legOrder: idx,
+        isDeadhead: false,
+        dutyDay: 1,
+        depStation: f.departureAirport,
+        arrStation: f.arrivalAirport,
+        flightNumber: f.flightNumber,
+        stdUtcIso: f.stdUtc,
+        staUtcIso: f.staUtc,
+        blockMinutes: f.blockMinutes,
+        aircraftTypeIcao: f.aircraftType || null,
+      }))
+      return {
+        pairingCode: source.pairingCode,
+        baseAirport: source.baseAirport,
+        aircraftTypeIcao: source.legs[0]?.aircraftTypeIcao ?? row.flights[0]?.aircraftType ?? null,
+        complementKey: source.complementKey,
+        cockpitCount: source.cockpitCount,
+        facilityClass: source.facilityClass,
+        legs,
+        fdtlStatus: 'legal' as const,
+        workflowStatus: source.workflowStatus,
+      } as PairingCreateInput
+    })
 
-    setRunning(false)
-    // Close once done — leave banner state for caller to decide.
-    onClose()
+    try {
+      const { created, failed } = await api.bulkCreatePairings(items)
+      for (const c of created) addPairing(pairingFromApi(c))
+      setProgress({ done: created.length, total: toCreate.length, failed })
+    } catch (err) {
+      console.error('bulk replicate failed', err)
+      setError(err instanceof Error ? err.message : 'Bulk replicate failed')
+      setProgress({ done: 0, total: toCreate.length, failed: toCreate.length })
+    } finally {
+      setRunning(false)
+      onClose()
+    }
   }
 
   // ── Styling ──────────────────────────────────────────────────────────
@@ -357,49 +386,74 @@ export function ReplicatePairingDialog({ source, onClose }: ReplicatePairingDial
           </button>
         </div>
 
-        {/* Quick actions */}
+        {/* Frequency picker — each digit toggles its weekday independently.
+            1=Mon…7=Sun (SSIM convention). Filled = all ready rows for that
+            weekday are selected; outlined = partial; muted = none. Digits
+            outside the source's daysOfWeek pattern (or with no ready pool
+            rows) are disabled. */}
         <div
-          className="flex items-center gap-2 px-5 py-2.5 shrink-0"
+          className="flex items-center gap-3 px-5 py-2.5 shrink-0"
           style={{ borderBottom: `1px solid ${panelBorder}` }}
         >
           <span className="text-[11px] font-semibold tracking-[0.10em] uppercase" style={{ color: textMuted }}>
-            Quick pick
+            Frequency
           </span>
-          <button
-            type="button"
-            onClick={() => selectAll('matching')}
-            disabled={running}
-            className="text-[12px] font-semibold px-2.5 h-7 rounded-md transition-colors disabled:opacity-40"
-            style={{ background: `${accent}18`, color: accent, border: `1px solid ${accent}44` }}
-          >
-            Frequency-matching days
-          </button>
-          <button
-            type="button"
-            onClick={() => selectAll('all')}
-            disabled={running}
-            className="text-[12px] font-semibold px-2.5 h-7 rounded-md transition-colors disabled:opacity-40"
-            style={{
-              background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)',
-              color: textPrimary,
-              border: `1px solid ${panelBorder}`,
-            }}
-          >
-            All ready days
-          </button>
-          <button
-            type="button"
-            onClick={clearSelection}
-            disabled={running}
-            className="text-[12px] font-semibold px-2.5 h-7 rounded-md transition-colors disabled:opacity-40"
-            style={{
-              background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)',
-              color: textMuted,
-              border: `1px solid ${panelBorder}`,
-            }}
-          >
-            Clear
-          </button>
+          <div className="inline-flex items-center gap-[3px]">
+            {weekdayChipState.map((s) => {
+              const enabled = s.readyCount > 0 && s.inSourcePattern
+              const full = enabled && s.selectedCount === s.readyCount
+              const partial = enabled && s.selectedCount > 0 && s.selectedCount < s.readyCount
+              const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+              const label = WEEKDAY_LABELS[s.n - 1]
+              const bg = full
+                ? accent
+                : partial
+                  ? 'transparent'
+                  : isDark
+                    ? 'rgba(255,255,255,0.04)'
+                    : 'rgba(15,23,42,0.04)'
+              const color = full
+                ? '#fff'
+                : partial
+                  ? accent
+                  : enabled
+                    ? isDark
+                      ? 'rgba(255,255,255,0.55)'
+                      : 'rgba(15,23,42,0.55)'
+                    : isDark
+                      ? 'rgba(255,255,255,0.22)'
+                      : 'rgba(15,23,42,0.22)'
+              const border = partial ? `1.5px solid ${accent}` : '1.5px solid transparent'
+              const tip = enabled
+                ? `${label} — ${s.selectedCount}/${s.readyCount} selected\nClick to ${full ? 'deselect' : 'select'} all ${label}s`
+                : !s.inSourcePattern
+                  ? `${label} — not in source pattern (${frequencySsim || '—'})`
+                  : `${label} — no ready days`
+              return (
+                <Tooltip key={s.n} content={tip} multiline maxWidth={220}>
+                  <button
+                    type="button"
+                    onClick={() => toggleWeekday(s.n)}
+                    disabled={running || !enabled}
+                    className="inline-flex items-center justify-center rounded-[5px] tabular-nums transition-all hover:brightness-110 active:scale-[0.95] disabled:opacity-40 disabled:cursor-not-allowed"
+                    style={{
+                      width: 22,
+                      height: 22,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      background: bg,
+                      color,
+                      border,
+                      boxSizing: 'border-box',
+                      cursor: enabled && !running ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    {s.n}
+                  </button>
+                </Tooltip>
+              )
+            })}
+          </div>
           <span className="flex-1" />
           <span className="text-[11px] font-semibold tabular-nums" style={{ color: textMuted }}>
             {readyCount} day{readyCount === 1 ? '' : 's'} available
@@ -553,35 +607,6 @@ export function ReplicatePairingDialog({ source, onClose }: ReplicatePairingDial
             Replicate
           </button>
         </div>
-
-        {/* Subtle preview of the selected-day legality */}
-        {selectedCount > 0 && !running && (
-          <div
-            className="px-5 py-2 text-[11px]"
-            style={{
-              borderTop: `1px solid ${panelBorder}`,
-              background: isDark ? 'rgba(0,0,0,0.20)' : 'rgba(15,23,42,0.03)',
-              color: textMuted,
-            }}
-          >
-            Preview (first day):{' '}
-            <strong
-              style={{
-                color:
-                  previewLegality.overallStatus === 'pass'
-                    ? '#06C270'
-                    : previewLegality.overallStatus === 'warning'
-                      ? '#FF8800'
-                      : '#FF3B3B',
-              }}
-            >
-              {previewLegality.overallStatus.toUpperCase()}
-            </strong>
-            {' · '}
-            {previewLegality.checks.length} rules evaluated. Replicas are created with their own per-day legality
-            stamped server-side.
-          </div>
-        )}
       </div>
     </div>,
     document.body,
@@ -625,11 +650,11 @@ function Td({ children, isDark }: { children: React.ReactNode; isDark: boolean }
 function StatusChip({ status, isDark }: { status: RowStatus; isDark: boolean }) {
   const cfg: Record<RowStatus, { label: string; color: string; Icon: typeof CheckCircle2 }> = {
     source: { label: 'Source', color: '#7c3aed', Icon: Copy },
-    'ready-legal': { label: 'Ready', color: '#06C270', Icon: CheckCircle2 },
+    'ready-legal': { label: 'Ready', color: '#D4A017', Icon: CheckCircle2 },
     'ready-warning': { label: 'Warning', color: '#FF8800', Icon: AlertTriangle },
     'ready-violation': { label: 'Violation', color: '#FF3B3B', Icon: XCircle },
     'missing-flights': { label: 'No flights', color: isDark ? '#8F90A6' : '#555770', Icon: XCircle },
-    'already-covered': { label: 'Already paired', color: '#FF8800', Icon: AlertTriangle },
+    'already-covered': { label: 'Completed', color: '#06C270', Icon: CheckCircle2 },
   }
   const { label, color, Icon } = cfg[status]
   return (

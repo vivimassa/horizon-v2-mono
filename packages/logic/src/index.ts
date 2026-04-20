@@ -32,6 +32,7 @@ export * from './messaging/asm-diff-engine'
 
 // Utils — tail-assignment & ops-tail-assignment both export autoAssignFlights
 export * from './utils/color-helpers'
+export * from './utils/date-format'
 export * from './utils/fdp-calc'
 export * from './utils/flight-display'
 export * from './utils/geo'

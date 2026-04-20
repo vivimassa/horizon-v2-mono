@@ -224,12 +224,51 @@ export function drawBars(
       ctx.fill()
     }
 
-    // Label (only if wide enough) — font scales with bar height
+    // Label (only if wide enough) — font scales with bar height. Sector
+    // labels ("SGN-DAD") stack vertically (DEP on top, ARR on bottom) when
+    // the single-line form doesn't fit, so narrow bars still communicate
+    // both stations instead of truncating to "SGN-…".
     if (bar.width >= 30) {
-      const fs = bar.height >= 48 ? 14 : bar.height >= 36 ? 12 : 11
+      // Dialled back from the earlier bolder scale — planners said the
+      // labels felt too heavy. 600-weight + slightly smaller sizes keeps
+      // them legible without dominating the bar.
+      const fs = bar.height >= 48 ? 13 : bar.height >= 36 ? 12 : bar.height >= 28 ? 11 : 10
       ctx.fillStyle = bar.textColor
-      ctx.font = `700 ${fs}px "JetBrains Mono", ui-monospace, monospace`
-      ctx.fillText(bar.label, bar.x + 6, bar.y + bar.height / 2)
+      ctx.font = `600 ${fs}px "JetBrains Mono", ui-monospace, monospace`
+      const maxTextW = bar.width - 12
+
+      const isSector = bar.label === `${bar.flight.depStation}-${bar.flight.arrStation}`
+      const singleLineW = ctx.measureText(bar.label).width
+
+      if (isSector && singleLineW > maxTextW) {
+        // Two-line stacked rendering. Match the single-line font size when
+        // the bar is tall enough; only shrink when two rows of `fs` would
+        // overflow the bar height.
+        const smallFs = Math.max(9, Math.min(fs, Math.floor((bar.height - 2) / 2)))
+        ctx.font = `600 ${smallFs}px "JetBrains Mono", ui-monospace, monospace`
+        const dep = bar.flight.depStation
+        const arr = bar.flight.arrStation
+        const depW = ctx.measureText(dep).width
+        const arrW = ctx.measureText(arr).width
+        const cy = bar.y + bar.height / 2
+        const lineGap = smallFs
+        // Left-align stacked text to match the single-line origin (bar.x + 6).
+        if (depW <= maxTextW) ctx.fillText(dep, bar.x + 6, cy - lineGap / 2)
+        if (arrW <= maxTextW) ctx.fillText(arr, bar.x + 6, cy + lineGap / 2)
+      } else {
+        let drawn = bar.label
+        if (singleLineW > maxTextW) {
+          drawn = ''
+          for (let n = bar.label.length - 1; n > 0; n--) {
+            const candidate = bar.label.slice(0, n) + '…'
+            if (ctx.measureText(candidate).width <= maxTextW) {
+              drawn = candidate
+              break
+            }
+          }
+        }
+        if (drawn) ctx.fillText(drawn, bar.x + 6, bar.y + bar.height / 2)
+      }
     }
 
     // Protected flight — "no entry" sign (red circle + white bar)

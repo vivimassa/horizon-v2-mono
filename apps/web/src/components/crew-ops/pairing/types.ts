@@ -55,12 +55,15 @@ export interface PairingLegMeta {
   aircraftTypeIcao?: string
   stdUtcIso?: string
   staUtcIso?: string
+  /** Registration the leg was operated by when the pairing was saved. */
+  tailNumber?: string | null
 }
 
 export interface Pairing {
   id: string
   pairingCode: string
   baseAirport: string
+  aircraftTypeIcao: string | null
   status: PairingLegalityStatus
   workflowStatus: PairingWorkflowStatus
   totalBlockMinutes: number

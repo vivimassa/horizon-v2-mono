@@ -223,6 +223,7 @@ function buildPairing(
     id: `pair-${code}-${startDate}`,
     pairingCode: code,
     baseAirport: base,
+    aircraftTypeIcao: flights[0]?.aircraftType ?? null,
     status,
     workflowStatus: workflow,
     totalBlockMinutes: totalBlock,

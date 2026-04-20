@@ -8,6 +8,7 @@ export function pairingFromApi(p: PairingRef): Pairing {
     id: p._id,
     pairingCode: p.pairingCode,
     baseAirport: p.baseAirport,
+    aircraftTypeIcao: p.aircraftTypeIcao ?? p.legs[0]?.aircraftTypeIcao ?? null,
     status: p.fdtlStatus,
     workflowStatus: p.workflowStatus,
     totalBlockMinutes: p.totalBlockMinutes,
@@ -37,6 +38,7 @@ export function pairingFromApi(p: PairingRef): Pairing {
       aircraftTypeIcao: l.aircraftTypeIcao ?? undefined,
       stdUtcIso: l.stdUtcIso,
       staUtcIso: l.staUtcIso,
+      tailNumber: l.tailNumber ?? null,
     })),
   }
 }

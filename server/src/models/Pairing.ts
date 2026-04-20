@@ -22,6 +22,11 @@ const pairingLegSchema = new Schema(
     staUtcIso: { type: String, required: true },
     blockMinutes: { type: Number, required: true },
     aircraftTypeIcao: { type: String, default: null },
+    /** Registration the leg was operated by when the pairing was saved.
+     *  Source cascade at create time: virtual placement (Gantt layout) →
+     *  flight pool `tailNumber` → null. Persisting here means the pairing
+     *  shows the correct tail even when the pool loses its overlay. */
+    tailNumber: { type: String, default: null },
   },
   { _id: false },
 )

@@ -101,6 +101,37 @@ function summarize(legs: z.infer<typeof pairingLegInput>[]): {
 }
 
 export async function pairingRoutes(app: FastifyInstance): Promise<void> {
+  // ── TEMP: probe tail coverage for a date — surfaces what's actually in the DB ──
+  app.get('/pairings/debug/tail-probe', async (req) => {
+    const q = req.query as Record<string, string>
+    const date = q.date ?? new Date().toISOString().slice(0, 10)
+    const operatorId = req.operatorId
+    const total = await FlightInstance.countDocuments({ operatorId, operatingDate: date })
+    const withTail = await FlightInstance.countDocuments({
+      operatorId,
+      operatingDate: date,
+      'tail.registration': { $ne: null },
+    })
+    const sample = await FlightInstance.find(
+      { operatorId, operatingDate: date },
+      { _id: 1, operatingDate: 1, 'tail.registration': 1, scheduledFlightId: 1 },
+    )
+      .limit(5)
+      .lean()
+    const distinctOpDates = await FlightInstance.distinct('operatingDate', {
+      operatorId,
+      operatingDate: { $regex: '^2026-04' },
+    })
+    return {
+      operatorId,
+      queriedDate: date,
+      total,
+      withTail,
+      sample,
+      aprilOperatingDatesFound: distinctOpDates.sort(),
+    }
+  })
+
   // ── Context: bases + aircraft types the user can pair with ──
   app.get('/pairings/context', async (req) => {
     const operatorId = req.operatorId
@@ -124,6 +155,12 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
     const dateFrom = q.dateFrom
     const dateTo = q.dateTo
     if (!dateFrom || !dateTo) return reply.code(400).send({ error: 'dateFrom and dateTo are required' })
+    // `includeBleed=1` asks for cross-midnight flights whose operating date is
+    // the day BEFORE dateFrom but whose STA lands inside the window. The Gantt
+    // view (4.1.5.2) opts in so overnight bars render on the first day; the
+    // Text view (4.1.5.1) stays strict so new pairings never get a
+    // prior-period startDate.
+    const includeBleed = q.includeBleed === '1' || q.includeBleed === 'true'
 
     const scenarioId = q.scenarioId ?? null
     const filter: Record<string, unknown> = {
@@ -145,21 +182,66 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
     // rarely populated directly (SSIM import doesn't set it), so reading the
     // instance overlay is the only way to surface tails the planner has
     // actually assigned. Keyed here as `${scheduledFlightId}__${operatingDate}`.
-    const instanceTails = new Map<string, string>()
+    // Per-date tail overlay — match by composite `_id` (`${sfId}|${opDate}`)
+    // directly, same shape Movement Control's `/gantt/flights` and
+    // `/gantt/bulk-assign` use. We build candidate ids up front from the
+    // schedule pattern so a pre-existing FlightInstance doc (one whose
+    // `operatingDate` / `scheduledFlightId` fields may never have been
+    // populated — e.g. created by a prior seed with only `_id` set) is
+    // still matched by its composite id.
+    const instanceTailById = new Map<string, string>()
     if (flights.length > 0) {
-      const instances = await FlightInstance.find(
-        {
-          operatorId: req.operatorId,
-          operatingDate: { $gte: dateFrom, $lte: dateTo },
-          scheduledFlightId: { $in: flights.map((f) => f._id as string) },
-        },
-        { scheduledFlightId: 1, operatingDate: 1, 'tail.registration': 1 },
-      ).lean()
-      for (const inst of instances) {
-        const reg = (inst as unknown as { tail?: { registration?: string | null } }).tail?.registration
-        if (reg && inst.scheduledFlightId && inst.operatingDate) {
-          instanceTails.set(`${inst.scheduledFlightId}__${inst.operatingDate}`, reg)
+      const DAY_MS_TAIL = 86_400_000
+      const fromMsTail = new Date(dateFrom + 'T00:00:00Z').getTime()
+      const toMsTail = new Date(dateTo + 'T00:00:00Z').getTime()
+      const candidateIds: string[] = []
+      for (const f of flights) {
+        const effFromMs = new Date(`${f.effectiveFrom}T00:00:00Z`).getTime()
+        const effUntilMs = new Date(`${f.effectiveUntil}T00:00:00Z`).getTime()
+        // Movement Control keys FlightInstance by the schedule's operating
+        // date (dayMs). For a cross-midnight flight (arrivalDayOffset > 1
+        // or a late-night STD that we expand via the main-loop lookback)
+        // the instance key is the DAY BEFORE the visible window starts.
+        // Extend the candidate range back by maxOffset days so those are
+        // included — otherwise they look unassigned even when MC has a
+        // real tail on them.
+        const depOffset = (f.departureDayOffset ?? 1) - 1
+        const arrOffset = (f.arrivalDayOffset ?? 1) - 1
+        const maxOffset = Math.max(depOffset, arrOffset)
+        const lookbackMs = (maxOffset + 1) * DAY_MS_TAIL
+        const start = Math.max(effFromMs, fromMsTail - lookbackMs)
+        const end = Math.min(effUntilMs, toMsTail)
+        const dow = f.daysOfWeek ?? '1234567'
+        for (let ms = start; ms <= end; ms += DAY_MS_TAIL) {
+          const iso = new Date(ms).toISOString().slice(0, 10)
+          const jsDay = new Date(iso + 'T12:00:00Z').getUTCDay()
+          const ssimDay = jsDay === 0 ? 7 : jsDay
+          if (!dow.includes(String(ssimDay))) continue
+          candidateIds.push(`${f._id as string}|${iso}`)
         }
+      }
+      if (candidateIds.length > 0) {
+        const instances = await FlightInstance.find(
+          { operatorId: req.operatorId, _id: { $in: candidateIds }, 'tail.registration': { $ne: null } },
+          { _id: 1, 'tail.registration': 1 },
+        ).lean()
+        for (const inst of instances) {
+          const reg = (inst as unknown as { tail?: { registration?: string | null } }).tail?.registration
+          if (reg && inst._id) {
+            instanceTailById.set(inst._id as string, reg)
+          }
+        }
+        req.log.info(
+          {
+            dateFrom,
+            dateTo,
+            candidateIds: candidateIds.length,
+            matched: instances.length,
+            sampleCandidate: candidateIds[0],
+            sampleMatched: instances[0]?._id,
+          },
+          '[pairing-flight-pool] tail overlay id match',
+        )
       }
     }
 
@@ -211,19 +293,40 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
+    // Visible window edges in epoch-ms — used to filter flights whose STD/STA
+    // falls outside the query period even when their operating date does.
+    const DAY_MS = 86_400_000
+    const fromMs = fromD.getTime()
+    const visibleEndMs = toD.getTime() + DAY_MS // inclusive of last day
+
     for (const f of flights) {
       const effFrom = new Date(`${f.effectiveFrom}T00:00:00Z`)
       const effTo = new Date(`${f.effectiveUntil}T00:00:00Z`)
-      const start = effFrom > fromD ? effFrom : fromD
-      const end = effTo < toD ? effTo : toD
 
       const depOffset = (f.departureDayOffset ?? 1) - 1 // 0 = same day, 1 = +1, …
       const arrOffset = (f.arrivalDayOffset ?? 1) - 1
 
+      // Expand operating dates inside the requested period. In strict mode
+      // (Text view, the default) we do NOT reach back into the prior day —
+      // otherwise a cross-midnight flight would leak its prior-month
+      // operating date into newly-created pairings (pairing.startDate = 31
+      // MAR). In bleed mode (Gantt view, opt-in via ?includeBleed=1) we
+      // reach back by `maxOffset + 1` days so overnight bars render on the
+      // first visible day. The downstream std/sta visibility filter below
+      // trims anything that doesn't actually overlap the window.
+      const lookbackDays = includeBleed ? Math.max(depOffset, arrOffset) + 1 : 0
+      const lookbackFromD = lookbackDays > 0 ? new Date(fromD.getTime() - lookbackDays * DAY_MS) : fromD
+      const start = effFrom > lookbackFromD ? effFrom : lookbackFromD
+      const end = effTo < toD ? effTo : toD
+
       for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
-        // daysOfWeek is 7-char bitmask, Monday-first. 1 = active.
-        const dow = (d.getUTCDay() + 6) % 7
-        if ((f.daysOfWeek ?? '1111111')[dow] !== '1') continue
+        // SSIM daysOfWeek: each digit is an operating day number (Mon=1..Sun=7).
+        // E.g. "1234567" = every day, "135" = Mon/Wed/Fri. A flight with
+        // digit N present in the string operates on that SSIM day. This matches
+        // Movement Control's `/gantt/flights` expansion — not a bitmask.
+        const jsDay = d.getUTCDay() // Sun=0..Sat=6
+        const ssimDay = jsDay === 0 ? 7 : jsDay
+        if (!(f.daysOfWeek ?? '1234567').includes(String(ssimDay))) continue
 
         const instanceDate = d.toISOString().slice(0, 10)
         const depDate = addDays(instanceDate, depOffset)
@@ -231,17 +334,25 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
         const stdIsoForInstance = composeIso(depDate, f.stdUtc)
         const staIsoForInstance = composeIso(arrDate, f.staUtc)
 
+        // Skip flights whose entire block falls outside the visible window.
+        // This covers the lookback window: an operating date from the
+        // previous month whose STA is also before fromD is excluded, but
+        // a cross-midnight flight whose STA lands inside the query period
+        // is kept. Matches Movement Control's `/gantt/flights` filter.
+        const stdMs = new Date(stdIsoForInstance).getTime()
+        const staMs = new Date(staIsoForInstance).getTime()
+        if (staMs < fromMs || stdMs >= visibleEndMs) continue
+
         // Fallback block minutes if the DB row is missing the value —
         // compute directly from the two ISO timestamps.
-        const derivedBlock = Math.max(
-          0,
-          Math.round((new Date(staIsoForInstance).getTime() - new Date(stdIsoForInstance).getTime()) / 60000),
-        )
+        const derivedBlock = Math.max(0, Math.round((staMs - stdMs) / 60000))
         const blockMinutes = f.blockMinutes && f.blockMinutes > 0 ? f.blockMinutes : derivedBlock
 
         const id = `${f._id}__${instanceDate}`
 
-        const instanceTail = instanceTails.get(`${f._id as string}__${instanceDate}`) ?? null
+        // Movement Control's `/gantt/assign` writes instances keyed
+        // `${scheduledFlightId}|${operatingDate}` — look up with that shape.
+        const instanceTail = instanceTailById.get(`${f._id as string}|${instanceDate}`) ?? null
         out.push({
           id,
           scheduledFlightId: f._id as string,
@@ -377,6 +488,78 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
     const res = await Pairing.deleteOne({ _id: id, operatorId: req.operatorId })
     if (res.deletedCount === 0) return reply.code(404).send({ error: 'Pairing not found' })
     return { success: true }
+  })
+
+  // ── Bulk create — replicate flow fires one request instead of N ──
+  app.post('/pairings/bulk', async (req, reply) => {
+    const parsed = z.object({ items: z.array(createPairingSchema).min(1).max(500) }).safeParse(req.body)
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues })
+    const items = parsed.data.items
+
+    // Tenant check — every referenced flight must belong to the caller.
+    const flightIds = [...new Set(items.flatMap((b) => b.legs.map((l) => l.flightId.split('__')[0])))]
+    const found = await ScheduledFlight.countDocuments({
+      _id: { $in: flightIds },
+      operatorId: req.operatorId,
+    })
+    if (found !== flightIds.length) {
+      return reply.code(400).send({ error: 'One or more referenced flights do not belong to this operator' })
+    }
+
+    const now = new Date().toISOString()
+    const createdBy = (req as { user?: { sub?: string } }).user?.sub ?? 'system'
+    const docs = items.map((body) => {
+      const summary = summarize(body.legs)
+      return {
+        _id: crypto.randomUUID(),
+        operatorId: req.operatorId,
+        scenarioId: body.scenarioId ?? null,
+        seasonCode: body.seasonCode ?? null,
+        pairingCode: body.pairingCode,
+        baseAirport: body.baseAirport,
+        baseId: body.baseId ?? null,
+        aircraftTypeIcao: body.aircraftTypeIcao ?? null,
+        aircraftTypeId: body.aircraftTypeId ?? null,
+        fdtlStatus: body.fdtlStatus,
+        workflowStatus: body.workflowStatus,
+        ...summary,
+        reportTime: body.reportTime ?? null,
+        releaseTime: body.releaseTime ?? null,
+        numberOfDuties: summary.pairingDays,
+        complementKey: body.complementKey,
+        cockpitCount: body.cockpitCount,
+        facilityClass: body.facilityClass ?? null,
+        crewCounts: body.crewCounts ?? null,
+        legs: body.legs,
+        lastLegalityResult: body.lastLegalityResult ?? null,
+        createdBy,
+        createdAt: now,
+        updatedAt: now,
+      }
+    })
+
+    // `ordered: false` lets good docs land even if one fails tenant-level
+    // checks. Returning failed count lets the UI surface the number.
+    try {
+      await Pairing.insertMany(docs, { ordered: false })
+      return { created: docs, failed: 0 }
+    } catch (err) {
+      const writeErrors = (err as { writeErrors?: unknown[] }).writeErrors ?? []
+      const failed = Array.isArray(writeErrors) ? writeErrors.length : 1
+      const insertedIds = new Set(
+        ((err as { insertedDocs?: Array<{ _id: string }> }).insertedDocs ?? []).map((d) => d._id),
+      )
+      const created = insertedIds.size > 0 ? docs.filter((d) => insertedIds.has(d._id)) : []
+      return { created, failed }
+    }
+  })
+
+  // ── Bulk delete — parent-group "Delete all 30 instances" flow ──
+  app.post('/pairings/bulk-delete', async (req, reply) => {
+    const parsed = z.object({ ids: z.array(z.string().min(1)).min(1).max(500) }).safeParse(req.body)
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues })
+    const res = await Pairing.deleteMany({ _id: { $in: parsed.data.ids }, operatorId: req.operatorId })
+    return { deletedCount: res.deletedCount ?? 0 }
   })
 
   // ── Legality check (thin wrapper — full FDTL integration TBD) ──

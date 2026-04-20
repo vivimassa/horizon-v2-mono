@@ -2677,10 +2677,19 @@ export const api = {
     dateTo: string
     scenarioId?: string | null
     aircraftTypes?: string[]
+    /**
+     * When true, include cross-midnight flights whose operating date is the
+     * day BEFORE dateFrom but whose STA lands inside the window. The Gantt
+     * view (4.1.5.2) sets this so overnight bars render on the first day;
+     * the Text view (4.1.5.1) keeps it off so new pairings never inherit a
+     * prior-period startDate.
+     */
+    includeBleed?: boolean
   }) => {
     const qs = new URLSearchParams({ dateFrom: params.dateFrom, dateTo: params.dateTo })
     if (params.scenarioId) qs.set('scenarioId', params.scenarioId)
     if (params.aircraftTypes?.length) qs.set('aircraftTypes', params.aircraftTypes.join(','))
+    if (params.includeBleed) qs.set('includeBleed', '1')
     return request<PairingFlightRef[]>(`/pairings/flight-pool?${qs.toString()}`)
   },
 
@@ -2709,6 +2718,24 @@ export const api = {
 
   deletePairing: (id: string) =>
     request<{ success: boolean }>(`/pairings/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  /**
+   * Bulk-create N pairings in a single request. The server creates them in
+   * one MongoDB `insertMany` with a shared `createdAt`. Returns the created
+   * docs in the same order as the input.
+   */
+  bulkCreatePairings: (items: PairingCreateInput[]) =>
+    request<{ created: PairingRef[]; failed: number }>('/pairings/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    }),
+
+  /** Bulk-delete by ids — one `deleteMany` under the hood. */
+  bulkDeletePairings: (ids: string[]) =>
+    request<{ deletedCount: number }>('/pairings/bulk-delete', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
 
   getFdtlRuleSet: () => request<SerializedRuleSetRef>('/fdtl/rule-set'),
 }
@@ -4381,6 +4408,8 @@ export interface PairingLegRef {
   staUtcIso: string
   blockMinutes: number
   aircraftTypeIcao: string | null
+  /** Registration the leg was operated by at save time. */
+  tailNumber?: string | null
 }
 
 export type PairingLegalityStatus = 'legal' | 'warning' | 'violation'

@@ -2,11 +2,13 @@ import { memo, useCallback } from 'react'
 import { Text, View, Pressable, TextInput } from 'react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import type { ScheduledFlightRef } from '@skyhub/api'
+import { formatDate } from '@skyhub/logic'
 import type { CellFormat } from './types'
 import type { GridColumn } from './grid-columns'
 import { fmtMinutes } from './grid-columns'
 import { getConditionalFormat } from './conditional-format-rules'
 import { FrequencyDots } from './frequency-picker'
+import { useOperatorStore } from '../../src/stores/use-operator-store'
 
 const STATUS_COLORS: Record<string, string> = {
   draft: '#6b7280',
@@ -15,6 +17,12 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: '#dc2626',
 }
 
+// Read the operator's configured date format once per render. We deliberately
+// use a shallow hook read here (instead of threading `dateFormat` through
+// every prop from the shell) because the grid has ~15 columns × N rows and
+// re-rendering the whole grid when another piece of operator state changes
+// would be wasteful. The store is hydrated at login, so this is a cheap
+// synchronous read in steady state.
 export const GridCell = memo(function GridCell({
   flight,
   col,
@@ -60,6 +68,7 @@ export const GridCell = memo(function GridCell({
   isDeleted: boolean
   isCancelled: boolean
 }) {
+  const dateFormat = useOperatorStore((s) => s.dateFormat)
   // Merge formatting: conditional > cell > defaults
   const fmt = { ...condFormat, ...cellFormat }
 
@@ -125,8 +134,16 @@ export const GridCell = memo(function GridCell({
   }
 
   // ── Display mode ──
+  // Date columns (effectiveFrom/effectiveUntil) are stored as ISO
+  // YYYY-MM-DD on the server but displayed in the operator's configured
+  // format (DD-MMM-YY by default). Time + block columns keep their own
+  // formatters.
   const displayVal =
-    col.key === 'blockMinutes' || col.key === 'tat' ? fmtMinutes(Number(value) || null) : value || '\u2014'
+    col.key === 'blockMinutes' || col.key === 'tat'
+      ? fmtMinutes(Number(value) || null)
+      : col.type === 'date' && value
+        ? formatDate(value, dateFormat)
+        : value || '\u2014'
 
   return (
     <Pressable

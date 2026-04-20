@@ -18,7 +18,9 @@ import { useNavigation, useRouter } from 'expo-router'
  *   3. router.replace — switch to the hub tab with ?domain=<key>
  *   4. hub home reads the param and auto-opens that module panel
  */
-export function useHubBack(domain: 'settings' | 'sysadmin') {
+export type HubDomainKey = 'network' | 'flightops' | 'groundops' | 'crewops' | 'settings' | 'sysadmin'
+
+export function useHubBack(domain: HubDomainKey) {
   const router = useRouter()
   const navigation = useNavigation()
 

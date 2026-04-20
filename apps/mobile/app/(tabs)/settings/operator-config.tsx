@@ -2,7 +2,8 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { Text, View, ScrollView, Pressable, TextInput, Alert, FlatList, Modal } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { api, type OperatorRef, type AirportRef } from '@skyhub/api'
+import { api, getApiBaseUrl, type OperatorRef, type AirportRef } from '@skyhub/api'
+import { DATE_FORMAT_OPTIONS } from '@skyhub/logic'
 import {
   ChevronLeft,
   Building2,
@@ -19,6 +20,9 @@ import * as ImagePicker from 'expo-image-picker'
 import { Image } from 'react-native'
 import { accentTint, type Palette as PaletteType } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
+import { useOperatorStore } from '../../../src/stores/use-operator-store'
+import { tokenStorage } from '../../../src/lib/token-storage'
+import { useHubBack } from '../../../lib/use-hub-back'
 
 type SectionKey = 'company' | 'operations' | 'branding' | 'modules'
 
@@ -34,6 +38,8 @@ const ALL_MODULES = ['home', 'network', 'flight-ops', 'ground-ops', 'crew-ops', 
 export default function OperatorConfigScreen() {
   const router = useRouter()
   const { palette, isDark, accent } = useAppTheme()
+  // Swipe-back lands on hub home with the System Administration panel open.
+  useHubBack('sysadmin')
 
   const [operator, setOperator] = useState<OperatorRef | null>(null)
   const [loading, setLoading] = useState(true)
@@ -72,6 +78,9 @@ export default function OperatorConfigScreen() {
     try {
       const updated = await api.updateOperator(operator._id, draft)
       setOperator(updated)
+      // Propagate to the app-wide operator store so date-format consumers
+      // (non-crew screens, future date pickers) refresh without reload.
+      useOperatorStore.getState().setOperator(updated)
       setDraft({})
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
@@ -272,6 +281,32 @@ export default function OperatorConfigScreen() {
               maxLength={3}
               uppercase
             />
+            <SelectField
+              label="Date Format"
+              value={(getVal('dateFormat') as string) ?? 'DD-MMM-YY'}
+              options={DATE_FORMAT_OPTIONS.map((o) => ({
+                value: o.value,
+                label: `${o.label}  ·  ${o.example}`,
+              }))}
+              onChange={(v) => handleChange('dateFormat', v)}
+              palette={palette}
+              isDark={isDark}
+              accent={accent}
+              hint="Applies to every date displayed across the app."
+            />
+            <SelectField
+              label="Delay Code Adherence"
+              value={(getVal('delayCodeAdherence') as string) ?? 'ahm730'}
+              options={[
+                { value: 'ahm730', label: 'AHM 730 (IATA standard)' },
+                { value: 'ahm732', label: 'AHM 732 (extended set)' },
+              ]}
+              onChange={(v) => handleChange('delayCodeAdherence', v)}
+              palette={palette}
+              isDark={isDark}
+              accent={accent}
+              hint="Reference standard used by Delay Codes master data."
+            />
           </View>
         )}
 
@@ -372,7 +407,7 @@ function LogoUploadMobile({
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
 
-  const API_BASE = 'http://192.168.1.101:3002'
+  const API_BASE = getApiBaseUrl()
 
   const logoSrc = operator.logoUrl
     ? operator.logoUrl.startsWith('/uploads/')
@@ -402,9 +437,11 @@ function LogoUploadMobile({
       const formData = new FormData()
       formData.append('logo', { uri, name: filename, type } as any)
 
+      const token = tokenStorage.getAccessToken()
       const res = await fetch(`${API_BASE}/operators/${operator._id}/logo`, {
         method: 'POST',
         body: formData,
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       })
       if (!res.ok) {
         const data = await res.json()
@@ -427,7 +464,11 @@ function LogoUploadMobile({
         onPress: async () => {
           setUploading(true)
           try {
-            await fetch(`${API_BASE}/operators/${operator._id}/logo`, { method: 'DELETE' })
+            const token = tokenStorage.getAccessToken()
+            await fetch(`${API_BASE}/operators/${operator._id}/logo`, {
+              method: 'DELETE',
+              headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            })
             onRefresh()
           } catch (err: any) {
             setError(err.message || 'Remove failed')
@@ -558,6 +599,76 @@ function Field({
         placeholderTextColor={palette.textTertiary}
       />
       {hint && <Text style={{ fontSize: 13, color: palette.textTertiary, marginTop: 4 }}>{hint}</Text>}
+    </View>
+  )
+}
+
+// ── Select Field (pill-style segmented picker for short option lists) ──
+
+function SelectField({
+  label,
+  value,
+  options,
+  onChange,
+  palette,
+  isDark,
+  accent,
+  hint,
+  required,
+}: {
+  label: string
+  value: string
+  options: Array<{ value: string; label: string }>
+  onChange: (v: string) => void
+  palette: PaletteType
+  isDark: boolean
+  accent: string
+  hint?: string
+  required?: boolean
+}) {
+  return (
+    <View style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: palette.border }}>
+      <Text
+        style={{
+          fontSize: 13,
+          color: palette.textSecondary,
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+          fontWeight: '600',
+          marginBottom: 8,
+        }}
+      >
+        {label}
+        {required && <Text style={{ color: '#ef4444' }}> *</Text>}
+      </Text>
+      <View className="flex-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+        {options.map((opt) => {
+          const active = value === opt.value
+          return (
+            <Pressable
+              key={opt.value}
+              onPress={() => onChange(opt.value)}
+              className="flex-row items-center rounded-lg px-3 py-2 active:opacity-70"
+              style={{
+                backgroundColor: active ? accentTint(accent, isDark ? 0.18 : 0.1) : 'transparent',
+                borderWidth: 1,
+                borderColor: active ? accent : palette.cardBorder,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: active ? '600' : '500',
+                  color: active ? accent : palette.text,
+                }}
+              >
+                {opt.label}
+              </Text>
+            </Pressable>
+          )
+        })}
+      </View>
+      {hint && <Text style={{ fontSize: 13, color: palette.textTertiary, marginTop: 8 }}>{hint}</Text>}
     </View>
   )
 }

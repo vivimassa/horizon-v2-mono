@@ -24,6 +24,7 @@ import {
   PackageOpen,
   ChevronRight,
   Database,
+  Contact,
 } from 'lucide-react-native'
 import type { LucideIcon } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
@@ -129,6 +130,13 @@ const SECTIONS: SectionDef[] = [
         desc: 'Check types, thresholds & windows',
         icon: ClipboardCheck,
         route: '/(tabs)/settings/maintenance-checks',
+      },
+      {
+        code: '5.2.5',
+        label: 'Non-Crew Directory',
+        desc: 'Non-crew personnel for jumpseat & APIS',
+        icon: Contact,
+        route: '/(tabs)/settings/non-crew-people',
       },
     ],
   },

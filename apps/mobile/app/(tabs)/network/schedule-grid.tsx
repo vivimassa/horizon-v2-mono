@@ -10,6 +10,7 @@ import { FilterPanel, FilterSection, DateRangePicker, DropdownSelect, MultiSelec
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { useDevice } from '../../../hooks/useDevice'
 import { useOperatorId } from '../../../hooks/useOperatorId'
+import { useHubBack } from '../../../lib/use-hub-back'
 import { ScheduleToolbar } from '../../../components/schedule/schedule-toolbar'
 import { RibbonToolbar } from '../../../components/schedule/ribbon-toolbar'
 import { ScheduleGrid } from '../../../components/schedule/schedule-grid'
@@ -24,12 +25,28 @@ import { ExportDialog } from '../../../components/schedule/export-dialog'
 import { FloatingSaveBar } from '../../../components/schedule/floating-save-bar'
 import { useScheduleGridStore } from '../../../stores/useScheduleGridStore'
 
+// Default to the 30-day window starting today so the page opens with data
+// visible instead of an empty grid behind a mandatory filter modal. Users
+// can widen / narrow the range via the filter affordance (bottom-sheet on
+// phone, left panel on tablet) as before.
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+function plusDaysIso(days: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
 export default function ScheduleGridScreen() {
   const { palette, isDark, accent } = useAppTheme()
   const { isTablet } = useDevice()
   const operatorId = useOperatorId()
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  // Swipe-back returns to the hub carousel with Network pre-opened, not to
+  // the old (tabs)/network/index.tsx stub.
+  useHubBack('network')
 
   // Data
   const [flights, setFlights] = useState<ScheduledFlightRef[]>([])
@@ -52,14 +69,15 @@ export default function ScheduleGridScreen() {
   const [showImport, setShowImport] = useState(false)
   const [showExport, setShowExport] = useState(false)
 
-  // Filters
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  // Filters — pre-populate the period so the first load renders data; users
+  // still open the filter (phone bottom-sheet / tablet side panel) to narrow.
+  const [dateFrom, setDateFrom] = useState(todayIso())
+  const [dateTo, setDateTo] = useState(plusDaysIso(30))
   const [depStations, setDepStations] = useState<Set<string> | null>(null)
   const [arrStations, setArrStations] = useState<Set<string> | null>(null)
   const [acTypeFilter, setAcTypeFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  const [showFilter, setShowFilter] = useState(true)
+  const [showFilter, setShowFilter] = useState(false)
   const [scenarioId, setScenarioId] = useState<string | null>(null)
 
   // Reference data for filter dropdowns
@@ -81,9 +99,16 @@ export default function ScheduleGridScreen() {
 
   // Fetch data
   const fetchData = useCallback(async () => {
-    if (!operatorId) return
-    setLoading(true)
+    if (!operatorId) {
+      // Don't silently no-op — the user clicked Go. Surface the fact that
+      // we're still resolving the operator and let the auto-retry effect
+      // below kick in once it's ready.
+      setError('Preparing operator session — please try again in a moment.')
+      setHasLoaded(true)
+      return
+    }
     setError(null)
+    setLoading(true)
     try {
       const params: any = { operatorId }
       if (scenarioId) params.scenarioId = scenarioId
@@ -116,19 +141,36 @@ export default function ScheduleGridScreen() {
     }
   }, [operatorId, scenarioId, dateFrom, dateTo, depStations, arrStations, acTypeFilter, statusFilter, sortKey, sortDir])
 
-  // Fetch reference data + scenarios on mount — flights load on user Apply
+  // Fetch reference data + scenarios. Runs on focus AND every time
+  // operatorId becomes non-empty (it starts as '' while useOperatorId
+  // resolves the cached value). Errors are surfaced via setError so the
+  // tablet banner tells the user when the server / auth is down, instead
+  // of silently leaving the dropdowns empty.
   useFocusEffect(
     useCallback(() => {
       if (!operatorId) return
-      Promise.all([api.getScenarios({ operatorId }), api.getAirports(), api.getAircraftTypes()])
+      Promise.all([api.getScenarios({ operatorId }), api.getAirports(), api.getAircraftTypes(operatorId)])
         .then(([s, ap, at]) => {
           setScenarios(s)
           setAirports(ap)
           setAcTypes([...new Set(at.filter((t) => t.isActive).map((t) => t.icaoType))].sort())
         })
-        .catch(() => {})
+        .catch((err: any) => {
+          setError(err?.message || 'Could not load reference data — check network / server')
+        })
     }, [operatorId]),
   )
+
+  // Auto-fetch flights once operatorId resolves. Also retries if the user
+  // clicked Go while operatorId was still empty — clearing hasLoaded above
+  // would be too aggressive, so instead we retry whenever operatorId flips
+  // from empty to populated AND there is no data yet.
+  useEffect(() => {
+    if (!operatorId) return
+    if (hasLoaded && flights.length > 0) return
+    fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [operatorId])
 
   // Dirty tracking
   const hasDirty = dirtyMap.size > 0 || newIds.size > 0 || deletedIds.size > 0
@@ -513,6 +555,30 @@ export default function ScheduleGridScreen() {
 
             {/* Right: main content area */}
             <View className="flex-1" style={{ padding: hasLoaded && !loading ? 0 : 8, paddingBottom: 8 }}>
+              {/* Error banner — makes silent API failures visible instead of
+                  leaving the user staring at an empty state forever. */}
+              {error && (
+                <View
+                  style={{
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    marginBottom: 8,
+                    backgroundColor: isDark ? 'rgba(230,53,53,0.1)' : '#fef2f2',
+                    borderWidth: 1,
+                    borderColor: isDark ? 'rgba(230,53,53,0.28)' : '#fecaca',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <Text style={{ flex: 1, fontSize: 13, color: '#E63535' }}>{error}</Text>
+                  <Pressable onPress={() => setError(null)} hitSlop={8}>
+                    <Text style={{ fontSize: 13, color: palette.textTertiary }}>Dismiss</Text>
+                  </Pressable>
+                </View>
+              )}
+
               {/* Before first load: empty panel with system logo */}
               {!hasLoaded && !loading && (
                 <View
@@ -527,7 +593,7 @@ export default function ScheduleGridScreen() {
                     <LayoutGrid size={80} color={palette.text} strokeWidth={0.8} />
                   </View>
                   <Text style={{ fontSize: 17, fontWeight: '600', color: palette.textTertiary }}>
-                    Set filters and press Go to load schedule
+                    {!operatorId ? 'Connecting to operator…' : 'Set filters and press Go to load schedule'}
                   </Text>
                 </View>
               )}

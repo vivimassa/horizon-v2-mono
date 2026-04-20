@@ -7,10 +7,24 @@ let fetchPromise: Promise<string> | null = null
 function resolveOperatorId(): Promise<string> {
   if (cachedId) return Promise.resolve(cachedId)
   if (fetchPromise) return fetchPromise
-  fetchPromise = api.getOperators().then((ops) => {
-    cachedId = ops[0]?._id ?? ''
-    return cachedId
-  })
+  fetchPromise = api
+    .getOperators()
+    .then((ops) => {
+      cachedId = ops[0]?._id ?? ''
+      return cachedId
+    })
+    .catch((err) => {
+      // Critical: never leave this promise rejected. A bare `.then(setId)`
+      // in a consumer would otherwise surface as an unhandled rejection and
+      // crash dev-builds ("Uncaught (in promise, id: 4)"). 401s are handled
+      // by the request() layer (it invokes onAuthFailure → logout); here we
+      // just log + fall back to an empty id so the UI can show an error
+      // banner instead of hanging silently.
+      console.warn('[useOperatorId] getOperators failed:', err?.message ?? err)
+      fetchPromise = null // allow a future retry after re-login
+      cachedId = ''
+      return ''
+    })
   return fetchPromise
 }
 
@@ -25,7 +39,12 @@ export function useOperatorId(): string {
       setId(cachedId)
       return
     }
-    resolveOperatorId().then(setId)
+    resolveOperatorId()
+      .then(setId)
+      .catch(() => {
+        // resolveOperatorId already swallows its own errors, but catch here
+        // too so any future .then chaining can't leak an unhandled rejection.
+      })
   }, [])
   return id
 }
@@ -35,6 +54,10 @@ export function useOperatorId(): string {
  * Prefer useOperatorId() in components.
  */
 export function getOperatorId(): string {
-  if (!cachedId && !fetchPromise) resolveOperatorId()
+  if (!cachedId && !fetchPromise) {
+    // Kick off the fetch but swallow any errors — synchronous callers can't
+    // await it anyway, they'll re-read once the cache is populated.
+    resolveOperatorId().catch(() => {})
+  }
   return cachedId ?? ''
 }

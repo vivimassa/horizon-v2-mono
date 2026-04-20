@@ -55,15 +55,22 @@ export default function TabLayout() {
             startCollapsed
             onTabChange={(index: number) => {
               const route = state.routes[index]
-              // Database and Admin don't render their own tab screens — they
-              // deep-link into the hub home with a domain pre-opened. Keeps
-              // a single source of truth for module trees (the hub panel).
-              if (route.name === 'settings') {
-                router.navigate({ pathname: '/(tabs)/', params: { domain: 'settings' } } as any)
-                return
+              // Every non-Home tab deep-links into the hub carousel with its
+              // domain pre-opened. Module pages live under the hub panels, not
+              // behind standalone tab roots — this keeps a single source of
+              // truth for each module tree and avoids the old "Coming soon"
+              // stubs under (tabs)/<module>/index.tsx.
+              const HUB_DOMAIN_FOR_TAB: Record<string, string> = {
+                network: 'network',
+                'flight-ops': 'flightops',
+                'ground-ops': 'groundops',
+                'crew-ops': 'crewops',
+                settings: 'settings',
+                admin: 'sysadmin',
               }
-              if (route.name === 'admin') {
-                router.navigate({ pathname: '/(tabs)/', params: { domain: 'sysadmin' } } as any)
+              const domain = HUB_DOMAIN_FOR_TAB[route.name]
+              if (domain) {
+                router.navigate({ pathname: '/(tabs)/', params: { domain } } as any)
                 return
               }
               if (state.index === index) {

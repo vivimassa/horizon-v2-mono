@@ -14,6 +14,7 @@ export const HUB_ROUTE_MAP: Record<string, string> = {
   '/flight-ops': '/(tabs)/flight-ops',
   '/ground-ops': '/(tabs)/ground-ops',
   '/crew-ops': '/(tabs)/crew-ops',
+  '/crew-ops/control/documents': '/(tabs)/crew-ops/documents',
   '/settings': '/(tabs)/settings/master-database',
 
   // ── Network (1.*) ──
@@ -36,6 +37,7 @@ export const HUB_ROUTE_MAP: Record<string, string> = {
   '/admin/aircraft-registrations': '/(tabs)/settings/aircraft-registrations',
   '/admin/delay-codes': '/(tabs)/settings/delay-codes',
   '/admin/maintenance-checks': '/(tabs)/settings/maintenance-checks',
+  '/admin/non-crew-people': '/(tabs)/settings/non-crew-people',
 
   // ── Master Database · Crew Ops (5.4.*) ──
   '/admin/crew-bases': '/(tabs)/settings/crew-bases',
@@ -50,6 +52,9 @@ export const HUB_ROUTE_MAP: Record<string, string> = {
 
   // ── System Administration (7.1.*) ──
   '/settings/admin/operator-config': '/(tabs)/settings/operator-config',
+  '/sysadmin/company-documents': '/(tabs)/settings/company-documents',
+  '/settings/admin/integration/asm-ssm-transmission': '/(tabs)/settings/asm-ssm-transmission',
+  '/settings/admin/integration/acars-mvt-ldm-transmission': '/(tabs)/settings/acars-mvt-ldm-transmission',
 }
 
 /** Returns the Expo Router path for a given registry web route, or null if unimplemented. */

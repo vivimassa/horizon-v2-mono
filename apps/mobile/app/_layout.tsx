@@ -9,9 +9,15 @@ import { ThemeProvider, useAppTheme } from '../providers/ThemeProvider'
 import { UserProvider } from '../providers/UserProvider'
 import { tokenStorage, hydrateTokenStorage } from '../src/lib/token-storage'
 import { promptBiometric } from '../src/lib/biometric-gate'
+import { useOperatorStore } from '../src/stores/use-operator-store'
 import LoginScreen from './login'
 
 function AuthedShell() {
+  // Fire-and-forget operator hydration so date-format + operator info are
+  // cached as soon as the authed UI mounts. Store guards against double load.
+  useEffect(() => {
+    void useOperatorStore.getState().loadOperator()
+  }, [])
   return (
     <UserProvider>
       <Slot />

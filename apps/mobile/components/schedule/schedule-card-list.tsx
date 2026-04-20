@@ -3,7 +3,9 @@ import { Text, View, FlatList, Pressable } from 'react-native'
 import { ChevronRight } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import type { ScheduledFlightRef } from '@skyhub/api'
+import { formatDate } from '@skyhub/logic'
 import { FrequencyDots } from './frequency-picker'
+import { useOperatorStore } from '../../src/stores/use-operator-store'
 
 const STATUS_COLORS: Record<string, string> = {
   draft: '#6b7280',
@@ -38,6 +40,7 @@ export const ScheduleCardList = memo(function ScheduleCardList({
   accent: string
   isDark: boolean
 }) {
+  const dateFormat = useOperatorStore((s) => s.dateFormat)
   return (
     <FlatList
       data={flights}
@@ -119,7 +122,7 @@ export const ScheduleCardList = memo(function ScheduleCardList({
               {/* Row 3: Dates + Frequency */}
               <View className="flex-row items-center">
                 <Text style={{ fontSize: 13, color: palette.textSecondary }}>
-                  {flight.effectiveFrom} — {flight.effectiveUntil}
+                  {formatDate(flight.effectiveFrom, dateFormat)} — {formatDate(flight.effectiveUntil, dateFormat)}
                 </Text>
                 <View className="flex-1" />
                 <FrequencyDots value={flight.daysOfWeek} accent={accent} palette={palette} size={16} />

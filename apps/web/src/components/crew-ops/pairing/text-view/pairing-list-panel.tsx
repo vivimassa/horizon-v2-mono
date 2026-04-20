@@ -9,6 +9,7 @@ import { PairingStatusBadge } from '../shared/pairing-status-badge'
 import { PairingRowContextMenu } from './pairing-row-context-menu'
 import { ReplicatePairingDialog } from '../dialogs/replicate-pairing-dialog'
 import { PairingDetailsDialog } from '../dialogs/pairing-details-dialog'
+import { DeletePairingDialog } from '../dialogs/delete-pairing-dialog'
 import type { Pairing } from '../types'
 
 const ACCENT = '#7c3aed' // Crew Ops workforce accent (MODULE_THEMES.workforce)
@@ -33,9 +34,38 @@ export function PairingListPanel() {
   const setError = usePairingStore((s) => s.setError)
 
   const [search, setSearch] = useState('')
-  const [menu, setMenu] = useState<{ x: number; y: number; pairing: Pairing } | null>(null)
+  const [menu, setMenu] = useState<{
+    x: number
+    y: number
+    pairing: Pairing
+    /** Set when the menu was opened from the aggregated parent group card. */
+    groupMembers?: Pairing[]
+  } | null>(null)
   const [replicateSource, setReplicateSource] = useState<Pairing | null>(null)
-  const [detailsPairing, setDetailsPairing] = useState<Pairing | null>(null)
+  const [detailsPairing, setDetailsPairing] = useState<{
+    pairing: Pairing
+    periodOverride?: { startDate: string; endDate: string; frequency: string; replicaCount: number }
+  } | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<{ pairings: Pairing[] } | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  // Ctrl+F1 — open Pairing Details for the currently inspected pairing.
+  // (F1 alone is reserved globally for Help — see project memory.)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'F1') {
+        const id = usePairingStore.getState().inspectedPairingId
+        if (!id) return
+        const target = usePairingStore.getState().pairings.find((p) => p.id === id)
+        if (target) {
+          e.preventDefault()
+          setDetailsPairing({ pairing: target })
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   /** pairingCode set — groups currently expanded. Single-member groups render flat. */
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const toggleGroup = (code: string) => {
@@ -208,7 +238,10 @@ export function PairingListPanel() {
                   onToggle={() => toggleGroup(g.code)}
                   onContextMenu={(e, p) => {
                     e.preventDefault()
-                    setMenu({ x: e.clientX, y: e.clientY, pairing: p })
+                    // Parent card menu — carry the full member list so the
+                    // Pairing Details dialog can render the aggregate period
+                    // + SSIM frequency instead of a single operating date.
+                    setMenu({ x: e.clientX, y: e.clientY, pairing: p, groupMembers: g.members })
                   }}
                   isDark={isDark}
                 />
@@ -241,25 +274,84 @@ export function PairingListPanel() {
           pairingCode={menu.pairing.pairingCode}
           isDraft={menu.pairing.workflowStatus === 'draft'}
           onClose={() => setMenu(null)}
-          onShowDetails={() => setDetailsPairing(menu.pairing)}
+          onShowDetails={() => {
+            if (menu.groupMembers && menu.groupMembers.length > 1) {
+              const sorted = [...menu.groupMembers].sort((a, b) => a.startDate.localeCompare(b.startDate))
+              setDetailsPairing({
+                pairing: menu.pairing,
+                periodOverride: {
+                  startDate: sorted[0].startDate,
+                  endDate: sorted[sorted.length - 1].endDate,
+                  frequency: deriveFrequency(sorted),
+                  replicaCount: sorted.length,
+                },
+              })
+            } else {
+              setDetailsPairing({ pairing: menu.pairing })
+            }
+          }}
           onReplicate={() => setReplicateSource(menu.pairing)}
           onInspect={() => inspectPairing(menu.pairing.id)}
-          onDelete={async () => {
-            const p = menu.pairing
-            if (!confirm(`Delete pairing ${p.pairingCode}? This cannot be undone.`)) return
-            try {
-              await api.deletePairing(p.id)
-              removePairing(p.id)
-            } catch (err) {
-              setError(err instanceof Error ? err.message : 'Failed to delete pairing')
-            }
+          onDelete={() => {
+            // Parent group → delete every replica; single row → just that one.
+            const toDelete = menu.groupMembers && menu.groupMembers.length > 1 ? menu.groupMembers : [menu.pairing]
+            setPendingDelete({ pairings: toDelete })
+            setMenu(null)
           }}
         />
       )}
 
+      {pendingDelete &&
+        (() => {
+          const list = pendingDelete.pairings
+          const first = list[0]
+          const detail =
+            list.length > 1
+              ? `${list.length} instances · ${first.routeChain}`
+              : `${first.flightIds.length} legs · ${first.routeChain}`
+          return (
+            <DeletePairingDialog
+              pairingCode={first.pairingCode}
+              detail={detail}
+              instanceCount={list.length}
+              busy={deleting}
+              onCancel={() => !deleting && setPendingDelete(null)}
+              onConfirm={async () => {
+                setDeleting(true)
+                try {
+                  if (list.length === 1) {
+                    await api.deletePairing(list[0].id)
+                    removePairing(list[0].id)
+                  } else {
+                    // One round-trip instead of N sequential DELETEs.
+                    const { deletedCount } = await api.bulkDeletePairings(list.map((p) => p.id))
+                    for (const p of list) removePairing(p.id)
+                    if (deletedCount !== list.length) {
+                      setError(
+                        `Deleted ${deletedCount} of ${list.length} pairings (${list.length - deletedCount} not found)`,
+                      )
+                    }
+                  }
+                  setPendingDelete(null)
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : 'Failed to delete pairings')
+                } finally {
+                  setDeleting(false)
+                }
+              }}
+            />
+          )
+        })()}
+
       {replicateSource && <ReplicatePairingDialog source={replicateSource} onClose={() => setReplicateSource(null)} />}
 
-      {detailsPairing && <PairingDetailsDialog pairing={detailsPairing} onClose={() => setDetailsPairing(null)} />}
+      {detailsPairing && (
+        <PairingDetailsDialog
+          pairing={detailsPairing.pairing}
+          periodOverride={detailsPairing.periodOverride}
+          onClose={() => setDetailsPairing(null)}
+        />
+      )}
 
       {/* Stats footer */}
       <div
@@ -274,6 +366,24 @@ export function PairingListPanel() {
       </div>
     </div>
   )
+}
+
+/**
+ * Build an SSIM `daysOfWeek` string (e.g. `1234567`, `135`) from the list of
+ * replica members by reading the UTC day-of-week of each member's startDate.
+ * Mon=1…Sun=7 to match the same format stored on ScheduledFlight. Digits are
+ * emitted in Mon→Sun order and deduplicated.
+ */
+function deriveFrequency(members: Pairing[]): string {
+  const days = new Set<number>()
+  for (const m of members) {
+    const d = new Date(`${m.startDate}T12:00:00Z`)
+    if (Number.isNaN(d.getTime())) continue
+    const js = d.getUTCDay() // Sun=0..Sat=6
+    const ssim = js === 0 ? 7 : js
+    days.add(ssim)
+  }
+  return [...days].sort((a, b) => a - b).join('')
 }
 
 function PairingRow({

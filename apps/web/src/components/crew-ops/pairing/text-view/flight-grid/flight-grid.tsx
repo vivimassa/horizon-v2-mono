@@ -20,6 +20,10 @@ interface FlightGridProps {
   onInspectPairing: (pairingId: string) => void
   /** Called when the user right-clicks a PAIRING cell and picks Delete. */
   onDeletePairing: (pairingId: string) => void
+  /** Called when the user picks "Layover at {ARR}" on a single-flight selection.
+   *  Parent captures `x`, `y` from the originating right-click so the chip can
+   *  anchor in-place of the menu. */
+  onStartLayover?: (flightId: string, station: string, x: number, y: number) => void
   /** False while a dialog is open or a save is in flight — suppresses the
    *  Enter / Shift+Enter keyboard shortcuts so the user can't double-fire. */
   canCreate?: boolean
@@ -35,6 +39,7 @@ export function FlightGrid({
   onCreateFinal,
   onInspectPairing,
   onDeletePairing,
+  onStartLayover,
   canCreate = true,
 }: FlightGridProps) {
   const { theme } = useTheme()
@@ -43,6 +48,8 @@ export function FlightGrid({
   const flights = usePairingStore((s) => s.flights)
   const pairings = usePairingStore((s) => s.pairings)
   const filters = usePairingStore((s) => s.filters)
+  const layoverMode = usePairingStore((s) => s.layoverMode)
+  const clearLayover = usePairingStore((s) => s.clearLayover)
 
   const selectedRowIds = useFlightGridSelection((s) => s.selectedRowIds)
   const activeCell = useFlightGridSelection((s) => s.activeCell)
@@ -306,7 +313,10 @@ export function FlightGrid({
   }, [orderedRows, selectAllAction, clearAll, canCreate, selectedFlightIds, onCreateDraft, onCreateFinal])
 
   // ── Context menu ──
-  type MenuCtx = { kind: 'create' } | { kind: 'pairing'; pairingId: string; pairingCode: string }
+  type MenuCtx =
+    | { kind: 'create' }
+    | { kind: 'pairing'; pairingId: string; pairingCode: string }
+    | { kind: 'layover-continue'; clickedFlight: PairingFlight; targetDate: string }
   const [menu, setMenu] = useState<{ x: number; y: number; ctx: MenuCtx } | null>(null)
 
   const handleContextMenu = useCallback(
@@ -327,10 +337,25 @@ export function FlightGrid({
           return
         }
       }
+      // Layover mode active AND the right-clicked row isn't the anchor flight
+      // itself → offer "Add return on {targetDate}". Parent's swap-effect
+      // handles replacing the click with the correct-date replica.
+      if (layoverMode && flight.id !== layoverMode.afterFlightId) {
+        const anchor = flights.find((f) => f.id === layoverMode.afterFlightId)
+        if (anchor) {
+          const targetDate = addDaysIsoLocal(anchor.staUtc.slice(0, 10), layoverMode.days)
+          setMenu({
+            x: e.clientX,
+            y: e.clientY,
+            ctx: { kind: 'layover-continue', clickedFlight: flight, targetDate },
+          })
+          return
+        }
+      }
       // Anywhere else → existing create menu based on the current selection.
       setMenu({ x: e.clientX, y: e.clientY, ctx: { kind: 'create' } })
     },
-    [pairingCodeById],
+    [pairingCodeById, layoverMode, flights],
   )
 
   return (
@@ -430,18 +455,39 @@ export function FlightGrid({
         </tbody>
       </table>
 
-      {menu && menu.ctx.kind === 'create' && (
-        <FlightGridContextMenu
-          x={menu.x}
-          y={menu.y}
-          variant="create"
-          selectionCount={selectedFlightIds.length}
-          onClose={() => setMenu(null)}
-          onCreateDraft={() => onCreateDraft(selectedFlightIds)}
-          onCreateFinal={() => onCreateFinal(selectedFlightIds)}
-          onClearSelection={() => clearAll()}
-        />
-      )}
+      {menu &&
+        menu.ctx.kind === 'create' &&
+        (() => {
+          // When the user has exactly one flight selected we surface its ARR
+          // station so the context menu can offer "Layover at {ARR}". Beyond
+          // one selection the action doesn't make sense (you layover after the
+          // last leg of a chain, not mid-selection of many).
+          const singleSelectionArr =
+            selectedFlightIds.length === 1
+              ? (orderedRows.find((r) => r.id === selectedFlightIds[0])?.arrivalAirport ?? null)
+              : null
+          return (
+            <FlightGridContextMenu
+              x={menu.x}
+              y={menu.y}
+              variant="create"
+              selectionCount={selectedFlightIds.length}
+              singleSelectionArr={singleSelectionArr}
+              onClose={() => setMenu(null)}
+              onCreateDraft={() => onCreateDraft(selectedFlightIds)}
+              onCreateFinal={() => onCreateFinal(selectedFlightIds)}
+              onClearSelection={() => clearAll()}
+              onStartLayover={
+                onStartLayover && singleSelectionArr
+                  ? (station) => {
+                      onStartLayover(selectedFlightIds[0], station, menu.x, menu.y)
+                      setMenu(null)
+                    }
+                  : undefined
+              }
+            />
+          )
+        })()}
       {menu && menu.ctx.kind === 'pairing' && (
         <FlightGridContextMenu
           x={menu.x}
@@ -453,9 +499,37 @@ export function FlightGrid({
           onDelete={() => onDeletePairing((menu.ctx as { pairingId: string }).pairingId)}
         />
       )}
+      {menu &&
+        menu.ctx.kind === 'layover-continue' &&
+        (() => {
+          const { clickedFlight, targetDate } = menu.ctx
+          return (
+            <FlightGridContextMenu
+              x={menu.x}
+              y={menu.y}
+              variant="layover-continue"
+              flightNumber={clickedFlight.flightNumber}
+              targetDate={targetDate}
+              onClose={() => setMenu(null)}
+              onCancelLayover={() => clearLayover()}
+              onAddReturn={() => {
+                // Add the clicked flight additively — the parent's
+                // swap-on-mismatch effect in `flight-pool-panel` then swaps to
+                // the correct-date replica and clears layover mode.
+                toggleRow(clickedFlight.id, 0)
+              }}
+            />
+          )
+        })()}
 
       {/* Reserved header space hint — keep the header flush */}
       <style>{`:root { --flight-grid-header-h: ${HEADER_HEIGHT}px; }`}</style>
     </div>
   )
+}
+
+function addDaysIsoLocal(ymd: string, days: number): string {
+  const d = new Date(`${ymd}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
 }

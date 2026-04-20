@@ -4,8 +4,9 @@ import { Fragment, useMemo, useState } from 'react'
 import { Plane, Users, Trash2, CheckCircle2 } from 'lucide-react'
 import { api } from '@skyhub/api'
 import { useTheme } from '@/components/theme-provider'
-import { usePairingStore } from '@/stores/use-pairing-store'
+import { usePairingStore, resolveComplementCounts } from '@/stores/use-pairing-store'
 import { PairingStatusBadge } from '../shared/pairing-status-badge'
+import { DeletePairingDialog } from '../dialogs/delete-pairing-dialog'
 import type { Pairing, PairingFlight } from '../types'
 import { usePairingLegality } from '../use-pairing-legality'
 import {
@@ -13,10 +14,13 @@ import {
   SectionHeader,
   SelectedLegRow,
   GroundTimeRow,
+  LayoverRow,
   LegalityChecks,
   ActionButton,
   complementLabel,
 } from './inspector-helpers'
+
+const LAYOVER_THRESHOLD_MIN = 24 * 60
 
 /**
  * Inspector in inspect mode: shows details of an existing pairing with
@@ -31,9 +35,41 @@ export function InspectPairingPanel({ pairing, flights }: { pairing: Pairing; fl
   const removePairing = usePairingStore((s) => s.removePairing)
   const setPairings = usePairingStore((s) => s.setPairings)
   const pairings = usePairingStore((s) => s.pairings)
+  const complements = usePairingStore((s) => s.complements)
+  const positions = usePairingStore((s) => s.positions)
   const setError = usePairingStore((s) => s.setError)
 
+  // Same fallback as the details dialog — resolve crewCounts from the 5.4.3
+  // catalog when the pairing itself doesn't have it stored. Filter by the
+  // operator's currently-active positions so retired codes (e.g. an old PS
+  // from a prior config) don't leak into the crew total.
+  const resolvedCrewCounts = useMemo(() => {
+    const raw =
+      pairing.crewCounts ??
+      resolveComplementCounts(
+        complements,
+        pairing.aircraftTypeIcao ?? pairing.legs[0]?.aircraftTypeIcao ?? null,
+        pairing.complementKey,
+      )
+    if (!raw) return null
+    if (positions.length === 0) return raw
+    const activeCodes = new Set(positions.map((p) => p.code))
+    const filtered: Record<string, number> = {}
+    for (const [code, n] of Object.entries(raw)) {
+      if (activeCodes.has(code) && n > 0) filtered[code] = n
+    }
+    return filtered
+  }, [pairing, complements, positions])
+  const cabinCount = useMemo(() => {
+    if (!resolvedCrewCounts) return 0
+    const cabinCodes = new Set(positions.filter((p) => p.category === 'cabin').map((p) => p.code))
+    return Object.entries(resolvedCrewCounts)
+      .filter(([code]) => cabinCodes.has(code))
+      .reduce((sum, [, n]) => sum + (n || 0), 0)
+  }, [resolvedCrewCounts, positions])
+
   const [busy, setBusy] = useState<'idle' | 'deleting' | 'committing'>('idle')
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   const textPrimary = isDark ? 'rgba(255,255,255,0.92)' : 'rgba(15,23,42,0.92)'
   const textSecondary = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(71,85,105,0.75)'
@@ -53,14 +89,18 @@ export function InspectPairingPanel({ pairing, flights }: { pairing: Pairing; fl
     deadheadIds: new Set(pairing.deadheadFlightIds),
   })
 
-  async function handleDelete() {
-    if (!confirm(`Delete pairing ${pairing.pairingCode}? This cannot be undone.`)) return
+  function handleDelete() {
+    setShowDeleteDialog(true)
+  }
+
+  async function confirmDelete() {
     setBusy('deleting')
     setError(null)
     try {
       await api.deletePairing(pairing.id)
       removePairing(pairing.id)
       inspectPairing(null)
+      setShowDeleteDialog(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete pairing')
     } finally {
@@ -117,24 +157,56 @@ export function InspectPairingPanel({ pairing, flights }: { pairing: Pairing; fl
           <span className="font-semibold">{complementLabel(pairing.complementKey)}</span>
           <span className="text-[12px]" style={{ color: textTertiary }}>
             ({pairing.cockpitCount} cockpit
-            {pairing.crewCounts ? `, ${pairing.crewCounts.CA ?? 0} cabin` : ''})
+            {resolvedCrewCounts ? `, ${cabinCount} cabin` : ''})
           </span>
         </div>
+        {resolvedCrewCounts && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]" style={{ color: textPrimary }}>
+            {positions
+              .slice()
+              .sort((a, b) => {
+                // Cockpit first, then cabin; inside each group by rankOrder.
+                if (a.category !== b.category) return a.category === 'cockpit' ? -1 : 1
+                return a.rankOrder - b.rankOrder
+              })
+              .filter((p) => (resolvedCrewCounts[p.code] ?? 0) > 0)
+              .map((p, i, arr) => (
+                <span key={p.code} className="inline-flex items-center gap-1" title={p.name}>
+                  <span className="font-semibold">{resolvedCrewCounts[p.code]}</span>
+                  <span style={{ color: textSecondary }}>{p.code}</span>
+                  {i < arr.length - 1 && (
+                    <span className="pl-2" style={{ color: textTertiary, opacity: 0.5 }}>
+                      ·
+                    </span>
+                  )}
+                </span>
+              ))}
+          </div>
+        )}
 
         <SectionHeader title={`Legs (${pairing.flightIds.length})`} isDark={isDark} />
         <div className="space-y-1">
-          {pairingFlights.map((f, i) => (
-            <Fragment key={f.id}>
-              <SelectedLegRow index={i} flight={f} isDark={isDark} />
-              {i < pairingFlights.length - 1 && (
-                <GroundTimeRow
-                  minutes={groundTimeMinutes(f, pairingFlights[i + 1])}
-                  station={f.arrivalAirport}
-                  isDark={isDark}
-                />
-              )}
-            </Fragment>
-          ))}
+          {pairingFlights.map((f, i) => {
+            const next = pairingFlights[i + 1]
+            if (!next) {
+              return (
+                <Fragment key={f.id}>
+                  <SelectedLegRow index={i} flight={f} isDark={isDark} />
+                </Fragment>
+              )
+            }
+            const gap = groundTimeMinutes(f, next)
+            return (
+              <Fragment key={f.id}>
+                <SelectedLegRow index={i} flight={f} isDark={isDark} />
+                {gap >= LAYOVER_THRESHOLD_MIN ? (
+                  <LayoverRow minutes={gap} station={f.arrivalAirport} isDark={isDark} />
+                ) : (
+                  <GroundTimeRow minutes={gap} station={f.arrivalAirport} isDark={isDark} />
+                )}
+              </Fragment>
+            )
+          })}
           {pairingFlights.length === 0 && (
             <p className="text-[12px] italic" style={{ color: textTertiary }}>
               Leg flights not in current pool — reload period to fetch them.
@@ -171,6 +243,16 @@ export function InspectPairingPanel({ pairing, flights }: { pairing: Pairing; fl
           />
         )}
       </div>
+
+      {showDeleteDialog && (
+        <DeletePairingDialog
+          pairingCode={pairing.pairingCode}
+          detail={`${pairing.flightIds.length} legs · ${pairing.routeChain}`}
+          busy={busy === 'deleting'}
+          onCancel={() => busy !== 'deleting' && setShowDeleteDialog(false)}
+          onConfirm={() => void confirmDelete()}
+        />
+      )}
     </div>
   )
 }

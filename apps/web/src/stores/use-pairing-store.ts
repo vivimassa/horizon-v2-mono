@@ -1,6 +1,7 @@
 'use client'
 
 import { create } from 'zustand'
+import type { CrewComplementRef, CrewPositionRef } from '@skyhub/api'
 import type {
   PairingFilters,
   Pairing,
@@ -31,6 +32,16 @@ interface PairingStoreState {
   // ── Data ──
   flights: PairingFlight[]
   pairings: Pairing[]
+  /** Crew complement templates keyed per (aircraftTypeIcao, templateKey).
+   *  Loaded once at shell mount — used to auto-fill `crewCounts` on create and
+   *  as a fallback when rendering pairings whose stored crewCounts is null. */
+  complements: CrewComplementRef[]
+  /** Crew positions (columns for the complement grid) — loaded once. */
+  positions: CrewPositionRef[]
+  /** Station → UTC offset hours. Loaded from `/airports` once at shell mount
+   *  so the Gantt tooltips can render STD/STA in local time without per-hover
+   *  network calls (mirrors the Movement Control gantt pattern). */
+  stationUtcOffsets: Record<string, number>
   loading: boolean
   error: string | null
 
@@ -44,6 +55,32 @@ interface PairingStoreState {
   activeComplementKey: 'standard' | 'aug1' | 'aug2' | 'custom'
   pairingOptions: PairingOptions
 
+  // ── Layover mode (text-view Flight Pool only) ──
+  // Set by the "Layover at {ARR}" right-click menu item after the planner
+  // picks a single outbound flight. While non-null, a floating chip anchored
+  // at the menu's click coords shows the station + a +/- day stepper; the
+  // next flight added to the selection closes the mode (the gap between leg
+  // dates becomes the layover).
+  layoverMode: {
+    afterFlightId: string
+    station: string
+    days: number
+    /** Viewport-pixel coords of the right-click that opened the menu —
+     *  the chip portals to this spot so it replaces the menu in-place. */
+    anchorX: number
+    anchorY: number
+  } | null
+
+  // ── Pending-create request (text view) ──
+  // The grid's keyboard (Enter / Shift+Enter) and right-click Draft/Final
+  // items dispatch to the Inspector Panel via this field — the Inspector
+  // owns all save/dialog state, the grid just announces intent.
+  pendingCreateRequest: {
+    ids: string[]
+    workflow: 'draft' | 'committed'
+    label: 'Draft' | 'Final'
+  } | null
+
   // ── Actions ──
   setPeriod: (from: string, to: string) => void
   commitPeriod: () => void
@@ -51,6 +88,9 @@ interface PairingStoreState {
 
   setFlights: (flights: PairingFlight[]) => void
   setPairings: (pairings: Pairing[]) => void
+  setComplements: (complements: CrewComplementRef[]) => void
+  setPositions: (positions: CrewPositionRef[]) => void
+  setStationUtcOffsets: (map: Record<string, number>) => void
   /** Append a new pairing AND mark its flights covered so the pool greys
    *  them out without a round-trip. */
   addPairing: (pairing: Pairing) => void
@@ -64,6 +104,13 @@ interface PairingStoreState {
 
   setComplement: (key: 'standard' | 'aug1' | 'aug2' | 'custom') => void
   setPairingOptions: (patch: Partial<PairingOptions>) => void
+
+  startLayover: (afterFlightId: string, station: string, anchorX: number, anchorY: number) => void
+  setLayoverDays: (days: number) => void
+  clearLayover: () => void
+
+  requestCreatePairing: (ids: string[], workflow: 'draft' | 'committed', label: 'Draft' | 'Final') => void
+  clearCreateRequest: () => void
 }
 
 /** Default 7-day period starting today (UTC YYYY-MM-DD). */
@@ -87,6 +134,9 @@ export const usePairingStore = create<PairingStoreState>((set, get) => ({
 
   flights: [],
   pairings: [],
+  complements: [],
+  positions: [],
+  stationUtcOffsets: {},
   loading: false,
   error: null,
 
@@ -103,12 +153,18 @@ export const usePairingStore = create<PairingStoreState>((set, get) => ({
     splitDutyRest: null,
   },
 
+  layoverMode: null,
+  pendingCreateRequest: null,
+
   setPeriod: (from, to) => set({ periodFrom: from, periodTo: to }),
   commitPeriod: () => set({ periodCommitted: true }),
   setFilters: (filters) => set({ filters }),
 
   setFlights: (flights) => set({ flights }),
   setPairings: (pairings) => set({ pairings }),
+  setComplements: (complements) => set({ complements }),
+  setPositions: (positions) => set({ positions }),
+  setStationUtcOffsets: (stationUtcOffsets) => set({ stationUtcOffsets }),
   addPairing: (pairing) => {
     const { pairings, flights } = get()
     const covered = new Set(pairing.flightIds)
@@ -138,6 +194,15 @@ export const usePairingStore = create<PairingStoreState>((set, get) => ({
     })),
 
   setPairingOptions: (patch) => set((s) => ({ pairingOptions: { ...s.pairingOptions, ...patch } })),
+
+  startLayover: (afterFlightId, station, anchorX, anchorY) =>
+    set({ layoverMode: { afterFlightId, station, days: 1, anchorX, anchorY } }),
+  setLayoverDays: (days) =>
+    set((s) => (s.layoverMode ? { layoverMode: { ...s.layoverMode, days: Math.max(1, days) } } : {})),
+  clearLayover: () => set({ layoverMode: null }),
+
+  requestCreatePairing: (ids, workflow, label) => set({ pendingCreateRequest: { ids, workflow, label } }),
+  clearCreateRequest: () => set({ pendingCreateRequest: null }),
 }))
 
 function complementToCockpit(key: 'standard' | 'aug1' | 'aug2' | 'custom'): number {
@@ -151,6 +216,21 @@ function complementToCockpit(key: 'standard' | 'aug1' | 'aug2' | 'custom'): numb
     case 'custom':
       return 2
   }
+}
+
+/** Resolve the crew complement counts for a (aircraftType, templateKey) pair
+ *  from the list loaded into the pairing store. Returns `null` when nothing
+ *  matches — callers should treat that as "complement not configured yet". */
+export function resolveComplementCounts(
+  complements: CrewComplementRef[],
+  aircraftTypeIcao: string | null | undefined,
+  templateKey: string | null | undefined,
+): Record<string, number> | null {
+  if (!aircraftTypeIcao || !templateKey) return null
+  const match = complements.find(
+    (c) => c.aircraftTypeIcao === aircraftTypeIcao && c.templateKey === templateKey && c.isActive,
+  )
+  return match ? match.counts : null
 }
 
 /** Helper selector — worst legality in a group of pairings (for list grouping). */

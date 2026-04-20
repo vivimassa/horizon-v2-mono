@@ -140,8 +140,17 @@ function renderValue(
     }
     case 'aircraftTypeIcao':
       return flight.aircraftType || '—'
-    case 'tailNumber':
-      return flight.tailNumber?.trim() || '—'
+    case 'tailNumber': {
+      // Real tail wins whenever it's been assigned (FlightInstance overlay or
+      // pattern-level aircraftReg). Without one, synthesize the same rotation
+      // label the AC column uses so every row has an identity the planner can
+      // reason about — "A320-01", "A321-03", etc.
+      const real = flight.tailNumber?.trim()
+      if (real) return real
+      if (flight.rotationLabel) return flight.rotationLabel
+      const type = flight.aircraftType || 'UNK'
+      return `${type}-${rotationSeq.toString().padStart(2, '0')}`
+    }
     case 'effectiveFrom':
       return formatDMY(flight.effectiveFrom || flight.instanceDate)
     case 'effectiveUntil':

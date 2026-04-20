@@ -103,7 +103,8 @@ export function PairingRowContextMenu({
       </div>
       <Item
         icon={<FileText size={14} strokeWidth={2.2} />}
-        label="Pairing Details…"
+        label="Pairing Details"
+        kbd="Ctrl+F1"
         onClick={() => {
           onShowDetails()
           onClose()
@@ -152,6 +153,7 @@ export function PairingRowContextMenu({
 function Item({
   icon,
   label,
+  kbd,
   accent,
   destructive,
   onClick,
@@ -160,6 +162,7 @@ function Item({
 }: {
   icon: React.ReactNode
   label: string
+  kbd?: string
   accent?: boolean
   destructive?: boolean
   onClick: () => void
@@ -181,7 +184,12 @@ function Item({
       }}
     >
       {icon}
-      {label}
+      <span className="flex-1">{label}</span>
+      {kbd && (
+        <span className="text-[11px] font-mono text-hz-text-tertiary" style={{ fontWeight: 500 }}>
+          {kbd}
+        </span>
+      )}
     </button>
   )
 }

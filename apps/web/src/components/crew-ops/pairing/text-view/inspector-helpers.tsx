@@ -1,7 +1,7 @@
 'use client'
 
 import type { Copy } from 'lucide-react'
-import { Users, UserPlus, Users2, Sparkles, Timer } from 'lucide-react'
+import { Users, UserPlus, Users2, Sparkles, Timer, Moon } from 'lucide-react'
 import type { PairingFlight, LegalityResult } from '../types'
 
 export const ACCENT = '#7c3aed' // Crew Ops workforce accent (MODULE_THEMES.workforce)
@@ -104,7 +104,7 @@ export function SelectedLegRow({ index, flight, isDark }: { index: number; fligh
 }
 
 /* ── Ground-time row shown between two consecutive legs ──────── */
-export function GroundTimeRow({ minutes, station, isDark }: { minutes: number; station: string; isDark: boolean }) {
+export function GroundTimeRow({ minutes, isDark }: { minutes: number; station?: string; isDark: boolean }) {
   const textMuted = isDark ? 'rgba(255,255,255,0.48)' : 'rgba(71,85,105,0.70)'
   const divider = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)'
   // Mild color cues: tight turnarounds < 30m hint orange, otherwise neutral.
@@ -113,11 +113,55 @@ export function GroundTimeRow({ minutes, station, isDark }: { minutes: number; s
     <div className="flex items-center gap-2 pl-6 pr-2 py-0.5">
       <div className="w-px h-3 ml-[0.4rem]" style={{ background: divider }} />
       <Timer size={10} strokeWidth={2.2} style={{ color }} />
-      <span className="text-[10px] font-semibold tabular-nums tracking-[0.04em]" style={{ color }}>
-        {formatGroundTime(minutes)} ground · {station}
+      <span className="text-[13px] tabular-nums tracking-[0.04em]" style={{ color }}>
+        {formatGroundTime(minutes)} ground
       </span>
     </div>
   )
+}
+
+/* ── Layover row — rendered between legs when the gap is ≥ 24h (overnight) ── */
+export function LayoverRow({ minutes, station, isDark }: { minutes: number; station: string; isDark: boolean }) {
+  const accent = '#7c3aed'
+  const textPrimary = isDark ? 'rgba(255,255,255,0.92)' : 'rgba(15,23,42,0.92)'
+  const textMuted = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(71,85,105,0.75)'
+  const bg = isDark ? 'rgba(124,58,237,0.10)' : 'rgba(124,58,237,0.06)'
+  const border = isDark ? 'rgba(124,58,237,0.30)' : 'rgba(124,58,237,0.22)'
+  return (
+    <div
+      className="flex items-center gap-2 rounded-md px-2.5 py-1.5 ml-4"
+      style={{
+        background: bg,
+        border: `1px solid ${border}`,
+        borderLeft: `3px solid ${accent}`,
+      }}
+    >
+      <Moon size={12} strokeWidth={2.2} style={{ color: accent, flexShrink: 0 }} />
+      <span className="text-[11px] font-bold tracking-[0.08em] uppercase" style={{ color: accent }}>
+        Layover
+      </span>
+      <span className="text-[12px] font-semibold" style={{ color: textPrimary }}>
+        at {station}
+      </span>
+      <span className="flex-1" />
+      <span className="text-[12px] tabular-nums" style={{ color: textMuted }}>
+        {formatLayover(minutes)}
+      </span>
+    </div>
+  )
+}
+
+function formatLayover(mins: number): string {
+  if (mins <= 0) return '0h'
+  const days = Math.floor(mins / (24 * 60))
+  const remainder = mins - days * 24 * 60
+  const h = Math.floor(remainder / 60)
+  const m = remainder % 60
+  const parts: string[] = []
+  if (days > 0) parts.push(`${days}d`)
+  if (h > 0) parts.push(`${h}h`)
+  if (m > 0) parts.push(`${m}m`)
+  return parts.join(' ') || '0h'
 }
 
 function formatGroundTime(mins: number): string {

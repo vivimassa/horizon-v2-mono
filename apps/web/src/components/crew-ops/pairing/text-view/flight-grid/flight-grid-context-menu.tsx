@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { FileText, CheckCircle2, X, Eye, Trash2 } from 'lucide-react'
+import { FileText, CheckCircle2, X, Eye, Trash2, Moon, ArrowRightCircle } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 
 type FlightGridContextMenuProps =
@@ -11,10 +11,16 @@ type FlightGridContextMenuProps =
       x: number
       y: number
       selectionCount: number
+      /** ARR station of the single selected flight (shows "Layover at {ARR}"
+       *  menu item). Null when 0 or multiple flights are selected. */
+      singleSelectionArr?: string | null
       onClose: () => void
       onCreateDraft: () => void
       onCreateFinal: () => void
       onClearSelection: () => void
+      /** Fires when the planner picks "Layover at {ARR}". Parent stores the
+       *  click coords so the chip can anchor in-place. */
+      onStartLayover?: (station: string) => void
     }
   | {
       variant: 'pairing'
@@ -24,6 +30,20 @@ type FlightGridContextMenuProps =
       onClose: () => void
       onInspect: () => void
       onDelete: () => void
+    }
+  | {
+      variant: 'layover-continue'
+      x: number
+      y: number
+      /** Flight number the planner right-clicked (e.g. "SH915"). */
+      flightNumber: string
+      /** Target ISO date (YYYY-MM-DD) computed from layover.days — the menu
+       *  item offers to add THIS instance as the return leg, swapping to the
+       *  date-matching replica if the clicked row is on a different date. */
+      targetDate: string
+      onClose: () => void
+      onAddReturn: () => void
+      onCancelLayover: () => void
     }
 
 /**
@@ -85,15 +105,25 @@ export function FlightGridContextMenu(props: FlightGridContextMenuProps) {
         zIndex: 1000,
       }}
     >
-      {props.variant === 'create' ? (
+      {props.variant === 'create' && (
         <CreateVariant {...props} textPrimary={textPrimary} textMuted={textMuted} hoverBg={hoverBg} border={border} />
-      ) : (
+      )}
+      {props.variant === 'pairing' && (
         <PairingVariant
           {...props}
           textPrimary={textPrimary}
           textMuted={textMuted}
           hoverBg={hoverBg}
           dangerHoverBg={dangerHoverBg}
+          border={border}
+        />
+      )}
+      {props.variant === 'layover-continue' && (
+        <LayoverContinueVariant
+          {...props}
+          textPrimary={textPrimary}
+          textMuted={textMuted}
+          hoverBg={hoverBg}
           border={border}
         />
       )}
@@ -105,9 +135,11 @@ export function FlightGridContextMenu(props: FlightGridContextMenuProps) {
 // ── Create variant (existing) ───────────────────────────────────────────
 function CreateVariant({
   selectionCount,
+  singleSelectionArr,
   onCreateDraft,
   onCreateFinal,
   onClearSelection,
+  onStartLayover,
   onClose,
   textPrimary,
   textMuted,
@@ -120,6 +152,7 @@ function CreateVariant({
   border: string
 }) {
   const disabled = selectionCount === 0
+  const canLayover = selectionCount === 1 && !!singleSelectionArr && !!onStartLayover
   return (
     <>
       <Header
@@ -154,6 +187,22 @@ function CreateVariant({
         hoverBg={hoverBg}
         textPrimary={textPrimary}
       />
+      {canLayover && (
+        <>
+          <Divider border={border} />
+          <MenuItem
+            icon={<Moon size={14} strokeWidth={2} />}
+            label={`Layover at ${singleSelectionArr}`}
+            onClick={() => {
+              onStartLayover!(singleSelectionArr!)
+              // Parent closes the menu after storing the anchor coords so the
+              // chip can replace the menu in-place.
+            }}
+            textPrimary={textPrimary}
+            hoverBg={hoverBg}
+          />
+        </>
+      )}
       <Divider border={border} />
       <MenuItem
         icon={<X size={14} strokeWidth={2} />}
@@ -218,6 +267,62 @@ function PairingVariant({
       />
     </>
   )
+}
+
+// ── Layover-continue variant (live while layover mode is active) ────────
+// Shown when the planner right-clicks ANY flight while the layover chip is
+// open. Offers a single primary action — "Add as return on {targetDate}" —
+// plus a cancel. The parent handles swapping to the correct-date replica if
+// the clicked row is on a different date.
+function LayoverContinueVariant({
+  flightNumber,
+  targetDate,
+  onAddReturn,
+  onCancelLayover,
+  onClose,
+  textPrimary,
+  textMuted,
+  hoverBg,
+  border,
+}: Extract<FlightGridContextMenuProps, { variant: 'layover-continue' }> & {
+  textPrimary: string
+  textMuted: string
+  hoverBg: string
+  border: string
+}) {
+  return (
+    <>
+      <Header title={`Add ${flightNumber} as return`} textMuted={textMuted} border={border} accent />
+      <MenuItem
+        icon={<ArrowRightCircle size={14} strokeWidth={2.2} />}
+        label={`Add return leg (${formatDMY(targetDate)})`}
+        onClick={() => {
+          onAddReturn()
+          onClose()
+        }}
+        accent
+        textPrimary={textPrimary}
+        hoverBg={hoverBg}
+      />
+      <Divider border={border} />
+      <MenuItem
+        icon={<X size={14} strokeWidth={2} />}
+        label="Cancel layover"
+        onClick={() => {
+          onCancelLayover()
+          onClose()
+        }}
+        muted
+        textPrimary={textMuted}
+        hoverBg={hoverBg}
+      />
+    </>
+  )
+}
+
+function formatDMY(ymd: string): string {
+  const [y, m, d] = ymd.split('-')
+  return `${d}/${m}/${y}`
 }
 
 // ── Small primitives ────────────────────────────────────────────────────

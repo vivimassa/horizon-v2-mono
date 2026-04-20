@@ -484,4 +484,144 @@ export async function fdtlRoutes(app: FastifyInstance): Promise<void> {
     const maxResults = Math.min(parseInt(limit ?? '100') || 100, 500)
     return FdtlAuditLog.find({ operatorId }).sort({ changedAt: -1 }).limit(maxResults).lean()
   })
+
+  // ── Serialized Rule Set ──
+  // Assembles a full SerializedRuleSet in one call so clients (e.g. the
+  // Crew Pairing workspace) can run FDTL legality checks entirely in-memory.
+  app.get('/fdtl/rule-set', async (req, reply) => {
+    const operatorId = req.operatorId
+    const scheme = await FdtlScheme.findOne({ operatorId }).lean()
+    if (!scheme) return reply.code(404).send({ error: 'No FDTL scheme configured for this operator' })
+
+    const fw = FDTL_FRAMEWORKS.find((f) => f.code === scheme.frameworkCode)
+    const [rules, tables] = await Promise.all([
+      FdtlRule.find({ operatorId, frameworkCode: scheme.frameworkCode, isActive: { $ne: false } }).lean(),
+      FdtlTable.find({ operatorId, frameworkCode: scheme.frameworkCode, isActive: { $ne: false } }).lean(),
+    ])
+
+    // Scheme → reporting times (flat list in SerializedRuleSet shape)
+    const reportingTimes = (scheme.reportingTimes ?? []).map((r) => ({
+      key: `${r.timeType}|${r.routeType}|${r.columnKey}`,
+      minutes: r.minutes as number,
+    }))
+
+    // Rule map — government first, then company overrides (which are always
+    // more restrictive by FDTL Rule Advisor design).
+    const ruleMap = new Map<
+      string,
+      {
+        code: string
+        value: string
+        valueType: string
+        unit: string
+        directionality: string | null
+        label: string
+        legalReference: string | null
+      }
+    >()
+    for (const r of rules.filter((x) => x.source === 'government')) {
+      ruleMap.set(r.ruleCode, {
+        code: r.ruleCode,
+        value: r.value,
+        valueType: r.valueType,
+        unit: r.unit ?? '',
+        directionality: r.directionality ?? null,
+        label: r.label,
+        legalReference: r.legalReference ?? null,
+      })
+    }
+    for (const r of rules.filter((x) => x.source === 'company')) {
+      ruleMap.set(r.ruleCode, {
+        code: r.ruleCode,
+        value: r.value,
+        valueType: r.valueType,
+        unit: r.unit ?? '',
+        directionality: r.directionality ?? null,
+        label: r.label,
+        legalReference: r.legalReference ?? null,
+      })
+    }
+
+    // Helpers for cruise time deductions (parse "H:MM" strings → minutes)
+    function hmmToMinutes(v?: string | null): number | null {
+      if (!v) return null
+      const m = v.trim().match(/^(\d+):(\d{2})$/)
+      if (!m) {
+        const n = parseInt(v, 10)
+        return Number.isFinite(n) ? n : null
+      }
+      return parseInt(m[1], 10) * 60 + parseInt(m[2], 10)
+    }
+    const cruiseTimeDeductions = {
+      taxiOutMinutes: hmmToMinutes(ruleMap.get('REST_TAXI_OUT_DEDUCTION')?.value) ?? 10,
+      taxiInMinutes: hmmToMinutes(ruleMap.get('REST_TAXI_IN_DEDUCTION')?.value) ?? 10,
+      climbMinutes: hmmToMinutes(ruleMap.get('REST_CLIMB_DEDUCTION')?.value) ?? 30,
+      descentMinutes: hmmToMinutes(ruleMap.get('REST_DESCENT_DEDUCTION')?.value) ?? 30,
+    }
+
+    // FDP table (first table with tabKey 'fdp')
+    const fdpTableDoc = tables.find((t) => t.tabKey === 'fdp')
+    const fdpTable = fdpTableDoc
+      ? {
+          tableCode: fdpTableDoc.tableCode,
+          rowKeys: fdpTableDoc.rowKeys ?? [],
+          rowLabels: fdpTableDoc.rowLabels ?? [],
+          colKeys: fdpTableDoc.colKeys ?? [],
+          colLabels: fdpTableDoc.colLabels ?? [],
+          cells: (fdpTableDoc.cells ?? [])
+            .filter((c) => c.valueMinutes != null)
+            .map((c) => ({ key: `${c.rowKey}|${c.colKey}`, minutes: c.valueMinutes as number })),
+        }
+      : null
+
+    // Augmented limits — stored as an augmented_matrix table
+    const augTableDoc = tables.find((t) => t.tableType === 'augmented_matrix' || t.tabKey === 'fdp_augmented')
+    const facilityLabelMap: Record<string, string> = {}
+    if (augTableDoc) {
+      for (let i = 0; i < (augTableDoc.colKeys ?? []).length; i += 1) {
+        const key = augTableDoc.colKeys?.[i]
+        const label = augTableDoc.colLabels?.[i]
+        if (key && label) facilityLabelMap[key] = label
+      }
+    }
+    const augmentedLimits = augTableDoc
+      ? (augTableDoc.cells ?? [])
+          .filter((c) => c.valueMinutes != null)
+          .map((c) => ({
+            crewCount: parseInt(c.rowKey, 10),
+            facilityClass: c.colKey,
+            facilityLabel: facilityLabelMap[c.colKey] ?? c.colKey,
+            maxFdpMinutes: c.valueMinutes as number,
+            legalReference: augTableDoc.legalReference ?? null,
+          }))
+      : []
+
+    // Cabin crew in-flight rest table
+    const cabinTableDoc = tables.find((t) => t.tabKey === 'cabin_crew')
+    const cabinRestTable = cabinTableDoc
+      ? {
+          rowKeys: cabinTableDoc.rowKeys ?? [],
+          rowLabels: cabinTableDoc.rowLabels ?? [],
+          colKeys: cabinTableDoc.colKeys ?? [],
+          colLabels: cabinTableDoc.colLabels ?? [],
+          cells: (cabinTableDoc.cells ?? [])
+            .filter((c) => c.valueMinutes != null)
+            .map((c) => ({ key: `${c.rowKey}|${c.colKey}`, minutes: c.valueMinutes as number })),
+        }
+      : null
+
+    return {
+      operatorId,
+      frameworkCode: scheme.frameworkCode,
+      frameworkName: fw?.name ?? scheme.frameworkCode,
+      defaultReportMinutes: scheme.reportTimeMinutes ?? 45,
+      defaultDebriefMinutes: scheme.debriefMinutes ?? scheme.postFlightMinutes ?? 30,
+      reportingTimes,
+      fdpTable,
+      rules: Array.from(ruleMap.values()),
+      augmentedLimits,
+      cabinRestTable,
+      cruiseTimeDeductions,
+    }
+  })
 }

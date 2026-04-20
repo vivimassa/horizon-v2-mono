@@ -39,6 +39,7 @@ import {
   LayoutDashboard,
   SlidersHorizontal,
   Plug,
+  GitMerge,
 } from 'lucide-react-native'
 
 export interface NavPage {
@@ -351,9 +352,9 @@ export const NAV_TREE: NavModule[] = [
           {
             key: 'crew-pairing',
             label: 'Crew Pairing',
-            num: '4.1.1',
-            route: '/crew-ops/planning/crew-pairing',
-            icon: Users,
+            num: '4.1.5',
+            route: '/crew-ops/control/pairing',
+            icon: GitMerge,
           },
           {
             key: 'auto-assignment',

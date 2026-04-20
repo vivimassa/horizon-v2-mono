@@ -566,10 +566,10 @@ export const NAV_TREE: NavModuleData[] = [
           {
             key: 'crew-pairing',
             label: 'Crew Pairing',
-            num: '4.1.1',
-            route: '/crew-ops/planning/crew-pairing',
-            iconName: 'Users',
-            desc: 'Build pairings from flights',
+            num: '4.1.5',
+            route: '/crew-ops/control/pairing',
+            iconName: 'GitMerge',
+            desc: 'Build and optimize crew pairings aligned with FDTL limits',
           },
           {
             key: 'auto-assignment',

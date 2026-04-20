@@ -2668,6 +2668,49 @@ export const api = {
     request<Record<string, Record<string, number>>>(
       `/manpower/plans/${encodeURIComponent(planId)}/standard-complements`,
     ),
+
+  // ── 4.1.5 Crew Pairing ──
+  getPairingContext: () => request<PairingContextRef>('/pairings/context'),
+
+  getPairingFlightPool: (params: {
+    dateFrom: string
+    dateTo: string
+    scenarioId?: string | null
+    aircraftTypes?: string[]
+  }) => {
+    const qs = new URLSearchParams({ dateFrom: params.dateFrom, dateTo: params.dateTo })
+    if (params.scenarioId) qs.set('scenarioId', params.scenarioId)
+    if (params.aircraftTypes?.length) qs.set('aircraftTypes', params.aircraftTypes.join(','))
+    return request<PairingFlightRef[]>(`/pairings/flight-pool?${qs.toString()}`)
+  },
+
+  getPairings: (
+    params: { dateFrom?: string; dateTo?: string; scenarioId?: string | null; baseAirport?: string } = {},
+  ) => {
+    const qs = new URLSearchParams()
+    if (params.dateFrom) qs.set('dateFrom', params.dateFrom)
+    if (params.dateTo) qs.set('dateTo', params.dateTo)
+    if (params.scenarioId) qs.set('scenarioId', params.scenarioId)
+    if (params.baseAirport) qs.set('baseAirport', params.baseAirport)
+    const query = qs.toString()
+    return request<PairingRef[]>(`/pairings${query ? `?${query}` : ''}`)
+  },
+
+  getPairing: (id: string) => request<PairingRef>(`/pairings/${encodeURIComponent(id)}`),
+
+  createPairing: (data: PairingCreateInput) =>
+    request<PairingRef>('/pairings', { method: 'POST', body: JSON.stringify(data) }),
+
+  updatePairing: (id: string, data: PairingUpdateInput) =>
+    request<PairingRef>(`/pairings/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deletePairing: (id: string) =>
+    request<{ success: boolean }>(`/pairings/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  getFdtlRuleSet: () => request<SerializedRuleSetRef>('/fdtl/rule-set'),
 }
 
 // ── Non-Crew Person types ──
@@ -4293,4 +4336,162 @@ export interface ManpowerEventRef {
   notes: string | null
   createdAt: string
   updatedAt: string
+}
+
+// ─── 4.1.5 Crew Pairing ────────────────────────────────────
+
+export interface PairingFlightRef {
+  /** Compound: `${scheduledFlightId}__${instanceDate}` */
+  id: string
+  scheduledFlightId: string
+  instanceDate: string
+  flightNumber: string
+  departureAirport: string
+  arrivalAirport: string
+  std: string
+  sta: string
+  stdUtc: string
+  staUtc: string
+  blockMinutes: number
+  aircraftType: string
+  tailNumber: string | null
+  rotationId: string | null
+  rotationLabel: string | null
+  serviceType: string | null
+  daysOfWeek: string | null
+  departureDayOffset: number
+  arrivalDayOffset: number
+  status: string
+  /** Schedule-level effectivity — inherited from the underlying ScheduledFlight. */
+  effectiveFrom: string
+  effectiveUntil: string
+  pairingId: string | null
+}
+
+export interface PairingLegRef {
+  flightId: string
+  flightDate: string
+  legOrder: number
+  isDeadhead: boolean
+  dutyDay: number
+  depStation: string
+  arrStation: string
+  flightNumber: string
+  stdUtcIso: string
+  staUtcIso: string
+  blockMinutes: number
+  aircraftTypeIcao: string | null
+}
+
+export type PairingLegalityStatus = 'legal' | 'warning' | 'violation'
+export type PairingWorkflowStatus = 'draft' | 'committed'
+
+export interface PairingRef {
+  _id: string
+  operatorId: string
+  scenarioId: string | null
+  seasonCode: string | null
+  pairingCode: string
+  baseAirport: string
+  baseId: string | null
+  aircraftTypeIcao: string | null
+  aircraftTypeId: string | null
+  fdtlStatus: PairingLegalityStatus
+  workflowStatus: PairingWorkflowStatus
+  totalBlockMinutes: number
+  totalDutyMinutes: number
+  pairingDays: number
+  startDate: string
+  endDate: string
+  reportTime: string | null
+  releaseTime: string | null
+  numberOfDuties: number
+  numberOfSectors: number
+  layoverAirports: string[]
+  complementKey: string
+  cockpitCount: number
+  facilityClass: string | null
+  crewCounts: Record<string, number> | null
+  legs: PairingLegRef[]
+  lastLegalityResult: unknown | null
+  routeChain: string
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PairingCreateInput {
+  pairingCode: string
+  baseAirport: string
+  baseId?: string | null
+  scenarioId?: string | null
+  seasonCode?: string | null
+  aircraftTypeIcao?: string | null
+  aircraftTypeId?: string | null
+  complementKey?: string
+  cockpitCount?: number
+  facilityClass?: string | null
+  crewCounts?: Record<string, number> | null
+  reportTime?: string | null
+  releaseTime?: string | null
+  workflowStatus?: PairingWorkflowStatus
+  fdtlStatus?: PairingLegalityStatus
+  lastLegalityResult?: unknown | null
+  legs: PairingLegRef[]
+}
+
+export type PairingUpdateInput = Partial<Omit<PairingCreateInput, 'legs'>> & { legs?: PairingLegRef[] }
+
+export interface PairingContextRef {
+  bases: Array<{ _id: string; iata: string | null; icao: string; name: string }>
+  aircraftTypes: Array<{ _id: string; icaoType: string; iataType: string | null }>
+}
+
+/** FDTL rule set assembled by `GET /fdtl/rule-set`. Shape matches
+ *  `@skyhub/logic/src/fdtl/engine-types.ts:SerializedRuleSet` — kept local
+ *  so `@skyhub/api` doesn't depend on `@skyhub/logic`. */
+export interface SerializedRuleSetRef {
+  operatorId: string
+  frameworkCode: string
+  frameworkName: string
+  defaultReportMinutes: number
+  defaultDebriefMinutes: number
+  reportingTimes: Array<{ key: string; minutes: number }>
+  fdpTable: {
+    tableCode: string
+    rowKeys: string[]
+    rowLabels: string[]
+    colKeys: string[]
+    colLabels: string[]
+    cells: Array<{ key: string; minutes: number }>
+  } | null
+  rules: Array<{
+    code: string
+    value: string
+    valueType: string
+    unit: string
+    directionality: string | null
+    label: string
+    legalReference: string | null
+  }>
+  augmentedLimits: Array<{
+    crewCount: number
+    facilityClass: string
+    facilityLabel: string
+    maxFdpMinutes: number
+    legalReference: string | null
+  }>
+  cabinRestTable: {
+    rowKeys: string[]
+    rowLabels: string[]
+    colKeys: string[]
+    colLabels: string[]
+    cells: Array<{ key: string; minutes: number }>
+  } | null
+  cruiseTimeDeductions: {
+    taxiOutMinutes: number
+    taxiInMinutes: number
+    climbMinutes: number
+    descentMinutes: number
+  }
 }

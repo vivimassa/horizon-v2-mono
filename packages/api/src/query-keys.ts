@@ -180,4 +180,16 @@ export const queryKeys = {
     stats: (operatorId: string, airportIata: string, seasonCode: string) =>
       ['slots', 'stats', operatorId, airportIata, seasonCode] as const,
   },
+
+  // ─── 4.1.5 Crew Pairing ───
+  pairings: {
+    all: ['pairings'] as const,
+    context: ['pairings', 'context'] as const,
+    list: (params: { dateFrom?: string; dateTo?: string; scenarioId?: string | null; baseAirport?: string } = {}) =>
+      ['pairings', 'list', params] as const,
+    detail: (id: string) => ['pairings', 'detail', id] as const,
+    flightPool: (params: { dateFrom: string; dateTo: string; scenarioId?: string | null; aircraftTypes?: string[] }) =>
+      ['pairings', 'flight-pool', params] as const,
+    ruleSet: ['pairings', 'fdtl-rule-set'] as const,
+  },
 } as const

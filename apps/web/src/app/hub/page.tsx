@@ -8,6 +8,7 @@ import { WallpaperBg } from '@/components/wallpaper-bg'
 import { useTheme } from '@/components/theme-provider'
 import { UserMenu } from '@/components/UserMenu'
 import { revealNavigate, supportsViewTransitions } from '@/lib/nav-transition'
+import { carouselTick, carouselSelect, carouselDismiss, hoverTak } from '@/lib/ui-sound'
 
 /* ═══════════════════════════════════════════════
    Data
@@ -144,16 +145,223 @@ export default function HomePage() {
   const [sel, setSel] = useState<number | null>(initialIdx >= 0 ? initialIdx : null)
   const isOpen = sel !== null
 
-  function next() {
-    if (!isOpen) setCur((c) => (c + 1) % DOMAINS.length)
+  /* ══════════════════════════════════════════
+     PHYSICS CAROUSEL
+     One scalar `position` on a ring of N cards. Wheel impulses add to
+     `velocity`; velocity decays exponentially; near-rest engages a spring
+     to snap onto the nearest whole card. Every frame we compute each
+     card's shortest-path offset from position and imperatively write its
+     transform — no CSS transitions, so there's nothing to misanimate.
+     ══════════════════════════════════════════ */
+  const N = DOMAINS.length
+  // Tuning constants
+  const DECAY = 5.0 // velocity decays as v *= exp(-DECAY*dt). Higher = faster settle.
+  const SPRING = 55 // stiffness when settling to a snap
+  const DAMP = 14 // damping on spring (critical ≈ 2*sqrt(SPRING) ≈ 14.8)
+  const SETTLE_VEL = 0.6 // cards/sec — below this, engage spring to nearest
+  const WHEEL_K = 0.03 // wheel delta → velocity (deltaY=100 → +3 cards/sec)
+  const WHEEL_CLAMP = 18 // max velocity (cards/sec) a single event can add
+  const MAX_VEL = 28 // hard ceiling on total velocity
+  const CARD_SPACING = 370 // px between card centers (matches original)
+
+  const positionRef = useRef<number>(initialIdx >= 0 ? initialIdx : 0)
+  const velocityRef = useRef<number>(0)
+  const targetRef = useRef<number | null>(null) // if set, spring pulls here (click nav)
+  const rafRef = useRef<number>(0)
+  const lastTsRef = useRef<number>(0)
+  const lastIdxRef = useRef<number>(initialIdx >= 0 ? initialIdx : 0)
+  const cardRefs = useRef<Array<HTMLDivElement | null>>([])
+
+  const setCardRef = useCallback(
+    (i: number) => (el: HTMLDivElement | null) => {
+      cardRefs.current[i] = el
+    },
+    [],
+  )
+
+  /* ── shortest signed distance on a ring of N. Returns value in [-N/2, N/2). */
+  const shortestDelta = useCallback(
+    (from: number, to: number) => {
+      let d = to - from
+      d = ((((d + N / 2) % N) + N) % N) - N / 2
+      return d
+    },
+    [N],
+  )
+
+  const modN = useCallback(
+    (x: number) => {
+      return ((x % N) + N) % N
+    },
+    [N],
+  )
+
+  /* ── apply every card's transform based on current `positionRef`. */
+  const applyTransforms = useCallback(() => {
+    for (let i = 0; i < N; i++) {
+      const el = cardRefs.current[i]
+      if (!el) continue
+      const offset = shortestDelta(positionRef.current, i)
+      const absU = Math.abs(offset)
+
+      // Coverflow curve — matches the original design:
+      //   absU 0 → scale 1, ry 0, op 1
+      //   absU 1 → scale 0.85, ry ±8, op 0.6
+      //   absU 2 → scale 0.68, ry ±16, op 0.2
+      //   absU ≥ 2.5 → hidden
+      const scale = Math.max(0.5, 1 - absU * 0.17)
+      const rotY = -Math.sign(offset) * Math.min(absU, 2) * 8
+      const opacity = Math.max(0, 1 - absU * 0.4)
+      const blur = Math.min(5, absU * 1.8)
+      const tx = offset * CARD_SPACING
+
+      el.style.transform = `translate(-50%, 0) translateX(${tx}px) scale(${scale}) rotateY(${rotY}deg)`
+      el.style.opacity = String(opacity)
+      el.style.filter = blur > 0.1 ? `blur(${blur.toFixed(2)}px) brightness(.85)` : 'none'
+      el.style.zIndex = String(10 - Math.round(absU))
+      el.style.pointerEvents = absU < 2.5 ? 'auto' : 'none'
+    }
+  }, [N, shortestDelta])
+
+  /* ── apply "open panel" frozen state: only selected card visible + zoomed.
+     Uses a CSS transition for smooth open/close animation since rAF is off. */
+  const applyOpenTransforms = useCallback(() => {
+    for (let i = 0; i < N; i++) {
+      const el = cardRefs.current[i]
+      if (!el) continue
+      const isSel = i === sel
+      el.style.transition = 'all 500ms cubic-bezier(.4,0,.2,1)'
+      el.style.transform = isSel
+        ? 'translate(-50%, 0) scale(1.12) rotateY(0deg)'
+        : 'translate(-50%, 0) scale(0.7) rotateY(0deg)'
+      el.style.opacity = isSel ? '1' : '0'
+      el.style.filter = 'none'
+      el.style.zIndex = isSel ? '10' : '1'
+      el.style.pointerEvents = isSel ? 'auto' : 'none'
+    }
+  }, [N, sel])
+
+  /* ── main rAF loop. Mounted once; pauses itself when isOpen. */
+  useEffect(() => {
+    if (isOpen) {
+      // Let CSS transitions handle the open-panel animation
+      applyOpenTransforms()
+      return
+    }
+
+    // Re-enable rAF mode: cards drive via imperative transforms, no CSS transition
+    for (let i = 0; i < N; i++) {
+      const el = cardRefs.current[i]
+      if (el) el.style.transition = 'none'
+    }
+
+    let running = true
+
+    function tick(now: number) {
+      if (!running) return
+      const dt = lastTsRef.current === 0 ? 0.016 : Math.min(0.05, (now - lastTsRef.current) / 1000)
+      lastTsRef.current = now
+
+      const pos = positionRef.current
+      let vel = velocityRef.current
+      const target = targetRef.current
+
+      if (target !== null) {
+        // User-directed: critically damped spring to explicit target
+        const diff = shortestDelta(pos, target)
+        const force = SPRING * diff - DAMP * vel
+        vel += force * dt
+        if (Math.abs(diff) < 0.005 && Math.abs(vel) < 0.05) {
+          positionRef.current = target
+          velocityRef.current = 0
+          targetRef.current = null
+          applyTransforms()
+          maybeTick()
+          rafRef.current = requestAnimationFrame(tick)
+          return
+        }
+      } else if (Math.abs(vel) > SETTLE_VEL) {
+        // Coasting: pure exponential decay. THIS is "spin then decelerate."
+        vel *= Math.exp(-DECAY * dt)
+      } else {
+        // Slow: spring to nearest integer for clean settle
+        const nearest = Math.round(pos)
+        const diff = shortestDelta(pos, nearest)
+        const force = SPRING * diff - DAMP * vel
+        vel += force * dt
+        if (Math.abs(diff) < 0.005 && Math.abs(vel) < 0.05) {
+          positionRef.current = modN(nearest)
+          velocityRef.current = 0
+          applyTransforms()
+          maybeTick()
+          rafRef.current = requestAnimationFrame(tick)
+          return
+        }
+      }
+
+      // Clamp + integrate
+      if (vel > MAX_VEL) vel = MAX_VEL
+      if (vel < -MAX_VEL) vel = -MAX_VEL
+      velocityRef.current = vel
+      positionRef.current = modN(pos + vel * dt)
+
+      applyTransforms()
+      maybeTick()
+      rafRef.current = requestAnimationFrame(tick)
+    }
+
+    function maybeTick() {
+      const idxNow = modN(Math.round(positionRef.current))
+      if (idxNow !== lastIdxRef.current) {
+        lastIdxRef.current = idxNow
+        carouselTick()
+        setCur(idxNow)
+      }
+    }
+
+    lastTsRef.current = 0
+    rafRef.current = requestAnimationFrame(tick)
+
+    return () => {
+      running = false
+      cancelAnimationFrame(rafRef.current)
+    }
+  }, [isOpen, N, SPRING, DAMP, DECAY, SETTLE_VEL, MAX_VEL, applyTransforms, applyOpenTransforms, modN, shortestDelta])
+
+  /* ── wheel: impulse into velocity. No gesture/axis locking needed — the
+     decay model naturally absorbs inertia tail noise. */
+  useEffect(() => {
+    function onWheel(e: WheelEvent) {
+      if (isOpen) return
+      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY
+      const factor = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1
+      let add = d * factor * WHEEL_K
+      if (add > WHEEL_CLAMP) add = WHEEL_CLAMP
+      if (add < -WHEEL_CLAMP) add = -WHEEL_CLAMP
+      velocityRef.current += add
+      targetRef.current = null // wheel cancels any pending snap-to-target
+    }
+    window.addEventListener('wheel', onWheel, { passive: true })
+    return () => window.removeEventListener('wheel', onWheel)
+  }, [isOpen, WHEEL_K, WHEEL_CLAMP])
+
+  /* ── navigate to specific card (click/key/dot) via spring-to-target. */
+  const goTo = useCallback(
+    (i: number) => {
+      targetRef.current = modN(i)
+    },
+    [modN],
+  )
+
+  function onCardClick(i: number) {
+    if (i === cur) {
+      carouselSelect()
+      setSel(i)
+    } else {
+      goTo(i)
+    }
   }
-  function prev() {
-    if (!isOpen) setCur((c) => (c - 1 + DOMAINS.length) % DOMAINS.length)
-  }
-  function select(i: number) {
-    if (i === cur) setSel(i)
-    else setCur(i)
-  }
+
   function close() {
     setSel(null)
   }
@@ -215,30 +423,22 @@ export default function HomePage() {
         close()
         return
       }
-      if (e.key === 'ArrowRight') next()
-      if (e.key === 'ArrowLeft') prev()
-      if (e.key === 'Enter' && !isOpen) select(cur)
+      if (isOpen) return
+      if (e.key === 'ArrowRight') {
+        velocityRef.current += 6 // one-card impulse
+        targetRef.current = null
+      }
+      if (e.key === 'ArrowLeft') {
+        velocityRef.current -= 6
+        targetRef.current = null
+      }
+      if (e.key === 'Enter') {
+        carouselSelect()
+        setSel(cur)
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  })
-
-  /* wheel */
-  const wc = useRef(false)
-  useEffect(() => {
-    function handler(e: WheelEvent) {
-      if (isOpen || wc.current) return
-      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY
-      if (Math.abs(d) < 30) return
-      wc.current = true
-      if (d > 0) next()
-      else prev()
-      setTimeout(() => {
-        wc.current = false
-      }, 500)
-    }
-    window.addEventListener('wheel', handler, { passive: true })
-    return () => window.removeEventListener('wheel', handler)
   })
 
   const selDomain = sel !== null ? DOMAINS[sel] : null
@@ -351,106 +551,57 @@ export default function HomePage() {
             className="flex items-center justify-center transition-all duration-500 ease-[cubic-bezier(.4,0,.2,1)] relative"
             style={{ width: isOpen ? '42%' : '100%', minWidth: isOpen ? '42%' : undefined }}
           >
-            {/* Cards container with perspective. On phone, shrink to viewport and
-             drop perspective depth so the single visible card reads cleanly. */}
+            {/* Perspective stage. Each card is absolute-positioned at left:50%;
+                the rAF loop writes its transform (translate + scale + rotateY)
+                every frame. No Embla, no CSS transitions during scroll. */}
             <div
               className="relative"
-              style={
-                isPhone
-                  ? { width: 'min(86vw, 340px)', height: 'min(120vw, 480px)', perspective: 800 }
-                  : { width: 440, height: 600, perspective: 1200 }
-              }
+              style={{
+                width: isPhone ? 'min(100vw, 340px)' : '100%',
+                height: isPhone ? 'min(120vw, 480px)' : 600,
+                perspective: isPhone ? 800 : 1200,
+                pointerEvents: isOpen ? 'none' : 'auto',
+              }}
             >
               {DOMAINS.map((domain, i) => {
                 const accent = MODULE_THEMES[domain.module]?.accent ?? '#64748b'
                 const Icon = getIcon(domain.icon)
                 const count = MODULE_REGISTRY.filter((m) => m.module === domain.module && m.level === 2).length
 
-                let offset = i - cur
-                if (offset > 2) offset -= DOMAINS.length
-                if (offset < -2) offset += DOMAINS.length
-                const isCenter = offset === 0
-                const abs = Math.abs(offset)
-
-                // Phone: only render the active / selected card. Rendering the 3D
-                // peek siblings at <768px overflows the viewport and steals taps.
-                if (isPhone) {
-                  if (isOpen && i !== sel) return null
-                  if (!isOpen && !isCenter) return null
-                }
-
-                // Compute transform
-                let tx: number, sc: number, ry: number, op: number, bl: number
-                if (isOpen) {
-                  // When open: center card stays, others gone
-                  if (i === sel) {
-                    tx = 0
-                    sc = 1.12
-                    ry = 0
-                    op = 1
-                    bl = 0
-                  } else {
-                    tx = 0
-                    sc = 0.7
-                    ry = 0
-                    op = 0
-                    bl = 0
-                  }
-                } else if (abs > 2) {
-                  tx = offset * 400
-                  sc = 0.5
-                  ry = 0
-                  op = 0
-                  bl = 5
-                } else {
-                  tx = offset * 370
-                  sc = isCenter ? 1 : abs === 1 ? 0.85 : 0.68
-                  ry = isCenter ? 0 : offset > 0 ? -8 : 8
-                  op = isCenter ? 1 : abs === 1 ? 0.5 : 0.2
-                  bl = isCenter ? 0 : abs === 1 ? 2 : 5
-                }
-
                 return (
-                  <button
+                  <div
                     key={domain.key}
-                    type="button"
-                    className="absolute inset-0 rounded-[20px] overflow-hidden focus:outline-none"
+                    ref={setCardRef(i)}
+                    className="absolute top-0 rounded-[20px] overflow-hidden"
                     style={{
-                      transform: `translateX(${tx}px) scale(${sc}) rotateY(${ry}deg)`,
-                      opacity: op,
-                      filter: bl ? `blur(${bl}px) brightness(.65)` : 'none',
-                      zIndex: isCenter ? 10 : 10 - abs,
-                      transition: 'all 500ms cubic-bezier(.4,0,.2,1)',
+                      width: isPhone ? 'min(86vw, 340px)' : 440,
+                      height: '100%',
+                      left: '50%',
+                      transform: 'translate(-50%, 0)', // rAF loop overrides
                       transformStyle: 'preserve-3d',
-                      border: isCenter ? `1px solid ${accent}40` : '1px solid rgba(255,255,255,.06)',
-                      boxShadow: isCenter
-                        ? `0 20px 60px rgba(0,0,0,.4), 0 0 60px ${accent}12`
-                        : '0 8px 32px rgba(0,0,0,.3)',
-                      cursor: isCenter ? 'pointer' : 'pointer',
-                      pointerEvents: (abs > 2 && !isOpen) || (isOpen && i !== sel) ? 'none' : 'auto',
+                      willChange: 'transform, opacity, filter',
+                      border: `1px solid ${accent}40`,
+                      boxShadow: `0 20px 60px rgba(0,0,0,.4), 0 0 60px ${accent}12`,
+                      cursor: 'pointer',
                     }}
-                    onClick={() => select(i)}
                   >
-                    {/* BG image */}
-                    <div
-                      className="absolute inset-0 bg-cover bg-center"
-                      style={{
-                        backgroundImage: `url(${domain.image})`,
-                        transform: isCenter ? 'scale(1.05)' : 'scale(1)',
-                        transition: 'transform 700ms ease',
-                      }}
-                    />
-                    {/* Darken */}
-                    <div
-                      className="absolute inset-0"
-                      style={{
-                        background: isCenter
-                          ? 'linear-gradient(180deg, rgba(0,0,0,.08) 0%, rgba(0,0,0,.25) 50%, rgba(0,0,0,.80) 100%)'
-                          : 'linear-gradient(180deg, rgba(0,0,0,.30) 0%, rgba(0,0,0,.70) 100%)',
-                      }}
-                    />
-                    {/* Glow */}
-                    {isCenter && (
+                    <button
+                      type="button"
+                      onClick={() => onCardClick(i)}
+                      className="absolute inset-0 focus:outline-none text-left"
+                      aria-label={domain.label}
+                    >
+                      <div
+                        className="absolute inset-0 bg-cover bg-center"
+                        style={{ backgroundImage: `url(${domain.image})` }}
+                      />
+                      <div
+                        className="absolute inset-0"
+                        style={{
+                          background:
+                            'linear-gradient(180deg, rgba(0,0,0,.08) 0%, rgba(0,0,0,.25) 50%, rgba(0,0,0,.80) 100%)',
+                        }}
+                      />
                       <div
                         className="absolute bottom-0 left-0 right-0 h-40"
                         style={{
@@ -458,79 +609,76 @@ export default function HomePage() {
                           animation: 'hzGlow 4s ease-in-out infinite',
                         }}
                       />
-                    )}
-                    {/* Top line */}
-                    {isCenter && (
                       <div
                         className="absolute top-0 left-0 right-0 h-[2px]"
-                        style={{ background: `linear-gradient(90deg, transparent 5%, ${accent} 50%, transparent 95%)` }}
+                        style={{
+                          background: `linear-gradient(90deg, transparent 5%, ${accent} 50%, transparent 95%)`,
+                        }}
                       />
-                    )}
 
-                    {/* Content — all inside the button */}
-                    <div className="absolute inset-0 flex flex-col p-5">
-                      {/* Top */}
-                      <div className="flex items-start justify-between">
-                        <div
-                          className="flex items-center justify-center rounded-full text-[14px] font-bold"
-                          style={{
-                            width: 36,
-                            height: 36,
-                            background: isCenter ? accent : 'rgba(255,255,255,.10)',
-                            color: '#fff',
-                            boxShadow: isCenter ? `0 4px 20px ${accent}50` : 'none',
-                            transition: 'all 500ms ease',
-                          }}
-                        >
-                          {String(i + 1).padStart(2, '0')}
+                      <div className="absolute inset-0 flex flex-col p-5">
+                        <div className="flex items-start justify-between">
+                          <div
+                            className="flex items-center justify-center rounded-full text-[14px] font-bold"
+                            style={{
+                              width: 36,
+                              height: 36,
+                              background: accent,
+                              color: '#fff',
+                              boxShadow: `0 4px 20px ${accent}50`,
+                            }}
+                          >
+                            {String(i + 1).padStart(2, '0')}
+                          </div>
+                          <div
+                            className="flex items-center justify-center rounded-xl"
+                            style={{
+                              width: 42,
+                              height: 42,
+                              background: 'rgba(0,0,0,.25)',
+                              backdropFilter: 'blur(12px)',
+                              border: `1px solid ${accent}40`,
+                            }}
+                          >
+                            <Icon size={20} strokeWidth={1.5} color="#fff" />
+                          </div>
                         </div>
-                        <div
-                          className="flex items-center justify-center rounded-xl"
-                          style={{
-                            width: 42,
-                            height: 42,
-                            background: 'rgba(0,0,0,.25)',
-                            backdropFilter: 'blur(12px)',
-                            border: isCenter ? `1px solid ${accent}40` : '1px solid rgba(255,255,255,.08)',
-                          }}
-                        >
-                          <Icon size={20} strokeWidth={1.5} color="#fff" />
-                        </div>
-                      </div>
 
-                      <div className="flex-1" />
+                        <div className="flex-1" />
 
-                      {/* Bottom */}
-                      <div className="text-left">
-                        <div className="text-[22px] font-bold tracking-tight text-white mb-1.5 drop-shadow-lg">
-                          {domain.label}
-                        </div>
-                        {isCenter && (
+                        <div className="text-left">
+                          <div className="text-[22px] font-bold tracking-tight text-white mb-1.5 drop-shadow-lg">
+                            {domain.label}
+                          </div>
                           <div className="text-[13px] leading-[1.5] text-white/55 mb-3">{domain.description}</div>
-                        )}
-                        {isCenter && (
                           <div className="flex items-center gap-3">
                             <span
                               className="text-[12px] font-semibold px-3 py-1 rounded-full"
-                              style={{ background: `${accent}25`, color: '#fff', border: `1px solid ${accent}30` }}
+                              style={{
+                                background: `${accent}25`,
+                                color: '#fff',
+                                border: `1px solid ${accent}30`,
+                              }}
                             >
                               {count} modules
                             </span>
                             <span className="text-[12px] text-white/30">Click to explore</span>
                           </div>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  </button>
+                    </button>
+                  </div>
                 )
               })}
             </div>
 
-            {/* Nav arrows — only when not open */}
             {!isOpen && (
               <>
                 <button
-                  onClick={prev}
+                  onClick={() => {
+                    velocityRef.current -= 6
+                    targetRef.current = null
+                  }}
                   className={`absolute top-1/2 -translate-y-1/2 z-20 rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-transform ${isPhone ? 'left-2 w-9 h-9' : 'left-4 w-11 h-11'}`}
                   style={{
                     background: isDark ? 'rgba(0,0,0,.25)' : 'rgba(255,255,255,.55)',
@@ -544,7 +692,10 @@ export default function HomePage() {
                   />
                 </button>
                 <button
-                  onClick={next}
+                  onClick={() => {
+                    velocityRef.current += 6
+                    targetRef.current = null
+                  }}
                   className={`absolute top-1/2 -translate-y-1/2 z-20 rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-transform ${isPhone ? 'right-2 w-9 h-9' : 'right-4 w-11 h-11'}`}
                   style={{
                     background: isDark ? 'rgba(0,0,0,.25)' : 'rgba(255,255,255,.55)',
@@ -560,9 +711,6 @@ export default function HomePage() {
               </>
             )}
 
-            {/* Dots — only when not open. Lifted off the bottom edge so a
-             small copyright line can sit comfortably below them. On phone
-             the dock occupies the bottom row, so lift the dots above it. */}
             {!isOpen && (
               <div
                 className={`absolute left-1/2 -translate-x-1/2 z-20 flex gap-2 ${isPhone ? 'bottom-24' : 'bottom-14'}`}
@@ -572,7 +720,7 @@ export default function HomePage() {
                   return (
                     <button
                       key={i}
-                      onClick={() => setCur(i)}
+                      onClick={() => goTo(i)}
                       className="rounded-full transition-all duration-500"
                       style={{
                         width: i === cur ? 28 : 8,
@@ -596,7 +744,10 @@ export default function HomePage() {
           >
             {/* Back button — neutral glass chip */}
             <button
-              onClick={close}
+              onClick={() => {
+                carouselDismiss()
+                close()
+              }}
               className="inline-flex items-center gap-2 mb-4 px-3.5 py-2 rounded-full transition-all duration-150 hover:scale-[1.03] active:scale-[0.97] focus:outline-none w-fit"
               style={{
                 background: 'rgba(255,255,255,0.10)',
@@ -751,6 +902,7 @@ export default function HomePage() {
                                 onClick={() => toggleCollapsed(child.code)}
                                 onMouseEnter={(e) => {
                                   e.currentTarget.style.background = 'rgba(255,255,255,.04)'
+                                  hoverTak()
                                 }}
                                 onMouseLeave={(e) => {
                                   e.currentTarget.style.background = 'transparent'
@@ -776,6 +928,7 @@ export default function HomePage() {
                                     e.currentTarget.style.background = 'rgba(255,255,255,.06)'
                                   }
                                   prefetch(child.route)
+                                  hoverTak()
                                 }}
                                 onFocus={() => prefetch(child.route)}
                                 onMouseLeave={(e) => {
@@ -815,6 +968,7 @@ export default function HomePage() {
                                         e.currentTarget.style.background = 'rgba(255,255,255,.05)'
                                       }
                                       prefetch(sub.route)
+                                      hoverTak()
                                     }}
                                     onFocus={() => prefetch(sub.route)}
                                     onMouseLeave={(e) => {

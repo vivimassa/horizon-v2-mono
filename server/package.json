@@ -12,6 +12,12 @@
     "seed:user": "tsx src/seed-user.ts",
     "seed:crew-a320-cp": "tsx src/seed-crew-a320-cp.ts",
     "seed:crew-all-fleets": "tsx src/seed-crew-all-fleets.ts",
+    "seed:crew-contacts": "tsx src/seed-crew-contacts.ts",
+    "seed:crew-passports": "tsx src/seed-crew-passports.ts",
+    "seed:crew-phones": "tsx src/seed-crew-phones.ts",
+    "seed:crew-expiries": "tsx src/seed-crew-expiries.ts",
+    "reseed:seniority": "tsx src/reseed-seniority.ts",
+    "backfill:pairing-legality": "tsx src/backfill-pairing-legality.ts",
     "migrate": "tsx src/migrate-from-supabase.ts"
   },
   "dependencies": {

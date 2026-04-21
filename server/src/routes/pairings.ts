@@ -6,6 +6,9 @@ import { ScheduledFlight } from '../models/ScheduledFlight.js'
 import { FlightInstance } from '../models/FlightInstance.js'
 import { Airport } from '../models/Airport.js'
 import { AircraftType } from '../models/AircraftType.js'
+import { CrewAssignment } from '../models/CrewAssignment.js'
+import { loadSerializedRuleSet } from '../services/fdtl-rule-set.js'
+import { evaluatePairingLegality } from '../services/evaluate-pairing-legality.js'
 
 /*
  * Routes for 4.1.5 Crew Pairing (operating pairings — sequences of flights
@@ -26,6 +29,11 @@ const pairingLegInput = z.object({
   staUtcIso: z.string().min(1),
   blockMinutes: z.number().int().min(0),
   aircraftTypeIcao: z.string().nullable().optional(),
+  // Tail is captured at pairing-save time so the inspector keeps the correct
+  // registration even after the virtual-placement overlay is cleared. Without
+  // this field here, Zod strips it silently and the Pairing doc persists
+  // `tailNumber: null` for every leg.
+  tailNumber: z.string().nullable().optional(),
 })
 
 const createPairingSchema = z
@@ -410,6 +418,65 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
     return doc
   })
 
+  // ── Schedule changes (ad-hoc delta against current FlightInstance) ──
+  // TODO: Replace with a proper flight-amendment audit log once the
+  // FlightInstance model emits change events. Today we synthesise the
+  // delta by comparing the pairing's frozen leg times to the current
+  // FlightInstance `schedule.stdUtc/staUtc` values.
+  app.get('/pairings/:id/schedule-changes', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const pairing = await Pairing.findOne({ _id: id, operatorId: req.operatorId }).lean()
+    if (!pairing) return reply.code(404).send({ error: 'Pairing not found' })
+
+    // FlightInstance._id = `${scheduledFlightId}|${yyyy-mm-dd}`.
+    // Pairing leg `flightId` may be scoped with `__` separators — the
+    // scheduledFlightId is always the first segment.
+    const instanceIds = pairing.legs.map((l) => `${l.flightId.split('__')[0]}|${l.flightDate}`)
+    const instances = await FlightInstance.find(
+      { operatorId: req.operatorId, _id: { $in: instanceIds } },
+      { _id: 1, schedule: 1, syncMeta: 1 },
+    ).lean()
+    const instByKey = new Map<string, (typeof instances)[number]>()
+    for (const inst of instances) instByKey.set(inst._id as string, inst)
+
+    const changes = pairing.legs.map((leg) => {
+      const key = `${leg.flightId.split('__')[0]}|${leg.flightDate}`
+      const inst = instByKey.get(key)
+      const pairingStdMs = Date.parse(leg.stdUtcIso)
+      const pairingStaMs = Date.parse(leg.staUtcIso)
+      const currentStdMs = inst?.schedule?.stdUtc ?? null
+      const currentStaMs = inst?.schedule?.staUtc ?? null
+      const stdDeltaMin =
+        currentStdMs !== null && !Number.isNaN(pairingStdMs) ? Math.round((currentStdMs - pairingStdMs) / 60_000) : null
+      const staDeltaMin =
+        currentStaMs !== null && !Number.isNaN(pairingStaMs) ? Math.round((currentStaMs - pairingStaMs) / 60_000) : null
+      return {
+        flightId: leg.flightId,
+        flightDate: leg.flightDate,
+        flightNumber: leg.flightNumber,
+        depStation: leg.depStation,
+        arrStation: leg.arrStation,
+        legOrder: leg.legOrder,
+        pairingStdUtcIso: leg.stdUtcIso,
+        pairingStaUtcIso: leg.staUtcIso,
+        currentStdUtcMs: currentStdMs,
+        currentStaUtcMs: currentStaMs,
+        stdDeltaMin,
+        staDeltaMin,
+        hasChange: (stdDeltaMin !== null && stdDeltaMin !== 0) || (staDeltaMin !== null && staDeltaMin !== 0),
+        lastChangedAtMs: inst?.syncMeta?.updatedAt ?? null,
+        instanceMissing: !inst,
+      }
+    })
+
+    return {
+      pairingId: pairing._id,
+      pairingCode: pairing.pairingCode,
+      pairingCommittedAt: pairing.updatedAt,
+      changes,
+    }
+  })
+
   // ── Create ──
   app.post('/pairings', async (req, reply) => {
     const parsed = createPairingSchema.safeParse(req.body)
@@ -429,6 +496,29 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
     const summary = summarize(body.legs)
     const now = new Date().toISOString()
 
+    // Auto-run FDTL engine when the client didn't pre-compute a result.
+    // Keeps `lastLegalityResult` populated for every saved pairing so the
+    // inspector's FDP / Legality rows never show blanks.
+    let legalityResult: unknown = body.lastLegalityResult ?? null
+    let fdtlStatus = body.fdtlStatus
+    if (!legalityResult) {
+      const ruleSet = await loadSerializedRuleSet(req.operatorId)
+      const evalResult = evaluatePairingLegality(
+        {
+          baseAirport: body.baseAirport,
+          complementKey: body.complementKey,
+          cockpitCount: body.cockpitCount,
+          facilityClass: body.facilityClass ?? null,
+          legs: body.legs,
+        },
+        ruleSet,
+      )
+      if (evalResult) {
+        legalityResult = evalResult.result
+        fdtlStatus = evalResult.status
+      }
+    }
+
     const doc = await Pairing.create({
       _id: crypto.randomUUID(),
       operatorId: req.operatorId,
@@ -439,7 +529,7 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
       baseId: body.baseId ?? null,
       aircraftTypeIcao: body.aircraftTypeIcao ?? null,
       aircraftTypeId: body.aircraftTypeId ?? null,
-      fdtlStatus: body.fdtlStatus,
+      fdtlStatus,
       workflowStatus: body.workflowStatus,
       ...summary,
       reportTime: body.reportTime ?? null,
@@ -450,7 +540,7 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
       facilityClass: body.facilityClass ?? null,
       crewCounts: body.crewCounts ?? null,
       legs: body.legs,
-      lastLegalityResult: body.lastLegalityResult ?? null,
+      lastLegalityResult: legalityResult,
       createdBy: (req as { user?: { sub?: string } }).user?.sub ?? 'system',
       createdAt: now,
       updatedAt: now,
@@ -473,6 +563,31 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
       patch.numberOfDuties = (patch as { pairingDays: number }).pairingDays
     }
 
+    // Re-run legality when legs changed and the caller didn't supply a
+    // fresh result. Pulls the current doc for unchanged fields (base /
+    // complement) so the engine sees the complete pairing.
+    if (body.legs && body.lastLegalityResult === undefined) {
+      const current = await Pairing.findOne({ _id: id, operatorId: req.operatorId }).lean()
+      if (current) {
+        const ruleSet = await loadSerializedRuleSet(req.operatorId)
+        const evalResult = evaluatePairingLegality(
+          {
+            baseAirport: (body.baseAirport as string | undefined) ?? current.baseAirport,
+            complementKey: (body.complementKey as string | undefined) ?? current.complementKey,
+            cockpitCount: (body.cockpitCount as number | undefined) ?? current.cockpitCount,
+            facilityClass:
+              body.facilityClass !== undefined ? (body.facilityClass as string | null) : current.facilityClass,
+            legs: body.legs,
+          },
+          ruleSet,
+        )
+        if (evalResult) {
+          patch.lastLegalityResult = evalResult.result
+          patch.fdtlStatus = evalResult.status
+        }
+      }
+    }
+
     const updated = await Pairing.findOneAndUpdate(
       { _id: id, operatorId: req.operatorId },
       { $set: patch },
@@ -483,11 +598,17 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
   })
 
   // ── Delete ──
+  // Cascade: remove any CrewAssignment rows still bound to this pairing so
+  // the crew-schedule Gantt (4.1.6) doesn't render orphan bars pointing at
+  // a missing pairing. Runs *before* the pairing delete so a partial
+  // failure leaves the assignments intact for retry.
   app.delete('/pairings/:id', async (req, reply) => {
     const { id } = req.params as { id: string }
-    const res = await Pairing.deleteOne({ _id: id, operatorId: req.operatorId })
-    if (res.deletedCount === 0) return reply.code(404).send({ error: 'Pairing not found' })
-    return { success: true }
+    const exists = await Pairing.exists({ _id: id, operatorId: req.operatorId })
+    if (!exists) return reply.code(404).send({ error: 'Pairing not found' })
+    const assignments = await CrewAssignment.deleteMany({ pairingId: id, operatorId: req.operatorId })
+    await Pairing.deleteOne({ _id: id, operatorId: req.operatorId })
+    return { success: true, deletedAssignments: assignments.deletedCount ?? 0 }
   })
 
   // ── Bulk create — replicate flow fires one request instead of N ──
@@ -508,8 +629,30 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
 
     const now = new Date().toISOString()
     const createdBy = (req as { user?: { sub?: string } }).user?.sub ?? 'system'
+    // Load rule set once for the whole batch — saves N-1 DB round-trips
+    // when the client didn't pre-compute legality on every pairing.
+    const needEngine = items.some((b) => !b.lastLegalityResult)
+    const ruleSet = needEngine ? await loadSerializedRuleSet(req.operatorId) : null
     const docs = items.map((body) => {
       const summary = summarize(body.legs)
+      let legalityResult: unknown = body.lastLegalityResult ?? null
+      let fdtlStatus = body.fdtlStatus
+      if (!legalityResult) {
+        const evalResult = evaluatePairingLegality(
+          {
+            baseAirport: body.baseAirport,
+            complementKey: body.complementKey,
+            cockpitCount: body.cockpitCount,
+            facilityClass: body.facilityClass ?? null,
+            legs: body.legs,
+          },
+          ruleSet,
+        )
+        if (evalResult) {
+          legalityResult = evalResult.result
+          fdtlStatus = evalResult.status
+        }
+      }
       return {
         _id: crypto.randomUUID(),
         operatorId: req.operatorId,
@@ -520,7 +663,7 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
         baseId: body.baseId ?? null,
         aircraftTypeIcao: body.aircraftTypeIcao ?? null,
         aircraftTypeId: body.aircraftTypeId ?? null,
-        fdtlStatus: body.fdtlStatus,
+        fdtlStatus,
         workflowStatus: body.workflowStatus,
         ...summary,
         reportTime: body.reportTime ?? null,
@@ -531,7 +674,7 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
         facilityClass: body.facilityClass ?? null,
         crewCounts: body.crewCounts ?? null,
         legs: body.legs,
-        lastLegalityResult: body.lastLegalityResult ?? null,
+        lastLegalityResult: legalityResult,
         createdBy,
         createdAt: now,
         updatedAt: now,
@@ -558,8 +701,13 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
   app.post('/pairings/bulk-delete', async (req, reply) => {
     const parsed = z.object({ ids: z.array(z.string().min(1)).min(1).max(500) }).safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues })
-    const res = await Pairing.deleteMany({ _id: { $in: parsed.data.ids }, operatorId: req.operatorId })
-    return { deletedCount: res.deletedCount ?? 0 }
+    const ids = parsed.data.ids
+    const assignments = await CrewAssignment.deleteMany({
+      pairingId: { $in: ids },
+      operatorId: req.operatorId,
+    })
+    const res = await Pairing.deleteMany({ _id: { $in: ids }, operatorId: req.operatorId })
+    return { deletedCount: res.deletedCount ?? 0, deletedAssignments: assignments.deletedCount ?? 0 }
   })
 
   // ── Legality check (thin wrapper — full FDTL integration TBD) ──

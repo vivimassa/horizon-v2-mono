@@ -48,6 +48,7 @@ import { crewDocumentsRoutes } from './routes/crew-documents.js'
 import { ensureSystemFolders } from './services/ensure-crew-document-folders.js'
 import { manpowerRoutes } from './routes/manpower.js'
 import { pairingRoutes } from './routes/pairings.js'
+import { crewScheduleRoutes } from './routes/crew-schedule.js'
 import { ensureManpowerBasePlan } from './services/ensure-manpower-base-plan.js'
 import { startWeatherPoll } from './jobs/weather-poll.js'
 import { startAutoTransmitScheduler } from './jobs/mvt-auto-transmit.js'
@@ -127,6 +128,7 @@ async function main(): Promise<void> {
   await app.register(crewDocumentsRoutes)
   await app.register(manpowerRoutes)
   await app.register(pairingRoutes)
+  await app.register(crewScheduleRoutes)
 
   // ── Bootstrap: ensure every active operator has the 4 system document
   // folders (Crew Photos / Passports & Licenses / Medical Certificates /

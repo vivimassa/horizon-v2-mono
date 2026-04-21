@@ -115,10 +115,28 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`API ${res.status}: ${body}`)
+    // Attach parsed JSON payload (if any) to the Error so callers can
+    // render structured errors (e.g. capacity_exceeded) without regex.
+    const err = new Error(`API ${res.status}: ${body}`) as ApiError
+    err.status = res.status
+    try {
+      err.payload = JSON.parse(body)
+    } catch {
+      err.payload = null
+    }
+    throw err
   }
 
   return res.json()
+}
+
+/** Error thrown by `request` on non-2xx. `payload` is the parsed JSON
+ *  body when the server returned JSON; null otherwise. Consumers can
+ *  branch on `payload.code` (e.g. 'capacity_exceeded') instead of
+ *  regex-parsing the message. */
+export interface ApiError extends Error {
+  status?: number
+  payload?: unknown
 }
 
 // ─── Flight types ─────────────────────────────────────────
@@ -2707,6 +2725,14 @@ export const api = {
 
   getPairing: (id: string) => request<PairingRef>(`/pairings/${encodeURIComponent(id)}`),
 
+  /**
+   * Ad-hoc delta detection — compares the pairing's frozen leg times to
+   * the current `flightInstances` docs and flags any STD/STA changes. To
+   * be replaced by a proper flight-amendment audit log in a later phase.
+   */
+  getPairingScheduleChanges: (id: string) =>
+    request<PairingScheduleChangesRef>(`/pairings/${encodeURIComponent(id)}/schedule-changes`),
+
   createPairing: (data: PairingCreateInput) =>
     request<PairingRef>('/pairings', { method: 'POST', body: JSON.stringify(data) }),
 
@@ -2738,6 +2764,351 @@ export const api = {
     }),
 
   getFdtlRuleSet: () => request<SerializedRuleSetRef>('/fdtl/rule-set'),
+
+  // ── 4.1.6 Crew Schedule ──
+  getCrewSchedule: (params: { from: string; to: string; base?: string; position?: string; acType?: string }) => {
+    const qs = new URLSearchParams({ from: params.from, to: params.to })
+    if (params.base) qs.set('base', params.base)
+    if (params.position) qs.set('position', params.position)
+    if (params.acType) qs.set('acType', params.acType)
+    return request<CrewScheduleResponse>(`/crew-schedule?${qs.toString()}`)
+  },
+
+  /** Crew currently assigned to a single pairing — display-ready rows
+   *  joined server-side. Used by the shared Pairing Details dialog when
+   *  opened from 4.1.5.1 / 4.1.5.2 (which don't hydrate the aggregator). */
+  getAssignedCrewForPairing: (pairingId: string) =>
+    request<{ rows: AssignedCrewRowRef[] }>(`/crew-schedule/pairings/${encodeURIComponent(pairingId)}/crew`),
+
+  /** Legality override audit rows for assignments live in [from, to].
+   *  Feeds the 4.1.6 Legality Check toolbar dialog. The future 4.3.1
+   *  Schedule Legality Check report will combine this feed with a live
+   *  FDTL re-evaluation. */
+  getLegalityOverrides: (params: { from: string; to: string }) => {
+    const qs = new URLSearchParams({ from: params.from, to: params.to })
+    return request<{ rows: LegalityOverrideRowRef[] }>(`/crew-schedule/legality-overrides?${qs.toString()}`)
+  },
+
+  createCrewAssignment: (data: CrewAssignmentCreateInput) =>
+    request<CrewAssignmentRef>('/crew-schedule/assignments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  patchCrewAssignment: (
+    id: string,
+    data: {
+      status?: CrewAssignmentStatus
+      notes?: string | null
+      /** Reassigns to a different crew member (Move flow). Server
+       *  revalidates seat eligibility and rejects double-book. */
+      crewId?: string
+    },
+  ) =>
+    request<CrewAssignmentRef>(`/crew-schedule/assignments/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteCrewAssignment: (id: string) =>
+    request<{ success: boolean }>(`/crew-schedule/assignments/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+
+  /** Atomic swap of crew on two assignments (AIMS §4.2 Swap duties).
+   *  Server revalidates eligibility both ways and rolls back on conflict. */
+  swapCrewAssignments: (data: { assignmentAId: string; assignmentBId: string }) =>
+    request<{ success: boolean; swappedAssignmentIds: [string, string] }>('/crew-schedule/assignments/swap', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /** Atomic swap of every assignment overlapping [fromIso, toIso]
+   *  between two crew members. Server revalidates eligibility both
+   *  ways and rejects on double-book. */
+  swapCrewAssignmentsBlock: (data: { sourceCrewId: string; targetCrewId: string; fromIso: string; toIso: string }) =>
+    request<{ success: boolean; swappedSourceCount: number; swappedTargetCount: number }>(
+      '/crew-schedule/assignments/swap-block',
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+
+  createCrewActivity: (data: CrewActivityCreateInput) =>
+    request<CrewActivityRef>('/crew-schedule/activities', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /** Bulk-assign one activity code to many (crewId, dateIso) pairs — AIMS
+   *  "Assign series of duties". Best-effort on the server: returns created
+   *  docs + failed count so the UI can refresh regardless of partials. */
+  createCrewActivitiesBulk: (data: {
+    activities: Array<{ crewId: string; activityCodeId: string; dateIso: string; notes?: string | null }>
+  }) =>
+    request<{ created: CrewActivityRef[]; failed: number }>('/crew-schedule/activities/bulk', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /** Edit an existing activity — times, notes, and/or its activity code. */
+  patchCrewActivity: (
+    id: string,
+    data: {
+      startUtcIso?: string
+      endUtcIso?: string
+      notes?: string | null
+      activityCodeId?: string
+    },
+  ) =>
+    request<CrewActivityRef>(`/crew-schedule/activities/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteCrewActivity: (id: string) =>
+    request<{ success: boolean }>(`/crew-schedule/activities/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+
+  /** Crew memos (AIMS Alt+M) — one collection, three scopes. */
+  createCrewMemo: (data: CrewMemoCreateInput) =>
+    request<CrewMemoRef>('/crew-schedule/memos', { method: 'POST', body: JSON.stringify(data) }),
+  patchCrewMemo: (id: string, data: { text?: string; pinned?: boolean }) =>
+    request<CrewMemoRef>(`/crew-schedule/memos/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteCrewMemo: (id: string) =>
+    request<{ success: boolean }>(`/crew-schedule/memos/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  /** Publish the current schedule for a period — creates a snapshot the
+   *  "Compare to Published" overlay diffs against (AIMS F10). */
+  publishCrewSchedule: (data: { periodFromIso: string; periodToIso: string; note?: string | null }) =>
+    request<CrewSchedulePublicationRef>('/crew-schedule/publications', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /** Get the most recent publication that covers a window. 404 when none. */
+  getLatestCrewSchedulePublication: (from: string, to: string) =>
+    request<CrewSchedulePublicationRef>(
+      `/crew-schedule/publications/latest?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+    ),
+
+  /** Create one or more temporary base assignments. Returns the created
+   *  rows with server-generated ids. */
+  createCrewTempBases: (entries: Array<{ crewId: string; fromIso: string; toIso: string; airportCode: string }>) =>
+    request<{ created: TempBaseRef[] }>('/crew-schedule/temp-bases', {
+      method: 'POST',
+      body: JSON.stringify({ entries }),
+    }),
+
+  patchCrewTempBase: (id: string, data: { fromIso?: string; toIso?: string; airportCode?: string }) =>
+    request<TempBaseRef>(`/crew-schedule/temp-bases/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteCrewTempBase: (id: string) =>
+    request<{ success: boolean }>(`/crew-schedule/temp-bases/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+}
+
+// ── 4.1.6 Crew Schedule types ──
+export type CrewAssignmentStatus = 'planned' | 'confirmed' | 'rostered' | 'cancelled'
+
+export interface CrewAssignmentRef {
+  _id: string
+  operatorId: string
+  scenarioId: string | null
+  pairingId: string
+  crewId: string
+  seatPositionId: string
+  seatIndex: number
+  status: CrewAssignmentStatus
+  startUtcIso: string
+  endUtcIso: string
+  assignedByUserId: string | null
+  assignedAtUtc: string
+  legalityResult: unknown
+  lastLegalityCheckUtcIso: string | null
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CrewAssignmentCreateInput {
+  pairingId: string
+  crewId: string
+  seatPositionId: string
+  seatIndex: number
+  status?: CrewAssignmentStatus
+  notes?: string | null
+  /** Rule violations the planner acknowledged and overrode. Each entry
+   *  persists as an `AssignmentViolationOverride` audit row on the
+   *  server for the future 4.3.1 Schedule Legality Check report. */
+  overrides?: Array<{
+    violationKind: string
+    messageSnapshot?: string | null
+    detail?: unknown
+  }>
+}
+
+export interface UncrewedPairingRef {
+  pairingId: string
+  pairingCode?: string
+  startDate: string
+  missing: Array<{ seatPositionId: string; seatCode: string; count: number }>
+}
+
+export interface CrewActivityRef {
+  _id: string
+  operatorId: string
+  scenarioId: string | null
+  crewId: string
+  activityCodeId: string
+  startUtcIso: string
+  endUtcIso: string
+  dateIso: string | null
+  notes: string | null
+  assignedByUserId: string | null
+  assignedAtUtc: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CrewActivityCreateInput {
+  crewId: string
+  activityCodeId: string
+  dateIso?: string
+  startUtcIso?: string
+  endUtcIso?: string
+  notes?: string | null
+}
+
+export type CrewMemoScope = 'pairing' | 'day' | 'crew'
+
+export interface CrewMemoRef {
+  _id: string
+  operatorId: string
+  scenarioId: string | null
+  scope: CrewMemoScope
+  targetId: string
+  dateIso: string | null
+  text: string
+  pinned: boolean
+  authorUserId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CrewMemoCreateInput {
+  scope: CrewMemoScope
+  targetId: string
+  dateIso?: string | null
+  text: string
+  pinned?: boolean
+}
+
+export interface CrewSchedulePublicationAssignmentRef {
+  assignmentId: string
+  pairingId: string
+  crewId: string
+  seatPositionId: string
+  seatIndex: number
+  startUtcIso: string
+  endUtcIso: string
+  status: string
+}
+
+export interface CrewSchedulePublicationActivityRef {
+  activityId: string
+  crewId: string
+  activityCodeId: string
+  startUtcIso: string
+  endUtcIso: string
+  dateIso: string | null
+}
+
+export interface CrewSchedulePublicationRef {
+  _id: string
+  operatorId: string
+  scenarioId: string | null
+  periodFromIso: string
+  periodToIso: string
+  publishedAtUtc: string
+  publishedByUserId: string | null
+  note: string | null
+  assignments: CrewSchedulePublicationAssignmentRef[]
+  activities: CrewSchedulePublicationActivityRef[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LegalityOverrideRowRef {
+  overrideId: string
+  violationKind: string
+  messageSnapshot: string | null
+  detail: unknown
+  crewId: string
+  crewName: string | null
+  employeeId: string | null
+  pairingId: string
+  pairingCode: string | null
+  overriddenByUserId: string | null
+  overriddenAtUtc: string
+}
+
+export interface AssignedCrewRowRef {
+  crewId: string
+  firstName: string
+  lastName: string
+  employeeId: string
+  positionCode: string
+  positionColor: string | null
+  baseLabel: string | null
+  seniority: number | null
+  status: string
+}
+
+export interface CrewScheduleResponse {
+  pairings: PairingRef[]
+  crew: CrewMemberListItemRef[]
+  assignments: CrewAssignmentRef[]
+  uncrewed: UncrewedPairingRef[]
+  positions: CrewPositionRef[]
+  activities: CrewActivityRef[]
+  activityCodes: ActivityCodeRef[]
+  activityGroups: ActivityCodeGroupRef[]
+  memos: CrewMemoRef[]
+  /** Operator's FDTL-driven visual padding for computed duty windows
+   *  (falls back to schema defaults when no scheme exists). */
+  fdtl: {
+    briefMinutes: number
+    debriefMinutes: number
+    /** Minimum mandatory rest after duty, per CAAV-style rules. Both
+     *  values are in minutes. The effective rest for a pairing is
+     *  `max(minutes, precedingDutyMinutes)`. 0 = rule not seeded — UI
+     *  renders no rest strip. */
+    restRules: {
+      homeBaseMinMinutes: number
+      awayMinMinutes: number
+    }
+  }
+  /** All aircraft types defined for the operator — ICAO → family map
+   *  used by the client-side AC-type-not-qualified hard-block. */
+  aircraftTypes: Array<{ icaoType: string; family: string | null }>
+  /** Temporary base assignments overlapping [from, to]. Used to paint
+   *  the Gantt band and to suppress `base_mismatch` violations. */
+  tempBases: TempBaseRef[]
+}
+
+export interface TempBaseRef {
+  _id: string
+  crewId: string
+  fromIso: string
+  toIso: string
+  airportCode: string
 }
 
 // ── Non-Crew Person types ──
@@ -3974,8 +4345,40 @@ export interface CrewMemberRef {
   noInternationalFlights: boolean
   maxLayoverStops: number | null
   photoUrl: string | null
+  /** Per-crew publish-visibility flag. When false, the crew member's
+   *  rostered duties are hidden in the mobile app (planner hasn't
+   *  committed yet). Toggled from 4.1.6 Crew Schedule → right-click
+   *  crew name → "Toggle published schedule". */
+  isScheduleVisible: boolean
+  /** Free-text HR notes, read-only in Crew Schedule's extra-info dialog. */
+  hrNotes: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface PairingScheduleChangeLegRef {
+  flightId: string
+  flightDate: string
+  flightNumber: string
+  depStation: string
+  arrStation: string
+  legOrder: number
+  pairingStdUtcIso: string
+  pairingStaUtcIso: string
+  currentStdUtcMs: number | null
+  currentStaUtcMs: number | null
+  stdDeltaMin: number | null
+  staDeltaMin: number | null
+  hasChange: boolean
+  lastChangedAtMs: number | null
+  instanceMissing: boolean
+}
+
+export interface PairingScheduleChangesRef {
+  pairingId: string
+  pairingCode: string
+  pairingCommittedAt: string
+  changes: PairingScheduleChangeLegRef[]
 }
 
 export interface CrewMemberCreate {
@@ -3997,6 +4400,11 @@ export interface CrewMemberListItemRef extends CrewMemberRef {
   acTypes: string[]
   expiryAlertCount: number
   baseLabel: string | null
+  /** Flat qualification rows: each aircraft-type rating the crew holds
+   *  plus the AC FAMILY toggle from their profile. Populated only by the
+   *  crew-schedule aggregator (not the generic /crew list). Drives the
+   *  client-side AC-type hard-block check at assignment time. */
+  qualifications?: Array<{ aircraftType: string; acFamilyQualified: boolean }>
 }
 
 export interface CrewPhoneRef {

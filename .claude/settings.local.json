@@ -152,7 +152,8 @@
       "Bash(echo \"LINT_EXIT=$?\")",
       "WebFetch(domain:api.anthropic.com)",
       "Bash(pnpm --filter @skyhub/constants run typecheck)",
-      "Bash(git -C \"/c/Users/ADMIN/horizon-v2-mono\" log --oneline -n 30 --all -- '**/fdt*' '**/fdtl*')"
+      "Bash(git -C \"/c/Users/ADMIN/horizon-v2-mono\" log --oneline -n 30 --all -- '**/fdt*' '**/fdtl*')",
+      "Bash(npm uninstall *)"
     ]
   },
   "enableAllProjectMcpServers": true,

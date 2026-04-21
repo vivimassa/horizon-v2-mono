@@ -3,6 +3,7 @@ import { validateServerEnv } from '@skyhub/env/server'
 const env = validateServerEnv()
 import { connectDB } from './db/connection.js'
 import { User } from './models/User.js'
+import { Operator } from './models/Operator.js'
 
 async function seedUser() {
   await connectDB(env.MONGODB_URI)
@@ -15,9 +16,18 @@ async function seedUser() {
     process.exit(0)
   }
 
+  // Bind the seed user to the first active operator — never a hardcoded string.
+  // If someone's local DB has a different tenant UUID, the user still belongs
+  // to the right tenant and queries resolve instead of returning empty.
+  const op = await Operator.findOne({ isActive: true }).lean()
+  if (!op) {
+    console.error('✗ No active operator in DB — seed an operator first')
+    process.exit(1)
+  }
+
   await User.create({
     _id: userId,
-    operatorId: 'skyhub',
+    operatorId: op._id,
     profile: {
       firstName: 'SkyHub',
       lastName: 'Administrator',

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect } from 'react'
 
 const PRESETS = ['aurora', 'ember', 'lagoon', 'prism'] as const
 type Preset = (typeof PRESETS)[number] | 'none'
@@ -50,35 +50,25 @@ export function toggleDynamicBg() {
 
 /**
  * Applies the animated background CSS classes to <body>.
- * Listens for changes via custom events so Settings toggles take effect immediately.
+ *
+ * DISABLED: The preset animation got stuck in a prior state and the CPU cost
+ * isn't worth the visual. Until we revisit, this component strips every
+ * `anim-bg*` class from <body> on mount and ignores any Settings toggle. The
+ * helpers above (getBgPreset / setBgPreset / toggleDynamicBg) remain for any
+ * caller that still references them, but they have no runtime effect here.
  */
 export function AnimatedBodyBg() {
-  const [preset, setPreset] = useState<Preset>('aurora')
-
-  const applyPreset = useCallback((p: Preset) => {
-    setPreset(p)
+  useEffect(() => {
     const body = document.body
     body.classList.remove('anim-bg')
     PRESETS.forEach((pr) => body.classList.remove(`anim-bg-${pr}`))
-    if (p !== 'none') {
-      body.classList.add('anim-bg', `anim-bg-${p}`)
+    // Also wipe the stuck preset in storage so a future page load doesn't
+    // try to re-apply it via a different code path.
+    try {
+      localStorage.setItem(STORAGE_KEY, 'none')
+    } catch {
+      /* ignore */
     }
   }, [])
-
-  // Init from localStorage
-  useEffect(() => {
-    applyPreset(getBgPreset())
-  }, [applyPreset])
-
-  // Listen for changes from Settings
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail as Preset
-      applyPreset(detail)
-    }
-    window.addEventListener(EVENT_NAME, handler)
-    return () => window.removeEventListener(EVENT_NAME, handler)
-  }, [applyPreset])
-
   return null
 }

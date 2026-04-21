@@ -10,7 +10,7 @@ import {
   type FdtlTabGroup,
 } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
-import { getOperatorId } from '@/stores/use-operator-store'
+import { getOperatorId, useOperatorStore } from '@/stores/use-operator-store'
 import { accentTint } from '@skyhub/ui/theme'
 import { useTheme } from '@/components/theme-provider'
 import { FdtMatrix } from './fdt-matrix'
@@ -60,6 +60,16 @@ const TAB_ICONS: Record<string, React.ComponentType<any>> = {
 export function FdtRulesShell() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+  // Operator must be loaded before we try to fetch the scheme — otherwise
+  // getOperatorId() returns '' and the server can't match a scheme, causing
+  // the UI to fall back to the framework selector even when the operator
+  // is already configured.
+  const operatorId = useOperatorStore((s) => s.operator?._id ?? '')
+  const operatorLoaded = useOperatorStore((s) => s.loaded)
+  const loadOperator = useOperatorStore((s) => s.loadOperator)
+  useEffect(() => {
+    if (!operatorLoaded) void loadOperator()
+  }, [operatorLoaded, loadOperator])
   const [frameworks, setFrameworks] = useState<FdtlFrameworkRef[]>([])
   const [tabGroups, setTabGroups] = useState<FdtlTabGroup[]>([])
   const [scheme, setScheme] = useState<FdtlSchemeRef | null>(null)
@@ -71,6 +81,7 @@ export function FdtRulesShell() {
   const [errorMsg, setErrorMsg] = useState('')
 
   const fetchData = useCallback(async () => {
+    if (!operatorId) return
     setLoading(true)
     try {
       const [fw, tg] = await Promise.all([api.getFdtlFrameworks(), api.getFdtlTabGroups()])
@@ -78,11 +89,11 @@ export function FdtRulesShell() {
       setTabGroups(tg)
 
       try {
-        const s = await api.getFdtlScheme(getOperatorId())
+        const s = await api.getFdtlScheme(operatorId)
         setScheme(s)
         const [r, t] = await Promise.all([
-          api.getFdtlRules(getOperatorId(), s.frameworkCode),
-          api.getFdtlTables(getOperatorId(), s.frameworkCode),
+          api.getFdtlRules(operatorId, s.frameworkCode),
+          api.getFdtlTables(operatorId, s.frameworkCode),
         ])
         setRules(r)
         setTables(t)
@@ -97,26 +108,33 @@ export function FdtRulesShell() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [operatorId, activeTab])
 
   useEffect(() => {
-    fetchData()
-  }, [fetchData])
+    // Wait for the operator store to finish loading before fetching — if
+    // operatorId is still '' we'd ping the server with an empty filter
+    // and always fall through to "scheme = null".
+    if (operatorLoaded && operatorId) fetchData()
+  }, [fetchData, operatorLoaded, operatorId])
 
   const handleSeed = useCallback(
     async (frameworkCode: string) => {
       setSeeding(true)
       setErrorMsg('')
       try {
-        await api.seedFdtl(getOperatorId(), frameworkCode)
+        await api.seedFdtl(operatorId, frameworkCode)
         await fetchData()
-      } catch {
-        setErrorMsg('Failed to seed framework')
+      } catch (e) {
+        // Surface the real cause — "Failed to seed framework" with no
+        // detail hides the actual issue (auth, network, server error).
+        const msg = (e as { message?: string })?.message ?? String(e)
+        console.error('seedFdtl failed:', e)
+        setErrorMsg(`Failed to seed framework: ${msg}`)
       } finally {
         setSeeding(false)
       }
     },
-    [fetchData],
+    [fetchData, operatorId],
   )
 
   const handleCellChange = useCallback(
@@ -184,7 +202,7 @@ export function FdtRulesShell() {
 
   const activeTabLabel = tabGroups.flatMap((g) => g.tabs).find((t) => t.key === activeTab)?.label ?? activeTab
 
-  if (loading) {
+  if (loading || !operatorLoaded) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-[14px] text-hz-text-secondary animate-pulse">Loading FDTL configuration...</div>
@@ -193,7 +211,15 @@ export function FdtRulesShell() {
   }
 
   if (!scheme) {
-    return <FrameworkSetup frameworks={frameworks} onSeed={handleSeed} seeding={seeding} isDark={isDark} />
+    return (
+      <FrameworkSetup
+        frameworks={frameworks}
+        onSeed={handleSeed}
+        seeding={seeding}
+        isDark={isDark}
+        errorMsg={errorMsg}
+      />
+    )
   }
 
   return (
@@ -397,13 +423,20 @@ function FrameworkSetup({
   onSeed,
   seeding,
   isDark,
+  errorMsg,
 }: {
   frameworks: FdtlFrameworkRef[]
   onSeed: (code: string) => void
   seeding: boolean
   isDark: boolean
+  errorMsg: string
 }) {
-  const [selected, setSelected] = useState<string | null>(null)
+  // Pre-select the first framework so the Initialize button is enabled
+  // immediately. User can change the selection before seeding.
+  const [selected, setSelected] = useState<string | null>(() => frameworks[0]?.code ?? null)
+  useEffect(() => {
+    if (!selected && frameworks[0]) setSelected(frameworks[0].code)
+  }, [frameworks, selected])
 
   return (
     <div className="flex flex-col items-center justify-center h-full gap-6 px-6">
@@ -427,13 +460,18 @@ function FrameworkSetup({
           return (
             <button
               key={fw.code}
+              type="button"
               onClick={() => setSelected(fw.code)}
-              className={`text-left p-4 rounded-xl border-2 transition-all ${
-                isSel ? 'shadow-md' : 'border-hz-border/50 hover:border-hz-border'
+              className={`text-left p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                isSel ? 'shadow-lg' : 'border-hz-border/50 hover:border-hz-border hover:shadow-md'
               }`}
               style={
                 isSel
-                  ? { borderColor: fw.color, backgroundColor: accentTint(fw.color, isDark ? 0.08 : 0.04) }
+                  ? {
+                      borderColor: fw.color,
+                      backgroundColor: accentTint(fw.color, isDark ? 0.12 : 0.06),
+                      boxShadow: `0 0 0 3px ${accentTint(fw.color, 0.25)}`,
+                    }
                   : undefined
               }
             >
@@ -457,13 +495,16 @@ function FrameworkSetup({
       </div>
 
       <button
+        type="button"
         onClick={() => selected && onSeed(selected)}
         disabled={!selected || seeding}
-        className="flex items-center gap-2 px-6 py-3 rounded-xl text-[14px] font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-40 bg-module-accent"
+        className="flex items-center gap-2 px-6 py-3 rounded-xl text-[14px] font-semibold text-white transition-colors hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+        style={{ backgroundColor: ACCENT }}
       >
         <Sparkles className="h-4 w-4" />
         {seeding ? 'Seeding rules & tables...' : 'Initialize Framework'}
       </button>
+      {errorMsg && <div className="text-[13px] text-[#E63535] mt-2">{errorMsg}</div>}
     </div>
   )
 }

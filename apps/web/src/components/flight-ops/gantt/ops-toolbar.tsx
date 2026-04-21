@@ -34,6 +34,7 @@ import { useTheme } from '@/components/theme-provider'
 import { colors } from '@skyhub/ui/theme'
 import { Tooltip } from '@/components/ui/tooltip'
 import { RibbonSection, RibbonBtn, RibbonDivider as Divider } from '@/components/ui/ribbon-primitives'
+import { FormatPopover } from '@/components/ui/format-popover'
 import { useGanttStore } from '@/stores/use-gantt-store'
 import { BulkAssignDialog } from '@/components/network/gantt/bulk-assign-dialog'
 import { RecoveryDialog } from './recovery-dialog'
@@ -121,8 +122,6 @@ export function OpsToolbar({
   const [utilizationPos, setUtilizationPos] = useState({ top: 0, left: 0 })
 
   const formatBtnRef = useRef<HTMLButtonElement>(null)
-  const formatDropRef = useRef<HTMLDivElement>(null)
-  const [formatPos, setFormatPos] = useState({ top: 0, left: 0 })
 
   const alertsBtnRef = useRef<HTMLButtonElement>(null)
   const alertsDropRef = useRef<HTMLDivElement>(null)
@@ -138,29 +137,6 @@ export function OpsToolbar({
       .then((runs) => setCompareCount(runs.length))
       .catch(() => {})
   }, [operatorId])
-
-  // Format popover positioning
-  useEffect(() => {
-    if (!formatOpen || !formatBtnRef.current) return
-    const r = formatBtnRef.current.getBoundingClientRect()
-    setFormatPos({ top: r.bottom + 6, left: r.left })
-  }, [formatOpen])
-
-  // Close format on outside click
-  useEffect(() => {
-    if (!formatOpen) return
-    const handler = (e: MouseEvent) => {
-      if (
-        formatDropRef.current &&
-        !formatDropRef.current.contains(e.target as Node) &&
-        !formatBtnRef.current?.contains(e.target as Node)
-      ) {
-        setFormatOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [formatOpen])
 
   // Alerts popover positioning
   useEffect(() => {
@@ -857,172 +833,40 @@ export function OpsToolbar({
         </div>
       )}
 
-      {/* ── Format Popover ── */}
-      {formatOpen &&
-        (() => {
-          const rowH = ROW_HEIGHT_LEVELS[rowHeightLevel].rowH
-          const OPS_ZOOMS: ZoomLevel[] = ['1D', '2D', '3D', '4D', '5D', '6D', '7D']
-          const zoomIdx = OPS_ZOOMS.indexOf(zoomLevel)
-          const zoomPrev = () => {
-            if (zoomIdx > 0) setZoom(OPS_ZOOMS[zoomIdx - 1])
-          }
-          const zoomNext = () => {
-            if (zoomIdx < OPS_ZOOMS.length - 1) setZoom(OPS_ZOOMS[zoomIdx + 1])
-          }
-          return createPortal(
-            <div
-              ref={formatDropRef}
-              className="fixed z-[9999] rounded-xl p-3 select-none space-y-3"
-              style={{
-                top: formatPos.top,
-                left: formatPos.left,
-                width: 200,
-                background: panelBg,
-                border: `1px solid ${panelBorder}`,
-                boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 32px rgba(96,97,112,0.14)',
-              }}
-            >
-              {/* Row Height */}
-              <div>
-                <div className="text-[13px] font-medium text-hz-text-secondary mb-2 text-center">Row Height</div>
-                <div className="flex items-center justify-center">
-                  <button
-                    onClick={zoomRowOut}
-                    disabled={rowHeightLevel <= 0}
-                    className="flex items-center justify-center rounded-l-lg text-[14px] font-bold transition-colors disabled:opacity-30"
-                    style={{ width: 40, height: 36, border: `1px solid ${panelBorder}` }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = hoverBg
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent'
-                    }}
-                  >
-                    −
-                  </button>
-                  <div
-                    className="flex items-center justify-center text-[13px] font-mono font-medium text-hz-text"
-                    style={{
-                      width: 56,
-                      height: 36,
-                      borderTop: `1px solid ${panelBorder}`,
-                      borderBottom: `1px solid ${panelBorder}`,
-                    }}
-                  >
-                    {rowH}
-                  </div>
-                  <button
-                    onClick={zoomRowIn}
-                    disabled={rowHeightLevel >= ROW_HEIGHT_LEVELS.length - 1}
-                    className="flex items-center justify-center rounded-r-lg text-[14px] font-bold transition-colors disabled:opacity-30"
-                    style={{ width: 40, height: 36, border: `1px solid ${panelBorder}` }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = hoverBg
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent'
-                    }}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              {/* Range (Zoom) */}
-              <div>
-                <div className="text-[13px] font-medium text-hz-text-secondary mb-2 text-center">Range</div>
-                <div className="flex items-center justify-center">
-                  <button
-                    onClick={zoomPrev}
-                    disabled={zoomIdx <= 0}
-                    className="flex items-center justify-center rounded-l-lg text-[14px] font-bold transition-colors disabled:opacity-30"
-                    style={{ width: 40, height: 36, border: `1px solid ${panelBorder}` }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = hoverBg
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent'
-                    }}
-                  >
-                    −
-                  </button>
-                  <div
-                    className="flex items-center justify-center text-[13px] font-mono font-medium text-hz-text"
-                    style={{
-                      width: 56,
-                      height: 36,
-                      borderTop: `1px solid ${panelBorder}`,
-                      borderBottom: `1px solid ${panelBorder}`,
-                    }}
-                  >
-                    {zoomLevel}
-                  </div>
-                  <button
-                    onClick={zoomNext}
-                    disabled={zoomIdx >= OPS_ZOOMS.length - 1}
-                    className="flex items-center justify-center rounded-r-lg text-[14px] font-bold transition-colors disabled:opacity-30"
-                    style={{ width: 40, height: 36, border: `1px solid ${panelBorder}` }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = hoverBg
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent'
-                    }}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              {/* Refresh Interval (auto-refresh in minutes) */}
-              <div>
-                <div className="text-[13px] font-medium text-hz-text-secondary mb-2 text-center">Refresh Interval</div>
-                <div className="flex items-center justify-center">
-                  <button
-                    onClick={() => setRefreshIntervalMins(refreshIntervalMins - 1)}
-                    disabled={refreshIntervalMins <= 5}
-                    className="flex items-center justify-center rounded-l-lg text-[14px] font-bold transition-colors disabled:opacity-30"
-                    style={{ width: 40, height: 36, border: `1px solid ${panelBorder}` }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = hoverBg
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent'
-                    }}
-                  >
-                    −
-                  </button>
-                  <div
-                    className="flex items-center justify-center text-[13px] font-mono font-medium text-hz-text"
-                    style={{
-                      width: 56,
-                      height: 36,
-                      borderTop: `1px solid ${panelBorder}`,
-                      borderBottom: `1px solid ${panelBorder}`,
-                    }}
-                  >
-                    {refreshIntervalMins}m
-                  </div>
-                  <button
-                    onClick={() => setRefreshIntervalMins(refreshIntervalMins + 1)}
-                    disabled={refreshIntervalMins >= 59}
-                    className="flex items-center justify-center rounded-r-lg text-[14px] font-bold transition-colors disabled:opacity-30"
-                    style={{ width: 40, height: 36, border: `1px solid ${panelBorder}` }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = hoverBg
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent'
-                    }}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            </div>,
-            document.body,
-          )
-        })()}
+      {/* ── Format Popover (shared with 4.1.6 Crew Schedule) ── */}
+      {(() => {
+        const OPS_ZOOMS: ZoomLevel[] = ['1D', '2D', '3D', '4D', '5D', '6D', '7D']
+        const zoomIdx = OPS_ZOOMS.indexOf(zoomLevel)
+        return (
+          <FormatPopover
+            open={formatOpen}
+            onClose={() => setFormatOpen(false)}
+            anchorRef={formatBtnRef}
+            rowHeight={{
+              displayValue: ROW_HEIGHT_LEVELS[rowHeightLevel].rowH,
+              canDecrement: rowHeightLevel > 0,
+              canIncrement: rowHeightLevel < ROW_HEIGHT_LEVELS.length - 1,
+              onDecrement: zoomRowOut,
+              onIncrement: zoomRowIn,
+            }}
+            range={{
+              displayValue: zoomLevel,
+              canPrev: zoomIdx > 0,
+              canNext: zoomIdx < OPS_ZOOMS.length - 1,
+              onPrev: () => {
+                if (zoomIdx > 0) setZoom(OPS_ZOOMS[zoomIdx - 1])
+              },
+              onNext: () => {
+                if (zoomIdx < OPS_ZOOMS.length - 1) setZoom(OPS_ZOOMS[zoomIdx + 1])
+              },
+            }}
+            refreshInterval={{
+              valueMins: refreshIntervalMins,
+              onChange: setRefreshIntervalMins,
+            }}
+          />
+        )
+      })()}
 
       {/* ── Alerts Popover ── */}
       {alertsOpen &&

@@ -1,5 +1,20 @@
 const BASE = 'http://localhost:3002';
 
+// Accept --operator=<id> or fall back to discovering the first active operator.
+// A hardcoded string like "horizon" creates rows no tenant can read.
+const operatorArg = process.argv.find((a) => a.startsWith('--operator='));
+let OPERATOR_ID;
+if (operatorArg) {
+  OPERATOR_ID = operatorArg.split('=')[1];
+} else {
+  const r = await fetch(BASE + '/operators');
+  if (!r.ok) { console.error('GET /operators failed — pass --operator=<id>'); process.exit(1); }
+  const ops = await r.json();
+  if (!ops.length) { console.error('No operators in DB — seed one first'); process.exit(1); }
+  OPERATOR_ID = ops[0]._id;
+}
+console.log('Seeding delay codes for operator:', OPERATOR_ID);
+
 const codes = [
   // Airline Internal (00-09)
   { code: "00", alphaCode: null, category: "Airline Internal", name: "Airline Internal", description: "Airline-specific internal use", color: "#6b7280" },
@@ -109,7 +124,7 @@ const codes = [
 (async () => {
   let ok = 0, skip = 0;
   for (const c of codes) {
-    const body = JSON.stringify({ operatorId: 'horizon', ...c, isActive: true, isIataStandard: true });
+    const body = JSON.stringify({ operatorId: OPERATOR_ID, ...c, isActive: true, isIataStandard: true });
     const r = await fetch(BASE + '/delay-codes', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body
     });

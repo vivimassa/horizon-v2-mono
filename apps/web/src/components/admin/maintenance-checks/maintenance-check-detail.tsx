@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { FileText, Clock, Wrench, Palette, RotateCcw, Loader2, Plus, Trash2 } from 'lucide-react'
 import { api, type MaintenanceCheckTypeRef, type MaintenanceWindowRef } from '@skyhub/api'
+import { useOperatorStore } from '@/stores/use-operator-store'
 
 // ── Shared styles ──
 
@@ -35,6 +36,7 @@ export function MaintenanceCheckDetail({
   onDirtyChange,
 }: Props) {
   const isCreate = !checkType
+  const operatorId = useOperatorStore((s) => s.operator?._id)
 
   // Form state
   const [code, setCode] = useState('')
@@ -199,12 +201,16 @@ export function MaintenanceCheckDetail({
       setError('Code and Name are required')
       return
     }
+    if (!operatorId) {
+      setError('Operator not loaded yet — please retry')
+      return
+    }
     setError('')
     setSaving(true)
     try {
       const payload = buildPayload()
       if (isCreate) {
-        await onCreate?.({ ...payload, operatorId: 'horizon' } as any)
+        await onCreate?.({ ...payload, operatorId } as any)
       } else {
         await onSave?.(checkType!._id, payload)
       }
@@ -232,10 +238,11 @@ export function MaintenanceCheckDetail({
   // Maintenance window handlers
   const handleWindowSave = async () => {
     if (!editBase.trim()) return
+    if (!operatorId) return
     setWindowSaving(true)
     try {
       await api.createMaintenanceWindow({
-        operatorId: 'horizon',
+        operatorId,
         base: editBase.trim().toUpperCase(),
         windowStartUtc: editStart,
         windowEndUtc: editEnd,

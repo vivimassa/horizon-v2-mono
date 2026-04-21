@@ -53,7 +53,23 @@ export const useOperatorStore = create<OperatorState>((set, get) => ({
     }),
 }))
 
-/** Get the current operator's _id. Use this instead of hardcoding "horizon". */
+/**
+ * Get the current operator's _id. The store is hydrated by AuthProvider before
+ * any authenticated child renders, so this should never return empty in practice.
+ * If it does, we throw in dev (and log loudly in prod) so the bug surfaces at
+ * the call site instead of silently sending `operatorId=""` to the server.
+ */
 export function getOperatorId(): string {
-  return useOperatorStore.getState().operator?._id ?? ''
+  const id = useOperatorStore.getState().operator?._id
+  if (!id) {
+    const msg =
+      '[operator-store] getOperatorId() called before operator was hydrated — ' +
+      'AuthProvider must resolve /operators/:id before this code runs.'
+    if (process.env.NODE_ENV !== 'production') {
+      throw new Error(msg)
+    }
+    console.error(msg)
+    return ''
+  }
+  return id
 }

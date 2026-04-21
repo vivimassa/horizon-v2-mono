@@ -2,7 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { setAuthCallbacks } from '@skyhub/api'
+import { api, setAuthCallbacks } from '@skyhub/api'
+import { useOperatorStore } from '@/stores/use-operator-store'
 
 interface AuthUser {
   _id: string
@@ -77,7 +78,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [operatorReady, setOperatorReady] = useState(false)
   const bootstrapped = useRef(false)
+
+  // Hydrate the global operator store from the authenticated user's operatorId.
+  // Every child that calls getOperatorId() depends on this — we block rendering
+  // below until it resolves, so no API call can ever fire with an empty id.
+  const hydrateOperator = useCallback(async (opId: string) => {
+    try {
+      const op = await api.getOperator(opId)
+      useOperatorStore.getState().setOperator(op)
+      setOperatorReady(true)
+    } catch (e) {
+      console.error('Failed to load operator for authenticated user:', e)
+      setOperatorReady(false)
+    }
+  }, [])
 
   const loadMe = useCallback(async (accessToken: string): Promise<AuthUser | null> => {
     const res = await fetch(`${API_BASE}/users/me`, {
@@ -87,20 +103,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return (await res.json()) as AuthUser
   }, [])
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await fetch(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    })
-    const body = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      throw new Error(body?.error || 'Login failed')
-    }
-    writeTokens(body.accessToken, body.refreshToken)
-    setUser(body.user as AuthUser)
-    setIsAuthenticated(true)
-  }, [])
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(body?.error || 'Login failed')
+      }
+      writeTokens(body.accessToken, body.refreshToken)
+      const u = body.user as AuthUser
+      setUser(u)
+      setIsAuthenticated(true)
+      await hydrateOperator(u.operatorId)
+    },
+    [hydrateOperator],
+  )
 
   const logout = useCallback(() => {
     clearTokens()
@@ -161,6 +182,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (me) {
           setUser(me)
           setIsAuthenticated(true)
+          await hydrateOperator(me.operatorId)
         } else {
           clearTokens()
         }
@@ -170,7 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false)
       }
     })()
-  }, [loadMe])
+  }, [loadMe, hydrateOperator])
 
   // Redirect unauthenticated users to /login (unless already on a public/marketing path)
   useEffect(() => {
@@ -195,6 +217,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated && !onPublicPath) {
     // The redirect useEffect above will route to /login — render nothing
     // in the meantime so nothing in the subtree fires an API call.
+    return <div className="h-screen w-screen bg-hz-bg" />
+  }
+  // Authenticated subtree: wait for the operator store to be hydrated. If we
+  // render children before this resolves, every useOperatorStore / getOperatorId()
+  // caller would fire API requests with operatorId="" and the server would reject.
+  if (isAuthenticated && !onPublicPath && !operatorReady) {
     return <div className="h-screen w-screen bg-hz-bg" />
   }
 

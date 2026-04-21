@@ -10,6 +10,19 @@ import { FieldRow } from '../airports/field-row'
 import { ACCENT } from './expiry-codes-shell'
 import { getOperatorId } from '@/stores/use-operator-store'
 import { Plus, Pencil, Save, X, Trash2, AlertTriangle, Settings, ShieldAlert, Users, Beaker } from 'lucide-react'
+import { Dropdown, type DropdownOption } from '@/components/ui/dropdown'
+
+const CREW_CATEGORY_OPTIONS: DropdownOption[] = [
+  { value: 'both', label: 'Both (Flight Deck + Cabin)' },
+  { value: 'cockpit', label: 'Flight Deck Only' },
+  { value: 'cabin', label: 'Cabin Crew Only' },
+]
+
+const AC_TYPE_SCOPE_OPTIONS: DropdownOption[] = [
+  { value: 'none', label: 'Not type-specific' },
+  { value: 'family', label: 'By type family (e.g. A320 family)' },
+  { value: 'variant', label: 'By exact variant (e.g. A321neo)' },
+]
 
 /* ─── Props ─── */
 
@@ -161,36 +174,18 @@ function CreatePanel({
             placeholder="e.g. Operator Proficiency Check"
             onChange={(v) => set('name', v)}
           />
-          <div className="py-2.5 border-b border-hz-border/50">
-            <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1 block">
-              Category *
-            </label>
-            <select
-              value={form.categoryId}
-              onChange={(e) => set('categoryId', e.target.value)}
-              className="w-full text-[13px] font-medium bg-transparent border-b border-hz-accent/30 outline-none focus:border-hz-accent py-0.5 text-hz-text"
-            >
-              {categories.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="py-2.5 border-b border-hz-border/50">
-            <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1 block">
-              Crew Category
-            </label>
-            <select
-              value={form.crewCategory}
-              onChange={(e) => set('crewCategory', e.target.value)}
-              className="w-full text-[13px] font-medium bg-transparent border-b border-hz-accent/30 outline-none focus:border-hz-accent py-0.5 text-hz-text"
-            >
-              <option value="both">Both (Flight Deck + Cabin)</option>
-              <option value="cockpit">Flight Deck Only</option>
-              <option value="cabin">Cabin Crew Only</option>
-            </select>
-          </div>
+          <SelectField
+            label="Category *"
+            value={form.categoryId}
+            onChange={(v) => set('categoryId', v)}
+            options={categories.map((c) => ({ value: c._id, label: c.label, color: c.color }))}
+          />
+          <SelectField
+            label="Crew Category"
+            value={form.crewCategory}
+            onChange={(v) => set('crewCategory', v)}
+            options={CREW_CATEGORY_OPTIONS}
+          />
           <FormField
             label="Description"
             value={form.description}
@@ -453,22 +448,12 @@ function ViewEditPanel({
               onChange={setField}
             />
             {editing ? (
-              <div className="py-2.5 border-b border-hz-border/50">
-                <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1 block">
-                  Category
-                </label>
-                <select
-                  value={getVal('categoryId')}
-                  onChange={(e) => setField('categoryId', e.target.value)}
-                  className="w-full text-[13px] font-medium bg-transparent border-b border-hz-accent/30 outline-none focus:border-hz-accent py-0.5 text-hz-text"
-                >
-                  {categories.map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <SelectField
+                label="Category"
+                value={getVal('categoryId')}
+                onChange={(v) => setField('categoryId', v)}
+                options={categories.map((c) => ({ value: c._id, label: c.label, color: c.color }))}
+              />
             ) : (
               <FieldRow
                 label="Category"
@@ -490,20 +475,12 @@ function ViewEditPanel({
               />
             )}
             {editing ? (
-              <div className="py-2.5 border-b border-hz-border/50">
-                <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1 block">
-                  Crew Category
-                </label>
-                <select
-                  value={getVal('crewCategory')}
-                  onChange={(e) => setField('crewCategory', e.target.value)}
-                  className="w-full text-[13px] font-medium bg-transparent border-b border-hz-accent/30 outline-none focus:border-hz-accent py-0.5 text-hz-text"
-                >
-                  <option value="both">Both (Flight Deck + Cabin)</option>
-                  <option value="cockpit">Flight Deck Only</option>
-                  <option value="cabin">Cabin Crew Only</option>
-                </select>
-              </div>
+              <SelectField
+                label="Crew Category"
+                value={getVal('crewCategory')}
+                onChange={(v) => setField('crewCategory', v)}
+                options={CREW_CATEGORY_OPTIONS}
+              />
             ) : (
               <FieldRow
                 label="Crew Category"
@@ -813,21 +790,14 @@ function FormulaSection({
 
       {/* Formula select */}
       <div className="mb-4">
-        <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1 block">
-          Formula Type
-        </label>
-        <select
+        <SelectField
+          label="Formula Type"
           value={formula}
-          onChange={(e) => onFormulaChange(e.target.value)}
-          className="w-full text-[13px] font-medium bg-transparent border-b border-hz-accent/30 outline-none focus:border-hz-accent py-0.5 text-hz-text"
-        >
-          {EXPIRY_FORMULAS.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-        {formulaDef && <p className="text-[13px] text-hz-text-secondary mt-1">{formulaDef.description}</p>}
+          onChange={onFormulaChange}
+          options={EXPIRY_FORMULAS.map((f) => ({ value: f.id, label: f.label }))}
+          compact
+        />
+        {formulaDef && <p className="text-[13px] text-hz-text-secondary mt-2">{formulaDef.description}</p>}
       </div>
 
       {/* Dynamic param fields */}
@@ -846,19 +816,14 @@ function FormulaSection({
 
       {/* AC Type Scope */}
       {formulaDef?.supportsAcType && (
-        <div className="mt-3 py-2.5 border-t border-hz-border/30">
-          <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1 block">
-            Aircraft Type Scope
-          </label>
-          <select
+        <div className="mt-4 pt-4 border-t border-hz-border/30">
+          <SelectField
+            label="Aircraft Type Scope"
             value={acTypeScope}
-            onChange={(e) => onAcTypeScopeChange(e.target.value as any)}
-            className="w-full text-[13px] font-medium bg-transparent border-b border-hz-accent/30 outline-none focus:border-hz-accent py-0.5 text-hz-text"
-          >
-            <option value="none">Not type-specific</option>
-            <option value="family">By type family (e.g. A320 family)</option>
-            <option value="variant">By exact variant (e.g. A321neo)</option>
-          </select>
+            onChange={(v) => onAcTypeScopeChange(v as any)}
+            options={AC_TYPE_SCOPE_OPTIONS}
+            compact
+          />
         </div>
       )}
     </div>
@@ -876,23 +841,13 @@ function FormulaFieldInput({
 }) {
   if (field.type === 'select' && field.options) {
     return (
-      <div className="py-2.5 border-b border-hz-border/50">
-        <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1 block">
-          {field.label}
-        </label>
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full text-[13px] font-medium bg-transparent border-b border-hz-accent/30 outline-none focus:border-hz-accent py-0.5 text-hz-text"
-        >
-          <option value="">Select...</option>
-          {field.options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <SelectField
+        label={field.label}
+        value={value ?? ''}
+        onChange={onChange}
+        options={field.options.map((o) => ({ value: o.value, label: o.label }))}
+        placeholder="Select..."
+      />
     )
   }
 
@@ -1100,6 +1055,33 @@ function FormField({
         onChange={(e) => onChange(e.target.value)}
         className={`w-full text-[13px] ${mono ? 'font-bold font-mono uppercase' : 'font-medium'} bg-transparent border-b border-hz-accent/30 outline-none focus:border-hz-accent py-0.5 text-hz-text`}
       />
+    </div>
+  )
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  compact,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  options: DropdownOption[]
+  placeholder?: string
+  /** compact = no bottom padding wrapper (for use inside existing sections) */
+  compact?: boolean
+}) {
+  const dd = <Dropdown value={value || null} options={options} onChange={onChange} placeholder={placeholder} />
+  return (
+    <div className={compact ? '' : 'py-2.5'}>
+      <label className="text-[12px] text-hz-text-secondary uppercase tracking-wider font-semibold mb-1.5 block">
+        {label}
+      </label>
+      {dd}
     </div>
   )
 }

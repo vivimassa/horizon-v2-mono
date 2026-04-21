@@ -5,8 +5,15 @@ import { api, type MaintenanceCheckTypeRef } from '@skyhub/api'
 import { MasterDetailLayout } from '@/components/layout'
 import { MaintenanceCheckList } from './maintenance-check-list'
 import { MaintenanceCheckDetail } from './maintenance-check-detail'
+import { useOperatorStore } from '@/stores/use-operator-store'
 
 export function MaintenanceChecksShell() {
+  const loadOperator = useOperatorStore((s) => s.loadOperator)
+  const operatorLoaded = useOperatorStore((s) => s.loaded)
+  useEffect(() => {
+    if (!operatorLoaded) void loadOperator()
+  }, [operatorLoaded, loadOperator])
+
   const [checkTypes, setCheckTypes] = useState<MaintenanceCheckTypeRef[]>([])
   const [selected, setSelected] = useState<MaintenanceCheckTypeRef | null>(null)
   const [search, setSearch] = useState('')

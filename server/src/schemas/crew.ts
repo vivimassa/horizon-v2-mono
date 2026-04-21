@@ -65,6 +65,8 @@ export const crewMemberUpdateSchema = z
     noInternationalFlights: z.boolean(),
     maxLayoverStops: z.number().nullable(),
     photoUrl: z.string().nullable(),
+    isScheduleVisible: z.boolean(),
+    hrNotes: z.string().nullable(),
   })
   .partial()
   .strict()

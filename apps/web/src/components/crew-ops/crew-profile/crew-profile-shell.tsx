@@ -69,6 +69,8 @@ function emptyCrewDraft(): CrewMemberRef {
     noInternationalFlights: false,
     maxLayoverStops: null,
     photoUrl: null,
+    isScheduleVisible: true,
+    hrNotes: null,
     createdAt: '',
     updatedAt: '',
   }

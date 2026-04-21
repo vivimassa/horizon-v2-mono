@@ -67,6 +67,20 @@ const crewMemberSchema = new Schema(
     // Media
     photoUrl: { type: String, default: null },
 
+    /**
+     * Per-crew publish-visibility flag. When true, the crew member sees
+     * their own duties in the mobile app. When false, planner hasn't
+     * committed yet and the crew's rostered duties are hidden client-side.
+     *
+     * Toggled from 4.1.6 Crew Schedule → right-click crew name → "Toggle
+     * published schedule" (distinct from the global F10 snapshot overlay).
+     */
+    isScheduleVisible: { type: Boolean, default: true },
+
+    /** Free-text HR notes — read-only in the Crew Schedule "extra info"
+     *  dialog; owned by the Crew Master Data module. */
+    hrNotes: { type: String, default: null },
+
     createdAt: { type: String, default: () => new Date().toISOString() },
     updatedAt: { type: String, default: () => new Date().toISOString() },
   },

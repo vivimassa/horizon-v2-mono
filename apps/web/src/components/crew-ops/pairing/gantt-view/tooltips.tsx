@@ -346,8 +346,6 @@ export const PairingTooltip = memo(function PairingTooltip({ pairing, clientX, c
 
   const status = getStatusStyle(pairing.status, isDark)
   const workflow = pairing.workflowStatus === 'committed' ? 'COMMITTED' : 'DRAFT'
-  const firstDep = pairing.legs[0]?.depStation ?? '?'
-  const lastArr = pairing.legs[pairing.legs.length - 1]?.arrStation ?? '?'
 
   const bg = isDark ? 'rgba(244,244,245,0.92)' : 'rgba(24,24,27,0.88)'
   const border = isDark ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'
@@ -378,45 +376,31 @@ export const PairingTooltip = memo(function PairingTooltip({ pairing, clientX, c
           boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)',
         }}
       >
-        {/* Header: pairing code pill + workflow status */}
-        <div className="flex items-center justify-between">
+        {/* Header: pairing code pill + route chain on the same row, with
+            the workflow · status badge right-aligned. */}
+        <div className="flex items-center gap-3">
           <span
-            className="font-bold text-[14px] px-2 py-0.5 rounded"
+            className="font-bold text-[14px] px-2 py-0.5 rounded shrink-0"
             style={{ background: status.bg, color: status.color }}
           >
             {pairing.pairingCode}
           </span>
-          <span className="text-[13px] font-medium tracking-wider uppercase" style={{ color: muted }}>
+          {pairing.routeChain && (
+            <span
+              className="font-mono text-[13px] truncate flex-1"
+              style={{ color: heading }}
+              title={pairing.routeChain}
+            >
+              {pairing.routeChain}
+            </span>
+          )}
+          <span className="text-[11px] font-medium tracking-wider uppercase shrink-0" style={{ color: muted }}>
             {workflow} · {status.text}
           </span>
         </div>
-
-        {/* Route: first-dep ─── legs ─── last-arr */}
-        <div className="flex items-center justify-between">
-          <div className="text-[20px] font-bold" style={{ color: heading }}>
-            {firstDep}
-          </div>
-          <div className="flex-1 flex items-center justify-center px-3">
-            <div className="flex-1 h-px" style={{ background: border }} />
-            <span className="px-2 text-[13px] font-medium tabular-nums" style={{ color: muted }}>
-              {pairing.legs.length} legs
-            </span>
-            <div className="flex-1 h-px" style={{ background: border }} />
-          </div>
-          <div className="text-[20px] font-bold" style={{ color: heading }}>
-            {lastArr}
-          </div>
+        <div className="text-[11px] font-medium" style={{ color: muted }}>
+          {pairing.legs.length} {pairing.legs.length === 1 ? 'leg' : 'legs'}
         </div>
-
-        {/* Route chain — full string, mono */}
-        {pairing.routeChain && (
-          <div
-            className="font-mono text-[13px] break-all rounded-md px-2 py-1.5"
-            style={{ color: body, background: isDark ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)' }}
-          >
-            {pairing.routeChain}
-          </div>
-        )}
 
         {/* Info grid */}
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[13px]">

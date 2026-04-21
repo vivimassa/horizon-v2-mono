@@ -27,6 +27,7 @@ import { PairingZoneOverlay } from './pairing-zone/pairing-zone-overlay'
 import { FlightTooltip, PairingTooltip } from './tooltips'
 import { PairingPillContextMenu } from './pairing-zone/pairing-pill-context-menu'
 import { PairingDetailsDialog } from '../dialogs/pairing-details-dialog'
+import { useAssignedCrewForPairing } from '../use-assigned-crew'
 import { DeletePairingDialog } from '../dialogs/delete-pairing-dialog'
 import { FlightContextMenu } from './flight-context-menu'
 import { SearchPill } from './search-pill'
@@ -1012,7 +1013,7 @@ export function PairingGanttCanvas() {
         (() => {
           const p = pairings.find((x) => x.id === detailsPairingId)
           if (!p) return null
-          return <PairingDetailsDialog pairing={p} onClose={() => setDetailsPairingId(null)} />
+          return <PairingDetailsDialogWithCrew pairing={p} onClose={() => setDetailsPairingId(null)} />
         })()}
 
       {pendingDelete && (
@@ -1040,6 +1041,14 @@ export function PairingGanttCanvas() {
       <SearchPill />
     </div>
   )
+}
+
+/** Wraps `PairingDetailsDialog` with a lazy fetch for the live assigned-
+ *  crew roster so 4.1.5.2's dialog shows the same "Crew Assigned" list
+ *  that 4.1.6 shows. Fetch runs once per pairingId, cached 30s. */
+function PairingDetailsDialogWithCrew({ pairing, onClose }: React.ComponentProps<typeof PairingDetailsDialog>) {
+  const { data: assignedCrew } = useAssignedCrewForPairing(pairing.id)
+  return <PairingDetailsDialog pairing={pairing} onClose={onClose} assignedCrew={assignedCrew ?? []} />
 }
 
 // ── Tooltip wrappers: read PairingFlight / Pairing from pairing-store ──

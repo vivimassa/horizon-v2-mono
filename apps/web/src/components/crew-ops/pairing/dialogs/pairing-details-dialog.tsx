@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   X,
@@ -60,6 +60,24 @@ interface PairingDetailsDialogProps {
     frequency: string
     replicaCount: number
   }
+  /**
+   * Optional list of crew currently assigned to this pairing. When supplied
+   * (e.g. from 4.1.6 Crew Schedule where assignments are live), renders a
+   * real "Crew Assigned" list instead of the placeholder panel.
+   */
+  assignedCrew?: AssignedCrewRow[]
+}
+
+export interface AssignedCrewRow {
+  crewId: string
+  firstName: string
+  lastName: string
+  employeeId: string
+  positionCode: string
+  positionColor?: string | null
+  baseLabel?: string | null
+  seniority?: number | null
+  status?: string
 }
 
 /**
@@ -67,7 +85,7 @@ interface PairingDetailsDialogProps {
  * list of legs and assigned crew. Ported in content from AIMS' "Details for
  * Crew Route" dialog, re-styled to SkyHub glass aesthetic.
  */
-export function PairingDetailsDialog({ pairing, onClose, periodOverride }: PairingDetailsDialogProps) {
+export function PairingDetailsDialog({ pairing, onClose, periodOverride, assignedCrew }: PairingDetailsDialogProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
@@ -154,7 +172,7 @@ export function PairingDetailsDialog({ pairing, onClose, periodOverride }: Pairi
   const divider = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
   const subtleBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.025)'
 
-  const crewCount = 0 // MVP — real list arrives with 3.2.x
+  const crewCount = assignedCrew?.length ?? 0
   const [timeMode, setTimeMode] = useState<'local' | 'utc'>('utc')
   // Operator timezone (IANA) from Settings → Admin → Operator Config. Used
   // to convert the stored UTC leg times into the operator's local display.
@@ -361,21 +379,12 @@ export function PairingDetailsDialog({ pairing, onClose, periodOverride }: Pairi
             </div>
           </section>
 
-          {/* Crew complement — required positions per 5.4.3 catalog */}
-          <section>
-            <SectionHeader icon={<UsersIcon size={13} strokeWidth={2} />} label="Crew Complement" isDark={isDark} />
-            <CrewComplementPanel
-              counts={resolvedCrewCounts}
-              total={complementTotal}
-              positions={positions}
-              templateLabel={complementTemplate?.label ?? pairing.complementKey}
-              templateBadge={complementTemplate?.badge ?? pairing.complementKey.toUpperCase()}
-              templateBadgeColor={complementTemplate?.badgeColor ?? '#6B7280'}
-              isDark={isDark}
-            />
-          </section>
+          {/* Crew Complement panel intentionally removed — the Summary grid
+               above already surfaces the full template + seat breakdown
+               (e.g. `1CP 1FO 1PU 3CA`), so the redundant panel added noise. */}
 
-          {/* Crew list — placeholder for 3.2.x */}
+          {/* Crew list — live when `assignedCrew` is provided (4.1.6); otherwise
+               a gentle placeholder for contexts without access to the roster. */}
           <section>
             <SectionHeader
               icon={<UsersIcon size={13} strokeWidth={2} />}
@@ -383,33 +392,47 @@ export function PairingDetailsDialog({ pairing, onClose, periodOverride }: Pairi
               count={crewCount}
               isDark={isDark}
             />
-            <div
-              className="flex flex-col items-center justify-center text-center gap-2 py-8 rounded-xl mt-3"
-              style={{
-                background: subtleBg,
-                border: `1px solid ${divider}`,
-              }}
-            >
-              <UsersIcon size={22} strokeWidth={1.8} style={{ color: textMuted }} />
-              <div className="text-[13px] font-semibold" style={{ color: textPrimary }}>
-                No crew members assigned to this pairing
-              </div>
-              <div className="text-[11px] max-w-[360px]" style={{ color: textSecondary }}>
-                Crew assignment lives in Roster (4.1.6 Crew Schedule / 3.2.x). Once wired, they'll appear here with
-                seniority, base, AC qualification and position.
-              </div>
+            {assignedCrew && assignedCrew.length > 0 ? (
+              <AssignedCrewList
+                rows={assignedCrew}
+                textPrimary={textPrimary}
+                textSecondary={textSecondary}
+                textMuted={textMuted}
+                divider={divider}
+                subtleBg={subtleBg}
+              />
+            ) : (
               <div
-                className="mt-2 inline-flex items-center gap-1.5 px-2 h-5 rounded text-[11px] font-semibold"
+                className="flex flex-col items-center justify-center text-center gap-2 py-8 rounded-xl mt-3"
                 style={{
-                  background: `${ACCENT}14`,
-                  color: ACCENT,
-                  border: `1px solid ${ACCENT}33`,
+                  background: subtleBg,
+                  border: `1px solid ${divider}`,
                 }}
               >
-                <Wrench size={10} strokeWidth={2.2} />
-                Coming next
+                <UsersIcon size={22} strokeWidth={1.8} style={{ color: textMuted }} />
+                <div className="text-[13px] font-semibold" style={{ color: textPrimary }}>
+                  No crew members assigned to this pairing
+                </div>
+                <div className="text-[11px] max-w-[360px]" style={{ color: textSecondary }}>
+                  {assignedCrew
+                    ? 'Assign crew from the 4.1.6 Crew Schedule to see them listed here.'
+                    : "Crew assignment lives in Roster (4.1.6 Crew Schedule / 3.2.x). Once wired, they'll appear here with seniority, base, AC qualification and position."}
+                </div>
+                {!assignedCrew && (
+                  <div
+                    className="mt-2 inline-flex items-center gap-1.5 px-2 h-5 rounded text-[11px] font-semibold"
+                    style={{
+                      background: `${ACCENT}14`,
+                      color: ACCENT,
+                      border: `1px solid ${ACCENT}33`,
+                    }}
+                  >
+                    <Wrench size={10} strokeWidth={2.2} />
+                    Coming next
+                  </div>
+                )}
               </div>
-            </div>
+            )}
           </section>
         </div>
 
@@ -437,6 +460,96 @@ export function PairingDetailsDialog({ pairing, onClose, periodOverride }: Pairi
       </div>
     </div>,
     document.body,
+  )
+}
+
+/** Render the live "Crew Assigned" roster for the pairing. Rows are grouped
+ *  by position so cockpit crew cluster before cabin crew, matching how the
+ *  4.1.5.2 Crew Complement block orders its pills. */
+function AssignedCrewList({
+  rows,
+  textPrimary,
+  textSecondary,
+  textMuted,
+  divider,
+  subtleBg,
+}: {
+  rows: AssignedCrewRow[]
+  textPrimary: string
+  textSecondary: string
+  textMuted: string
+  divider: string
+  subtleBg: string
+}) {
+  return (
+    <div className="mt-3 rounded-xl overflow-hidden" style={{ background: subtleBg, border: `1px solid ${divider}` }}>
+      <table className="w-full text-[13px] tabular-nums border-collapse">
+        <thead>
+          <tr style={{ borderBottom: `1px solid ${divider}` }}>
+            <th
+              className="text-left px-3 py-2 text-[11px] font-semibold uppercase tracking-wider"
+              style={{ color: textMuted }}
+            >
+              Pos
+            </th>
+            <th
+              className="text-left px-3 py-2 text-[11px] font-semibold uppercase tracking-wider"
+              style={{ color: textMuted }}
+            >
+              Name
+            </th>
+            <th
+              className="text-left px-3 py-2 text-[11px] font-semibold uppercase tracking-wider"
+              style={{ color: textMuted }}
+            >
+              Employee ID
+            </th>
+            <th
+              className="text-left px-3 py-2 text-[11px] font-semibold uppercase tracking-wider"
+              style={{ color: textMuted }}
+            >
+              Base
+            </th>
+            <th
+              className="text-right px-3 py-2 text-[11px] font-semibold uppercase tracking-wider"
+              style={{ color: textMuted }}
+            >
+              Sen.
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={r.crewId} style={i < rows.length - 1 ? { borderBottom: `1px solid ${divider}` } : undefined}>
+              <td className="px-3 py-2">
+                <span
+                  className="inline-flex items-center h-[22px] px-2 rounded-md text-[12px] font-bold tabular-nums"
+                  style={{
+                    background: r.positionColor ? `${r.positionColor}22` : 'rgba(124,58,237,0.14)',
+                    color: r.positionColor ?? '#7c3aed',
+                    border: `1px solid ${r.positionColor ?? '#7c3aed'}33`,
+                  }}
+                >
+                  {r.positionCode}
+                </span>
+              </td>
+              <td className="px-3 py-2 font-semibold" style={{ color: textPrimary }}>
+                {r.lastName} {r.firstName}
+              </td>
+              <td className="px-3 py-2" style={{ color: textSecondary }}>
+                {r.employeeId}
+              </td>
+              <td className="px-3 py-2" style={{ color: textSecondary }}>
+                {r.baseLabel ?? '—'}
+              </td>
+              <td className="px-3 py-2 text-right" style={{ color: textSecondary }}>
+                {r.seniority != null ? r.seniority : '—'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -701,80 +814,122 @@ function LegsTable({
           {sortedLegs.map((leg, i) => {
             const f = pairingFlights.find((x) => x.id === leg.flightId)
             const isDhc = leg.isDeadhead || pairing.deadheadFlightIds.includes(leg.flightId)
+            // Layover marker between chained legs when the ground gap is ≥6h
+            // (overnight / long rest). Matches the 4.1.6 right-panel heuristic.
+            const prev = i > 0 ? sortedLegs[i - 1] : null
+            const layover = (() => {
+              if (!prev) return null
+              if (prev.arrStation !== leg.depStation) return null
+              const prevStaIso = staIsoShifted[i - 1] ?? prev.staUtc
+              const curStdIso = stdIsoShifted[i] ?? leg.stdUtc
+              if (!prevStaIso || !curStdIso) return null
+              const gapMin = Math.round((new Date(curStdIso).getTime() - new Date(prevStaIso).getTime()) / 60_000)
+              if (gapMin < 6 * 60) return null
+              return { station: leg.depStation, gapMin }
+            })()
             return (
-              <tr
-                key={leg.flightId}
-                style={{
-                  height: 28,
-                  background:
-                    i % 2 === 1 ? (isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.015)') : 'transparent',
-                }}
-              >
-                <Td isDark={isDark}>
-                  <span style={{ color: textMuted, fontWeight: 600 }}>{i + 1}</span>
-                </Td>
-                <Td isDark={isDark}>
-                  {/* Derived via forward-chaining — see deriveOperatingDates. */}
-                  <span style={{ color: textPrimary }}>
-                    {timeMode === 'local' && stdIsoShifted[i]
-                      ? formatDateInTz(stdIsoShifted[i], operatorTz)
-                      : formatDMY(operatingDates[i] || leg.flightDate)}
-                  </span>
-                </Td>
-                <Td isDark={isDark}>
-                  <span style={{ color: textPrimary, fontWeight: 600 }}>{leg.flightNumber}</span>
-                </Td>
-                <Td isDark={isDark}>
-                  <span style={{ color: textPrimary }}>{leg.depStation}</span>
-                </Td>
-                <Td isDark={isDark}>
-                  <span style={{ color: textPrimary }}>{leg.arrStation}</span>
-                </Td>
-                <Td isDark={isDark}>
-                  <span style={{ color: textPrimary }}>
-                    {stdIsoShifted[i]
-                      ? timeMode === 'local'
-                        ? formatTimeInTz(stdIsoShifted[i], operatorTz)
-                        : stdIsoShifted[i].slice(11, 16)
-                      : (leg.stdUtc ?? '—')}
-                  </span>
-                </Td>
-                <Td isDark={isDark}>
-                  <span style={{ color: textPrimary }}>
-                    {staIsoShifted[i]
-                      ? timeMode === 'local'
-                        ? formatTimeInTz(staIsoShifted[i], operatorTz)
-                        : staIsoShifted[i].slice(11, 16)
-                      : (leg.staUtc ?? '—')}
-                  </span>
-                </Td>
-                <Td isDark={isDark}>
-                  <span style={{ color: textPrimary }}>{minutesToHM(leg.blockMinutes ?? 0)}</span>
-                </Td>
-                <Td isDark={isDark}>
-                  <TailCell
-                    tail={leg.tailNumber ?? f?.tailNumber ?? null}
-                    fallback={leg.aircraftTypeIcao ?? '—'}
-                    isDark={isDark}
-                  />
-                </Td>
-                <Td isDark={isDark}>
-                  {isDhc ? (
-                    <span
-                      className="px-1.5 h-5 inline-flex items-center rounded text-[10px] font-bold"
+              <Fragment key={leg.flightId}>
+                {layover && (
+                  <tr style={{ height: 26, background: isDark ? 'rgba(124,58,237,0.06)' : 'rgba(124,58,237,0.04)' }}>
+                    <td
+                      colSpan={10}
+                      className="px-2"
                       style={{
-                        background: 'rgba(255,136,0,0.14)',
-                        color: '#FF8800',
-                        border: '1px solid rgba(255,136,0,0.35)',
+                        fontSize: 11,
+                        lineHeight: '26px',
+                        borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)'}`,
                       }}
                     >
-                      DHC
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="h-px flex-1"
+                          style={{ background: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(15,23,42,0.10)' }}
+                        />
+                        <span className="font-bold uppercase tracking-[0.08em]" style={{ color: ACCENT, fontSize: 11 }}>
+                          Layover · {layover.station} ·{' '}
+                          {`${Math.floor(layover.gapMin / 60)}:${String(layover.gapMin % 60).padStart(2, '0')}`}
+                        </span>
+                        <span
+                          className="h-px flex-1"
+                          style={{ background: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(15,23,42,0.10)' }}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                <tr
+                  style={{
+                    height: 28,
+                    background:
+                      i % 2 === 1 ? (isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.015)') : 'transparent',
+                  }}
+                >
+                  <Td isDark={isDark}>
+                    <span style={{ color: textMuted, fontWeight: 600 }}>{i + 1}</span>
+                  </Td>
+                  <Td isDark={isDark}>
+                    {/* Derived via forward-chaining — see deriveOperatingDates. */}
+                    <span style={{ color: textPrimary }}>
+                      {timeMode === 'local' && stdIsoShifted[i]
+                        ? formatDateInTz(stdIsoShifted[i], operatorTz)
+                        : formatDMY(operatingDates[i] || leg.flightDate)}
                     </span>
-                  ) : (
-                    <span style={{ color: textMuted }}>—</span>
-                  )}
-                </Td>
-              </tr>
+                  </Td>
+                  <Td isDark={isDark}>
+                    <span style={{ color: textPrimary, fontWeight: 600 }}>{leg.flightNumber}</span>
+                  </Td>
+                  <Td isDark={isDark}>
+                    <span style={{ color: textPrimary }}>{leg.depStation}</span>
+                  </Td>
+                  <Td isDark={isDark}>
+                    <span style={{ color: textPrimary }}>{leg.arrStation}</span>
+                  </Td>
+                  <Td isDark={isDark}>
+                    <span style={{ color: textPrimary }}>
+                      {stdIsoShifted[i]
+                        ? timeMode === 'local'
+                          ? formatTimeInTz(stdIsoShifted[i], operatorTz)
+                          : stdIsoShifted[i].slice(11, 16)
+                        : (leg.stdUtc ?? '—')}
+                    </span>
+                  </Td>
+                  <Td isDark={isDark}>
+                    <span style={{ color: textPrimary }}>
+                      {staIsoShifted[i]
+                        ? timeMode === 'local'
+                          ? formatTimeInTz(staIsoShifted[i], operatorTz)
+                          : staIsoShifted[i].slice(11, 16)
+                        : (leg.staUtc ?? '—')}
+                    </span>
+                  </Td>
+                  <Td isDark={isDark}>
+                    <span style={{ color: textPrimary }}>{minutesToHM(leg.blockMinutes ?? 0)}</span>
+                  </Td>
+                  <Td isDark={isDark}>
+                    <TailCell
+                      tail={leg.tailNumber ?? f?.tailNumber ?? null}
+                      fallback={leg.aircraftTypeIcao ?? '—'}
+                      isDark={isDark}
+                    />
+                  </Td>
+                  <Td isDark={isDark}>
+                    {isDhc ? (
+                      <span
+                        className="px-1.5 h-5 inline-flex items-center rounded text-[10px] font-bold"
+                        style={{
+                          background: 'rgba(255,136,0,0.14)',
+                          color: '#FF8800',
+                          border: '1px solid rgba(255,136,0,0.35)',
+                        }}
+                      >
+                        DHC
+                      </span>
+                    ) : (
+                      <span style={{ color: textMuted }}>—</span>
+                    )}
+                  </Td>
+                </tr>
+              </Fragment>
             )
           })}
         </tbody>

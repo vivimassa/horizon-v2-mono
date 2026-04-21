@@ -9,6 +9,7 @@ import { PairingStatusBadge } from '../shared/pairing-status-badge'
 import { PairingRowContextMenu } from './pairing-row-context-menu'
 import { ReplicatePairingDialog } from '../dialogs/replicate-pairing-dialog'
 import { PairingDetailsDialog } from '../dialogs/pairing-details-dialog'
+import { useAssignedCrewForPairing } from '../use-assigned-crew'
 import { DeletePairingDialog } from '../dialogs/delete-pairing-dialog'
 import type { Pairing } from '../types'
 
@@ -346,7 +347,7 @@ export function PairingListPanel() {
       {replicateSource && <ReplicatePairingDialog source={replicateSource} onClose={() => setReplicateSource(null)} />}
 
       {detailsPairing && (
-        <PairingDetailsDialog
+        <PairingDetailsDialogWithCrew
           pairing={detailsPairing.pairing}
           periodOverride={detailsPairing.periodOverride}
           onClose={() => setDetailsPairing(null)}
@@ -660,5 +661,24 @@ function InlineEmptyState({
         </p>
       </div>
     </div>
+  )
+}
+
+/** Wraps `PairingDetailsDialog` with a lazy fetch for the live assigned-
+ *  crew roster, so 4.1.5.1's dialog shows the same "Crew Assigned" list
+ *  that 4.1.6 shows. Fetch runs once per pairingId, cached 30s. */
+function PairingDetailsDialogWithCrew({
+  pairing,
+  periodOverride,
+  onClose,
+}: React.ComponentProps<typeof PairingDetailsDialog>) {
+  const { data: assignedCrew } = useAssignedCrewForPairing(pairing.id)
+  return (
+    <PairingDetailsDialog
+      pairing={pairing}
+      periodOverride={periodOverride}
+      onClose={onClose}
+      assignedCrew={assignedCrew ?? []}
+    />
   )
 }

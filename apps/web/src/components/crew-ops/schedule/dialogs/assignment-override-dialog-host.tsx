@@ -25,10 +25,10 @@ export function AssignmentOverrideDialogHost() {
         if (busy) return
         clear()
       }}
-      onConfirm={async () => {
+      onConfirm={async (ack) => {
         setBusy(true)
         try {
-          await pending.proceed()
+          await pending.proceed(ack)
         } finally {
           setBusy(false)
           clear()

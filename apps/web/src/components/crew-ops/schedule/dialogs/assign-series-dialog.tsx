@@ -215,6 +215,7 @@ export function AssignSeriesDialog({ fromIso, toIso, crewId, onClose, onAfterMut
               disabled={busy}
               onPick={(code) => setPicked(code)}
               searchPlaceholder="Search activity codes..."
+              disableTimeEditor
             />
           </div>
           {picked && (

@@ -235,6 +235,8 @@ export const UncrewedDutiesTray = memo(function UncrewedDutiesTray({
         positionsById,
         assignments: s.assignments,
         pairingsById,
+        activities: s.activities,
+        ruleSet: s.ruleSet,
       })
       s.setDragState({
         ...dragging,
@@ -243,6 +245,8 @@ export const UncrewedDutiesTray = memo(function UncrewedDutiesTray({
         dropCrewId: targetCrewId,
         dropLegality: legality.level,
         dropReason: legality.reason,
+        dropChecks: legality.checks,
+        dropOverridable: legality.overridable ?? false,
       })
       document.body.style.cursor = legality.level === 'violation' ? 'not-allowed' : 'grabbing'
     }
@@ -278,15 +282,25 @@ export const UncrewedDutiesTray = memo(function UncrewedDutiesTray({
         positionsById,
         assignments: s.assignments,
         pairingsById,
+        activities: s.activities,
+        ruleSet: s.ruleSet,
       })
-      if (legality.level === 'violation' || !legality.pickedSeat) return
+      // Hard block only. FDTL violations overridable — proceed to assign
+      // (server records override audit row).
+      if ((legality.level === 'violation' && !legality.overridable) || !legality.pickedSeat) {
+        storeApi.getState().setDropRejection(legality.reason ? `Drop rejected — ${legality.reason}` : 'Drop rejected')
+        return
+      }
 
       const pickedSeat = legality.pickedSeat
 
       // Reusable API-call + optimistic-apply closure. Runs either
       // immediately (no violations) or after the planner confirms via
       // the AssignmentOverrideDialog.
-      const performAssign = async (overrides: import('@/lib/crew-schedule/violations').AssignmentViolation[]) => {
+      const performAssign = async (
+        overrides: import('@/lib/crew-schedule/violations').AssignmentViolation[],
+        ack?: { reason: string; commanderDiscretion: boolean },
+      ) => {
         const optimisticId = `__optimistic_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
         const startUtcIso =
           pairing.reportTime ??
@@ -334,7 +348,8 @@ export const UncrewedDutiesTray = memo(function UncrewedDutiesTray({
                 ? overrides.map((v) => ({
                     violationKind: v.kind,
                     messageSnapshot: v.message,
-                    detail: v.detail,
+                    detail: { ...(v.detail ?? {}), commanderDiscretion: !!ack?.commanderDiscretion },
+                    reason: ack?.reason ?? null,
                   }))
                 : undefined,
           })
@@ -375,25 +390,32 @@ export const UncrewedDutiesTray = memo(function UncrewedDutiesTray({
       // Check rule violations BEFORE the optimistic apply. Hard-blocks
       // (e.g. AC type not qualified) abort with an OK-only dialog — no
       // API call. Overridables park on the store for the override dialog.
-      const aircraftTypes = storeApi.getState().aircraftTypes
-      const tempBases = storeApi.getState().tempBases.filter((t) => t.crewId === targetCrew._id)
-      const violations = checkAssignmentViolations({ crew: targetCrew, pairing, aircraftTypes, tempBases })
+      const storeState = storeApi.getState()
+      const aircraftTypes = storeState.aircraftTypes
+      const tempBases = storeState.tempBases.filter((t) => t.crewId === targetCrew._id)
+      const violations = checkAssignmentViolations({
+        crew: targetCrew,
+        pairing,
+        aircraftTypes,
+        tempBases,
+        assignments: storeState.assignments,
+        activities: storeState.activities,
+        pairings: storeState.pairings,
+        ruleSet: storeState.ruleSet,
+      })
+      // Drag-drop: drop feedback was already shown inline via the
+      // Legality Check panel. Abort without a dialog, but surface a
+      // brief toast so the planner gets feedback that the drop did
+      // NOT take effect (otherwise "nothing happens" is confusing).
       const { hardBlocks, overridable } = partitionViolations(violations)
       if (hardBlocks.length > 0) {
-        storeApi.getState().setAssignmentBlocked({ violations: hardBlocks })
+        storeApi.getState().setDropRejection(`Drop rejected — ${hardBlocks[0].message || hardBlocks[0].title}`)
         return
       }
-      if (overridable.length > 0) {
-        storeApi.getState().setAssignmentOverridePending({
-          violations: overridable,
-          proceed: async () => {
-            await performAssign(overridable)
-          },
-        })
-        return
-      }
-
-      void performAssign([])
+      // Overridable (FDTL warnings / base mismatch) → proceed with the
+      // assign. Server persists the overrides as audit rows. User saw the
+      // reasons inline via the drag-time Legality Check panel.
+      void performAssign(overridable)
     }
 
     const onKey = (e: KeyboardEvent) => {

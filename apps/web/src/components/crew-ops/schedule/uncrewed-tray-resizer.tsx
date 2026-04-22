@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useCrewScheduleStore } from '@/stores/use-crew-schedule-store'
+import { Tooltip } from '@/components/ui/tooltip'
 
 /**
  * Drag handle between the crew Gantt canvas and the uncrewed-duties tray.
@@ -94,25 +95,26 @@ export function UncrewedTrayResizer({ frameHeight }: Props) {
   }
 
   return (
-    <div
-      className="shrink-0 relative group cursor-row-resize select-none"
-      // 16px invisible hit band; marginTop/Bottom of -5 makes it overlap
-      // 5px into the canvas above and 5px into the tray below without
-      // affecting layout, so the click target is forgiving.
-      style={{ height: 10, marginTop: -5, marginBottom: -5, zIndex: 10 }}
-      onMouseDown={handleMouseDown}
-      title="Drag to resize uncrewed tray"
-    >
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div
-          className="rounded-full transition-colors group-hover:bg-module-accent"
-          style={{
-            width: 40,
-            height: 3,
-            background: 'rgba(125,125,140,0.55)',
-          }}
-        />
+    <Tooltip content="Drag to resize uncrewed duties tray">
+      <div
+        className="shrink-0 relative group cursor-row-resize select-none"
+        // 16px invisible hit band; marginTop/Bottom of -5 makes it overlap
+        // 5px into the canvas above and 5px into the tray below without
+        // affecting layout, so the click target is forgiving.
+        style={{ height: 10, marginTop: -5, marginBottom: -5, zIndex: 10 }}
+        onMouseDown={handleMouseDown}
+      >
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div
+            className="rounded-full transition-colors group-hover:bg-module-accent"
+            style={{
+              width: 40,
+              height: 3,
+              background: 'rgba(125,125,140,0.55)',
+            }}
+          />
+        </div>
       </div>
-    </div>
+    </Tooltip>
   )
 }

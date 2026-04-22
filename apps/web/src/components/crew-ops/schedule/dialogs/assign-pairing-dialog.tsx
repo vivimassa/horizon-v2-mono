@@ -32,6 +32,10 @@ export function AssignPairingDialog({ crewId, dateIso, onClose, onAfterMutate }:
   const positions = useCrewScheduleStore((s) => s.positions)
   const aircraftTypes = useCrewScheduleStore((s) => s.aircraftTypes)
   const tempBases = useCrewScheduleStore((s) => s.tempBases)
+  const assignmentsAll = useCrewScheduleStore((s) => s.assignments)
+  const activitiesAll = useCrewScheduleStore((s) => s.activities)
+  const pairingsAll = useCrewScheduleStore((s) => s.pairings)
+  const ruleSet = useCrewScheduleStore((s) => s.ruleSet)
   const setAssignmentBlocked = useCrewScheduleStore((s) => s.setAssignmentBlocked)
   const reconcilePeriod = useCrewScheduleStore((s) => s.reconcilePeriod)
   const fmtDate = useDateFormat()
@@ -97,6 +101,10 @@ export function AssignPairingDialog({ crewId, dateIso, onClose, onAfterMutate }:
             pairing,
             aircraftTypes,
             tempBases: tempBases.filter((t) => t.crewId === crew._id),
+            assignments: assignmentsAll,
+            activities: activitiesAll,
+            pairings: pairingsAll,
+            ruleSet,
           }),
         )
         if (hardBlocks.length > 0) {

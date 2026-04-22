@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { EyeOff } from 'lucide-react'
+import { EyeOff, ShieldAlert } from 'lucide-react'
 import type { CrewPositionRef } from '@skyhub/api'
 import { useCrewScheduleStore } from '@/stores/use-crew-schedule-store'
 import type { CrewRowLayout } from '@/lib/crew-schedule/layout'
@@ -13,9 +13,38 @@ interface Props {
   rowH: number
 }
 
-/** 28-day block-hour limit per regulator. V1 fixed value; future work
- *  (P4-alpha) will read from `FdtlRule` for the crew's rule set. */
-const BLOCK_LIMIT_28D_MIN = 100 * 60
+/** Fallback 28-day block-hour limit when no ruleset loaded. Real value
+ *  reads from the active ruleset (any `rolling_cumulative` rule with
+ *  window=28D + field=block — covers MAX_BLOCK_28D, MAX_BH_28D,
+ *  MAX_FLIGHT_TIME_28D across frameworks). */
+const BLOCK_LIMIT_28D_FALLBACK_MIN = 100 * 60
+
+function resolveBlock28dLimit(ruleSet: unknown | null): number {
+  if (!ruleSet) return BLOCK_LIMIT_28D_FALLBACK_MIN
+  const rs = ruleSet as {
+    rules: Array<{
+      code: string
+      value: string
+      computationType?: string | null
+      params?: Record<string, unknown> | null
+    }>
+  }
+  for (const r of rs.rules) {
+    const type = r.computationType ?? null
+    const params = (r.params ?? null) as Record<string, unknown> | null
+    const codeMatch = /^MAX_(BLOCK|BH|FLIGHT_TIME|FT)_28D$/i.test(r.code)
+    const typedMatch = type === 'rolling_cumulative' && params?.window === '28D' && params?.field === 'block'
+    if (!codeMatch && !typedMatch) continue
+    const m = r.value.trim().match(/^(\d+):(\d{2})$/)
+    if (m) {
+      const mins = parseInt(m[1], 10) * 60 + parseInt(m[2], 10)
+      if (mins > 0) return mins
+    }
+    const n = parseFloat(r.value)
+    if (Number.isFinite(n) && n > 0) return Math.round(n * 60)
+  }
+  return BLOCK_LIMIT_28D_FALLBACK_MIN
+}
 
 const LEFT_W = 280
 const HEADER_H = 48
@@ -35,6 +64,20 @@ export const CrewScheduleLeftPanel = memo(function CrewScheduleLeftPanel({ rows,
   const selectCrew = useCrewScheduleStore((s) => s.selectCrew)
   const scrollTop = useCrewScheduleStore((s) => s.scrollTop)
   const openContextMenu = useCrewScheduleStore((s) => s.openContextMenu)
+  const crewIssues = useCrewScheduleStore((s) => s.crewIssues)
+  const ruleSet = useCrewScheduleStore((s) => s.ruleSet)
+  const blockLimit28dMin = useMemo(() => resolveBlock28dLimit(ruleSet), [ruleSet])
+
+  const issuesByCrew = useMemo(() => {
+    const map = new Map<string, { warnings: number; violations: number }>()
+    for (const i of crewIssues) {
+      const entry = map.get(i.crewId) ?? { warnings: 0, violations: 0 }
+      if (i.status === 'violation') entry.violations += 1
+      else entry.warnings += 1
+      map.set(i.crewId, entry)
+    }
+    return map
+  }, [crewIssues])
 
   const positionsById = useMemo(() => new Map(positions.map((p) => [p._id, p])), [positions])
 
@@ -81,9 +124,9 @@ export const CrewScheduleLeftPanel = memo(function CrewScheduleLeftPanel({ rows,
               const pos = c.position ? positionsById.get(c.position) : undefined
               const selected = c._id === selectedCrewId
               const isSmartMatch = !!row.smartMatch
-              const blockRatio = Math.min(1, row.blockMinutesInPeriod / BLOCK_LIMIT_28D_MIN)
+              const blockRatio = Math.min(1, row.blockMinutesInPeriod / blockLimit28dMin)
               const isNearLimit = blockRatio >= 0.9
-              const isOverLimit = row.blockMinutesInPeriod > BLOCK_LIMIT_28D_MIN
+              const isOverLimit = row.blockMinutesInPeriod > blockLimit28dMin
               return (
                 <button
                   key={c._id}
@@ -147,8 +190,27 @@ export const CrewScheduleLeftPanel = memo(function CrewScheduleLeftPanel({ rows,
                         />
                       )}
                     </div>
-                    <div className="text-[11px] text-hz-text-secondary truncate tabular-nums">
-                      {c.employeeId} · {pos?.code ?? '—'} · {c.baseLabel ?? '—'} · {formatQuals(c)}
+                    <div className="text-[11px] text-hz-text-secondary truncate tabular-nums flex items-center gap-1.5">
+                      <span className="truncate">
+                        {c.employeeId} · {pos?.code ?? '—'} · {c.baseLabel ?? '—'} · {formatQuals(c)}
+                      </span>
+                      {(() => {
+                        const iss = issuesByCrew.get(c._id)
+                        // Only surface real violations. Warnings stay hidden —
+                        // they clutter the roster when the duty is still
+                        // legal overall.
+                        if (!iss || iss.violations === 0) return null
+                        return (
+                          <span
+                            className="shrink-0 inline-flex items-center gap-0.5 px-1 rounded font-semibold"
+                            style={{ background: 'rgba(230,53,53,0.16)', color: '#E63535' }}
+                            title={`${iss.violations} FDTL violation${iss.violations === 1 ? '' : 's'}`}
+                          >
+                            <ShieldAlert className="w-3 h-3" />
+                            {iss.violations}
+                          </span>
+                        )
+                      })()}
                     </div>
                   </div>
                   {/* Block-hour chip — current period total vs 28-day limit

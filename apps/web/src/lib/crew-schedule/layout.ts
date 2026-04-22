@@ -10,7 +10,7 @@ import type {
 } from '@skyhub/api'
 import { isSmartFilterActive, matchesSmartFilter, type SmartFilterCriteria } from './smart-filter'
 
-export type CrewScheduleZoom = '7D' | '14D' | '28D' | 'M'
+export type CrewScheduleZoom = '1D' | '2D' | '3D' | '4D' | '5D' | '6D' | '7D' | '14D' | '28D' | 'M'
 export type BarLabelMode = 'pairing' | 'sector' | 'flight'
 
 export interface CrewRowLayout {
@@ -462,6 +462,72 @@ export function buildCrewScheduleLayout(input: BuildLayoutInput): CrewScheduleLa
       // code.color → group.color → neutral gray.
       color: code?.color ?? group?.color ?? '#9A9BA8',
     })
+  }
+
+  // Rest strips after duty-ish activities (Ground Duty, Deadhead, Airport/
+  // Home Standby, Training, Simulator). Uses the same `max(minRest, duty)`
+  // rule as pairings; capped at the next bar (pairing or activity) on the
+  // same crew row so it doesn't overlap the next duty.
+  if (restActive) {
+    const REST_FLAGS = new Set([
+      'is_flight_duty',
+      'is_ground_duty',
+      'is_deadhead',
+      'is_airport_standby',
+      'is_home_standby',
+      'is_training',
+      'is_simulator',
+    ])
+    // Precompute "next bar start x" per crew by scanning all pairing +
+    // activity bars on that crew row, sorted by x.
+    const allBarsByCrew = new Map<string, { x: number; width: number }[]>()
+    for (const b of bars) {
+      const arr = allBarsByCrew.get(b.crewId) ?? []
+      arr.push({ x: b.x, width: b.width })
+      allBarsByCrew.set(b.crewId, arr)
+    }
+    for (const ab of activityBars) {
+      const arr = allBarsByCrew.get(ab.crewId) ?? []
+      arr.push({ x: ab.x, width: ab.width })
+      allBarsByCrew.set(ab.crewId, arr)
+    }
+    for (const arr of allBarsByCrew.values()) arr.sort((a, b) => a.x - b.x)
+
+    for (const ab of activityBars) {
+      const code = activityCodeById.get(ab.activityCodeId)
+      if (!code) continue
+      if (!(code.flags ?? []).some((f) => REST_FLAGS.has(f))) continue
+      const row = rowByCrew.get(ab.crewId)
+      if (!row) continue
+      const crewBars = allBarsByCrew.get(ab.crewId) ?? []
+      // "Away vs home" doesn't apply to ground activities — use home-base
+      // min as the floor.
+      const minMins = restRules!.homeBaseMinMinutes
+      const dutyMins = Math.max(0, (ab.width / pph) * 60)
+      const requiredMins = Math.max(minMins, dutyMins)
+      if (requiredMins <= 0) continue
+      const desiredWidth = (requiredMins / 60) * pph
+      const restX = ab.x + ab.width
+      // Next bar start after this activity's end.
+      let cap = totalWidth
+      for (const other of crewBars) {
+        if (other.x > restX - 0.5) {
+          cap = other.x
+          break
+        }
+      }
+      const width = Math.max(0, Math.min(desiredWidth, cap - restX))
+      if (width < MIN_REST_WIDTH_PX) continue
+      restStrips.push({
+        crewId: ab.crewId,
+        x: restX,
+        y: row.y + (ROW_H - BAR_H) / 2,
+        width,
+        height: BAR_H,
+        fromAssignmentId: ab.activityId,
+        toAssignmentId: '',
+      })
+    }
   }
 
   // Ghost bars for assignments present in the published snapshot but

@@ -4,13 +4,16 @@ import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   api,
+  type CrewLegalityIssueRef,
   type LegalityOverrideRowRef,
   type PairingRef,
   type CrewAssignmentRef,
   type CrewMemberListItemRef,
 } from '@skyhub/api'
+import { useCrewScheduleStore } from '@/stores/use-crew-schedule-store'
 import { AlertTriangle, CheckCircle2, Loader2, ShieldAlert, X, XCircle } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
+import { useDateFormat } from '@/hooks/use-date-format'
 
 /**
  * 4.1.6 Legality Check dialog — preview of what the future 4.3.1
@@ -58,6 +61,9 @@ type IssueRow = {
   pairingCode: string
   crewId: string | null
   at: string | null
+  /** Rolling-window descriptor (e.g. "28D · 2026-03-15 → 2026-04-11") for
+   *  window-scoped rules. Rendered as a second line in the row. */
+  windowRange: string | null
 }
 
 export function LegalityCheckDialog({
@@ -73,6 +79,8 @@ export function LegalityCheckDialog({
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const open = !!scope
+  const crewIssues = useCrewScheduleStore((s) => s.crewIssues)
+  const fmtDate = useDateFormat()
 
   const {
     data: overrideRes,
@@ -112,6 +120,34 @@ export function LegalityCheckDialog({
         pairingCode: o.pairingCode ?? o.pairingId.slice(0, 6),
         crewId: o.crewId,
         at: o.overriddenAtUtc,
+        windowRange: null,
+      })
+    }
+    // Roster-level FDTL issues (pre-FDP rest, cumulative, augmented) from
+    // the server `evaluateCrewRoster` pass.
+    const crewById = new Map(crew.map((c) => [c._id, c]))
+    const assignPairingByAssignment = new Map(assignments.map((a) => [a._id, a]))
+    for (const i of crewIssues) {
+      const c = crewById.get(i.crewId)
+      const firstAid = i.assignmentIds[0]
+      const linked = firstAid ? assignPairingByAssignment.get(firstAid) : null
+      const linkedPairingId = linked?.pairingId ?? ''
+      const pairingCode = linkedPairingId
+        ? (pairings.find((p) => p._id === linkedPairingId)?.pairingCode ?? linkedPairingId.slice(0, 6))
+        : 'roster'
+      raw.push({
+        source: 'fdtl',
+        severity: i.status,
+        kind: i.ruleCode,
+        title: i.label,
+        message: `${i.shortReason}${i.legalReference ? ` — ${i.legalReference}` : ''}`,
+        crewLabel: c ? `${c.lastName} ${c.firstName}` : null,
+        employeeId: c?.employeeId ?? null,
+        pairingId: linkedPairingId,
+        pairingCode,
+        crewId: i.crewId,
+        at: i.detectedAtUtc,
+        windowRange: formatWindowRange(i.windowLabel, i.windowFromIso, i.windowToIso, i.anchorUtc, i.ruleCode, fmtDate),
       })
     }
     const assignedPairingIds = new Set(assignments.filter((a) => a.status !== 'cancelled').map((a) => a.pairingId))
@@ -131,6 +167,7 @@ export function LegalityCheckDialog({
         pairingCode: p.pairingCode,
         crewId: null,
         at: null,
+        windowRange: null,
       })
     }
 
@@ -195,19 +232,20 @@ export function LegalityCheckDialog({
       subtitle = `${crewSubtitle} · ${scope.fromIso} → ${scope.toIso}`
     }
 
-    // Sort: violations before warnings, then by pairing code.
-    filtered = [...filtered].sort((a, b) => {
-      if (a.severity !== b.severity) return a.severity === 'violation' ? -1 : 1
-      return a.pairingCode.localeCompare(b.pairingCode)
-    })
+    // Drop warnings entirely — they clutter the list when the duty is
+    // still legal overall. Only show violations + override audit rows.
+    filtered = filtered.filter((r) => r.source === 'override' || r.severity === 'violation')
+
+    // Sort by pairing code (all remaining rows are violations or
+    // overrides of equal urgency).
+    filtered = [...filtered].sort((a, b) => a.pairingCode.localeCompare(b.pairingCode))
 
     return { issues: filtered, subtitle }
-  }, [scope, overrideRes, pairings, assignments, crew, periodFromIso, periodToIso])
+  }, [scope, overrideRes, crewIssues, pairings, assignments, crew, periodFromIso, periodToIso])
 
   if (!open) return null
 
   const violations = issues.filter((i) => i.severity === 'violation').length
-  const warnings = issues.filter((i) => i.severity === 'warning').length
 
   return (
     <div
@@ -242,9 +280,7 @@ export function LegalityCheckDialog({
             <div className="text-[13px] mt-0.5 truncate" style={{ color: isDark ? '#A7A9B5' : '#6B6C7B' }}>
               {subtitle}
               {' · '}
-              {issues.length === 0
-                ? 'No issues'
-                : `${violations} violation${violations === 1 ? '' : 's'} · ${warnings} warning${warnings === 1 ? '' : 's'}`}
+              {issues.length === 0 ? 'No issues' : `${violations} violation${violations === 1 ? '' : 's'}`}
             </div>
           </div>
           <button
@@ -354,9 +390,60 @@ function IssueRowView({
         <div className="text-[13px] mt-1 leading-relaxed" style={{ color: isDark ? '#A7A9B5' : '#6B6C7B' }}>
           {row.message}
         </div>
+        {row.windowRange && (
+          <div className="text-[13px] mt-1 leading-relaxed" style={{ color: isDark ? '#C7C9D3' : '#555770' }}>
+            {row.windowRange.replace(/^\d+[DHMY]\s*·\s*/, '')}
+          </div>
+        )}
       </div>
     </button>
   )
+}
+
+function formatWindowRange(
+  label: string | null,
+  fromIso: string | null,
+  toIso: string | null,
+  anchorUtc: string,
+  ruleCode: string | null,
+  fmtDate: (iso: string | null | undefined) => string,
+): string | null {
+  // Preferred: evaluator-provided window bounds (new issues).
+  if (fromIso && toIso) {
+    const prefix = label ? `${label} · ` : ''
+    return `${prefix}${fmtDate(fromIso)} → ${fmtDate(toIso)}`
+  }
+  // Fallback for pre-fix DB rows: derive from rule code suffix + anchor.
+  const derived = deriveWindowFromCode(ruleCode, anchorUtc)
+  if (!derived) return null
+  return `${derived.label} · ${fmtDate(derived.fromIso)} → ${fmtDate(derived.toIso)}`
+}
+
+function deriveWindowFromCode(
+  ruleCode: string | null,
+  anchorUtc: string,
+): { label: string; fromIso: string; toIso: string } | null {
+  if (!ruleCode) return null
+  const m = ruleCode.match(/_(\d+)([DHMY])$/i)
+  if (!m) return null
+  const n = parseInt(m[1], 10)
+  const unit = m[2].toUpperCase()
+  const windowMs =
+    unit === 'H'
+      ? n * 3_600_000
+      : unit === 'D'
+        ? n * 86_400_000
+        : unit === 'M'
+          ? n * 30 * 86_400_000
+          : n * 365 * 86_400_000
+  const anchorMs = new Date(anchorUtc).getTime()
+  if (!Number.isFinite(anchorMs)) return null
+  const fromMs = anchorMs - windowMs
+  return {
+    label: `${n}${unit}`,
+    fromIso: new Date(fromMs).toISOString(),
+    toIso: new Date(anchorMs).toISOString(),
+  }
 }
 
 function titleForKind(kind: string): string {

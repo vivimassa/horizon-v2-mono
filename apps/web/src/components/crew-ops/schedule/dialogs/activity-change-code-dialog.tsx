@@ -61,6 +61,7 @@ export function ActivityChangeCodeDialog({ activityId, onClose, onAfterMutate }:
             crewPositionId={crew?.position ?? null}
             disabled={busy}
             onPick={onPick}
+            disableTimeEditor
           />
         </div>
       </div>

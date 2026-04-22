@@ -1,6 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type MouseEvent as ReactMouseEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { api, type ApiError } from '@skyhub/api'
 import { useTheme } from '@/components/theme-provider'
@@ -14,6 +22,8 @@ import type {
 } from '@/lib/crew-schedule/layout'
 import { computeDropLegality } from '@/lib/crew-schedule/drop-legality'
 import { checkAssignmentViolations, partitionViolations } from '@/lib/crew-schedule/violations'
+import { ActivityHoverTooltip } from './activity-hover-tooltip'
+import { PairingHoverTooltip } from './pairing-hover-tooltip'
 
 const HEADER_H = 48
 
@@ -81,12 +91,29 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
   /** Cached legality result keyed by `${targetCrewId}|${mode}`. Skips
    *  the O(assignments) recompute on every mousemove when the cursor
    *  stays in the same row. Cleared when drag ends. */
-  const legalityCacheRef = useRef<Map<string, { level: 'legal' | 'warning' | 'violation'; reason: string }>>(new Map())
+  const legalityCacheRef = useRef<
+    Map<
+      string,
+      {
+        level: 'legal' | 'warning' | 'violation'
+        reason: string
+        checks?: Array<{ label: string; actual: string; limit: string; status: 'warning' | 'violation' }>
+        overridable?: boolean
+      }
+    >
+  >(new Map())
 
   const selectedAssignmentId = useCrewScheduleStore((s) => s.selectedAssignmentId)
   const selectedActivityId = useCrewScheduleStore((s) => s.selectedActivityId)
+  const selectedCrewId = useCrewScheduleStore((s) => s.selectedCrewId)
+  const selectedDateIso = useCrewScheduleStore((s) => s.selectedDateIso)
+  const cellSelectMode = useCrewScheduleStore((s) => s.cellSelectMode)
   const hoveredAssignmentId = useCrewScheduleStore((s) => s.hoveredAssignmentId)
   const hoveredActivityId = useCrewScheduleStore((s) => s.hoveredActivityId)
+  const activities = useCrewScheduleStore((s) => s.activities)
+  const activityCodes = useCrewScheduleStore((s) => s.activityCodes)
+  const [activityHoverPos, setActivityHoverPos] = useState<{ x: number; y: number } | null>(null)
+  const [pairingHoverPos, setPairingHoverPos] = useState<{ x: number; y: number } | null>(null)
   const rangeSelection = useCrewScheduleStore((s) => s.rangeSelection)
   const dragState = useCrewScheduleStore((s) => s.dragState)
   const tempBases = useCrewScheduleStore((s) => s.tempBases)
@@ -465,6 +492,33 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
       }
     }
 
+    // Double-click cell selection border. Painted above range + temp-base
+    // so the user's freshest pick reads clearly; color tracks the global
+    // accent color (operator branding / user override).
+    if (selectedCrewId && selectedDateIso) {
+      const row = layout.rows.find((r) => r.crewId === selectedCrewId)
+      if (row) {
+        const dayMs = new Date(selectedDateIso + 'T00:00:00Z').getTime()
+        const dayIdx = Math.round((dayMs - layout.periodStartMs) / 86_400_000)
+        if (dayIdx >= 0 && dayIdx < layout.periodDays) {
+          const x0 = dayIdx * 24 * layout.pph - sx
+          const x1 = (dayIdx + 1) * 24 * layout.pph - sx
+          const y = row.y - sy
+          // 'assign' mode = red (armed for assign/replace). Default = accent.
+          const isAssignMode = cellSelectMode === 'assign'
+          const strokeColor = isAssignMode ? '#E63535' : accentColor
+          const fillRgba = isAssignMode ? 'rgba(230,53,53,0.10)' : hexToRgba(accentColor, 0.08)
+          ctx.save()
+          ctx.fillStyle = fillRgba
+          ctx.fillRect(x0, y, x1 - x0, row.height)
+          ctx.strokeStyle = strokeColor
+          ctx.lineWidth = 1.5
+          ctx.strokeRect(x0 + 0.75, y + 0.75, x1 - x0 - 1.5, row.height - 1.5)
+          ctx.restore()
+        }
+      }
+    }
+
     // Now-line
     drawNowLine(ctx, layout, sx, h - HEADER_H)
 
@@ -475,6 +529,9 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
     accentColor,
     selectedAssignmentId,
     selectedActivityId,
+    selectedCrewId,
+    selectedDateIso,
+    cellSelectMode,
     hoveredAssignmentId,
     hoveredActivityId,
     rangeSelection,
@@ -602,13 +659,22 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
         clearDragState()
 
         if (!targetCrewId) return
-        if (level === 'violation') return
+        // Hard block only. FDTL violations are overridable — let them through
+        // to the optimistic update + API, which records an override audit
+        // row. Drag-ghost already showed the Legality Check inline.
+        if (level === 'violation' && !drag.dropOverridable) {
+          useCrewScheduleStore
+            .getState()
+            .setDropRejection(drag.dropReason ? `Drop rejected — ${drag.dropReason}` : 'Drop rejected')
+          return
+        }
         if (mode === 'move' && targetCrewId === sourceCrewId) return
 
-        // Hard-block check — AC type qualification (un-overridable). If
-        // the target crew isn't rated for the pairing's aircraft type
-        // (with AC FAMILY fallback), surface the blocked dialog and
-        // abort. No optimistic update, no API call.
+        // Hard-block check — AC type qualification (un-overridable). The
+        // planner already saw these inline via the drag-time Legality
+        // Check panel, so we just abort silently instead of popping a
+        // dialog (user preference: no button clicks required during
+        // drag-drop).
         {
           const s = useCrewScheduleStore.getState()
           const targetCrew = s.crew.find((c) => c._id === targetCrewId)
@@ -620,10 +686,16 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
                 pairing,
                 aircraftTypes: s.aircraftTypes,
                 tempBases: s.tempBases.filter((t) => t.crewId === targetCrewId),
+                assignments: s.assignments,
+                activities: s.activities,
+                pairings: s.pairings,
+                ruleSet: s.ruleSet,
               }),
             )
             if (hardBlocks.length > 0) {
-              s.setAssignmentBlocked({ violations: hardBlocks })
+              useCrewScheduleStore
+                .getState()
+                .setDropRejection(`Drop rejected — ${hardBlocks[0].message || hardBlocks[0].title}`)
               return
             }
           }
@@ -849,8 +921,10 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
               positionsById,
               assignments: s.assignments,
               pairingsById,
+              activities: s.activities,
+              ruleSet: s.ruleSet,
             })
-            legality = { level: full.level, reason: full.reason }
+            legality = { level: full.level, reason: full.reason, checks: full.checks, overridable: full.overridable }
             legalityCacheRef.current.set(cacheKey, legality)
           }
           setDragState({
@@ -860,6 +934,8 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
             dropCrewId: pending.row.crewId,
             dropLegality: legality.level,
             dropReason: legality.reason,
+            dropChecks: legality.checks,
+            dropOverridable: legality.overridable ?? false,
             mode,
           })
           container.style.cursor =
@@ -872,6 +948,8 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
       if (pairingHit) {
         setHover(pairingHit.assignmentId)
         setActivityHover(null)
+        setActivityHoverPos(null)
+        setPairingHoverPos({ x: e.clientX, y: e.clientY })
         container.style.cursor = 'grab'
         return
       }
@@ -879,11 +957,15 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
       if (activityHit) {
         setHover(null)
         setActivityHover(activityHit.activityId)
+        setActivityHoverPos({ x: e.clientX, y: e.clientY })
+        setPairingHoverPos(null)
         container.style.cursor = 'pointer'
         return
       }
       setHover(null)
       setActivityHover(null)
+      setActivityHoverPos(null)
+      setPairingHoverPos(null)
       container.style.cursor = e.shiftKey ? 'crosshair' : 'default'
     },
     [layout, pointerToContent, resolveCellAt, setHover, setActivityHover, setRangeSelection, setDragState],
@@ -929,6 +1011,9 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
         selectCrew(bar.crewId)
         selectActivity(null)
         clearRangeSelection()
+        // Single-click on a pairing bar = Duty inspector. Assign tab is
+        // reserved for double-click (armed Replace mode).
+        s.setInspectorTab('duty')
         return
       }
       if (s.hoveredActivityId) {
@@ -941,10 +1026,29 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
         clearRangeSelection()
         return
       }
-      // Click landed on empty canvas — clear any active range.
+      // Click landed on empty canvas — clear any active range, and mark
+      // the clicked cell in 'view' mode so user sees the accent border.
       clearRangeSelection()
+      const p = pointerToContent(e)
+      if (!p || p.y < 0) return
+      const row = hitTestRow(layout.rows, p.y)
+      if (!row) return
+      const dayIdx = Math.floor(p.x / (layout.pph * 24))
+      if (dayIdx < 0 || dayIdx >= layout.periodDays) return
+      const dayMs = layout.periodStartMs + dayIdx * 86_400_000
+      const dateIso = new Date(dayMs).toISOString().slice(0, 10)
+      selectDateCell(row.crewId, dateIso, 'view')
     },
-    [layout, selectAssignment, selectPairing, selectActivity, selectCrew, clearRangeSelection, pointerToContent],
+    [
+      layout,
+      selectAssignment,
+      selectPairing,
+      selectActivity,
+      selectCrew,
+      selectDateCell,
+      clearRangeSelection,
+      pointerToContent,
+    ],
   )
 
   // Right-click → target-dispatched context menu. The menu rendered in
@@ -1042,6 +1146,8 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
         openContextMenu({
           kind: 'temp-base',
           tempBaseId: tb._id,
+          crewId: row.crewId,
+          dateIso,
           pageX: e.clientX,
           pageY: e.clientY,
         })
@@ -1088,10 +1194,38 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
       const x = e.clientX - rect.left + s.scrollLeft
       const y = e.clientY - rect.top + s.scrollTop - HEADER_H
 
-      // If the click landed on a pairing/activity bar, don't open the picker —
-      // onClick has already handled it. Bail out.
-      if (hitTestBar(layout.bars, x, y)) return
-      if (hitTestActivityBar(layout.activityBars, x, y)) return
+      // Pairing bar double-click → open Assign tab (replace-mode). Single-
+      // click keeps Duty tab so planners can inspect without accidentally
+      // opening the activity picker.
+      const barHit = hitTestBar(layout.bars, x, y)
+      if (barHit) {
+        const store = useCrewScheduleStore.getState()
+        const assign = store.assignments.find((a) => a._id === barHit.assignmentId)
+        if (!assign) return
+        const dateIso = new Date(assign.startUtcIso).toISOString().slice(0, 10)
+        store.selectDateCell(barHit.crewId, dateIso, 'assign')
+        store.setRightPanelOpen(true)
+        store.setInspectorTab('assign')
+        return
+      }
+
+      // Activity bar double-click: arm replace-mode on the Assign tab so
+      // the next picked code swaps in place (delete + create).
+      const activityHit = hitTestActivityBar(layout.activityBars, x, y)
+      if (activityHit) {
+        const store = useCrewScheduleStore.getState()
+        const act = store.activities.find((a) => a._id === activityHit.activityId)
+        const dateIso = act?.dateIso ?? (act ? new Date(act.startUtcIso).toISOString().slice(0, 10) : null)
+        if (!dateIso) return
+        store.startReplaceActivity({
+          activityId: activityHit.activityId,
+          crewId: activityHit.crewId,
+          dateIso,
+        })
+        store.setRightPanelOpen(true)
+        store.setInspectorTab('assign')
+        return
+      }
 
       const row = hitTestRow(layout.rows, y)
       if (!row) return
@@ -1100,7 +1234,9 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
       if (dayIdx < 0 || dayIdx >= layout.periodDays) return
       const dayMs = layout.periodStartMs + dayIdx * 86_400_000
       const dateIso = new Date(dayMs).toISOString().slice(0, 10)
-      selectDateCell(row.crewId, dateIso)
+      selectDateCell(row.crewId, dateIso, 'assign')
+      useCrewScheduleStore.getState().setRightPanelOpen(true)
+      useCrewScheduleStore.getState().setInspectorTab('assign')
     },
     [layout, selectDateCell],
   )
@@ -1124,6 +1260,8 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
         onMouseLeave={() => {
           setHover(null)
           setActivityHover(null)
+          setActivityHoverPos(null)
+          setPairingHoverPos(null)
         }}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
@@ -1137,6 +1275,40 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
           scroll-wheel events while dragging still reach the canvas. */}
       <DragGhost />
       <CapacityErrorDialog />
+      {hoveredActivityId &&
+        activityHoverPos &&
+        (() => {
+          const act = activities.find((a) => a._id === hoveredActivityId)
+          if (!act) return null
+          const code = activityCodes.find((c) => c._id === act.activityCodeId) ?? null
+          return (
+            <ActivityHoverTooltip
+              activity={act}
+              code={code}
+              clientX={activityHoverPos.x}
+              clientY={activityHoverPos.y}
+            />
+          )
+        })()}
+      {hoveredAssignmentId &&
+        pairingHoverPos &&
+        !dragState &&
+        (() => {
+          const store = useCrewScheduleStore.getState()
+          const assign = store.assignments.find((a) => a._id === hoveredAssignmentId)
+          if (!assign) return null
+          const pairing = store.pairings.find((p) => p._id === assign.pairingId)
+          if (!pairing) return null
+          return (
+            <PairingHoverTooltip
+              pairing={pairing}
+              positions={store.positions}
+              assignments={store.assignments}
+              clientX={pairingHoverPos.x}
+              clientY={pairingHoverPos.y}
+            />
+          )
+        })()}
     </div>
   )
 }
@@ -1149,6 +1321,17 @@ function CapacityErrorDialog() {
   const clearCapacityError = useCrewScheduleStore((s) => s.clearCapacityError)
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+  useEffect(() => {
+    if (!err) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        clearCapacityError()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [err, clearCapacityError])
   if (!err) return null
   const used = err.capacity // seat is full → used = capacity
   const pairingLabel = err.pairingCode ? ` on pairing ${err.pairingCode}` : ''
@@ -1183,8 +1366,9 @@ function CapacityErrorDialog() {
           style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}
         >
           <button
+            autoFocus
             onClick={clearCapacityError}
-            className="h-8 px-4 rounded-lg text-[13px] font-medium text-white"
+            className="h-8 px-4 rounded-lg text-[13px] font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent"
             style={{ backgroundColor: 'var(--module-accent, #3E7BFA)' }}
           >
             OK
@@ -1208,6 +1392,8 @@ function DragGhost() {
   if (!dragState || typeof document === 'undefined') return null
   const badgeColor =
     dragState.dropLegality === 'violation' ? '#E63535' : dragState.dropLegality === 'warning' ? '#FF8800' : '#06C270'
+  const checks = dragState.dropChecks ?? []
+  const hasChecks = checks.length > 0
   // Portal to <body> so `position: fixed` is always anchored to the
   // viewport. An ancestor with `transform/filter/perspective` would
   // otherwise become the containing block for fixed descendants and
@@ -1233,7 +1419,37 @@ function DragGhost() {
         {dragState.mode === 'copy' ? '+ ' : ''}
         {dragState.ghostLabel}
       </div>
-      {dragState.dropCrewId && (
+      {dragState.dropCrewId && hasChecks && (
+        <div
+          className="mt-1 min-w-[240px] max-w-[320px] rounded-lg overflow-hidden shadow-xl"
+          style={{
+            background: 'rgba(25,25,33,0.96)',
+            border: `1px solid ${badgeColor}`,
+            backdropFilter: 'blur(12px)',
+          }}
+        >
+          <div
+            className="px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-white"
+            style={{ background: badgeColor }}
+          >
+            Legality Check
+          </div>
+          <div className="px-2.5 py-1.5 space-y-1">
+            {checks.map((c, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 text-[12px]">
+                <span className="text-white/90 truncate">{c.label}</span>
+                <span
+                  className="tabular-nums font-semibold shrink-0"
+                  style={{ color: c.status === 'violation' ? '#FF6B6B' : '#FFB347' }}
+                >
+                  {c.actual} / {c.limit}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {dragState.dropCrewId && !hasChecks && (
         <div
           className="mt-1 inline-block px-2 py-0.5 rounded text-[11px] font-medium text-white shadow"
           style={{ backgroundColor: badgeColor }}
@@ -1348,15 +1564,11 @@ function drawBar(
   ctx.fillStyle = 'rgba(255,255,255,0.08)'
   ctx.fillRect(x + 1, y + 1, bar.width - 2, bar.height * 0.35)
 
-  // Violation border
+  // Only real violations get a red border. Warnings are suppressed —
+  // the duty is still legal, so the bar stays neutral.
   if (bar.fdtlStatus === 'violation') {
     ctx.strokeStyle = '#FF3B3B'
     ctx.lineWidth = 2
-    drawRoundedRect(ctx, x, y, bar.width, bar.height, r)
-    ctx.stroke()
-  } else if (bar.fdtlStatus === 'warning') {
-    ctx.strokeStyle = '#FF8800'
-    ctx.lineWidth = 1.5
     drawRoundedRect(ctx, x, y, bar.width, bar.height, r)
     ctx.stroke()
   }

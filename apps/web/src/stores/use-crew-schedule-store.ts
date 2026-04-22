@@ -8,6 +8,7 @@ import {
   type CrewActivityRef,
   type CrewAssignmentRef,
   type CrewMemberListItemRef,
+  type CrewLegalityIssueRef,
   type CrewMemoRef,
   type CrewPositionRef,
   type CrewSchedulePublicationRef,
@@ -16,6 +17,7 @@ import {
 } from '@skyhub/api'
 import type { BarLabelMode, CrewScheduleZoom } from '@/lib/crew-schedule/layout'
 import { sortCrewRoster } from '@/lib/crew-schedule/layout'
+import { useOperatorStore } from '@/stores/use-operator-store'
 
 /**
  * Store for 4.1.6 Crew Schedule. Mirrors `useGanttStore` shape:
@@ -112,6 +114,10 @@ interface Data {
     debriefMinutes: number
     restRules: { homeBaseMinMinutes: number; awayMinMinutes: number }
   }
+  /** Full serialized FDTL rule set — drives the 4.1.6 FDTL-aware validator. */
+  ruleSet: unknown | null
+  /** Roster-level FDTL issues for the visible window. */
+  crewIssues: CrewLegalityIssueRef[]
   aircraftTypes: Array<{ icaoType: string; family: string | null }>
 }
 
@@ -144,6 +150,14 @@ interface State extends Data {
    *  Opens the Assign tab's activity picker. Cleared when a pairing is
    *  selected or the user assigns an activity. */
   selectedDateIso: string | null
+  /** When set, the Assign tab is in replace-mode: picking a code deletes
+   *  this activity before creating the new one. Cleared after submit or
+   *  when the Assign tab closes. */
+  replaceActivityId: string | null
+  /** Visual mode for the selected date cell.
+   *  'view'   = single click, accent-color border (just showing focus).
+   *  'assign' = double click / Assign action armed, red border. */
+  cellSelectMode: 'view' | 'assign' | null
   hoveredAssignmentId: string | null
   hoveredActivityId: string | null
 
@@ -157,7 +171,14 @@ interface State extends Data {
     | { kind: 'crew-name'; crewId: string; pageX: number; pageY: number }
     | { kind: 'date-header'; dateIso: string; pageX: number; pageY: number }
     | { kind: 'block'; crewIds: string[]; fromIso: string; toIso: string; pageX: number; pageY: number }
-    | { kind: 'temp-base'; tempBaseId: string; pageX: number; pageY: number }
+    | {
+        kind: 'temp-base'
+        tempBaseId: string
+        crewId: string
+        dateIso: string
+        pageX: number
+        pageY: number
+      }
     | null
 
   /** Which inspector tab is active. Lifted to the store so context-menu
@@ -204,6 +225,15 @@ interface State extends Data {
     pairingCode: string | null
   } | null
 
+  /** Brief toast shown when a drag-drop is silently aborted due to a
+   *  rule violation. Gives the planner immediate feedback that the drop
+   *  did NOT take effect (preferred over a blocking dialog per user
+   *  preference: drag-time panel shows why, toast confirms the reject). */
+  dropRejection: {
+    reason: string
+    at: number
+  } | null
+
   /** Pending assignment that hit one or more planner-overridable rule
    *  violations (base mismatch today; FDP / rest / rank later). The
    *  `AssignmentOverrideDialog` reads this and — on Confirm — calls
@@ -211,8 +241,9 @@ interface State extends Data {
   assignmentOverridePending: {
     violations: import('@/lib/crew-schedule/violations').AssignmentViolation[]
     /** Description of the action for the confirm button — fires the
-     *  real assignment POST when called. */
-    proceed: () => Promise<void>
+     *  real assignment POST when called. Receives planner-supplied
+     *  reason text + commander-discretion flag for the audit row. */
+    proceed: (ack?: { reason: string; commanderDiscretion: boolean }) => Promise<void>
   } | null
 
   /** Pending assignment blocked by one or more hard-block violations
@@ -358,6 +389,19 @@ interface State extends Data {
     /** 'legal' | 'warning' | 'violation' | null — drives row tint. */
     dropLegality: 'legal' | 'warning' | 'violation' | null
     dropReason: string
+    /** Failing FDTL / rule checks at the current drop target. Only
+     *  populated when `dropLegality === 'warning' | 'violation'`;
+     *  drives the inline Legality Check mini-panel beside the ghost.
+     *  Empty array is valid (e.g. a non-FDTL block like overlap). */
+    dropChecks?: Array<{
+      label: string
+      actual: string
+      limit: string
+      status: 'warning' | 'violation'
+    }>
+    /** True when violation is FDTL (overridable). Drop handler proceeds
+     *  to create the assignment; server records an override audit row. */
+    dropOverridable?: boolean
     /** Move = reassign; Copy = duplicate; assign-uncrewed = tray → row. */
     mode: 'move' | 'copy' | 'assign-uncrewed'
     /** Only present when mode === 'assign-uncrewed'. Drives the legality
@@ -408,8 +452,12 @@ interface State extends Data {
   selectActivity: (id: string | null) => void
   /** Opens the activity picker. Clears pairing/activity selection so the
    *  right panel knows the user wants to assign (not inspect). */
-  selectDateCell: (crewId: string, dateIso: string) => void
+  selectDateCell: (crewId: string, dateIso: string, mode?: 'view' | 'assign') => void
   clearDateCell: () => void
+  /** Arms the Assign tab to replace an existing activity on the crew/date
+   *  pair. The next pick deletes this activity first. */
+  startReplaceActivity: (args: { activityId: string; crewId: string; dateIso: string }) => void
+  clearReplaceActivity: () => void
   setHover: (id: string | null) => void
   setActivityHover: (id: string | null) => void
   openContextMenu: (menu: NonNullable<State['contextMenu']>) => void
@@ -474,6 +522,8 @@ interface State extends Data {
   setExportCanvasRef: (el: HTMLCanvasElement | null) => void
   setCapacityError: (e: State['capacityError']) => void
   clearCapacityError: () => void
+  setDropRejection: (reason: string) => void
+  clearDropRejection: () => void
   setAssignmentOverridePending: (p: State['assignmentOverridePending']) => void
   clearAssignmentOverridePending: () => void
   setAssignmentBlocked: (p: State['assignmentBlocked']) => void
@@ -593,8 +643,8 @@ function persistGrouping(g: CrewGroupingState | null) {
 
 function defaultPeriod(): { from: string; to: string } {
   const now = new Date()
-  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
-  const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0))
+  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 6))
   return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }
 }
 
@@ -618,6 +668,8 @@ export const useCrewScheduleStore = create<State>((set, get) => {
       debriefMinutes: 0,
       restRules: { homeBaseMinMinutes: 0, awayMinMinutes: 0 },
     },
+    ruleSet: null,
+    crewIssues: [],
     aircraftTypes: [],
 
     // Committed view state
@@ -626,7 +678,7 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     filters: { baseIds: [], positionIds: [], acTypeIcaos: [] },
 
     // View state
-    zoom: '28D',
+    zoom: '7D',
     barLabelMode: 'pairing',
     rowHeightLevel: 1,
     refreshIntervalMins: 15,
@@ -637,6 +689,8 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     selectedAssignmentId: null,
     selectedActivityId: null,
     selectedDateIso: null,
+    replaceActivityId: null,
+    cellSelectMode: null,
     hoveredAssignmentId: null,
     hoveredActivityId: null,
     contextMenu: null,
@@ -658,6 +712,7 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     publishedOverlayVisible: false,
     exportCanvasRef: null,
     capacityError: null,
+    dropRejection: null,
     assignmentOverridePending: null,
     assignmentBlocked: null,
     legalityCheck: null,
@@ -722,6 +777,8 @@ export const useCrewScheduleStore = create<State>((set, get) => {
           activityGroups: res.activityGroups,
           memos: res.memos,
           fdtl: res.fdtl,
+          ruleSet: res.ruleSet ?? null,
+          crewIssues: res.crewIssues ?? [],
           aircraftTypes: res.aircraftTypes ?? [],
           tempBases: res.tempBases ?? [],
           periodCommitted: true,
@@ -769,9 +826,35 @@ export const useCrewScheduleStore = create<State>((set, get) => {
           activityGroups: res.activityGroups,
           memos: res.memos,
           fdtl: res.fdtl,
+          ruleSet: res.ruleSet ?? null,
+          crewIssues: res.crewIssues ?? [],
           aircraftTypes: res.aircraftTypes ?? [],
           tempBases: res.tempBases ?? [],
         })
+        // Fire-and-forget roster re-evaluation. Any assignment / activity
+        // mutation upstream (assign / swap / delete) can invalidate FDTL
+        // findings, so we always sweep in the background. The next
+        // reconcile picks up the refreshed issues.
+        if (res.ruleSet) {
+          const opId = useOperatorStore.getState().operator?._id
+          if (opId) {
+            void api
+              .reevaluateCrewRoster({ operatorId: opId, from: s.periodFromIso, to: s.periodToIso })
+              .then(async () => {
+                const fresh = await api.getCrewSchedule({
+                  from: s.periodFromIso,
+                  to: s.periodToIso,
+                  base: s.filters.baseIds.length === 1 ? s.filters.baseIds[0] : undefined,
+                  position: s.filters.positionIds.length === 1 ? s.filters.positionIds[0] : undefined,
+                  acType: s.filters.acTypeIcaos.length === 1 ? s.filters.acTypeIcaos[0] : undefined,
+                })
+                set({ crewIssues: fresh.crewIssues ?? [] })
+              })
+              .catch(() => {
+                // Silent — stale crewIssues are self-healing on next fetch.
+              })
+          }
+        }
       } catch {
         // Silent — caller already painted optimistic state. Next natural
         // refresh (period change, Go, etc.) will re-sync.
@@ -828,14 +911,27 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     },
     selectAssignment: (id) => set({ selectedAssignmentId: id }),
     selectActivity: (id) => set({ selectedActivityId: id }),
-    selectDateCell: (crewId, dateIso) =>
+    selectDateCell: (crewId, dateIso, mode = 'view') =>
       set({
         selectedCrewId: crewId,
         selectedDateIso: dateIso,
         selectedPairingId: null,
         selectedAssignmentId: null,
+        replaceActivityId: null,
+        cellSelectMode: mode,
       }),
-    clearDateCell: () => set({ selectedDateIso: null }),
+    clearDateCell: () => set({ selectedDateIso: null, replaceActivityId: null, cellSelectMode: null }),
+    startReplaceActivity: ({ activityId, crewId, dateIso }) =>
+      set({
+        selectedCrewId: crewId,
+        selectedDateIso: dateIso,
+        replaceActivityId: activityId,
+        selectedPairingId: null,
+        selectedAssignmentId: null,
+        selectedActivityId: null,
+        cellSelectMode: 'assign',
+      }),
+    clearReplaceActivity: () => set({ replaceActivityId: null }),
     setHover: (id) => {
       if (get().hoveredAssignmentId === id) return
       set({ hoveredAssignmentId: id })
@@ -953,6 +1049,12 @@ export const useCrewScheduleStore = create<State>((set, get) => {
           // ignore
         }
       }
+      // Opening the tray: pull the latest pairings/assignments so
+      // Network / Pairing-edit changes (4.1.5.1 / 4.1.5.2) are reflected
+      // without waiting for the 15-min auto-refresh.
+      if (next) {
+        void get().reconcilePeriod()
+      }
     },
     setUncrewedTrayVisible: (visible) => {
       set({ uncrewedTrayVisible: visible })
@@ -962,6 +1064,9 @@ export const useCrewScheduleStore = create<State>((set, get) => {
         } catch {
           // ignore
         }
+      }
+      if (visible) {
+        void get().reconcilePeriod()
       }
     },
     setCrewGrouping: (g) => {
@@ -984,6 +1089,8 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     setExportCanvasRef: (el) => set({ exportCanvasRef: el }),
     setCapacityError: (e) => set({ capacityError: e }),
     clearCapacityError: () => set({ capacityError: null }),
+    setDropRejection: (reason) => set({ dropRejection: { reason, at: Date.now() } }),
+    clearDropRejection: () => set({ dropRejection: null }),
     setAssignmentOverridePending: (p) => set({ assignmentOverridePending: p }),
     clearAssignmentOverridePending: () => set({ assignmentOverridePending: null }),
     setAssignmentBlocked: (p) => set({ assignmentBlocked: p }),
@@ -1042,3 +1149,11 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     },
   }
 })
+
+// Dev-mode diagnostic hook — exposes the store on `window` so planners
+// can inspect live state from the browser console (e.g. pairings, legs,
+// reportTime) when debugging FDTL issues. No-op in production builds.
+if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+  ;(window as unknown as { useCrewScheduleStore: typeof useCrewScheduleStore }).useCrewScheduleStore =
+    useCrewScheduleStore
+}

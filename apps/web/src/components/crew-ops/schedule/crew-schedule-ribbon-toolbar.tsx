@@ -39,7 +39,7 @@ interface Props {
 }
 
 /** Zoom progression for the Format popover's Range stepper. */
-const CREW_ZOOMS: CrewScheduleZoom[] = ['7D', '14D', '28D', 'M']
+const CREW_ZOOMS: CrewScheduleZoom[] = ['1D', '2D', '3D', '4D', '5D', '6D', '7D', '14D', '28D', 'M']
 
 /**
  * Ribbon toolbar for 4.1.6 Crew Schedule. Section order mirrors 4.1.5.2

@@ -311,15 +311,30 @@ export function CrewScheduleShell() {
   //   • Position trims the `missing` seat list to only seats whose
   //     position was picked, then drops pairings whose missing list
   //     becomes empty (all selected seats are already filled).
+  // Resolve selected base _ids → IATA codes so we can match against
+  // `pairing.baseAirport` (which is an IATA, not a DB id).
+  const bases = useCrewScheduleStore((s) => s.context.bases)
+  const selectedBaseIatas = useMemo(() => {
+    if (filters.baseIds.length === 0) return null
+    const byId = new Map(bases.map((b) => [b._id, b.iataCode]))
+    return new Set(
+      filters.baseIds.map((id) => byId.get(id)).filter((v): v is string => typeof v === 'string' && v.length > 0),
+    )
+  }, [filters.baseIds, bases])
+
   const filteredUncrewed = useMemo(() => {
     const acActive = filters.acTypeIcaos.length > 0
     const posActive = filters.positionIds.length > 0
-    if (!acActive && !posActive) return uncrewed
+    const baseActive = !!selectedBaseIatas && selectedBaseIatas.size > 0
+    if (!acActive && !posActive && !baseActive) return uncrewed
     const out: typeof uncrewed = []
     for (const u of uncrewed) {
+      const p = baseActive || acActive ? pairingsById.get(u.pairingId) : null
+      if (baseActive) {
+        if (!p || !p.baseAirport || !selectedBaseIatas!.has(p.baseAirport)) continue
+      }
       if (acActive) {
-        const p = pairingsById.get(u.pairingId)
-        if (!p || !filters.acTypeIcaos.includes(p.aircraftTypeIcao)) continue
+        if (!p || !p.aircraftTypeIcao || !filters.acTypeIcaos.includes(p.aircraftTypeIcao)) continue
       }
       if (posActive) {
         const keptMissing = u.missing.filter((m) => filters.positionIds.includes(m.seatPositionId))
@@ -330,7 +345,7 @@ export function CrewScheduleShell() {
       }
     }
     return out
-  }, [uncrewed, pairingsById, filters.acTypeIcaos, filters.positionIds])
+  }, [uncrewed, pairingsById, filters.acTypeIcaos, filters.positionIds, selectedBaseIatas])
 
   return (
     <div

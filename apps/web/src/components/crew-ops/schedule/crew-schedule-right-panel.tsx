@@ -28,8 +28,10 @@ import type { LegalityResult } from '../pairing/types'
 import { computeNightHours, computeTafb, minutesToHM, resolveRequiredRestMinutes } from '../pairing/lib/pairing-metrics'
 import { useCrewScheduleStore } from '@/stores/use-crew-schedule-store'
 import { useDateFormat } from '@/hooks/use-date-format'
+import { useOperatorStore } from '@/stores/use-operator-store'
+import { toUTC } from '@skyhub/logic'
 import { CrewScheduleMemoPanel } from './crew-schedule-memo-panel'
-import { ActivityCodePicker } from './activity-code-picker'
+import { ActivityCodePicker, type ActivityPickTimes } from './activity-code-picker'
 
 /** Module-level airport _id → IATA cache. Shared across every BioTab mount so
  *  we only fetch once per session, even as the inspector is opened/closed. */
@@ -204,21 +206,25 @@ function DutyTab({ pairing, positions }: { pairing: PairingRef | null; positions
 
   return (
     <div className="p-4 space-y-4">
-      {/* Header — pairing code + legal pill + route chain + inline meta */}
+      {/* Header — pairing code + status pill. Pill is hidden for legal
+          AND warning pairings; only real violations surface here to keep
+          the header quiet. */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-[16px] font-bold tracking-tight tabular-nums text-hz-text">{pairing.pairingCode}</h3>
-          <span
-            className="inline-flex items-center gap-1 text-[12px] font-bold px-2 h-[22px] rounded-full tabular-nums"
-            style={{
-              background: `${statusColor}18`,
-              color: statusColor,
-              border: `1px solid ${statusColor}55`,
-            }}
-          >
-            <StatusIcon size={11} strokeWidth={2.4} />
-            {statusLabel}
-          </span>
+          {pairing.fdtlStatus === 'violation' && (
+            <span
+              className="inline-flex items-center gap-1 text-[12px] font-bold px-2 h-[22px] rounded-full tabular-nums"
+              style={{
+                background: `${statusColor}18`,
+                color: statusColor,
+                border: `1px solid ${statusColor}55`,
+              }}
+            >
+              <StatusIcon size={11} strokeWidth={2.4} />
+              {statusLabel}
+            </span>
+          )}
         </div>
       </div>
 
@@ -390,9 +396,11 @@ function SummaryGrid({ pairing, legalityResult }: { pairing: PairingRef; legalit
     legOrder: l.legOrder,
   })) as unknown as import('../pairing/types').PairingLegMeta[]
   const nightMin = computeNightHours({ legs: legsForMetrics })
-  // No FDTL rule set available in the schedule inspector — helpers fall back to defaults.
-  const tafbMin = computeTafb({ legs: legsForMetrics }, null)
-  const requiredRestMin = resolveRequiredRestMinutes(null, dutyMin)
+  // Feed the loaded FDTL rule set so Required Rest reflects CAAV (or
+  // whichever scheme) rather than the adaptive heuristic.
+  const ruleSet = useCrewScheduleStore.getState().ruleSet as Parameters<typeof resolveRequiredRestMinutes>[0] | null
+  const tafbMin = computeTafb({ legs: legsForMetrics }, ruleSet ?? null)
+  const requiredRestMin = resolveRequiredRestMinutes(ruleSet ?? null, dutyMin)
   const fdpCheck = legalityResult?.checks.find(
     (c) => c.label === 'Flight Duty Period' || c.label.toUpperCase().includes('FDP'),
   )
@@ -586,18 +594,52 @@ function ActivityAssignTab({
     return dateIso ? [dateIso] : []
   }, [range, dateIso])
 
-  const assign = async (code: ActivityCodeRef) => {
+  const operatorTz = useOperatorStore((s) => s.operator?.timezone ?? 'UTC')
+  const replaceActivityId = useCrewScheduleStore((s) => s.replaceActivityId)
+  const clearReplaceActivity = useCrewScheduleStore((s) => s.clearReplaceActivity)
+
+  const assign = async (code: ActivityCodeRef, times?: ActivityPickTimes) => {
     if (!crew || datesInScope.length === 0) return
     setBusy(true)
     setError(null)
     try {
+      const buildWindow = (d: string) => {
+        if (!times) return {}
+        const startLocal = new Date(`${d}T${times.startHHMM}:00`)
+        let endLocal = new Date(`${d}T${times.endHHMM}:00`)
+        // End <= start → crosses midnight, roll to next day.
+        if (endLocal.getTime() <= startLocal.getTime()) {
+          endLocal = new Date(endLocal.getTime() + 86_400_000)
+        }
+        return {
+          startUtcIso: toUTC(startLocal, operatorTz).toISOString(),
+          endUtcIso: toUTC(endLocal, operatorTz).toISOString(),
+        }
+      }
+      // Replace-mode: drop the existing activity before creating the new
+      // one. No prompt — user already confirmed by double-clicking the bar.
+      if (replaceActivityId && datesInScope.length === 1) {
+        try {
+          await api.deleteCrewActivity(replaceActivityId)
+        } catch (err) {
+          // If it was already gone (e.g. deleted elsewhere), proceed.
+          console.warn('Replace: delete failed, continuing with create', err)
+        }
+      }
       if (datesInScope.length === 1) {
-        await api.createCrewActivity({ crewId: crew._id, activityCodeId: code._id, dateIso: datesInScope[0] })
+        const d = datesInScope[0]
+        await api.createCrewActivity({ crewId: crew._id, activityCodeId: code._id, dateIso: d, ...buildWindow(d) })
       } else {
         await api.createCrewActivitiesBulk({
-          activities: datesInScope.map((d) => ({ crewId: crew._id, activityCodeId: code._id, dateIso: d })),
+          activities: datesInScope.map((d) => ({
+            crewId: crew._id,
+            activityCodeId: code._id,
+            dateIso: d,
+            ...buildWindow(d),
+          })),
         })
       }
+      clearReplaceActivity()
       onAssigned()
     } catch (e) {
       setError((e as Error).message)
@@ -616,7 +658,11 @@ function ActivityAssignTab({
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="min-w-0">
             <div className="text-[13px] uppercase tracking-wider text-hz-text-tertiary">
-              {range ? `Assign Series · ${datesInScope.length} days` : 'Assign Activity'}
+              {range
+                ? `Assign Series · ${datesInScope.length} days`
+                : replaceActivityId
+                  ? 'Replace Activity'
+                  : 'Assign Activity'}
             </div>
             <div className="text-[15px] font-semibold truncate">
               {crew ? `${crew.lastName} ${crew.firstName}` : '—'}

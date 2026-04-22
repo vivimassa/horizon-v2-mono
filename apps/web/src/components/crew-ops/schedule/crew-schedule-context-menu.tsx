@@ -96,6 +96,90 @@ export function CrewScheduleContextMenu({ onAfterMutate }: Props) {
       setInspectorTab(t)
     }
 
+    const buildEmptyCellSections = (crewId: string, dateIso: string): Section[] => [
+      [
+        {
+          icon: Activity,
+          label: 'Assign activity…',
+          shortcut: 'A',
+          onClick: () => {
+            selectDateCell(crewId, dateIso)
+            openInspectorOnTab('assign')
+          },
+        },
+        {
+          icon: ClipboardList,
+          label: 'Assign pairing…',
+          shortcut: 'P',
+          onClick: () => {
+            useCrewScheduleStore.getState().openDialogFor({ kind: 'assign-pairing', crewId, dateIso })
+          },
+        },
+        {
+          icon: Copy,
+          label: 'Copy previous day',
+          onClick: async () => {
+            setBusy(true)
+            try {
+              const store = useCrewScheduleStore.getState()
+              const prev = new Date(new Date(dateIso + 'T00:00:00Z').getTime() - 86_400_000).toISOString().slice(0, 10)
+              const source = store.activities.find(
+                (a) =>
+                  a.crewId === crewId &&
+                  ((a.dateIso && a.dateIso === prev) || (!a.dateIso && a.startUtcIso.slice(0, 10) === prev)),
+              )
+              if (!source) {
+                console.warn('Copy previous day: no activity found for', crewId, prev)
+                return
+              }
+              await api.createCrewActivity({
+                crewId,
+                activityCodeId: source.activityCodeId,
+                dateIso,
+                notes: source.notes ?? null,
+              })
+              await store.reconcilePeriod()
+              onAfterMutate()
+            } finally {
+              setBusy(false)
+              closeContextMenu()
+            }
+          },
+        },
+        {
+          icon: CalendarRange,
+          label: 'Assign series of duties…',
+          onClick: () => {
+            useCrewScheduleStore.getState().openDialogFor({
+              kind: 'assign-series',
+              fromIso: dateIso,
+              toIso: dateIso,
+              crewId,
+            })
+          },
+        },
+      ],
+      [
+        {
+          icon: StickyNote,
+          label: 'View / edit day memo',
+          shortcut: 'M',
+          onClick: () => {
+            openMemoOverlay({ scope: 'day', crewId, dateIso })
+            closeContextMenu()
+          },
+        },
+        {
+          icon: Scale,
+          label: 'Legality Check',
+          shortcut: 'L',
+          onClick: () => {
+            useCrewScheduleStore.getState().openLegalityCheck({ kind: 'crew', crewId })
+          },
+        },
+      ],
+    ]
+
     switch (menu.kind) {
       case 'pairing':
         return [
@@ -282,96 +366,7 @@ export function CrewScheduleContextMenu({ onAfterMutate }: Props) {
         ]
 
       case 'empty-cell':
-        return [
-          [
-            {
-              icon: Activity,
-              label: 'Assign activity…',
-              shortcut: 'A',
-              onClick: () => {
-                selectDateCell(menu.crewId, menu.dateIso)
-                openInspectorOnTab('assign')
-              },
-            },
-            {
-              icon: ClipboardList,
-              label: 'Assign pairing…',
-              shortcut: 'P',
-              onClick: () => {
-                useCrewScheduleStore
-                  .getState()
-                  .openDialogFor({ kind: 'assign-pairing', crewId: menu.crewId, dateIso: menu.dateIso })
-              },
-            },
-            {
-              icon: Copy,
-              label: 'Copy previous day',
-              onClick: async () => {
-                setBusy(true)
-                try {
-                  const store = useCrewScheduleStore.getState()
-                  // Previous day ISO (UTC).
-                  const prev = new Date(new Date(menu.dateIso + 'T00:00:00Z').getTime() - 86_400_000)
-                    .toISOString()
-                    .slice(0, 10)
-                  // Find an activity on the previous day for this crew.
-                  // Prefer `dateIso` match; fall back to startUtcIso day.
-                  const source = store.activities.find(
-                    (a) =>
-                      a.crewId === menu.crewId &&
-                      ((a.dateIso && a.dateIso === prev) || (!a.dateIso && a.startUtcIso.slice(0, 10) === prev)),
-                  )
-                  if (!source) {
-                    console.warn('Copy previous day: no activity found for', menu.crewId, prev)
-                    return
-                  }
-                  await api.createCrewActivity({
-                    crewId: menu.crewId,
-                    activityCodeId: source.activityCodeId,
-                    dateIso: menu.dateIso,
-                    notes: source.notes ?? null,
-                  })
-                  await store.reconcilePeriod()
-                  onAfterMutate()
-                } finally {
-                  setBusy(false)
-                  closeContextMenu()
-                }
-              },
-            },
-            {
-              icon: CalendarRange,
-              label: 'Assign series of duties…',
-              onClick: () => {
-                useCrewScheduleStore.getState().openDialogFor({
-                  kind: 'assign-series',
-                  fromIso: menu.dateIso,
-                  toIso: menu.dateIso,
-                  crewId: menu.crewId,
-                })
-              },
-            },
-          ],
-          [
-            {
-              icon: StickyNote,
-              label: 'View / edit day memo',
-              shortcut: 'M',
-              onClick: () => {
-                openMemoOverlay({ scope: 'day', crewId: menu.crewId, dateIso: menu.dateIso })
-                closeContextMenu()
-              },
-            },
-            {
-              icon: Scale,
-              label: 'Legality Check',
-              shortcut: 'L',
-              onClick: () => {
-                useCrewScheduleStore.getState().openLegalityCheck({ kind: 'crew', crewId: menu.crewId })
-              },
-            },
-          ],
-        ]
+        return buildEmptyCellSections(menu.crewId, menu.dateIso)
 
       case 'crew-name':
         return [
@@ -529,7 +524,9 @@ export function CrewScheduleContextMenu({ onAfterMutate }: Props) {
       case 'temp-base': {
         const tb = useCrewScheduleStore.getState().tempBases.find((t) => t._id === menu.tempBaseId)
         if (!tb) return null
+        const base = buildEmptyCellSections(menu.crewId, menu.dateIso)
         return [
+          ...base,
           [
             {
               icon: MapPin,
@@ -857,7 +854,13 @@ function MenuHeader({ menu }: { menu: NonNullable<ReturnType<typeof useCrewSched
     }
     case 'temp-base': {
       const tb = useCrewScheduleStore.getState().tempBases.find((t) => t._id === menu.tempBaseId)
-      label = tb ? `TEMP BASE ${tb.airportCode}` : 'Temporary Base'
+      label = (
+        <span className="flex items-center gap-1.5">
+          <CalendarDays className="w-3 h-3" />
+          {fmt(menu.dateIso)}
+          {tb ? ` · TEMP BASE ${tb.airportCode}` : ''}
+        </span>
+      )
       break
     }
   }

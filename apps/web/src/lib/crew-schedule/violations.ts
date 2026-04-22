@@ -1,4 +1,5 @@
-import type { CrewMemberListItemRef, PairingRef } from '@skyhub/api'
+import type { CrewActivityRef, CrewAssignmentRef, CrewMemberListItemRef, PairingRef } from '@skyhub/api'
+import { validateCrewAssignment, buildScheduleDuties, buildCandidateDuty } from '@skyhub/logic'
 
 /**
  * Rule violations checked *at assignment time* — the drag-drop drop
@@ -34,6 +35,13 @@ export interface CheckViolationsInput {
    *  inside one whose `airportCode` matches the pairing base, the
    *  `base_mismatch` rule is suppressed. */
   tempBases?: Array<{ fromIso: string; toIso: string; airportCode: string }>
+  /** Optional FDTL context — enables rest / cumulative checks as
+   *  override-level violations (planner can ack). When absent, FDTL
+   *  checks don't run. */
+  assignments?: CrewAssignmentRef[]
+  activities?: CrewActivityRef[]
+  pairings?: PairingRef[]
+  ruleSet?: unknown | null
 }
 
 export function checkAssignmentViolations({
@@ -41,6 +49,10 @@ export function checkAssignmentViolations({
   pairing,
   aircraftTypes,
   tempBases,
+  assignments,
+  activities,
+  pairings,
+  ruleSet,
 }: CheckViolationsInput): AssignmentViolation[] {
   const list: AssignmentViolation[] = []
 
@@ -101,6 +113,47 @@ export function checkAssignmentViolations({
         pairingId: pairing._id,
       },
     })
+  }
+
+  // FDTL roster-level (rest / cumulative). All classified 'override' so
+  // the planner can still proceed with a commander-discretion audit row.
+  if (ruleSet && assignments && pairings) {
+    const pairingsById = new Map(pairings.map((p) => [p._id, p]))
+    const existing = buildScheduleDuties({
+      crewId: crew._id,
+      assignments,
+      activities: activities ?? [],
+      pairingsById,
+    })
+    const candidate = buildCandidateDuty(pairing)
+    if (candidate) {
+      const result = validateCrewAssignment({
+        candidate,
+        existing,
+        homeBase: (crew.baseLabel ?? '').toUpperCase(),
+        ruleSet: ruleSet as Parameters<typeof validateCrewAssignment>[0]['ruleSet'],
+      })
+      for (const chk of result.checks) {
+        if (chk.status !== 'violation' && chk.status !== 'warning') continue
+        list.push({
+          kind: `fdtl_${chk.ruleCode ?? 'rule'}`.toLowerCase(),
+          severity: 'override',
+          title: chk.label,
+          message: `${chk.shortReason}${chk.legalReference ? ` — ${chk.legalReference}` : ''}`,
+          detail: {
+            ruleCode: chk.ruleCode,
+            actual: chk.actual,
+            limit: chk.limit,
+            actualNum: chk.actualNum,
+            limitNum: chk.limitNum,
+            status: chk.status,
+            legalReference: chk.legalReference ?? null,
+            crewId: crew._id,
+            pairingId: pairing._id,
+          },
+        })
+      }
+    }
   }
 
   return list

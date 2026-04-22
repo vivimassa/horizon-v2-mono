@@ -109,6 +109,13 @@ function computeDutyDaySpans(p: PairingRef, briefMin: number, debriefMin: number
   const spans: DutyDaySpan[] = []
   const pairingReportMs = p.reportTime ? new Date(p.reportTime).getTime() : null
   const pairingReleaseMs = p.releaseTime ? new Date(p.releaseTime).getTime() : null
+  // Day-1 floor: pairing.startDate at UTC midnight. When a pairing's first
+  // leg departs on the PREVIOUS UTC date (cross-midnight cases), clamping
+  // day-1 reportMs to this floor keeps the bar on the pairing's declared
+  // start date — which is what the Gantt day columns are keyed on. Without
+  // this the bar would render on the prior day column and the pairing
+  // appears invisible when the viewport starts on pairing.startDate.
+  const startDateFloorMs = p.startDate ? new Date(p.startDate + 'T00:00:00.000Z').getTime() : null
   for (let i = 0; i < days.length; i += 1) {
     const d = days[i]
     const legs = (byDay.get(d) ?? []).slice().sort((a, b) => a.legOrder - b.legOrder)
@@ -117,7 +124,10 @@ function computeDutyDaySpans(p: PairingRef, briefMin: number, debriefMin: number
     const lastSta = new Date(legs[legs.length - 1].staUtcIso).getTime()
     const isFirst = i === 0
     const isLast = i === days.length - 1
-    const reportMs = isFirst && pairingReportMs !== null ? pairingReportMs : firstStd - briefMin * 60_000
+    let reportMs = isFirst && pairingReportMs !== null ? pairingReportMs : firstStd - briefMin * 60_000
+    if (isFirst && pairingReportMs === null && startDateFloorMs !== null && reportMs < startDateFloorMs) {
+      reportMs = startDateFloorMs
+    }
     const releaseMs = isLast && pairingReleaseMs !== null ? pairingReleaseMs : lastSta + debriefMin * 60_000
     spans.push({ dutyDay: d, reportMs, releaseMs })
   }

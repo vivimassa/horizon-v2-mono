@@ -1,7 +1,7 @@
 'use client'
 
 import { XCircle } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useTheme } from '@/components/theme-provider'
 import type { AssignmentViolation } from '@/lib/crew-schedule/violations'
 
@@ -18,10 +18,16 @@ interface Props {
 export function AssignmentBlockedDialog({ violations, onClose }: Props) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+  const okRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
+    // Focus the CTA so Enter / Space dismiss without mouse travel.
+    okRef.current?.focus()
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' || e.key === 'Enter') onClose()
+      if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        onClose()
+      }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
@@ -91,9 +97,11 @@ export function AssignmentBlockedDialog({ violations, onClose }: Props) {
           style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}
         >
           <button
+            ref={okRef}
             type="button"
+            autoFocus
             onClick={onClose}
-            className="h-10 px-4 rounded-lg text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+            className="h-10 px-4 rounded-lg text-[13px] font-semibold text-white transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent"
             style={{ background: '#E63535' }}
           >
             OK

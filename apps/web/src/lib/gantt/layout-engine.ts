@@ -33,6 +33,9 @@ export interface LayoutInput {
   previousVirtualPlacements?: Map<string, string>
   /** Forced placements — override virtual placement for specific flights (from drag-drop rearrange) */
   forcedPlacements?: Map<string, string>
+  /** Optional: tail registration to pin at the top of its type group AND bubble that type group to the top.
+   *  Used by the pairing gantt "Proposal" feature to surface the nearest legal next-leg candidate row. */
+  pinnedRegistration?: string | null
 }
 
 /**
@@ -351,6 +354,15 @@ export function computeLayout(input: LayoutInput): LayoutResult {
     } else {
       acList.sort((a, b) => a.registration.localeCompare(b.registration))
     }
+    // Pin one reg at top of its group if requested.
+    const pin = input.pinnedRegistration
+    if (pin) {
+      const idx = acList.findIndex((a) => a.registration === pin)
+      if (idx > 0) {
+        const [pinned] = acList.splice(idx, 1)
+        acList.unshift(pinned)
+      }
+    }
   }
 
   const rows: RowLayout[] = []
@@ -358,6 +370,14 @@ export function computeLayout(input: LayoutInput): LayoutResult {
   let y = 0
 
   const sortedTypes = [...typeGroups.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+  // Bubble the type group hosting the pinned registration to the top.
+  if (input.pinnedRegistration) {
+    const idx = sortedTypes.findIndex(([, list]) => list.some((ac) => ac.registration === input.pinnedRegistration))
+    if (idx > 0) {
+      const [pinnedGroup] = sortedTypes.splice(idx, 1)
+      sortedTypes.unshift(pinnedGroup)
+    }
+  }
 
   for (const [typeIcao, acList] of sortedTypes) {
     const typeInfo = aircraftTypes.find((t) => t.icaoType === typeIcao)

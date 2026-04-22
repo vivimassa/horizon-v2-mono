@@ -149,6 +149,8 @@ export interface BarLayout {
   label: string
   row: number
   flight: GanttFlight
+  /** Pairing-gantt only: mark bars whose pairing uses an augmented crew template. */
+  augmented?: boolean
 }
 
 export interface RowLayout {

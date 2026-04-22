@@ -32,6 +32,31 @@ function hhmmToMinutes(val: string): number | null {
   return h * 60 + m
 }
 
+/** Mutually-exclusive flag groups. Turning on a flag in one group blocks
+ *  flags in any group listed as a conflict. */
+const DUTY_TRAINING_FLAGS: ActivityFlag[] = [
+  'is_flight_duty',
+  'is_ground_duty',
+  'is_deadhead',
+  'is_training',
+  'is_simulator',
+]
+const OFF_LEAVE_FLAGS: ActivityFlag[] = ['is_day_off', 'is_annual_leave', 'is_sick_leave']
+
+function getConflictingFlags(flag: ActivityFlag): ActivityFlag[] {
+  if (DUTY_TRAINING_FLAGS.includes(flag)) return OFF_LEAVE_FLAGS
+  if (OFF_LEAVE_FLAGS.includes(flag)) return DUTY_TRAINING_FLAGS
+  return []
+}
+
+/** Disables a flag checkbox when an opposing flag is already set. */
+function isFlagBlockedByActive(flag: ActivityFlag, activeFlags: string[]): boolean {
+  const conflicts = getConflictingFlags(flag)
+  if (conflicts.length === 0) return false
+  if (activeFlags.includes(flag)) return false // already on — let user turn off
+  return conflicts.some((c) => activeFlags.includes(c))
+}
+
 export function ActivityCodeDetail({
   code,
   groups,
@@ -100,7 +125,23 @@ export function ActivityCodeDetail({
   const handleFlagToggle = async (flag: ActivityFlag) => {
     if (!code || !onUpdateFlags || isSystem) return
     const current = code.flags ?? []
-    const next = current.includes(flag) ? current.filter((f) => f !== flag) : [...current, flag]
+    const turningOn = !current.includes(flag)
+    const next = turningOn ? [...current, flag] : current.filter((f) => f !== flag)
+    // Mutual exclusion: Day Off / Leave cannot coexist with Duty / Training.
+    if (turningOn) {
+      const conflicts = getConflictingFlags(flag)
+      if (conflicts.length > 0) {
+        const offending = next.filter((f) => conflicts.includes(f))
+        if (offending.length > 0) {
+          const offLabels = offending.map((f) => FLAG_LABELS[f]).join(', ')
+          alert(
+            `"${FLAG_LABELS[flag]}" can't be combined with ${offLabels}. ` +
+              `Day Off / Leave and Duty / Training are mutually exclusive.`,
+          )
+          return
+        }
+      }
+    }
     await onUpdateFlags(code._id, next)
   }
 
@@ -501,19 +542,26 @@ function GeneralTab({
             <div key={cat.label} className="rounded-xl border border-hz-border p-3 space-y-2">
               <p className="text-[13px] font-semibold text-hz-text-secondary uppercase tracking-wider">{cat.label}</p>
               {cat.flags.map((flag) => {
-                const active = (code.flags ?? []).includes(flag)
+                const activeFlags = code.flags ?? []
+                const active = activeFlags.includes(flag)
+                const blocked = isFlagBlockedByActive(flag, activeFlags)
+                const disabled = isSystem || blocked
+                const conflicts = getConflictingFlags(flag)
+                  .map((c) => FLAG_LABELS[c])
+                  .join(', ')
                 return (
                   <label
                     key={flag}
+                    title={blocked ? `Conflicts with active flag (${conflicts})` : undefined}
                     className={`flex items-center gap-2 ${
-                      isSystem ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                      disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
                     }`}
                   >
                     <input
                       type="checkbox"
                       checked={active}
                       onChange={() => onFlagToggle(flag)}
-                      disabled={isSystem}
+                      disabled={disabled}
                       className="rounded"
                     />
                     <span className="text-[13px] text-hz-text">{FLAG_LABELS[flag]}</span>

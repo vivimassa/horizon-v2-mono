@@ -27,6 +27,29 @@ const fdtlRuleSchema = new Schema(
     verificationStatus: { type: String, enum: ['verified', 'unverified', 'disputed'], default: 'unverified' },
     sortOrder: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true },
+    // Data-driven evaluator dispatch. One of the RuleComputationType values
+    // from @skyhub/logic. When null, the client validator falls back to
+    // inference from ruleCode. Set explicitly for custom rules that don't
+    // match the standard naming pattern.
+    computationType: {
+      type: String,
+      enum: [
+        'rolling_cumulative',
+        'min_rest_between_events',
+        'min_rest_after_augmented',
+        'min_rest_in_window',
+        'per_duty_limit',
+        'consecutive_count',
+        'custom',
+        null,
+      ],
+      default: null,
+    },
+    // Free-form params consumed by the evaluator. E.g.
+    //   rolling_cumulative → { window: '7D', field: 'duty' }
+    //   min_rest_between_events → { context: 'home' | 'away' | 'any' }
+    //   min_rest_in_window → { windowRule: 'MAX_BETWEEN_EXTENDED_RECOVERY' }
+    params: { type: Schema.Types.Mixed, default: null },
     createdAt: { type: String, default: null },
     updatedAt: { type: String, default: null },
   },

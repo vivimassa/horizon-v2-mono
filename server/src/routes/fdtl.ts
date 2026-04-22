@@ -517,30 +517,23 @@ export async function fdtlRoutes(app: FastifyInstance): Promise<void> {
         directionality: string | null
         label: string
         legalReference: string | null
+        computationType: string | null
+        params: Record<string, unknown> | null
       }
     >()
-    for (const r of rules.filter((x) => x.source === 'government')) {
-      ruleMap.set(r.ruleCode, {
-        code: r.ruleCode,
-        value: r.value,
-        valueType: r.valueType,
-        unit: r.unit ?? '',
-        directionality: r.directionality ?? null,
-        label: r.label,
-        legalReference: r.legalReference ?? null,
-      })
-    }
-    for (const r of rules.filter((x) => x.source === 'company')) {
-      ruleMap.set(r.ruleCode, {
-        code: r.ruleCode,
-        value: r.value,
-        valueType: r.valueType,
-        unit: r.unit ?? '',
-        directionality: r.directionality ?? null,
-        label: r.label,
-        legalReference: r.legalReference ?? null,
-      })
-    }
+    const toEntry = (r: (typeof rules)[number]) => ({
+      code: r.ruleCode,
+      value: r.value,
+      valueType: r.valueType,
+      unit: r.unit ?? '',
+      directionality: r.directionality ?? null,
+      label: r.label,
+      legalReference: r.legalReference ?? null,
+      computationType: (r as { computationType?: string | null }).computationType ?? null,
+      params: ((r as { params?: Record<string, unknown> | null }).params as Record<string, unknown> | null) ?? null,
+    })
+    for (const r of rules.filter((x) => x.source === 'government')) ruleMap.set(r.ruleCode, toEntry(r))
+    for (const r of rules.filter((x) => x.source === 'company')) ruleMap.set(r.ruleCode, toEntry(r))
 
     // Helpers for cruise time deductions (parse "H:MM" strings → minutes)
     function hmmToMinutes(v?: string | null): number | null {

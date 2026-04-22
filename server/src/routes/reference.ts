@@ -1986,6 +1986,19 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     return doc
   })
 
+  // Mutual exclusion check shared by POST / PATCH / flags routes.
+  const DUTY_TRAINING_FLAGS = ['is_flight_duty', 'is_ground_duty', 'is_deadhead', 'is_training', 'is_simulator']
+  const OFF_LEAVE_FLAGS = ['is_day_off', 'is_annual_leave', 'is_sick_leave']
+  const validateFlagExclusion = (flags: string[] | undefined): string | null => {
+    if (!Array.isArray(flags)) return null
+    const hasDuty = flags.some((f) => DUTY_TRAINING_FLAGS.includes(f))
+    const hasOff = flags.some((f) => OFF_LEAVE_FLAGS.includes(f))
+    if (hasDuty && hasOff) {
+      return 'Day Off / Leave flags cannot be combined with Duty / Training flags.'
+    }
+    return null
+  }
+
   app.post('/activity-codes', async (req, reply) => {
     const raw = req.body as Record<string, unknown>
     if (raw.code) raw.code = (raw.code as string).toUpperCase()
@@ -1995,6 +2008,8 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
     const body = parsed.data
+    const flagErr = validateFlagExclusion(body.flags)
+    if (flagErr) return reply.code(400).send({ error: flagErr })
     const existing = await ActivityCode.findOne({ operatorId: body.operatorId, code: body.code }).lean()
     if (existing) return reply.code(409).send({ error: `Activity code "${body.code}" already exists` })
     const id = crypto.randomUUID()
@@ -2011,6 +2026,8 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
       const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`)
       return reply.code(400).send({ error: 'Validation failed', details: errors })
     }
+    const flagErr = validateFlagExclusion(parsed.data.flags)
+    if (flagErr) return reply.code(400).send({ error: flagErr })
     const existing = await ActivityCode.findById(id).lean()
     if (!existing) return reply.code(404).send({ error: 'Activity code not found' })
     if (existing.isSystem) {
@@ -2034,6 +2051,8 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     const existing = await ActivityCode.findById(id).lean()
     if (!existing) return reply.code(404).send({ error: 'Activity code not found' })
     if (existing.isSystem) return reply.code(403).send({ error: 'Cannot modify flags on system codes' })
+    const flagErr = validateFlagExclusion(flags)
+    if (flagErr) return reply.code(400).send({ error: flagErr })
     const doc = await ActivityCode.findByIdAndUpdate(
       id,
       { $set: { flags, updatedAt: new Date().toISOString() } },

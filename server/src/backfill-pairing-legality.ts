@@ -5,7 +5,7 @@ import { connectDB } from './db/connection.js'
 import { Pairing } from './models/Pairing.js'
 import { Operator } from './models/Operator.js'
 import { loadSerializedRuleSet } from './services/fdtl-rule-set.js'
-import { evaluatePairingLegality } from './services/evaluate-pairing-legality.js'
+import { evaluatePairingLegality, loadAirportTzCountryMaps } from './services/evaluate-pairing-legality.js'
 
 /**
  * One-off backfill: run the FDTL engine over every existing pairing whose
@@ -50,6 +50,10 @@ async function main() {
     process.exit(1)
   }
 
+  const opDoc = (await Operator.findById(operatorId).lean()) as { timezone?: string } | null
+  const timezone = opDoc?.timezone ?? 'UTC'
+  console.log(`Operator timezone: ${timezone} (fallback for FDP band lookup)\n`)
+
   const filter: Record<string, unknown> = { operatorId }
   if (!rebuildAll) filter.$or = [{ lastLegalityResult: null }, { lastLegalityResult: { $exists: false } }]
 
@@ -65,6 +69,20 @@ async function main() {
   }).lean()
 
   console.log(`Pairings to evaluate: ${pairings.length}\n`)
+
+  // Load airport tz + country maps once for the entire batch. Any IATA
+  // that's missing from the collection falls back to operator tz.
+  const allIatas = new Set<string>()
+  for (const p of pairings) {
+    for (const l of p.legs) {
+      if (l.depStation) allIatas.add(l.depStation)
+      if (l.arrStation) allIatas.add(l.arrStation)
+    }
+  }
+  const maps = await loadAirportTzCountryMaps(allIatas)
+  console.log(
+    `Loaded tz for ${Object.keys(maps.tz).length} airports, country for ${Object.keys(maps.country).length}\n`,
+  )
 
   let touched = 0
   let skipped = 0
@@ -93,6 +111,9 @@ async function main() {
             blockMinutes: l.blockMinutes,
             aircraftTypeIcao: l.aircraftTypeIcao,
           })),
+          timezone,
+          airportTimezones: maps.tz,
+          airportCountries: maps.country,
         },
         ruleSet,
       )

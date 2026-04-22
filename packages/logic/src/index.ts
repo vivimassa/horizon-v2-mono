@@ -4,6 +4,9 @@
 export * from './fdtl/engine'
 export * from './fdtl/engine-types'
 export * from './fdtl/validator'
+export * from './fdtl/crew-schedule-validator'
+export * from './fdtl/evaluators'
+export * from './fdtl/schedule-duty-builder'
 export * from './fdtl/utils'
 export * from './fdtl/seed-operator-rules'
 

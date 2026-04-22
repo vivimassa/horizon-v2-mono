@@ -17,6 +17,9 @@ import { AssignmentViolationOverride } from '../models/AssignmentViolationOverri
 import { CrewQualification } from '../models/CrewQualification.js'
 import { AircraftType } from '../models/AircraftType.js'
 import { CrewTempBase } from '../models/CrewTempBase.js'
+import { loadSerializedRuleSet } from '../services/fdtl-rule-set.js'
+import { evaluateCrewRoster } from '../services/evaluate-crew-roster.js'
+import { CrewLegalityIssue } from '../models/CrewLegalityIssue.js'
 
 /** Parse an FDTL rule value like "12:00" / "10:30" / raw-number minutes
  *  into total minutes. Returns 0 on parse failure so the UI falls back
@@ -68,11 +71,16 @@ type PairingLean = {
   reportTime: string | null
   startDate: string
   endDate: string
-  legs: Array<{ staUtcIso: string; arrStation: string }>
+  legs: Array<{ stdUtcIso: string; staUtcIso: string; arrStation: string }>
 }
 
 function computeAssignmentWindow(p: PairingLean): { startUtcIso: string; endUtcIso: string } {
-  const start = p.reportTime ?? (p.legs[0] ? addMinutesIso(p.legs[0].staUtcIso, -90) : `${p.startDate}T00:00:00.000Z`)
+  // Start = explicit report OR first leg STD − 60min (brief). Using STA
+  // − 90 was a pre-existing bug: for long sectors STA comes hours after
+  // STD, so the synthetic start was placed mid-flight. Rest / overlap
+  // checks then fired incorrectly.
+  const firstLeg = p.legs[0]
+  const start = p.reportTime ?? (firstLeg ? addMinutesIso(firstLeg.stdUtcIso, -60) : `${p.startDate}T00:00:00.000Z`)
   const lastLeg = p.legs[p.legs.length - 1]
   const end = lastLeg ? addMinutesIso(lastLeg.staUtcIso, 30) : `${p.endDate}T23:59:00.000Z`
   return { startUtcIso: start, endUtcIso: end }
@@ -119,6 +127,7 @@ const createAssignmentSchema = z
             violationKind: z.string().min(1),
             messageSnapshot: z.string().nullable().optional(),
             detail: z.unknown().optional(),
+            reason: z.string().nullable().optional(),
           })
           .strict(),
       )
@@ -184,7 +193,7 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       $or: [{ scope: 'pairing' }, { scope: 'crew' }, { scope: 'day', dateIso: { $gte: q.from, $lte: q.to } }],
     }
 
-    const [pairings, crew, assignments, positions, activities, activityCodes, activityGroups, memos, complements] =
+    const [pairings, crew, rawAssignments, positions, activities, activityCodes, activityGroups, memos, complements] =
       await Promise.all([
         Pairing.find(pairingFilter).lean(),
         CrewMember.find(crewFilter).sort({ base: 1, seniority: 1, lastName: 1 }).lean(),
@@ -196,6 +205,20 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
         CrewMemo.find(memoFilter).lean(),
         CrewComplement.find({ operatorId, isActive: true }).lean(),
       ])
+
+    // Recompute assignment windows from fresh pairing data. Older writes
+    // that used the legs[0].staUtcIso-90 fallback stored bogus startUtcIso
+    // values; rebuilding here means the client always sees corrected
+    // windows without a data migration.
+    const pairingWindowById = new Map<string, { startUtcIso: string; endUtcIso: string }>()
+    for (const p of pairings) {
+      pairingWindowById.set(p._id as string, computeAssignmentWindow(p as unknown as PairingLean))
+    }
+    const assignments = rawAssignments.map((a) => {
+      const w = pairingWindowById.get(a.pairingId)
+      if (!w) return a
+      return { ...a, startUtcIso: w.startUtcIso, endUtcIso: w.endUtcIso }
+    })
 
     // Build (aircraftType/templateKey) → counts lookup so we can fall back
     // when a pairing's denormalised crewCounts cache wasn't populated.
@@ -352,6 +375,35 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       airportCode: t.airportCode,
     }))
 
+    // Full SerializedRuleSet — powers the 4.1.6 FDTL-aware validator.
+    // Same assembly path that /fdtl/rule-set returns, so every tweak in
+    // /admin/fdt-rules flows here without a code change.
+    const ruleSet = await loadSerializedRuleSet(operatorId)
+
+    // Roster-level issues for the visible window. Cheap to read since
+    // indexed by (operatorId, periodFromIso, periodToIso). Re-evaluation
+    // is triggered separately (mutation-driven or nightly job), but we
+    // also do a best-effort inline run when the cache is empty.
+    let crewIssues = await CrewLegalityIssue.find({
+      operatorId,
+      periodFromIso: q.from,
+      periodToIso: q.to,
+    }).lean()
+    if (crewIssues.length === 0 && ruleSet) {
+      // First-time fetch for this window — run synchronously so the
+      // planner sees findings on load. Subsequent calls hit the cache.
+      try {
+        await evaluateCrewRoster(operatorId, q.from, q.to)
+        crewIssues = await CrewLegalityIssue.find({
+          operatorId,
+          periodFromIso: q.from,
+          periodToIso: q.to,
+        }).lean()
+      } catch (err) {
+        req.log.warn({ err }, 'Roster evaluation failed inline')
+      }
+    }
+
     return {
       pairings,
       crew,
@@ -363,9 +415,26 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       activityGroups,
       memos,
       fdtl,
+      ruleSet,
+      crewIssues,
       aircraftTypes,
       tempBases,
     }
+  })
+
+  // POST /crew-schedule/reevaluate-roster — on-demand roster FDTL sweep.
+  // Returns aggregate counts; clients then refetch /crew-schedule to get
+  // the updated issues. Safe to call after any mutation.
+  app.post('/crew-schedule/reevaluate-roster', async (req, reply) => {
+    const body = req.body as { operatorId?: string; from?: string; to?: string; scenarioId?: string | null }
+    const operatorId = body.operatorId
+    const from = body.from
+    const to = body.to
+    if (!operatorId || !from || !to) {
+      return reply.code(400).send({ error: 'operatorId, from, to required' })
+    }
+    const result = await evaluateCrewRoster(operatorId, from, to, { scenarioId: body.scenarioId ?? null })
+    return result
   })
 
   // ── GET /crew-schedule/pairings/:pairingId/crew ──────────────────────
@@ -914,7 +983,7 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
           violationKind: o.violationKind,
           detail: o.detail ?? null,
           messageSnapshot: o.messageSnapshot ?? null,
-          reason: null,
+          reason: o.reason ?? null,
           overriddenByUserId: req.userId || null,
           overriddenAtUtc: now,
           createdAt: now,

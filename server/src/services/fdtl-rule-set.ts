@@ -33,30 +33,23 @@ export async function loadSerializedRuleSet(operatorId: string): Promise<unknown
     directionality: string | null
     label: string
     legalReference: string | null
+    computationType: string | null
+    params: Record<string, unknown> | null
   }
   const ruleMap = new Map<string, RuleEntry>()
-  for (const r of rules.filter((x) => x.source === 'government')) {
-    ruleMap.set(r.ruleCode, {
-      code: r.ruleCode,
-      value: r.value,
-      valueType: r.valueType,
-      unit: r.unit ?? '',
-      directionality: r.directionality ?? null,
-      label: r.label,
-      legalReference: r.legalReference ?? null,
-    })
-  }
-  for (const r of rules.filter((x) => x.source === 'company')) {
-    ruleMap.set(r.ruleCode, {
-      code: r.ruleCode,
-      value: r.value,
-      valueType: r.valueType,
-      unit: r.unit ?? '',
-      directionality: r.directionality ?? null,
-      label: r.label,
-      legalReference: r.legalReference ?? null,
-    })
-  }
+  const toEntry = (r: (typeof rules)[number]): RuleEntry => ({
+    code: r.ruleCode,
+    value: r.value,
+    valueType: r.valueType,
+    unit: r.unit ?? '',
+    directionality: r.directionality ?? null,
+    label: r.label,
+    legalReference: r.legalReference ?? null,
+    computationType: (r as { computationType?: string | null }).computationType ?? null,
+    params: ((r as { params?: Record<string, unknown> | null }).params as Record<string, unknown> | null) ?? null,
+  })
+  for (const r of rules.filter((x) => x.source === 'government')) ruleMap.set(r.ruleCode, toEntry(r))
+  for (const r of rules.filter((x) => x.source === 'company')) ruleMap.set(r.ruleCode, toEntry(r))
 
   function hmmToMinutes(v?: string | null): number | null {
     if (!v) return null

@@ -109,6 +109,10 @@ export function PairingTextShell() {
   }, [])
 
   const setStationUtcOffsets = usePairingStore((s) => s.setStationUtcOffsets)
+  const setStationCountries = usePairingStore((s) => s.setStationCountries)
+  const setPairingConfig = usePairingStore((s) => s.setPairingConfig)
+  const setHomeCountryIso2 = usePairingStore((s) => s.setHomeCountryIso2)
+  const setAircraftTypeFamilies = usePairingStore((s) => s.setAircraftTypeFamilies)
 
   // Load the crew complement catalog + position columns + airport offset map
   // once. These drive the auto-fill at creation time, the complement panel in
@@ -116,19 +120,39 @@ export function PairingTextShell() {
   // need to be present even before the user clicks Go.
   useEffect(() => {
     let cancelled = false
-    Promise.all([api.getCrewComplements(getOperatorId()), api.getCrewPositions(getOperatorId()), api.getAirports()])
-      .then(([complements, positions, airports]) => {
+    Promise.all([
+      api.getCrewComplements(getOperatorId()),
+      api.getCrewPositions(getOperatorId()),
+      api.getAirports(),
+      api.getAircraftTypes(),
+      api.getOperatorPairingConfig(getOperatorId()),
+      api.getOperator(getOperatorId()).catch(() => null),
+    ])
+      .then(([complements, positions, airports, acTypes, pairingCfg, op]) => {
         if (cancelled) return
         setComplements(complements)
         setPositions(positions)
-        const map: Record<string, number> = {}
+        const familyMap: Record<string, string | null> = {}
+        for (const t of acTypes) familyMap[t.icaoType] = t.family ?? null
+        setAircraftTypeFamilies(familyMap)
+        const offsetMap: Record<string, number> = {}
+        const countryMap: Record<string, string> = {}
         for (const a of airports) {
           const offset = a.utcOffsetHours != null ? a.utcOffsetHours : a.timezone ? offsetFromTz(a.timezone) : null
-          if (offset == null) continue
-          if (a.icaoCode) map[a.icaoCode] = offset
-          if (a.iataCode) map[a.iataCode] = offset
+          if (offset != null) {
+            if (a.icaoCode) offsetMap[a.icaoCode] = offset
+            if (a.iataCode) offsetMap[a.iataCode] = offset
+          }
+          const country = a.countryIso2 ?? a.country ?? null
+          if (country) {
+            if (a.icaoCode) countryMap[a.icaoCode] = country
+            if (a.iataCode) countryMap[a.iataCode] = country
+          }
         }
-        setStationUtcOffsets(map)
+        setStationUtcOffsets(offsetMap)
+        setStationCountries(countryMap)
+        setPairingConfig(pairingCfg)
+        setHomeCountryIso2(op?.countryIso2 ?? null)
       })
       .catch((err) => {
         // Non-fatal — the UI shows "—" for complement counts when missing.
@@ -137,7 +161,15 @@ export function PairingTextShell() {
     return () => {
       cancelled = true
     }
-  }, [setComplements, setPositions, setStationUtcOffsets])
+  }, [
+    setComplements,
+    setPositions,
+    setStationUtcOffsets,
+    setStationCountries,
+    setPairingConfig,
+    setHomeCountryIso2,
+    setAircraftTypeFamilies,
+  ])
 
   return (
     <div className="h-full flex gap-3 p-3">

@@ -11,27 +11,6 @@ import {
 } from '@/components/filter-panel'
 import { usePairingFilterStore } from '@/stores/use-pairing-filter-store'
 import { usePairingStore } from '@/stores/use-pairing-store'
-import {
-  ALL_DURATIONS,
-  ALL_STATUS,
-  ALL_WORKFLOW,
-  type DurationFilterValue,
-  type PairingLegalityStatus,
-  type PairingWorkflowStatus,
-} from '../types'
-
-const STATUS_OPTIONS: MultiSelectOption[] = [
-  { key: 'legal', label: 'Legal', color: '#06C270' },
-  { key: 'warning', label: 'Warning', color: '#FF8800' },
-  { key: 'violation', label: 'Violation', color: '#FF3B3B' },
-]
-
-const WORKFLOW_OPTIONS: MultiSelectOption[] = [
-  { key: 'draft', label: 'Draft', color: '#3B82F6' },
-  { key: 'committed', label: 'Committed', color: '#06C270' },
-]
-
-const DURATION_OPTIONS: MultiSelectOption[] = ALL_DURATIONS.map((d) => ({ key: d, label: d.toUpperCase() }))
 
 // Seed values while ref-data fetches are not yet wired.
 const SEED_BASES: MultiSelectOption[] = [
@@ -76,17 +55,26 @@ export function PairingFilterPanel({ onGo }: PairingFilterPanelProps) {
 
   const baseKeys = useMemo(() => SEED_BASES.map((o) => o.key), [])
   const aircraftKeys = useMemo(() => SEED_AIRCRAFT.map((o) => o.key), [])
+  const positions = usePairingStore((s) => s.positions)
+  const positionOptions = useMemo<MultiSelectOption[]>(
+    () =>
+      [...positions]
+        .filter((p) => p.isActive)
+        .sort((a, b) => a.rankOrder - b.rankOrder)
+        .map((p) => ({ key: p.code, label: `${p.code} — ${p.name}`, color: p.color ?? undefined })),
+    [positions],
+  )
+  const positionKeys = useMemo(() => positionOptions.map((o) => o.key), [positionOptions])
 
   const selectedBases = draft.baseAirports ?? baseKeys
   const selectedAircraft = draft.aircraftTypes ?? aircraftKeys
+  const selectedPositions = draft.positionFilter ?? positionKeys
 
   const activeCount = mounted
     ? [draftFrom, draftTo].filter(Boolean).length +
       (draft.baseAirports !== null ? 1 : 0) +
       (draft.aircraftTypes !== null ? 1 : 0) +
-      (draft.statusFilter.length < ALL_STATUS.length ? 1 : 0) +
-      (draft.workflowFilter.length < ALL_WORKFLOW.length ? 1 : 0) +
-      (draft.durations.length > 0 ? 1 : 0)
+      (draft.positionFilter !== null && draft.positionFilter.length > 0 ? 1 : 0)
     : 0
 
   function handleGo() {
@@ -125,30 +113,16 @@ export function PairingFilterPanel({ onGo }: PairingFilterPanelProps) {
         />
       </FilterSection>
 
-      <FilterSection label="Pairing Status">
+      <FilterSection label="Position">
         <MultiSelectField
-          options={STATUS_OPTIONS}
-          value={draft.statusFilter as string[]}
-          onChange={(keys) => setDraftFilters({ statusFilter: keys as PairingLegalityStatus[] })}
-          allLabel="All Statuses"
-        />
-      </FilterSection>
-
-      <FilterSection label="Workflow">
-        <MultiSelectField
-          options={WORKFLOW_OPTIONS}
-          value={draft.workflowFilter as string[]}
-          onChange={(keys) => setDraftFilters({ workflowFilter: keys as PairingWorkflowStatus[] })}
-          allLabel="All Workflow"
-        />
-      </FilterSection>
-
-      <FilterSection label="Duration">
-        <MultiSelectField
-          options={DURATION_OPTIONS}
-          value={draft.durations as string[]}
-          onChange={(keys) => setDraftFilters({ durations: keys as DurationFilterValue[] })}
-          allLabel="Any length"
+          options={positionOptions}
+          value={selectedPositions}
+          onChange={(keys) =>
+            setDraftFilters({
+              positionFilter: keys.length === positionKeys.length || keys.length === 0 ? null : keys,
+            })
+          }
+          allLabel="All Positions"
         />
       </FilterSection>
     </FilterPanel>

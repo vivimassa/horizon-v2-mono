@@ -67,10 +67,6 @@ function getStatusStyle(status: string, isDark: boolean) {
   switch (status) {
     case 'active':
       return { bg: 'rgba(6,194,112,0.15)', color: '#06C270', text: 'Active' }
-    case 'draft':
-      return isDark
-        ? { bg: 'rgba(30,40,80,0.20)', color: '#1e3a5f', text: 'Draft' }
-        : { bg: 'rgba(255,136,0,0.15)', color: '#FF8800', text: 'Draft' }
     case 'suspended':
       return { bg: 'rgba(255,136,0,0.15)', color: '#FF8800', text: 'Suspended' }
     case 'cancelled':
@@ -129,9 +125,19 @@ interface FlightTooltipProps {
   flight: PairingFlight
   clientX: number
   clientY: number
+  /** Per-position required/actual/delta from computeFlightCoverage. Empty when master missing or flight uncovered. */
+  coverageDeltas?: Array<{ code: string; required: number; actual: number; delta: number }>
+  /** Overall coverage state — used for the color label on the Complement row. */
+  coverageState?: 'uncovered' | 'fully' | 'under' | 'over' | 'mixed'
 }
 
-export const FlightTooltip = memo(function FlightTooltip({ flight, clientX, clientY }: FlightTooltipProps) {
+export const FlightTooltip = memo(function FlightTooltip({
+  flight,
+  clientX,
+  clientY,
+  coverageDeltas,
+  coverageState,
+}: FlightTooltipProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const ref = useFollowCursor(clientX, clientY, true)
@@ -266,15 +272,43 @@ export const FlightTooltip = memo(function FlightTooltip({ flight, clientX, clie
               <span style={{ color: body }}>{flight.serviceType}</span>
             </div>
           )}
-          {flight.pairingId && (
-            <div className="flex justify-between">
-              <span style={{ color: muted }}>Pairing</span>
-              <span className="font-medium" style={{ color: '#06C270' }}>
-                Covered
-              </span>
-            </div>
-          )}
         </div>
+
+        {/* Crew complement coverage — "Fully covered" when every position's
+         *  delta is 0, otherwise per-position deltas (negative=under,
+         *  positive=over). Replaces the separate "Pairing: Covered" row —
+         *  coverage state is already implicit in the complement output. */}
+        {coverageDeltas && coverageDeltas.length > 0 && (
+          <div
+            className="flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-1.5 mt-1"
+            style={{ borderTop: `1px solid ${border}` }}
+          >
+            <span style={{ color: muted }}>Complement</span>
+            {coverageDeltas.every((d) => d.delta === 0) ? (
+              <span className="font-medium" style={{ color: '#06C270' }}>
+                Fully covered
+              </span>
+            ) : (
+              coverageDeltas.map((d) => {
+                const color = d.delta === 0 ? '#06C270' : d.delta < 0 ? '#FF3B3B' : '#6600CC'
+                const sign = d.delta > 0 ? '+' : ''
+                return (
+                  <span key={d.code} className="font-mono tabular-nums text-[12px]" style={{ color }}>
+                    {`${sign}${d.delta} ${d.code}`}
+                  </span>
+                )
+              })
+            )}
+          </div>
+        )}
+        {coverageState === 'uncovered' && flight.pairingId == null && (
+          <div className="flex items-center gap-2 pt-1.5 mt-1" style={{ borderTop: `1px solid ${border}` }}>
+            <span style={{ color: muted }}>Complement</span>
+            <span className="font-medium" style={{ color: '#FF3B3B' }}>
+              Uncovered
+            </span>
+          </div>
+        )}
       </div>
     </div>,
     document.body,
@@ -344,8 +378,11 @@ export const PairingTooltip = memo(function PairingTooltip({ pairing, clientX, c
 
   if (typeof document === 'undefined') return null
 
-  const status = getStatusStyle(pairing.status, isDark)
-  const workflow = pairing.workflowStatus === 'committed' ? 'COMMITTED' : 'DRAFT'
+  // Prefer live legality so soft rules (4.1.5.4 aircraft-change ground
+  // time) downgrade a stored 'legal' pairing to 'warning' in the tooltip.
+  const liveStatus =
+    legality.overallStatus === 'pass' ? 'legal' : legality.overallStatus === 'warning' ? 'warning' : 'violation'
+  const status = getStatusStyle(liveStatus, isDark)
 
   const bg = isDark ? 'rgba(244,244,245,0.92)' : 'rgba(24,24,27,0.88)'
   const border = isDark ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'
@@ -395,7 +432,7 @@ export const PairingTooltip = memo(function PairingTooltip({ pairing, clientX, c
             </span>
           )}
           <span className="text-[11px] font-medium tracking-wider uppercase shrink-0" style={{ color: muted }}>
-            {workflow} · {status.text}
+            {status.text}
           </span>
         </div>
         <div className="text-[11px] font-medium" style={{ color: muted }}>

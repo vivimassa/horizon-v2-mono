@@ -15,6 +15,8 @@ import {
   CalendarCheck,
   ChevronUp,
   ChevronDown,
+  Lightbulb,
+  CalendarDays,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
@@ -57,6 +59,10 @@ export function PairingGanttToolbar() {
   const setFullscreen = usePairingGanttStore((s) => s.setFullscreen)
   const buildMode = usePairingGanttStore((s) => s.buildMode)
   const setBuildMode = usePairingGanttStore((s) => s.setBuildMode)
+  const proposalEnabled = usePairingGanttStore((s) => s.proposalEnabled)
+  const toggleProposal = usePairingGanttStore((s) => s.toggleProposal)
+  const proposalDays = usePairingGanttStore((s) => s.proposalDays)
+  const setProposalDays = usePairingGanttStore((s) => s.setProposalDays)
   const showTat = usePairingGanttStore((s) => s.showTat)
   const toggleTat = usePairingGanttStore((s) => s.toggleTat)
   const centerTimebar = usePairingGanttStore((s) => s.centerTimebar)
@@ -101,6 +107,38 @@ export function PairingGanttToolbar() {
   const formatBtnCollapsedRef = useRef<HTMLButtonElement>(null)
   const formatDropRef = useRef<HTMLDivElement>(null)
   const [formatPos, setFormatPos] = useState({ top: 0, left: 0 })
+
+  // ── Proposal days popover ──
+  const [daysOpen, setDaysOpen] = useState(false)
+  const daysBtnRef = useRef<HTMLButtonElement>(null)
+  const daysBtnCollapsedRef = useRef<HTMLButtonElement>(null)
+  const daysDropRef = useRef<HTMLDivElement>(null)
+  const [daysPos, setDaysPos] = useState({ top: 0, left: 0 })
+
+  useEffect(() => {
+    if (!daysOpen) return
+    const source = collapsed ? daysBtnCollapsedRef.current : daysBtnRef.current
+    if (!source) return
+    const rect = source.getBoundingClientRect()
+    setDaysPos({ top: rect.bottom + 4, left: rect.left })
+  }, [daysOpen, collapsed])
+
+  useEffect(() => {
+    if (!daysOpen) return
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (
+        daysDropRef.current?.contains(target) ||
+        daysBtnRef.current?.contains(target) ||
+        daysBtnCollapsedRef.current?.contains(target)
+      ) {
+        return
+      }
+      setDaysOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [daysOpen])
 
   useEffect(() => {
     if (!formatOpen) return
@@ -193,11 +231,30 @@ export function PairingGanttToolbar() {
     },
     {
       icon: Route,
-      label: buildMode ? 'Cancel' : 'Build Pairing',
-      tooltip: buildMode ? 'Cancel pairing build' : 'Build a new pairing',
+      label: buildMode ? 'Build: ON' : 'Build: OFF',
+      tooltip: buildMode
+        ? 'Build mode enabled — click canvas flights to add to chain'
+        : 'Build mode disabled — click to enable',
       onClick: () => setBuildMode(!buildMode),
       active: buildMode,
       disabled: !periodCommitted,
+    },
+    {
+      icon: Lightbulb,
+      label: 'Proposal',
+      tooltip: proposalEnabled ? 'Hide next-leg proposals' : 'Highlight legal next-leg candidates',
+      onClick: toggleProposal,
+      active: proposalEnabled,
+      disabled: !buildMode,
+    },
+    {
+      icon: CalendarDays,
+      label: `Days (${proposalDays})`,
+      tooltip: 'Days ahead to search for next-leg candidates',
+      onClick: () => setDaysOpen((o) => !o),
+      active: daysOpen,
+      disabled: !buildMode || !proposalEnabled,
+      collapsedRef: daysBtnCollapsedRef,
     },
   ]
 
@@ -362,15 +419,57 @@ export function PairingGanttToolbar() {
           <RibbonSection label="Build">
             <RibbonBtn
               icon={Route}
-              label={buildMode ? 'Cancel' : 'Build Pairing'}
+              label={buildMode ? 'Build: ON' : 'Build: OFF'}
               onClick={() => setBuildMode(!buildMode)}
               disabled={!periodCommitted}
               active={buildMode}
               isDark={isDark}
               hoverBg={hoverBg}
               activeBg={activeBg}
-              tooltip={buildMode ? 'Cancel pairing build' : 'Build a new pairing'}
+              tooltip={
+                buildMode
+                  ? 'Build mode enabled — click canvas flights to add to chain'
+                  : 'Build mode disabled — click to enable'
+              }
             />
+            <div
+              className="flex items-center rounded-xl overflow-hidden"
+              style={{
+                border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)'}`,
+                background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.03)',
+              }}
+            >
+              <RibbonBtn
+                icon={Lightbulb}
+                label="Proposal"
+                onClick={toggleProposal}
+                disabled={!buildMode}
+                active={proposalEnabled}
+                isDark={isDark}
+                hoverBg={hoverBg}
+                activeBg={activeBg}
+                tooltip={proposalEnabled ? 'Hide next-leg proposals' : 'Highlight legal next-leg candidates'}
+              />
+              <div
+                style={{
+                  width: 1,
+                  alignSelf: 'stretch',
+                  background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                }}
+              />
+              <RibbonBtn
+                ref={daysBtnRef}
+                icon={CalendarDays}
+                label={`Days (${proposalDays})`}
+                onClick={() => setDaysOpen((o) => !o)}
+                disabled={!buildMode || !proposalEnabled}
+                active={daysOpen}
+                isDark={isDark}
+                hoverBg={hoverBg}
+                activeBg={activeBg}
+                tooltip="Days ahead to search for next-leg candidates"
+              />
+            </div>
           </RibbonSection>
 
           {/* Collapse chevron — top-right */}
@@ -437,6 +536,36 @@ export function PairingGanttToolbar() {
               minusDisabled={refreshIntervalMins <= 1}
               plusDisabled={refreshIntervalMins >= 59}
               value={`${refreshIntervalMins}m`}
+              panelBorder={panelBorder}
+              hoverBg={hoverBg}
+            />
+          </div>,
+          document.body,
+        )}
+
+      {/* ── Proposal days popover ── */}
+      {daysOpen &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={daysDropRef}
+            className="fixed z-[9999] rounded-xl p-3 select-none"
+            style={{
+              top: daysPos.top,
+              left: daysPos.left,
+              width: 200,
+              background: panelBg,
+              border: `1px solid ${panelBorder}`,
+              boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 32px rgba(96,97,112,0.14)',
+            }}
+          >
+            <Stepper
+              label="Days Ahead"
+              onMinus={() => setProposalDays(proposalDays - 1)}
+              onPlus={() => setProposalDays(proposalDays + 1)}
+              minusDisabled={proposalDays <= 1}
+              plusDisabled={proposalDays >= 7}
+              value={`${proposalDays}d`}
               panelBorder={panelBorder}
               hoverBg={hoverBg}
             />

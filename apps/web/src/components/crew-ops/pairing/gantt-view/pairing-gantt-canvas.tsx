@@ -29,8 +29,13 @@ import { PairingPillContextMenu } from './pairing-zone/pairing-pill-context-menu
 import { PairingDetailsDialog } from '../dialogs/pairing-details-dialog'
 import { useAssignedCrewForPairing } from '../use-assigned-crew'
 import { DeletePairingDialog } from '../dialogs/delete-pairing-dialog'
+import { ReplicatePairingDialog } from '../dialogs/replicate-pairing-dialog'
 import { FlightContextMenu } from './flight-context-menu'
 import { SearchPill } from './search-pill'
+import { computeFlightCoverage } from '@/lib/crew-coverage/compute-flight-coverage'
+import { coverageBarColor } from '@/lib/crew-coverage/coverage-colors'
+import { computeNextLegCandidates } from '@/lib/crew-coverage/compute-next-leg-candidates'
+import type { BarLayout } from '@/lib/gantt/types'
 
 const ROW_LABEL_W = 160
 
@@ -85,6 +90,11 @@ export function PairingGanttCanvas() {
 
   // Pairing workspace (shared period / pairings / inspected id)
   const pairings = usePairingStore((s) => s.pairings)
+  const complements = usePairingStore((s) => s.complements)
+  const aircraftTypeFamilies = usePairingStore((s) => s.aircraftTypeFamilies)
+  const activeComplementKey = usePairingStore((s) => s.activeComplementKey)
+  const pairingFlightPool = usePairingStore((s) => s.flights)
+  const positionFilter = usePairingStore((s) => s.filters.positionFilter)
   const baseAirports = usePairingStore((s) => s.filters.baseAirports)
   const inspectedPairingId = usePairingStore((s) => s.inspectedPairingId)
   const inspectPairing = usePairingStore((s) => s.inspectPairing)
@@ -108,6 +118,12 @@ export function PairingGanttCanvas() {
   const zoneHeightRatio = usePairingGanttStore((s) => s.zoneHeightRatio)
   const zoneFilter = usePairingGanttStore((s) => s.zoneFilter)
   const buildMode = usePairingGanttStore((s) => s.buildMode)
+  const setBuildMode = usePairingGanttStore((s) => s.setBuildMode)
+  const proposalEnabled = usePairingGanttStore((s) => s.proposalEnabled)
+  const proposalDays = usePairingGanttStore((s) => s.proposalDays)
+  const proposalCandidateIds = usePairingGanttStore((s) => s.proposalCandidateIds)
+  const setProposalCandidates = usePairingGanttStore((s) => s.setProposalCandidates)
+  const aircraftTypesForProposal = usePairingGanttStore((s) => s.aircraftTypes)
   const showTat = usePairingGanttStore((s) => s.showTat)
   const centerTimebar = usePairingGanttStore((s) => s.centerTimebar)
   const searchHighlight = usePairingGanttStore((s) => s.searchHighlight)
@@ -148,14 +164,127 @@ export function PairingGanttCanvas() {
     if (!layout || !pairings.length) return null
     const pph = computePixelsPerHour(containerWidth, zoomLevel)
     const startMs = dateToMs(periodFrom)
+    // Position filter: only pairings that carry ≥1 selected position count.
+    const scoped =
+      positionFilter && positionFilter.length > 0
+        ? pairings.filter((p) => {
+            const counts = p.crewCounts ?? {}
+            return positionFilter.some((code) => (counts[code] ?? 0) > 0)
+          })
+        : pairings
+    // Pin the inspected pairing to the front so it lands on lane 0
+    // ("top row" of the zone deck). "Show pairing" flow depends on this.
+    const sorted = inspectedPairingId
+      ? [...scoped].sort((a, b) => {
+          if (a.id === inspectedPairingId) return -1
+          if (b.id === inspectedPairingId) return 1
+          return 0
+        })
+      : scoped
     return layoutPairings({
-      pairings,
+      pairings: sorted,
       filter: zoneFilter,
       startMs,
       pph,
       baseAirports,
     })
-  }, [pairings, zoneFilter, periodFrom, containerWidth, zoomLevel, baseAirports, layout])
+  }, [
+    pairings,
+    zoneFilter,
+    periodFrom,
+    containerWidth,
+    zoomLevel,
+    baseAirports,
+    layout,
+    positionFilter,
+    inspectedPairingId,
+  ])
+
+  // Coverage-colored bars — pairing-page-only override of the shared layout's
+  // status/AC-type colors. Keeps `getBarColor` and other gantt pages untouched.
+  const coverageBars = useMemo<BarLayout[]>(() => {
+    if (!layout) return []
+    const poolById = new Map(pairingFlightPool.map((f) => [f.id, f]))
+    return layout.bars.map((bar) => {
+      const pf = poolById.get(bar.flightId)
+      const { state, augmented } = computeFlightCoverage({
+        flightId: bar.flightId,
+        aircraftTypeIcao: bar.flight.aircraftTypeIcao,
+        pairings,
+        complementMaster: complements,
+        positionFilter,
+        pairingIdHint: pf?.pairingId ?? null,
+      })
+      const { bg, text } = coverageBarColor(state, isDark)
+      if (selectedFlightIds.has(bar.flightId)) {
+        return { ...bar, color: '#FFCC00', textColor: '#1C1C28', augmented }
+      }
+      if (proposalCandidateIds.has(bar.flightId)) {
+        return { ...bar, color: '#FDDD48', textColor: '#E63535', augmented }
+      }
+      return { ...bar, color: bg, textColor: text, augmented }
+    })
+  }, [
+    layout,
+    pairings,
+    complements,
+    isDark,
+    selectedFlightIds,
+    proposalCandidateIds,
+    positionFilter,
+    pairingFlightPool,
+  ])
+
+  // Proposal: compute next-leg candidates, debounced so rapid chain edits
+  // batch into one update. NOTE: `proposalCandidateIds` is intentionally NOT
+  // in deps — the effect writes it, reading it would create an infinite loop.
+  // Screen position is preserved — no auto-scroll; user scrolls manually.
+  useEffect(() => {
+    const run = () => {
+      const currentIds = usePairingGanttStore.getState().proposalCandidateIds
+      if (!proposalEnabled || !buildMode) {
+        if (currentIds.size > 0) setProposalCandidates(new Set(), null)
+        return
+      }
+      const chain = Array.from(selectedFlightIds)
+        .map((id) => pairingFlightPool.find((f) => f.id === id))
+        .filter((f): f is NonNullable<typeof f> => !!f)
+        .sort((a, b) => Date.parse(a.stdUtc) - Date.parse(b.stdUtc))
+      if (chain.length === 0) {
+        if (currentIds.size > 0) setProposalCandidates(new Set(), null)
+        return
+      }
+      const fdpLimitMinutes =
+        activeComplementKey === 'aug2'
+          ? 900
+          : activeComplementKey === 'aug1'
+            ? 780
+            : activeComplementKey === 'custom'
+              ? 780
+              : 600
+      const { candidateIds, nearestRegistration } = computeNextLegCandidates({
+        chain,
+        pool: pairingFlightPool,
+        aircraftTypeFamilies,
+        aircraftTypes: aircraftTypesForProposal,
+        daysAhead: proposalDays,
+        fdpLimitMinutes,
+      })
+      setProposalCandidates(candidateIds, nearestRegistration)
+    }
+    const t = setTimeout(run, 120)
+    return () => clearTimeout(t)
+  }, [
+    proposalEnabled,
+    buildMode,
+    proposalDays,
+    selectedFlightIds,
+    pairingFlightPool,
+    aircraftTypeFamilies,
+    aircraftTypesForProposal,
+    activeComplementKey,
+    setProposalCandidates,
+  ])
 
   // ── Main grid draw (verbatim from Movement Control with swap/TAT/slot stripped) ──
   const draw = useCallback(() => {
@@ -176,7 +305,26 @@ export function PairingGanttCanvas() {
 
     drawGrid(ctx, layout.ticks, layout.rows, sx, sy, vw, vh, isDark, accentColor)
     drawGroupHeaders(ctx, layout.rows, sx, sy, vw, vh, isDark)
-    drawBars(ctx, layout.bars, selectedFlightIds, hoveredFlightId, sx, sy, vw, vh)
+    drawBars(ctx, coverageBars, selectedFlightIds, hoveredFlightId, sx, sy, vw, vh)
+
+    // Augmentation glyph — asterisk inset into each augmented bar's top-right.
+    const visR = sx + vw
+    const visB = sy + vh
+    ctx.save()
+    ctx.font = 'bold 12px Inter, system-ui, sans-serif'
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'top'
+    ctx.fillStyle = '#FFFFFF'
+    ctx.shadowColor = 'rgba(0,0,0,0.45)'
+    ctx.shadowBlur = 2
+    for (const bar of coverageBars) {
+      if (!bar.augmented) continue
+      if (bar.x + bar.width < sx || bar.x > visR) continue
+      if (bar.y + bar.height < sy || bar.y > visB) continue
+      ctx.fillText('*', bar.x + bar.width - 4, bar.y + 2)
+    }
+    ctx.restore()
+
     if (showTat) drawTatLabels(ctx, barsByRowRef.current, sx, sy, vw, vh, isDark)
     drawNightstopLabels(ctx, barsByRowRef.current, sx, sy, vw, vh, isDark)
 
@@ -203,6 +351,7 @@ export function PairingGanttCanvas() {
     ctx.restore()
   }, [
     layout,
+    coverageBars,
     selectedFlightIds,
     hoveredFlightId,
     isDark,
@@ -366,7 +515,7 @@ export function PairingGanttCanvas() {
     ctrlKey: boolean
     hitBarId: string | null
   } | null>(null)
-  const [rubberband, setRubberband] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  const rubberbandRef = useRef<HTMLDivElement>(null)
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -398,7 +547,14 @@ export function PairingGanttCanvas() {
           const ry = Math.min(dragRef.current.startY, y)
           const rw = Math.abs(x - dragRef.current.startX)
           const rh = Math.abs(y - dragRef.current.startY)
-          setRubberband({ x: rx, y: ry, w: rw, h: rh })
+          const rb = rubberbandRef.current
+          if (rb) {
+            rb.style.display = 'block'
+            rb.style.left = `${rx}px`
+            rb.style.top = `${ry}px`
+            rb.style.width = `${rw}px`
+            rb.style.height = `${rh}px`
+          }
         }
       }
 
@@ -422,39 +578,44 @@ export function PairingGanttCanvas() {
       if (!layout || e.button !== 0) return
       const drag = dragRef.current
       dragRef.current = null
-      setRubberband(null)
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
       const x = e.clientX - rect.left + scrollState.current.left
       const y = e.clientY - rect.top + scrollState.current.top
 
+      if (rubberbandRef.current) rubberbandRef.current.style.display = 'none'
       if (drag?.dragging) {
-        // Rubberband — select all bars within the rectangle
+        // Rubberband — bars within the rectangle.
+        // Build mode: UNION with existing chain so a partial drag extends it.
+        // Otherwise: replace viewport selection.
         const rx = Math.min(drag.startX, x)
         const ry = Math.min(drag.startY, y)
         const rw = Math.abs(x - drag.startX)
         const rh = Math.abs(y - drag.startY)
-        const selected = new Set<string>()
+        const hit = new Set<string>()
         for (const bar of layout.bars) {
           const barRight = bar.x + bar.width
           const barBottom = bar.y + bar.height
           if (bar.x < rx + rw && barRight > rx && bar.y < ry + rh && barBottom > ry) {
-            selected.add(bar.flightId)
+            hit.add(bar.flightId)
           }
         }
-        if (selected.size > 0) usePairingGanttStore.setState({ selectedFlightIds: selected })
+        if (hit.size > 0) {
+          if (buildMode) {
+            const current = usePairingGanttStore.getState().selectedFlightIds
+            const merged = new Set(current)
+            for (const id of hit) merged.add(id)
+            usePairingGanttStore.setState({ selectedFlightIds: merged })
+          } else {
+            usePairingGanttStore.setState({ selectedFlightIds: hit })
+          }
+        }
       } else {
-        // Simple click
+        // Simple click — AIMS-style: inspect/select only, never touches chain.
+        // Chain edits happen exclusively via double-click.
+        if (buildMode) return
         const hit = hitTestBars(x, y, layout.bars)
         if (hit) {
-          // Build mode: clicks add/toggle chain membership, no modifier key needed.
-          if (buildMode) {
-            const flight = flights.find((f) => f.id === hit)
-            if (!flight) return
-            selectFlight(hit, true)
-            return
-          }
           selectFlight(hit, drag?.ctrlKey ?? false)
-          // If the clicked flight is already in a pairing, surface it in the inspector.
           const flight = flights.find((f) => f.id === hit)
           const pairing = pairings.find((p) => p.flightIds.includes(hit))
           if (flight && pairing) inspectPairing(pairing.id)
@@ -467,10 +628,52 @@ export function PairingGanttCanvas() {
     [layout, buildMode, flights, pairings, selectFlight, clearSelection, inspectPairing, inspectedPairingId],
   )
 
+  // Double-click a flight bar — AIMS-style pairing construction.
+  //   • Chain empty → enable build mode, seed first leg.
+  //   • Chain non-empty → toggle this flight's chain membership (add / remove).
+  const handleDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!layout) return
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      const x = e.clientX - rect.left + scrollState.current.left
+      const y = e.clientY - rect.top + scrollState.current.top
+      const hit = hitTestBars(x, y, layout.bars)
+      if (!hit) return
+      e.preventDefault()
+      const store = usePairingGanttStore.getState()
+      if (!store.buildMode) store.setBuildMode(true)
+      // `selectFlight(id, true)` toggles membership when multi=true.
+      store.selectFlight(hit, true)
+    },
+    [layout],
+  )
+
   // ── Context menus ──
   const [flightCtxMenu, setFlightCtxMenu] = useState<{ x: number; y: number; flightId: string } | null>(null)
   const [pairingCtxMenu, setPairingCtxMenu] = useState<{ x: number; y: number; pairingId: string } | null>(null)
   const [detailsPairingId, setDetailsPairingId] = useState<string | null>(null)
+  const [replicatePairingId, setReplicatePairingId] = useState<string | null>(null)
+
+  // Seed build-mode state from a pairing so the planner can re-edit its legs
+  // and complement. Persists `editingPairingId` so the save handler PATCHes
+  // instead of POSTs.
+  const startEditPairing = useCallback((pairingId: string) => {
+    const ps = usePairingStore.getState()
+    const pairing = ps.pairings.find((p) => p.id === pairingId)
+    if (!pairing) return
+    const sortedLegs = [...pairing.legs].sort((a, b) => a.legOrder - b.legOrder)
+    const operatingIds = new Set(sortedLegs.filter((l) => !l.isDeadhead).map((l) => l.flightId))
+    const gantt = usePairingGanttStore.getState()
+    if (!gantt.buildMode) gantt.setBuildMode(true)
+    usePairingGanttStore.setState({ selectedFlightIds: operatingIds })
+    const key = pairing.complementKey as 'standard' | 'aug1' | 'aug2' | 'custom'
+    ps.setComplement(key === 'standard' || key === 'aug1' || key === 'aug2' || key === 'custom' ? key : 'standard')
+    if (pairing.crewCounts) ps.setCustomCrewCounts(pairing.crewCounts)
+    // Order matters: `inspectPairing(null)` nulls out `editingPairingId`
+    // in the store, so set the edit target AFTER clearing inspect state.
+    ps.inspectPairing(null)
+    ps.setEditingPairing(pairingId)
+  }, [])
   const [pendingDelete, setPendingDelete] = useState<{
     id: string
     pairingCode: string
@@ -488,6 +691,31 @@ export function PairingGanttCanvas() {
         if (!id) return
         e.preventDefault()
         setDetailsPairingId(id)
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'e' || e.key === 'E')) {
+        const id = usePairingStore.getState().inspectedPairingId
+        if (!id) return
+        e.preventDefault()
+        startEditPairing(id)
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R')) {
+        const id = usePairingStore.getState().inspectedPairingId
+        if (!id) return
+        e.preventDefault()
+        setReplicatePairingId(id)
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
+        const hovered = usePairingGanttStore.getState().hoveredFlightId
+        if (!hovered) return
+        const store = usePairingStore.getState()
+        const pf = store.flights.find((fl) => fl.id === hovered)
+        if (!pf) return
+        const covering = store.pairings.find(
+          (p) => (p.flightIds.includes(pf.id) || p.id === pf.pairingId) && !p.deadheadFlightIds.includes(pf.id),
+        )
+        if (!covering) return
+        e.preventDefault()
+        store.inspectPairing(covering.id)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -532,9 +760,27 @@ export function PairingGanttCanvas() {
       const localX = e.clientX - rect.left + scrollState.current.left
       const localY = e.clientY - rect.top + zoneScrollState.current.top
       const hit = hitTestPairingPill(localX, localY, zoneLayout.packed, 6, pairingPillHeight, pairingLaneHeight)
-      if (hit) inspectPairing(inspectedPairingId === hit.pairingId ? null : hit.pairingId)
+      if (!hit) return
+      // Left-click on a committed pairing pill always shows it in the
+      // inspector. If build mode is on (Inspector showing the blank chain),
+      // exit build + clear any in-progress selection so the pairing view
+      // takes over the panel.
+      if (buildMode) {
+        setBuildMode(false)
+        clearSelection()
+      }
+      inspectPairing(inspectedPairingId === hit.pairingId ? null : hit.pairingId)
     },
-    [zoneLayout, inspectedPairingId, inspectPairing, pairingPillHeight, pairingLaneHeight],
+    [
+      zoneLayout,
+      inspectedPairingId,
+      inspectPairing,
+      pairingPillHeight,
+      pairingLaneHeight,
+      buildMode,
+      setBuildMode,
+      clearSelection,
+    ],
   )
 
   const handleZoneContextMenu = useCallback(
@@ -663,7 +909,7 @@ export function PairingGanttCanvas() {
       drawRef.current()
       drawZoneRef.current()
     })
-  }, [layout, selectedFlightIds, isDark, zoneLayout, zoneHeightPx, inspectedPairingId])
+  }, [layout, coverageBars, selectedFlightIds, isDark, zoneLayout, zoneHeightPx, inspectedPairingId])
 
   // Now-line timer (every minute)
   useEffect(() => {
@@ -913,25 +1159,22 @@ export function PairingGanttCanvas() {
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMoveDrag}
             onMouseUp={handleMouseUp}
+            onDoubleClick={handleDoubleClick}
             onMouseLeave={() => setHovered(null)}
             onContextMenu={handleContextMenu}
           >
             <div style={{ width: totalWidth, height: totalHeight }} />
-            {rubberband && (
-              <div
-                className="absolute pointer-events-none"
-                style={{
-                  left: rubberband.x,
-                  top: rubberband.y,
-                  width: rubberband.w,
-                  height: rubberband.h,
-                  background: 'rgba(30,64,175,0.08)',
-                  border: '2px solid rgba(30,64,175,0.35)',
-                  borderRadius: 2,
-                  zIndex: 2,
-                }}
-              />
-            )}
+            <div
+              ref={rubberbandRef}
+              className="absolute pointer-events-none"
+              style={{
+                display: 'none',
+                background: 'rgba(30,64,175,0.08)',
+                border: '2px solid rgba(30,64,175,0.35)',
+                borderRadius: 2,
+                zIndex: 2,
+              }}
+            />
           </div>
         </div>
       </div>
@@ -996,6 +1239,8 @@ export function PairingGanttCanvas() {
           pairingId={pairingCtxMenu.pairingId}
           onClose={() => setPairingCtxMenu(null)}
           onShowDetails={(id) => setDetailsPairingId(id)}
+          onReplicate={(id) => setReplicatePairingId(id)}
+          onEdit={(id) => startEditPairing(id)}
           onRequestDelete={(id) => {
             const p = pairings.find((x) => x.id === id)
             if (!p) return
@@ -1008,6 +1253,13 @@ export function PairingGanttCanvas() {
           }}
         />
       )}
+
+      {replicatePairingId &&
+        (() => {
+          const p = pairings.find((x) => x.id === replicatePairingId)
+          if (!p) return null
+          return <ReplicatePairingDialog source={p} onClose={() => setReplicatePairingId(null)} />
+        })()}
 
       {detailsPairingId &&
         (() => {
@@ -1061,9 +1313,32 @@ function FlightTooltipWrapper({
   mousePosRef: React.MutableRefObject<{ x: number; y: number }>
 }) {
   const flights = usePairingStore((s) => s.flights)
+  const pairings = usePairingStore((s) => s.pairings)
+  const complements = usePairingStore((s) => s.complements)
+  const positions = usePairingStore((s) => s.positions)
+  const positionFilter = usePairingStore((s) => s.filters.positionFilter)
   const f = flightId ? (flights.find((fl) => fl.id === flightId) ?? null) : null
   if (!f) return null
-  return <FlightTooltip flight={f} clientX={mousePosRef.current.x} clientY={mousePosRef.current.y} />
+  const { state, deltas } = computeFlightCoverage({
+    flightId: f.id,
+    aircraftTypeIcao: f.aircraftType || null,
+    pairings,
+    complementMaster: complements,
+    positionFilter,
+    pairingIdHint: f.pairingId ?? null,
+  })
+  // Order deltas by crew-position rankOrder so the row reads CP → FO → PU → FA.
+  const order = new Map(positions.map((p) => [p.code, p.rankOrder]))
+  const sortedDeltas = [...deltas].sort((a, b) => (order.get(a.code) ?? 999) - (order.get(b.code) ?? 999))
+  return (
+    <FlightTooltip
+      flight={f}
+      clientX={mousePosRef.current.x}
+      clientY={mousePosRef.current.y}
+      coverageState={state}
+      coverageDeltas={sortedDeltas}
+    />
+  )
 }
 
 function PairingTooltipWrapper({

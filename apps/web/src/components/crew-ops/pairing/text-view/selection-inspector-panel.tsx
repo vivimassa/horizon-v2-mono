@@ -1,17 +1,19 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, FileText, CheckCircle2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { api, type PairingCreateInput } from '@skyhub/api'
 import { useTheme } from '@/components/theme-provider'
 import { usePairingStore, resolveComplementCounts } from '@/stores/use-pairing-store'
 import { useFlightGridSelection } from '@/stores/use-flight-grid-selection'
 import { PairingStatusBadge } from '../shared/pairing-status-badge'
-import type { LegalityResult, PairingFlight, PairingWorkflowStatus } from '../types'
+import type { LegalityResult, PairingFlight } from '../types'
 import { usePairingLegality } from '../use-pairing-legality'
 import { pairingFromApi } from '../adapters'
 import { IllegalPairingDialog } from '../dialogs/illegal-pairing-dialog'
 import { MAX_PAIRING_DAYS, OversizedPairingDialog } from '../dialogs/oversized-pairing-dialog'
+import { CrossFamilyPairingDialog } from '../dialogs/cross-family-pairing-dialog'
+import { validateCrossFamily, type CrossFamilyConflict } from '@/lib/crew-coverage/validate-cross-family'
 import {
   ACCENT,
   SectionHeader,
@@ -27,8 +29,8 @@ const LAYOVER_THRESHOLD_MIN = 24 * 60 // ≥24h gap between legs = overnight lay
 /**
  * Inspector variant that renders whenever the user has flights selected on the
  * Flight Pool grid. Shows a red banner on violation (loud, V1-style), a live
- * leg list + FDTL checks, and the Draft / Final CTAs. This panel OWNS the
- * save flow + the illegal/oversized confirmation dialogs — the grid dispatches
+ * leg list + FDTL checks, and a single Create CTA. This panel OWNS the save
+ * flow + the illegal/oversized confirmation dialogs — the grid dispatches
  * intent via `requestCreatePairing` and we run it here.
  */
 export function SelectionInspectorPanel() {
@@ -39,6 +41,10 @@ export function SelectionInspectorPanel() {
   const setComplement = usePairingStore((s) => s.setComplement)
   const flights = usePairingStore((s) => s.flights)
   const complements = usePairingStore((s) => s.complements)
+  const positions = usePairingStore((s) => s.positions)
+  const customCrewCounts = usePairingStore((s) => s.customCrewCounts)
+  const setCustomCrewCounts = usePairingStore((s) => s.setCustomCrewCounts)
+  const aircraftTypeFamilies = usePairingStore((s) => s.aircraftTypeFamilies)
   const addPairing = usePairingStore((s) => s.addPairing)
   const inspectPairing = usePairingStore((s) => s.inspectPairing)
   const setError = usePairingStore((s) => s.setError)
@@ -72,21 +78,19 @@ export function SelectionInspectorPanel() {
   // ── Save flow (moved here from FlightPoolPanel) ──────────────────────
   const [pending, setPending] = useState<{
     flightIds: string[]
-    workflow: PairingWorkflowStatus
-    workflowLabel: 'Draft' | 'Final'
     result: LegalityResult
   } | null>(null)
+  const [crossFamilyConflict, setCrossFamilyConflict] = useState<CrossFamilyConflict | null>(null)
   const [oversized, setOversized] = useState<{
     flightIds: string[]
-    workflow: PairingWorkflowStatus
-    workflowLabel: 'Draft' | 'Final'
     spanDays: number
     flightCount: number
   } | null>(null)
   const [saving, setSaving] = useState(false)
 
   const savePairing = useCallback(
-    async (flightIds: string[], workflow: PairingWorkflowStatus, legality: LegalityResult) => {
+    async (flightIds: string[], legality: LegalityResult) => {
+      const workflow = 'committed' as const
       if (saving) return
       setSaving(true)
       setError(null)
@@ -109,13 +113,29 @@ export function SelectionInspectorPanel() {
           tailNumber: f.tailNumber ?? null,
         }))
         const aircraftTypeIcao = selected[0].aircraftType || null
-        const crewCounts = resolveComplementCounts(complements, aircraftTypeIcao, activeComplementKey)
+        const crewCounts =
+          activeComplementKey === 'custom'
+            ? customCrewCounts
+            : resolveComplementCounts(complements, aircraftTypeIcao, activeComplementKey)
+        const cockpitCount =
+          activeComplementKey === 'custom'
+            ? (() => {
+                const codes = new Set(positions.filter((p) => p.category === 'cockpit').map((p) => p.code))
+                return Object.entries(customCrewCounts)
+                  .filter(([code]) => codes.has(code))
+                  .reduce((s, [, n]) => s + (n || 0), 0)
+              })()
+            : activeComplementKey === 'aug2'
+              ? 4
+              : activeComplementKey === 'aug1'
+                ? 3
+                : 2
         const created = await api.createPairing({
           pairingCode: generatePairingCode(selected),
           baseAirport: selected[0].departureAirport,
           aircraftTypeIcao,
           complementKey: activeComplementKey,
-          cockpitCount: activeComplementKey === 'aug2' ? 4 : activeComplementKey === 'aug1' ? 3 : 2,
+          cockpitCount,
           crewCounts,
           legs,
           fdtlStatus:
@@ -137,22 +157,39 @@ export function SelectionInspectorPanel() {
         setSaving(false)
       }
     },
-    [activeComplementKey, addPairing, clearAll, complements, flights, inspectPairing, saving, setError],
+    [
+      activeComplementKey,
+      addPairing,
+      clearAll,
+      complements,
+      customCrewCounts,
+      flights,
+      inspectPairing,
+      positions,
+      saving,
+      setError,
+    ],
   )
 
   const proceedToLegalityCheck = useCallback(
-    (flightIds: string[], workflow: PairingWorkflowStatus, label: 'Draft' | 'Final') => {
-      if (result.overallStatus === 'violation') {
-        setPending({ flightIds, workflow, workflowLabel: label, result })
+    (flightIds: string[]) => {
+      const selected = flightIds.map((id) => flights.find((f) => f.id === id)).filter((f): f is PairingFlight => !!f)
+      const fam = validateCrossFamily(selected, aircraftTypeFamilies)
+      if (!fam.ok && fam.conflict) {
+        setCrossFamilyConflict(fam.conflict)
         return
       }
-      void savePairing(flightIds, workflow, result)
+      if (result.overallStatus === 'violation') {
+        setPending({ flightIds, result })
+        return
+      }
+      void savePairing(flightIds, result)
     },
-    [result, savePairing],
+    [result, savePairing, flights, aircraftTypeFamilies],
   )
 
   const handleCreate = useCallback(
-    (flightIds: string[], workflow: PairingWorkflowStatus, label: 'Draft' | 'Final') => {
+    (flightIds: string[]) => {
       if (flightIds.length === 0 || saving) return
       const uniqueDates = new Set(
         flightIds.map((id) => flights.find((f) => f.id === id)?.instanceDate).filter(Boolean) as string[],
@@ -160,14 +197,12 @@ export function SelectionInspectorPanel() {
       if (uniqueDates.size > MAX_PAIRING_DAYS) {
         setOversized({
           flightIds,
-          workflow,
-          workflowLabel: label,
           spanDays: uniqueDates.size,
           flightCount: flightIds.length,
         })
         return
       }
-      proceedToLegalityCheck(flightIds, workflow, label)
+      proceedToLegalityCheck(flightIds)
     },
     [flights, proceedToLegalityCheck, saving],
   )
@@ -176,9 +211,9 @@ export function SelectionInspectorPanel() {
   // the same handleCreate so guards + dialogs stay in one place.
   useEffect(() => {
     if (!pendingCreateRequest) return
-    const { ids, workflow, label } = pendingCreateRequest
+    const { ids } = pendingCreateRequest
     clearCreateRequest()
-    handleCreate(ids, workflow, label)
+    handleCreate(ids)
   }, [pendingCreateRequest, clearCreateRequest, handleCreate])
 
   const selectedIds = useMemo(() => selectedFlights.map((f) => f.id), [selectedFlights])
@@ -227,7 +262,7 @@ export function SelectionInspectorPanel() {
             />
           </div>
           <p className="text-[11px] mt-0.5" style={{ color: textTertiary }}>
-            Live FDTL check. Use the Draft or Final button below to create.
+            Live FDTL check. Use the Create button below to save.
             {usingMock && <span className="ml-1 italic">(preview — FDTL not yet configured)</span>}
           </p>
         </div>
@@ -250,6 +285,14 @@ export function SelectionInspectorPanel() {
       <div className="flex-1 min-h-0 overflow-auto px-4 py-3 space-y-4">
         <SectionHeader title="Complement" isDark={isDark} />
         <ComplementSelector value={activeComplementKey} onChange={setComplement} isDark={isDark} />
+        {activeComplementKey === 'custom' && (
+          <CustomComplementRows
+            counts={customCrewCounts}
+            positions={positions}
+            onChange={setCustomCrewCounts}
+            isDark={isDark}
+          />
+        )}
 
         <SectionHeader title={`Selected flights (${selectedFlights.length})`} isDark={isDark} />
         <div className="space-y-1">
@@ -274,22 +317,13 @@ export function SelectionInspectorPanel() {
         <LegalityChecks result={result} isDark={isDark} />
       </div>
 
-      {/* Footer CTAs — faint-orange Draft + faint-green Final */}
+      {/* Footer CTA — single Create button (drafts removed) */}
       <div className="shrink-0 px-4 py-3 flex items-center gap-2" style={{ borderTop: `1px solid ${divider}` }}>
         <CtaButton
-          label={saving ? 'Saving…' : 'Create as Draft'}
-          icon={<FileText size={14} strokeWidth={2.2} />}
-          tone="draft"
-          disabled={!canCreate}
-          onClick={() => handleCreate(selectedIds, 'draft', 'Draft')}
-          isDark={isDark}
-        />
-        <CtaButton
-          label={saving ? 'Saving…' : 'Create as Final'}
+          label={saving ? 'Saving…' : 'Create'}
           icon={<CheckCircle2 size={14} strokeWidth={2.2} />}
-          tone="final"
           disabled={!canCreate}
-          onClick={() => handleCreate(selectedIds, 'committed', 'Final')}
+          onClick={() => handleCreate(selectedIds)}
           isDark={isDark}
         />
       </div>
@@ -299,24 +333,26 @@ export function SelectionInspectorPanel() {
           spanDays={oversized.spanDays}
           flightCount={oversized.flightCount}
           maxDays={MAX_PAIRING_DAYS}
-          workflowLabel={oversized.workflowLabel}
           onProceed={() => {
             const snap = oversized
             setOversized(null)
-            proceedToLegalityCheck(snap.flightIds, snap.workflow, snap.workflowLabel)
+            proceedToLegalityCheck(snap.flightIds)
           }}
           onCancel={() => setOversized(null)}
         />
       )}
 
+      {crossFamilyConflict && (
+        <CrossFamilyPairingDialog conflict={crossFamilyConflict} onClose={() => setCrossFamilyConflict(null)} />
+      )}
+
       {pending && (
         <IllegalPairingDialog
           result={pending.result}
-          workflowLabel={pending.workflowLabel}
           onProceed={async () => {
             const snap = pending
             setPending(null)
-            await savePairing(snap.flightIds, snap.workflow, snap.result)
+            await savePairing(snap.flightIds, snap.result)
           }}
           onCancel={() => setPending(null)}
         />
@@ -328,22 +364,20 @@ export function SelectionInspectorPanel() {
 function CtaButton({
   label,
   icon,
-  tone,
   disabled,
   onClick,
   isDark,
 }: {
   label: string
   icon: React.ReactNode
-  tone: 'draft' | 'final'
   disabled?: boolean
   onClick: () => void
   isDark: boolean
 }) {
-  // Faint-orange for Draft (WIP) · Faint-green for Final (committed). Uses
-  // XD semantic colours at ~15% fill + 35% border so the CTA reads as an
-  // action without competing with the red violation banner when present.
-  const colour = tone === 'draft' ? '#FF8800' : '#06C270'
+  // Faint-green Create CTA. Uses XD semantic colour at ~15% fill + 35% border
+  // so the CTA reads as an action without competing with the red violation
+  // banner when present.
+  const colour = '#06C270'
   const bg = isDark ? `${colour}26` : `${colour}1F` // 15%/12% alpha
   const border = `${colour}59` // ~35% alpha
   return (
@@ -361,6 +395,81 @@ function CtaButton({
       {icon}
       {label}
     </button>
+  )
+}
+
+function CustomComplementRows({
+  counts,
+  positions,
+  onChange,
+  isDark,
+}: {
+  counts: Record<string, number>
+  positions: import('@skyhub/api').CrewPositionRef[]
+  onChange: (next: Record<string, number>) => void
+  isDark: boolean
+}) {
+  const active = positions.filter((p) => p.isActive).sort((a, b) => a.rankOrder - b.rankOrder)
+  const bump = (code: string, delta: number) => {
+    const current = counts[code] ?? 0
+    const next = Math.max(0, Math.min(99, current + delta))
+    onChange({ ...counts, [code]: next })
+  }
+  const divider = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)'
+  const rowBg = isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)'
+  const stepperBtn = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)'
+  const textSecondary = isDark ? 'rgba(255,255,255,0.65)' : 'rgba(71,85,105,0.85)'
+  const textTertiary = isDark ? 'rgba(255,255,255,0.38)' : 'rgba(100,116,139,0.65)'
+  const textPrimary = isDark ? '#F5F2FD' : '#1C1C28'
+  return (
+    <div className="rounded-lg p-2 space-y-1" style={{ border: `1px solid ${divider}`, background: rowBg }}>
+      <div className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: textTertiary }}>
+        Positions
+      </div>
+      {active.length === 0 ? (
+        <div className="text-[12px] italic px-1 py-1" style={{ color: textTertiary }}>
+          No crew positions configured.
+        </div>
+      ) : (
+        active.map((p) => {
+          const n = counts[p.code] ?? 0
+          return (
+            <div key={p.code} className="flex items-center gap-2 py-0.5">
+              <span className="w-10 text-[12px] font-mono font-bold" style={{ color: textSecondary }}>
+                {p.code}
+              </span>
+              <span className="flex-1 text-[12px] truncate" style={{ color: textSecondary }}>
+                {p.name}
+              </span>
+              <button
+                type="button"
+                onClick={() => bump(p.code, -1)}
+                disabled={n <= 0}
+                className="w-6 h-6 flex items-center justify-center rounded-md text-[13px] font-bold disabled:opacity-30"
+                style={{ background: stepperBtn, color: textSecondary }}
+              >
+                −
+              </button>
+              <span
+                className="w-6 text-center text-[13px] font-mono font-bold tabular-nums"
+                style={{ color: textPrimary }}
+              >
+                {n}
+              </span>
+              <button
+                type="button"
+                onClick={() => bump(p.code, 1)}
+                disabled={n >= 99}
+                className="w-6 h-6 flex items-center justify-center rounded-md text-[13px] font-bold disabled:opacity-30"
+                style={{ background: stepperBtn, color: textSecondary }}
+              >
+                +
+              </button>
+            </div>
+          )
+        })
+      )}
+    </div>
   )
 }
 

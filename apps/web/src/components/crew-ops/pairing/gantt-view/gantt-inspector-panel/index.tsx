@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   PanelRightOpen,
   PanelRightClose,
@@ -25,6 +25,8 @@ import { pairingFromApi } from '../../adapters'
 import { InspectPairingPanel } from '../../text-view/inspect-pairing-panel'
 import { IllegalPairingDialog } from '../../dialogs/illegal-pairing-dialog'
 import { DeletePairingDialog } from '../../dialogs/delete-pairing-dialog'
+import { CrossFamilyPairingDialog } from '../../dialogs/cross-family-pairing-dialog'
+import { validateCrossFamily, type CrossFamilyConflict } from '@/lib/crew-coverage/validate-cross-family'
 import {
   ACCENT as INSPECTOR_ACCENT,
   SectionHeader as InspectorSectionHeader,
@@ -35,7 +37,7 @@ import {
 } from '../../text-view/inspector-helpers'
 
 const LAYOVER_THRESHOLD_MIN = 24 * 60
-import type { PairingFlight, LegalityResult, PairingWorkflowStatus } from '../../types'
+import type { PairingFlight, LegalityResult } from '../../types'
 
 interface InspectorProps {
   open: boolean
@@ -61,20 +63,27 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
   const inspectedPairingId = usePairingStore((s) => s.inspectedPairingId)
   const inspectPairing = usePairingStore((s) => s.inspectPairing)
   const addPairing = usePairingStore((s) => s.addPairing)
+  const replacePairing = usePairingStore((s) => s.replacePairing)
   const setError = usePairingStore((s) => s.setError)
+  const editingPairingId = usePairingStore((s) => s.editingPairingId)
+  const setEditingPairing = usePairingStore((s) => s.setEditingPairing)
   const activeComplementKey = usePairingStore((s) => s.activeComplementKey)
   const setComplement = usePairingStore((s) => s.setComplement)
+  const customCrewCounts = usePairingStore((s) => s.customCrewCounts)
+  const setCustomCrewCounts = usePairingStore((s) => s.setCustomCrewCounts)
+  const aircraftTypeFamilies = usePairingStore((s) => s.aircraftTypeFamilies)
+  const positionFilter = usePairingStore((s) => s.filters.positionFilter)
 
   const selectedFlightIds = usePairingGanttStore((s) => s.selectedFlightIds)
   const clearSelection = usePairingGanttStore((s) => s.clearSelection)
   const buildMode = usePairingGanttStore((s) => s.buildMode)
   const setBuildMode = usePairingGanttStore((s) => s.setBuildMode)
   const [saving, setSaving] = useState(false)
-  // When the planner clicks Create on a violating chain we stash the intent
-  // here (including the workflow the keystroke requested) so the
-  // IllegalPairingDialog can surface the specific rule failures and ask for
-  // an override. `null` dismisses the dialog.
-  const [pendingIllegal, setPendingIllegal] = useState<PairingWorkflowStatus | null>(null)
+  // When the planner clicks Create on a violating chain we stash a flag so
+  // the IllegalPairingDialog can surface the specific rule failures and ask
+  // for an override. `false` dismisses the dialog.
+  const [pendingIllegal, setPendingIllegal] = useState<boolean>(false)
+  const [crossFamilyConflict, setCrossFamilyConflict] = useState<CrossFamilyConflict | null>(null)
   const [pendingDelete, setPendingDelete] = useState<{
     id: string
     pairingCode: string
@@ -103,33 +112,83 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
     [pairings, inspectedPairingId],
   )
 
+  // Auto-set custom complement when Position filter is active + chain has an
+  // aircraft type. Sums required counts from the standard CrewComplement
+  // template for the selected positions; overwrites any prior custom edits
+  // (per user spec: simple, predictable).
+  useEffect(() => {
+    if (!buildMode) return
+    if (!positionFilter || positionFilter.length === 0) return
+    const icao = selectedBuildFlights[0]?.aircraftType ?? null
+    if (!icao) return
+    const template = resolveComplementCounts(complements, icao, 'standard')
+    const counts: Record<string, number> = {}
+    for (const code of positionFilter) {
+      const req = template?.[code]
+      if (typeof req === 'number' && req > 0) counts[code] = req
+      else counts[code] = 1
+    }
+    setCustomCrewCounts(counts)
+    if (activeComplementKey !== 'custom') setComplement('custom')
+    // Intentionally exclude `activeComplementKey` / `customCrewCounts` from deps
+    // to avoid a loop — we only fire on filter / chain-AC / buildMode changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [positionFilter, buildMode, selectedBuildFlights[0]?.aircraftType, complements])
+
+  // Debounce the flight chain before running legality so rapid clicks / drag
+  // commits don't block the UI with back-to-back FDTL engine runs. 150ms is
+  // imperceptible to planners but batches bursts of double-clicks into one pass.
+  const [debouncedBuildFlights, setDebouncedBuildFlights] = useState<PairingFlight[]>([])
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useLayoutEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!buildMode || selectedBuildFlights.length === 0) {
+      setDebouncedBuildFlights([])
+      return
+    }
+    debounceRef.current = setTimeout(() => {
+      setDebouncedBuildFlights(selectedBuildFlights)
+    }, 150)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+    // selectedBuildFlights array ref changes each render; compare by stable IDs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buildMode, selectedFlightIds])
+
   // Live FDTL legality for the build-mode chain. `usePairingLegality` uses
   // the real engine when the operator has an FDTL rule set loaded, and falls
   // back to a realistic mock so the UI stays usable in dev.
-  const { result: liveLegality, usingMock: legalityUsingMock } = usePairingLegality(
-    buildMode ? selectedBuildFlights : [],
-    {
-      complementKey: activeComplementKey,
-      facilityClass: activeComplementKey === 'standard' ? undefined : 'CLASS_1',
-      homeBase: selectedBuildFlights[0]?.departureAirport,
-    },
-  )
+  const { result: liveLegality, usingMock: legalityUsingMock } = usePairingLegality(debouncedBuildFlights, {
+    complementKey: activeComplementKey,
+    facilityClass: activeComplementKey === 'standard' ? undefined : 'CLASS_1',
+    homeBase: debouncedBuildFlights[0]?.departureAirport,
+  })
 
-  /** Persist the pairing in the requested workflow state. If `override` is
-   *  false and the chain has any FDTL violation we short-circuit and surface
-   *  the IllegalPairingDialog (matching the Text workspace flow). */
+  /** Persist the pairing as committed. If `override` is false and the chain
+   *  has any FDTL violation we short-circuit and surface the
+   *  IllegalPairingDialog (matching the Text workspace flow). */
   const handleCreatePairing = useCallback(
-    async (workflow: PairingWorkflowStatus = 'draft', override = false) => {
+    async (override = false) => {
       if (selectedBuildFlights.length < 2 || saving) return
-      if (!override && liveLegality.overallStatus === 'violation') {
-        setPendingIllegal(workflow)
+      const fam = validateCrossFamily(selectedBuildFlights, aircraftTypeFamilies)
+      if (!fam.ok && fam.conflict) {
+        setCrossFamilyConflict(fam.conflict)
         return
       }
+      if (!override && liveLegality.overallStatus === 'violation') {
+        setPendingIllegal(true)
+        return
+      }
+      const workflow = 'committed' as const
       setSaving(true)
       setError(null)
       try {
         const aircraftTypeIcao = selectedBuildFlights[0].aircraftType || null
-        const crewCounts = resolveComplementCounts(complements, aircraftTypeIcao, activeComplementKey)
+        const crewCounts =
+          activeComplementKey === 'custom'
+            ? customCrewCounts
+            : resolveComplementCounts(complements, aircraftTypeIcao, activeComplementKey)
         // Pick up virtual placements from the Gantt's current layout so the
         // tail that the planner sees on the canvas row gets persisted onto
         // the leg — even when the flight pool has no `tailNumber` of its own.
@@ -149,28 +208,50 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
           aircraftTypeIcao: f.aircraftType || null,
           tailNumber: virtualPlacements?.get(f.id) ?? f.tailNumber ?? null,
         }))
-        const created = await api.createPairing({
-          pairingCode: makePairingCode(selectedBuildFlights[0]),
-          baseAirport: selectedBuildFlights[0].departureAirport,
-          aircraftTypeIcao,
-          complementKey: activeComplementKey,
-          cockpitCount: activeComplementKey === 'aug2' ? 4 : activeComplementKey === 'aug1' ? 3 : 2,
-          crewCounts,
-          legs,
-          fdtlStatus:
-            liveLegality.overallStatus === 'pass'
-              ? 'legal'
-              : liveLegality.overallStatus === 'warning'
-                ? 'warning'
-                : 'violation',
-          workflowStatus: workflow,
-          lastLegalityResult: liveLegality,
-        })
-        const local = pairingFromApi(created)
-        addPairing(local)
-        setBuildMode(false)
-        clearSelection()
-        inspectPairing(local.id)
+        const facilityClass = activeComplementKey === 'standard' ? null : 'CLASS_1'
+        const fdtlStatus =
+          liveLegality.overallStatus === 'pass'
+            ? 'legal'
+            : liveLegality.overallStatus === 'warning'
+              ? 'warning'
+              : 'violation'
+        if (editingPairingId) {
+          const updated = await api.updatePairing(editingPairingId, {
+            pairingCode: makePairingCode(selectedBuildFlights[0]),
+            complementKey: activeComplementKey,
+            cockpitCount: computeCockpitCount(activeComplementKey, crewCounts),
+            facilityClass,
+            crewCounts,
+            legs,
+            fdtlStatus,
+            workflowStatus: workflow,
+            lastLegalityResult: liveLegality,
+          })
+          const local = pairingFromApi(updated)
+          replacePairing(local)
+          setEditingPairing(null)
+          clearSelection()
+          inspectPairing(local.id)
+        } else {
+          const created = await api.createPairing({
+            pairingCode: makePairingCode(selectedBuildFlights[0]),
+            baseAirport: selectedBuildFlights[0].departureAirport,
+            aircraftTypeIcao,
+            complementKey: activeComplementKey,
+            cockpitCount: computeCockpitCount(activeComplementKey, crewCounts),
+            facilityClass,
+            crewCounts,
+            legs,
+            fdtlStatus,
+            workflowStatus: workflow,
+            lastLegalityResult: liveLegality,
+          })
+          const local = pairingFromApi(created)
+          addPairing(local)
+          // Stay in build mode so planner can chain another pairing back-to-back.
+          clearSelection()
+          inspectPairing(local.id)
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to create pairing')
       } finally {
@@ -183,8 +264,13 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
       setError,
       complements,
       activeComplementKey,
+      customCrewCounts,
+      aircraftTypeFamilies,
       liveLegality,
       addPairing,
+      replacePairing,
+      editingPairingId,
+      setEditingPairing,
       setBuildMode,
       clearSelection,
       inspectPairing,
@@ -194,8 +280,7 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
 
   // Global keyboard shortcuts for this view.
   //   B             — toggle Build mode ON/OFF (same as the toolbar button).
-  //   Enter         — Create pairing as Draft  (build mode only)
-  //   Shift+Enter   — Create pairing as Final  (build mode only)
+  //   Enter         — Create pairing  (build mode only)
   //   Escape        — exit build mode
   //   Del/Backspace — delete inspected pairing
   useEffect(() => {
@@ -219,17 +304,18 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
       }
 
       if (e.key === 'Escape' && buildMode) {
-        setBuildMode(false)
+        // Escape clears the in-progress chain only; build mode stays on until
+        // the planner explicitly toggles it via the B key or toolbar button.
         clearSelection()
         return
       }
 
-      // Create shortcuts only fire while building AND a valid chain is picked.
+      // Create shortcut only fires while building AND a valid chain is picked.
       if (e.key === 'Enter' && buildMode) {
         if (saving) return
         if (selectedBuildFlights.length < 2) return
         e.preventDefault()
-        void handleCreatePairing(e.shiftKey ? 'committed' : 'draft', false)
+        void handleCreatePairing(false)
         return
       }
 
@@ -328,10 +414,13 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
             legality={liveLegality}
             legalityUsingMock={legalityUsingMock}
             saving={saving}
-            onCreate={() => handleCreatePairing('draft', false)}
+            onCreate={() => handleCreatePairing(false)}
             onCancel={() => {
-              setBuildMode(false)
+              // Cancel clears the chain and any in-progress edit; build mode
+              // stays on. Planner exits build via the toolbar button or the
+              // B shortcut.
               clearSelection()
+              setEditingPairing(null)
             }}
             onRemoveFlight={(id) => {
               const next = new Set(selectedFlightIds)
@@ -350,14 +439,16 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
       {pendingIllegal && buildMode && (
         <IllegalPairingDialog
           result={liveLegality}
-          workflowLabel={pendingIllegal === 'committed' ? 'Final' : 'Draft'}
           onProceed={() => {
-            const workflow = pendingIllegal
-            setPendingIllegal(null)
-            void handleCreatePairing(workflow, true)
+            setPendingIllegal(false)
+            void handleCreatePairing(true)
           }}
-          onCancel={() => setPendingIllegal(null)}
+          onCancel={() => setPendingIllegal(false)}
         />
+      )}
+
+      {crossFamilyConflict && (
+        <CrossFamilyPairingDialog conflict={crossFamilyConflict} onClose={() => setCrossFamilyConflict(null)} />
       )}
 
       {pendingDelete && (
@@ -512,6 +603,9 @@ function InspectorBuild({
   // breakdown is derived the same way as the committed-pairing inspector.
   const complements = usePairingStore((s) => s.complements)
   const positions = usePairingStore((s) => s.positions)
+  const customCrewCounts = usePairingStore((s) => s.customCrewCounts)
+  const setCustomCrewCounts = usePairingStore((s) => s.setCustomCrewCounts)
+  const editingPairingId = usePairingStore((s) => s.editingPairingId)
 
   const textPrimary = isDark ? 'rgba(255,255,255,0.92)' : 'rgba(15,23,42,0.92)'
   const textSecondary = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(71,85,105,0.75)'
@@ -538,6 +632,15 @@ function InspectorBuild({
   // cabin count in the Complement strip reflects the actual catalog rather
   // than an approximation.
   const resolvedCrewCounts = useMemo(() => {
+    if (activeComplementKey === 'custom') {
+      if (positions.length === 0) return customCrewCounts
+      const activeCodes = new Set(positions.map((p) => p.code))
+      const filtered: Record<string, number> = {}
+      for (const [code, n] of Object.entries(customCrewCounts)) {
+        if (activeCodes.has(code) && n > 0) filtered[code] = n
+      }
+      return filtered
+    }
     const raw = resolveComplementCounts(complements, aircraftType, activeComplementKey)
     if (!raw) return null
     if (positions.length === 0) return raw
@@ -547,8 +650,20 @@ function InspectorBuild({
       if (activeCodes.has(code) && n > 0) filtered[code] = n
     }
     return filtered
-  }, [complements, aircraftType, activeComplementKey, positions])
-  const cockpitCount = activeComplementKey === 'aug2' ? 4 : activeComplementKey === 'aug1' ? 3 : 2
+  }, [complements, aircraftType, activeComplementKey, positions, customCrewCounts])
+  const cockpitCount =
+    activeComplementKey === 'custom'
+      ? (() => {
+          const cockpitCodes = new Set(positions.filter((p) => p.category === 'cockpit').map((p) => p.code))
+          return Object.entries(customCrewCounts)
+            .filter(([code]) => cockpitCodes.has(code))
+            .reduce((s, [, n]) => s + (n || 0), 0)
+        })()
+      : activeComplementKey === 'aug2'
+        ? 4
+        : activeComplementKey === 'aug1'
+          ? 3
+          : 2
   const cabinCount = useMemo(() => {
     if (!resolvedCrewCounts) return 0
     const cabinCodes = new Set(positions.filter((p) => p.category === 'cabin').map((p) => p.code))
@@ -570,6 +685,7 @@ function InspectorBuild({
     { key: 'standard', label: 'Standard' },
     { key: 'aug1', label: 'Aug 1' },
     { key: 'aug2', label: 'Aug 2' },
+    { key: 'custom', label: 'Other' },
   ] as const
 
   return (
@@ -667,6 +783,18 @@ function InspectorBuild({
           })}
         </div>
 
+        {activeComplementKey === 'custom' && (
+          <CustomComplementEditor
+            counts={customCrewCounts}
+            positions={positions}
+            onChange={setCustomCrewCounts}
+            isDark={isDark}
+            divider={divider}
+            textSecondary={textSecondary}
+            textTertiary={textTertiary}
+          />
+        )}
+
         {/* Legs — mirrors the committed-pairing inspector, adds remove X. */}
         <InspectorSectionHeader title={`Legs (${selectedFlights.length})`} isDark={isDark} />
         <div className="space-y-1">
@@ -756,10 +884,10 @@ function InspectorBuild({
             onClick={onCreate}
             title={
               legality.overallStatus === 'violation'
-                ? 'Create as Draft with FDTL violation (Enter — requires override confirmation)'
+                ? 'Create with FDTL violation (Enter — requires override confirmation)'
                 : selectedFlights.length < 2
                   ? 'Select at least 2 flights'
-                  : 'Create as Draft (Enter) · Shift+Enter for Final'
+                  : 'Create (Enter)'
             }
             className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-lg text-[13px] font-semibold text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
@@ -774,19 +902,8 @@ function InspectorBuild({
             ) : (
               <CheckCircle2 size={13} strokeWidth={2.2} />
             )}
-            {saving ? 'Creating…' : legality.overallStatus === 'violation' ? 'Create Anyway…' : 'Create Pairing'}
+            {saving ? (editingPairingId ? 'Updating…' : 'Creating…') : editingPairingId ? 'Update' : 'Create'}
           </button>
-        </div>
-        {/* Keyboard hint strip — mirrors the shortcut contract used by the
-            Text workspace. Shown at all times so the planner discovers the
-            shortcuts without tooltip-hunting. */}
-        <div
-          className="flex items-center justify-center gap-3 text-[10px] font-semibold tracking-[0.06em] uppercase"
-          style={{ color: textTertiary }}
-        >
-          <KbdHint keys={['Enter']} label="Draft" isDark={isDark} />
-          <KbdHint keys={['Shift', 'Enter']} label="Final" isDark={isDark} />
-          <KbdHint keys={['B']} label="Toggle Build" isDark={isDark} />
         </div>
       </div>
     </div>
@@ -890,6 +1007,94 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
       <span className="font-semibold text-hz-text">{value}</span>
     </div>
   )
+}
+
+function CustomComplementEditor({
+  counts,
+  positions,
+  onChange,
+  isDark,
+  divider,
+  textSecondary,
+  textTertiary,
+}: {
+  counts: Record<string, number>
+  positions: import('@skyhub/api').CrewPositionRef[]
+  onChange: (next: Record<string, number>) => void
+  isDark: boolean
+  divider: string
+  textSecondary: string
+  textTertiary: string
+}) {
+  const active = positions.filter((p) => p.isActive).sort((a, b) => a.rankOrder - b.rankOrder)
+  const bump = (code: string, delta: number) => {
+    const current = counts[code] ?? 0
+    const next = Math.max(0, Math.min(99, current + delta))
+    onChange({ ...counts, [code]: next })
+  }
+  const stepperBtn = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.05)'
+  const rowBg = isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)'
+  return (
+    <div className="rounded-lg p-2 space-y-1" style={{ border: `1px solid ${divider}`, background: rowBg }}>
+      <div className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: textTertiary }}>
+        Positions
+      </div>
+      {active.length === 0 ? (
+        <div className="text-[12px] italic px-1 py-1" style={{ color: textTertiary }}>
+          No crew positions configured.
+        </div>
+      ) : (
+        active.map((p) => {
+          const n = counts[p.code] ?? 0
+          return (
+            <div key={p.code} className="flex items-center gap-2 py-0.5">
+              <span className="w-10 text-[12px] font-mono font-bold" style={{ color: textSecondary }}>
+                {p.code}
+              </span>
+              <span className="flex-1 text-[12px] truncate" style={{ color: textSecondary }}>
+                {p.name}
+              </span>
+              <button
+                type="button"
+                onClick={() => bump(p.code, -1)}
+                disabled={n <= 0}
+                className="w-6 h-6 flex items-center justify-center rounded-md text-[13px] font-bold disabled:opacity-30"
+                style={{ background: stepperBtn, color: textSecondary }}
+              >
+                −
+              </button>
+              <span
+                className="w-6 text-center text-[13px] font-mono font-bold tabular-nums"
+                style={{ color: isDark ? '#F5F2FD' : '#1C1C28' }}
+              >
+                {n}
+              </span>
+              <button
+                type="button"
+                onClick={() => bump(p.code, 1)}
+                disabled={n >= 99}
+                className="w-6 h-6 flex items-center justify-center rounded-md text-[13px] font-bold disabled:opacity-30"
+                style={{ background: stepperBtn, color: textSecondary }}
+              >
+                +
+              </button>
+            </div>
+          )
+        })
+      )}
+    </div>
+  )
+}
+
+function computeCockpitCount(
+  key: 'standard' | 'aug1' | 'aug2' | 'custom',
+  counts: Record<string, number> | null,
+): number {
+  if (key === 'custom') {
+    if (!counts) return 2
+    return (counts.CP ?? 0) + (counts.FO ?? 0) + (counts.SO ?? 0) + (counts.CM ?? 0)
+  }
+  return key === 'aug2' ? 4 : key === 'aug1' ? 3 : 2
 }
 
 function makePairingCode(f: PairingFlight): string {

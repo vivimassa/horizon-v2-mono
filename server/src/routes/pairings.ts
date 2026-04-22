@@ -7,8 +7,27 @@ import { FlightInstance } from '../models/FlightInstance.js'
 import { Airport } from '../models/Airport.js'
 import { AircraftType } from '../models/AircraftType.js'
 import { CrewAssignment } from '../models/CrewAssignment.js'
+import { Operator } from '../models/Operator.js'
 import { loadSerializedRuleSet } from '../services/fdtl-rule-set.js'
-import { evaluatePairingLegality } from '../services/evaluate-pairing-legality.js'
+import {
+  evaluatePairingLegality,
+  loadAirportTzCountryMaps,
+  type PairingLegForLegality,
+} from '../services/evaluate-pairing-legality.js'
+
+async function getOperatorTimezone(operatorId: string): Promise<string> {
+  const op = (await Operator.findById(operatorId).lean()) as { timezone?: string } | null
+  return op?.timezone ?? 'UTC'
+}
+
+function collectIatas(legs: PairingLegForLegality[]): Set<string> {
+  const s = new Set<string>()
+  for (const l of legs) {
+    if (l.depStation) s.add(l.depStation)
+    if (l.arrStation) s.add(l.arrStation)
+  }
+  return s
+}
 
 /*
  * Routes for 4.1.5 Crew Pairing (operating pairings — sequences of flights
@@ -74,6 +93,43 @@ const updatePairingSchema = z
   })
   .partial()
   .strict()
+
+/**
+ * Cross-family pairing guard. All non-deadhead legs must share the same
+ * aircraft family (A320 family allows A320+A321; A350+A380 blocked).
+ * Returns null on OK, or an object describing the first offending pair.
+ */
+async function findCrossFamilyConflict(
+  legs: z.infer<typeof pairingLegInput>[],
+  operatorId: string,
+): Promise<{
+  flightA: { flightNumber: string; icao: string }
+  flightB: { flightNumber: string; icao: string }
+} | null> {
+  const icaos = [...new Set(legs.map((l) => l.aircraftTypeIcao).filter((v): v is string => !!v))]
+  if (icaos.length < 2) return null
+  const types = await AircraftType.find({ operatorId, icaoType: { $in: icaos } })
+    .select({ icaoType: 1, family: 1 })
+    .lean()
+  const familyByIcao = new Map<string, string | null>()
+  for (const t of types) familyByIcao.set(t.icaoType, t.family ?? null)
+  const first = legs[0]
+  const firstFam = first.aircraftTypeIcao ? (familyByIcao.get(first.aircraftTypeIcao) ?? null) : null
+  if (firstFam == null) return null
+  for (let i = 1; i < legs.length; i += 1) {
+    const leg = legs[i]
+    if (!leg.aircraftTypeIcao) continue
+    const fam = familyByIcao.get(leg.aircraftTypeIcao) ?? null
+    if (fam == null) continue
+    if (fam !== firstFam) {
+      return {
+        flightA: { flightNumber: first.flightNumber, icao: first.aircraftTypeIcao ?? '' },
+        flightB: { flightNumber: leg.flightNumber, icao: leg.aircraftTypeIcao },
+      }
+    }
+  }
+  return null
+}
 
 /** Aggregate computed fields from a list of legs. */
 function summarize(legs: z.infer<typeof pairingLegInput>[]): {
@@ -404,7 +460,16 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
     const filter: Record<string, unknown> = { operatorId: req.operatorId }
     if (q.scenarioId) filter.scenarioId = q.scenarioId
     else filter.scenarioId = { $in: [null, undefined] }
-    if (q.dateFrom) filter.endDate = { $gte: q.dateFrom }
+    // Back-buffer endDate by 1 day: pairings created in Gantt bleed mode
+    // may have startDate/endDate = prior UTC day (first leg STD late-night
+    // UTC) even though their legs operate inside the display period.
+    // Without the buffer, those pairings disappear from the 01APR+ query
+    // even though the user built them for 01APR local operation.
+    if (q.dateFrom) {
+      const from = new Date(q.dateFrom + 'T00:00:00Z')
+      from.setUTCDate(from.getUTCDate() - 1)
+      filter.endDate = { $gte: from.toISOString().slice(0, 10) }
+    }
     if (q.dateTo) filter.startDate = { $lte: q.dateTo }
     if (q.baseAirport) filter.baseAirport = q.baseAirport
     return Pairing.find(filter).sort({ startDate: 1, pairingCode: 1 }).lean()
@@ -493,6 +558,15 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: 'One or more referenced flights do not belong to this operator' })
     }
 
+    const conflict = await findCrossFamilyConflict(body.legs, req.operatorId)
+    if (conflict) {
+      return reply.code(400).send({
+        error: `Cross-family pairing not allowed. Flight ${conflict.flightA.flightNumber} (${conflict.flightA.icao}) and Flight ${conflict.flightB.flightNumber} (${conflict.flightB.icao}) require separate type ratings.`,
+        code: 'CROSS_FAMILY_PAIRING',
+        conflict,
+      })
+    }
+
     const summary = summarize(body.legs)
     const now = new Date().toISOString()
 
@@ -502,7 +576,11 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
     let legalityResult: unknown = body.lastLegalityResult ?? null
     let fdtlStatus = body.fdtlStatus
     if (!legalityResult) {
-      const ruleSet = await loadSerializedRuleSet(req.operatorId)
+      const [ruleSet, timezone, maps] = await Promise.all([
+        loadSerializedRuleSet(req.operatorId),
+        getOperatorTimezone(req.operatorId),
+        loadAirportTzCountryMaps(collectIatas(body.legs)),
+      ])
       const evalResult = evaluatePairingLegality(
         {
           baseAirport: body.baseAirport,
@@ -510,6 +588,9 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
           cockpitCount: body.cockpitCount,
           facilityClass: body.facilityClass ?? null,
           legs: body.legs,
+          timezone,
+          airportTimezones: maps.tz,
+          airportCountries: maps.country,
         },
         ruleSet,
       )
@@ -556,6 +637,17 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues })
     const body = parsed.data
 
+    if (body.legs) {
+      const conflict = await findCrossFamilyConflict(body.legs, req.operatorId)
+      if (conflict) {
+        return reply.code(400).send({
+          error: `Cross-family pairing not allowed. Flight ${conflict.flightA.flightNumber} (${conflict.flightA.icao}) and Flight ${conflict.flightB.flightNumber} (${conflict.flightB.icao}) require separate type ratings.`,
+          code: 'CROSS_FAMILY_PAIRING',
+          conflict,
+        })
+      }
+    }
+
     const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() }
     Object.assign(patch, body)
     if (body.legs) {
@@ -569,7 +661,11 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
     if (body.legs && body.lastLegalityResult === undefined) {
       const current = await Pairing.findOne({ _id: id, operatorId: req.operatorId }).lean()
       if (current) {
-        const ruleSet = await loadSerializedRuleSet(req.operatorId)
+        const [ruleSet, timezone, maps] = await Promise.all([
+          loadSerializedRuleSet(req.operatorId),
+          getOperatorTimezone(req.operatorId),
+          loadAirportTzCountryMaps(collectIatas(body.legs as PairingLegForLegality[])),
+        ])
         const evalResult = evaluatePairingLegality(
           {
             baseAirport: (body.baseAirport as string | undefined) ?? current.baseAirport,
@@ -578,6 +674,9 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
             facilityClass:
               body.facilityClass !== undefined ? (body.facilityClass as string | null) : current.facilityClass,
             legs: body.legs,
+            timezone,
+            airportTimezones: maps.tz,
+            airportCountries: maps.country,
           },
           ruleSet,
         )
@@ -632,7 +731,22 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
     // Load rule set once for the whole batch — saves N-1 DB round-trips
     // when the client didn't pre-compute legality on every pairing.
     const needEngine = items.some((b) => !b.lastLegalityResult)
-    const ruleSet = needEngine ? await loadSerializedRuleSet(req.operatorId) : null
+    const allIatas = new Set<string>()
+    if (needEngine) {
+      for (const b of items) {
+        for (const l of b.legs) {
+          if (l.depStation) allIatas.add(l.depStation)
+          if (l.arrStation) allIatas.add(l.arrStation)
+        }
+      }
+    }
+    const [ruleSet, timezone, maps] = needEngine
+      ? await Promise.all([
+          loadSerializedRuleSet(req.operatorId),
+          getOperatorTimezone(req.operatorId),
+          loadAirportTzCountryMaps(allIatas),
+        ])
+      : [null as unknown, 'UTC', { tz: {} as Record<string, string>, country: {} as Record<string, string> }]
     const docs = items.map((body) => {
       const summary = summarize(body.legs)
       let legalityResult: unknown = body.lastLegalityResult ?? null
@@ -645,6 +759,9 @@ export async function pairingRoutes(app: FastifyInstance): Promise<void> {
             cockpitCount: body.cockpitCount,
             facilityClass: body.facilityClass ?? null,
             legs: body.legs,
+            timezone,
+            airportTimezones: maps.tz,
+            airportCountries: maps.country,
           },
           ruleSet,
         )

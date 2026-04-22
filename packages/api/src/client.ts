@@ -638,6 +638,17 @@ export interface FdtlRuleRef {
   verificationStatus: 'verified' | 'unverified' | 'disputed'
   sortOrder: number
   isActive: boolean
+  /** Data-driven evaluator key. When null, client validator infers from ruleCode. */
+  computationType:
+    | 'rolling_cumulative'
+    | 'min_rest_between_events'
+    | 'min_rest_after_augmented'
+    | 'min_rest_in_window'
+    | 'per_duty_limit'
+    | 'consecutive_count'
+    | 'custom'
+    | null
+  params: Record<string, unknown> | null
 }
 
 export interface FdtlTableCellRef {
@@ -2364,6 +2375,21 @@ export const api = {
 
   getAutoTransmitStatus: () => request<AutoTransmitStatus>('/movement-messages/auto-transmit/status'),
 
+  // ── 4.1.5.4 Pairing Configurations ──
+  getOperatorPairingConfig: (operatorId: string) =>
+    request<OperatorPairingConfig | null>(
+      `/operator-pairing-config?operatorId=${encodeURIComponent(operatorId)}`,
+    ).catch((err) => {
+      if (err instanceof Error && /^API 404/.test(err.message)) return null
+      throw err
+    }),
+
+  upsertOperatorPairingConfig: (body: OperatorPairingConfigUpsert) =>
+    request<OperatorPairingConfig>('/operator-pairing-config', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
   resolveFlight: (q: { operatorId: string; flightNumber: string; date: string; dep?: string; arr?: string }) => {
     const params = new URLSearchParams({ operatorId: q.operatorId, flightNumber: q.flightNumber, date: q.date })
     if (q.dep) params.set('dep', q.dep)
@@ -2838,6 +2864,15 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  /** Kick off a roster-level FDTL re-evaluation for [from, to]. The
+   *  caller should then refetch /crew-schedule to pick up the refreshed
+   *  `crewIssues`. */
+  reevaluateCrewRoster: (data: { operatorId: string; from: string; to: string; scenarioId?: string | null }) =>
+    request<{ total: number; warnings: number; violations: number }>('/crew-schedule/reevaluate-roster', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   /** Bulk-assign one activity code to many (crewId, dateIso) pairs — AIMS
    *  "Assign series of duties". Best-effort on the server: returns created
    *  docs + failed count so the UI can refresh regardless of partials. */
@@ -2951,6 +2986,7 @@ export interface CrewAssignmentCreateInput {
     violationKind: string
     messageSnapshot?: string | null
     detail?: unknown
+    reason?: string | null
   }>
 }
 
@@ -3095,6 +3131,13 @@ export interface CrewScheduleResponse {
       awayMinMinutes: number
     }
   }
+  /** Full serialized FDTL rule set — enables the 4.1.6 FDTL-aware
+   *  validator. Null when the operator hasn't configured any scheme. */
+  ruleSet: unknown | null
+  /** Pre-computed roster-level FDTL issues for the visible window.
+   *  Upserted by the `reevaluate-roster` service; drives left-panel
+   *  badges and the Legality Check dialog. */
+  crewIssues: CrewLegalityIssueRef[]
   /** All aircraft types defined for the operator — ICAO → family map
    *  used by the client-side AC-type-not-qualified hard-block. */
   aircraftTypes: Array<{ icaoType: string; family: string | null }>
@@ -3109,6 +3152,32 @@ export interface TempBaseRef {
   fromIso: string
   toIso: string
   airportCode: string
+}
+
+export interface CrewLegalityIssueRef {
+  _id: string
+  operatorId: string
+  scenarioId: string | null
+  crewId: string
+  ruleCode: string
+  status: 'warning' | 'violation'
+  label: string
+  actual: string
+  limit: string
+  actualNum: number | null
+  limitNum: number | null
+  /** Rolling-window bounds the violation fired for (e.g. 28D anchor). */
+  windowFromIso: string | null
+  windowToIso: string | null
+  windowLabel: string | null
+  legalReference: string | null
+  shortReason: string
+  assignmentIds: string[]
+  activityIds: string[]
+  periodFromIso: string
+  periodToIso: string
+  anchorUtc: string
+  detectedAtUtc: string
 }
 
 // ── Non-Crew Person types ──
@@ -3343,6 +3412,33 @@ export interface AsmSsmConfig {
 export interface AsmSsmConfigUpsert {
   generation?: Partial<AsmSsmGenerationConfig>
   autoRelease?: Partial<Omit<AsmSsmAutoReleaseConfig, 'lastRunAtUtc' | 'lastMatched' | 'lastReleased' | 'lastFailed'>>
+}
+
+// ── 4.1.5.4 Pairing Configurations ──
+// Operator-wide soft-rule policy for pairing construction. Not FDTL —
+// these are planning conventions surfaced as warnings in the Inspector.
+export interface AircraftChangeGroundTimeConfig {
+  /** Domestic → Domestic, minutes. */
+  domToDomMin: number
+  /** Domestic → International, minutes. */
+  domToIntlMin: number
+  /** International → Domestic, minutes. */
+  intlToDomMin: number
+  /** International → International, minutes. */
+  intlToIntlMin: number
+}
+
+export interface OperatorPairingConfig {
+  _id: string
+  operatorId: string
+  aircraftChangeGroundTime: AircraftChangeGroundTimeConfig
+  createdAt: string
+  updatedAt: string
+}
+
+export interface OperatorPairingConfigUpsert {
+  operatorId: string
+  aircraftChangeGroundTime?: Partial<AircraftChangeGroundTimeConfig>
 }
 
 export type AsmSsmDeliveryMode = 'pull_api' | 'sftp' | 'smtp'

@@ -12,10 +12,8 @@ import { FlightGridRow } from './flight-grid-row'
 import { FlightGridContextMenu } from './flight-grid-context-menu'
 
 interface FlightGridProps {
-  /** Called when the user picks "Create Pairing as Draft" from the menu. */
-  onCreateDraft: (flightIds: string[]) => void
-  /** Called when the user picks "Create Pairing as Final" from the menu. */
-  onCreateFinal: (flightIds: string[]) => void
+  /** Called when the user picks "Create Pairing" from the menu or hits Enter. */
+  onCreatePairing: (flightIds: string[]) => void
   /** Called when the user right-clicks a PAIRING cell and picks Inspect. */
   onInspectPairing: (pairingId: string) => void
   /** Called when the user right-clicks a PAIRING cell and picks Delete. */
@@ -25,7 +23,7 @@ interface FlightGridProps {
    *  anchor in-place of the menu. */
   onStartLayover?: (flightId: string, station: string, x: number, y: number) => void
   /** False while a dialog is open or a save is in flight — suppresses the
-   *  Enter / Shift+Enter keyboard shortcuts so the user can't double-fire. */
+   *  Enter keyboard shortcut so the user can't double-fire. */
   canCreate?: boolean
 }
 
@@ -35,8 +33,7 @@ interface FlightGridProps {
  * JetBrains Mono cells, Excel-style selection. No editing.
  */
 export function FlightGrid({
-  onCreateDraft,
-  onCreateFinal,
+  onCreatePairing,
   onInspectPairing,
   onDeletePairing,
   onStartLayover,
@@ -282,8 +279,7 @@ export function FlightGrid({
   // ── Keyboard shortcuts ──
   //   Ctrl/Cmd + A         → select all visible rows
   //   Escape               → clear selection
-  //   Enter                → Create Pairing as Draft (uses current selection)
-  //   Shift + Enter        → Create Pairing as Final
+  //   Enter                → Create Pairing (uses current selection)
   //
   // Suppressed while typing in an input, and while `canCreate` is false
   // (which the parent sets when a dialog is open or a save is mid-flight).
@@ -304,13 +300,12 @@ export function FlightGrid({
         if (!canCreate) return
         if (selectedFlightIds.length === 0) return
         e.preventDefault()
-        if (e.shiftKey) onCreateFinal(selectedFlightIds)
-        else onCreateDraft(selectedFlightIds)
+        onCreatePairing(selectedFlightIds)
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [orderedRows, selectAllAction, clearAll, canCreate, selectedFlightIds, onCreateDraft, onCreateFinal])
+  }, [orderedRows, selectAllAction, clearAll, canCreate, selectedFlightIds, onCreatePairing])
 
   // ── Context menu ──
   type MenuCtx =
@@ -474,8 +469,7 @@ export function FlightGrid({
               selectionCount={selectedFlightIds.length}
               singleSelectionArr={singleSelectionArr}
               onClose={() => setMenu(null)}
-              onCreateDraft={() => onCreateDraft(selectedFlightIds)}
-              onCreateFinal={() => onCreateFinal(selectedFlightIds)}
+              onCreatePairing={() => onCreatePairing(selectedFlightIds)}
               onClearSelection={() => clearAll()}
               onStartLayover={
                 onStartLayover && singleSelectionArr

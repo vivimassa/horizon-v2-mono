@@ -4,8 +4,20 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, queryKeys, type SerializedRuleSetRef } from '@skyhub/api'
 import { validatePairingClient, type Flight, type CrewConfig } from '@skyhub/logic/src/fdtl/validator'
-import type { PairingFlight, LegalityResult } from './types'
+import { usePairingStore } from '@/stores/use-pairing-store'
+import type { PairingFlight, LegalityResult, LegalityCheck } from './types'
 import { mockLegalityResult } from './mocks'
+
+/** Fallback thresholds mirror the server-side schema defaults in
+ *  `OperatorPairingConfig`. Applied when the operator has no saved
+ *  config yet, so the soft rule still fires with reasonable numbers
+ *  instead of silently passing everything. */
+const DEFAULT_AC_CHANGE_GROUND = {
+  domToDomMin: 45,
+  domToIntlMin: 60,
+  intlToDomMin: 60,
+  intlToIntlMin: 75,
+} as const
 
 /**
  * Loads the operator's FDTL rule set from `/fdtl/rule-set`. Cached for 5 min —
@@ -43,6 +55,9 @@ export function usePairingLegality(
   } = {},
 ): { result: LegalityResult; usingMock: boolean; ruleSet: SerializedRuleSetRef | null | undefined } {
   const { data: ruleSet, isSuccess } = useFdtlRuleSet()
+  const pairingConfig = usePairingStore((s) => s.pairingConfig)
+  const stationCountries = usePairingStore((s) => s.stationCountries)
+  const homeCountryIso2 = usePairingStore((s) => s.homeCountryIso2)
 
   return useMemo(() => {
     if (flights.length === 0) {
@@ -52,6 +67,13 @@ export function usePairingLegality(
         ruleSet: ruleSet ?? null,
       }
     }
+
+    const softChecks = evaluateAircraftChangeGroundTime(
+      flights,
+      pairingConfig?.aircraftChangeGroundTime ?? DEFAULT_AC_CHANGE_GROUND,
+      stationCountries,
+      homeCountryIso2,
+    )
 
     // If the FDTL rule set is loaded, run the real engine.
     if (isSuccess && ruleSet) {
@@ -87,8 +109,9 @@ export function usePairingLegality(
       // The validator's `LegalityResult` is a close match to our local type —
       // widen `status` to also allow 'info' (our type accepts it; validator
       // won't emit it today but we keep the surface compatible).
+      const merged = mergeSoftChecks(raw as unknown as LegalityResult, softChecks)
       return {
-        result: raw as unknown as LegalityResult,
+        result: merged,
         usingMock: false,
         ruleSet,
       }
@@ -96,7 +119,7 @@ export function usePairingLegality(
 
     // Fallback: no rule set loaded → use realistic mock so the UI still works.
     return {
-      result: mockLegalityResult(flights),
+      result: mergeSoftChecks(mockLegalityResult(flights), softChecks),
       usingMock: true,
       ruleSet: ruleSet ?? null,
     }
@@ -109,7 +132,112 @@ export function usePairingLegality(
     options.cockpitCount,
     options.homeBase,
     options.deadheadIds,
+    pairingConfig,
+    stationCountries,
+    homeCountryIso2,
   ])
+}
+
+/** Classify a leg as DOM or INTL. A leg is DOMESTIC when both endpoints sit
+ *  in the same country as the operator's home base. If the home country isn't
+ *  known, fall back to same-country-on-both-endpoints (still a useful
+ *  heuristic, and matches how most planners reason). Returns null when
+ *  either endpoint's country is unknown — caller skips the check. */
+function classifyLeg(
+  depCountry: string | undefined,
+  arrCountry: string | undefined,
+  home: string | null,
+): 'dom' | 'intl' | null {
+  if (!depCountry || !arrCountry) return null
+  if (home) {
+    return depCountry === home && arrCountry === home ? 'dom' : 'intl'
+  }
+  return depCountry === arrCountry ? 'dom' : 'intl'
+}
+
+function fmtHHMM(min: number): string {
+  const m = Math.max(0, Math.floor(min))
+  const h = Math.floor(m / 60)
+  const mm = m % 60
+  return `${h}:${String(mm).padStart(2, '0')}`
+}
+
+/** Evaluate the 4.1.5.4 aircraft-change ground-time soft rule across a
+ *  chain of flights. Emits one `LegalityCheck` (status: 'warning') per
+ *  consecutive leg pair where the tail changes AND the ground-time gap
+ *  falls below the configured threshold for the relevant dom/intl combo.
+ *  Returns an empty array when config is missing so callers merge a no-op. */
+function evaluateAircraftChangeGroundTime(
+  flights: PairingFlight[],
+  config: {
+    domToDomMin: number
+    domToIntlMin: number
+    intlToDomMin: number
+    intlToIntlMin: number
+  } | null,
+  stationCountries: Record<string, string>,
+  home: string | null,
+): LegalityCheck[] {
+  if (!config || flights.length < 2) return []
+  const out: LegalityCheck[] = []
+  for (let i = 0; i < flights.length - 1; i += 1) {
+    const prev = flights[i]
+    const next = flights[i + 1]
+    // Only fires when the tail actually changes between legs. Missing tails
+    // on either side skip the check — we can't tell an aircraft change from
+    // a same-tail turn without the data.
+    if (!prev.tailNumber || !next.tailNumber) continue
+    if (prev.tailNumber === next.tailNumber) continue
+
+    const gapMin = Math.max(0, Math.round((Date.parse(next.stdUtc) - Date.parse(prev.staUtc)) / 60000))
+    const prevCls = classifyLeg(stationCountries[prev.departureAirport], stationCountries[prev.arrivalAirport], home)
+    const nextCls = classifyLeg(stationCountries[next.departureAirport], stationCountries[next.arrivalAirport], home)
+    if (!prevCls || !nextCls) continue
+
+    const key: 'domToDomMin' | 'domToIntlMin' | 'intlToDomMin' | 'intlToIntlMin' =
+      prevCls === 'dom' && nextCls === 'dom'
+        ? 'domToDomMin'
+        : prevCls === 'dom' && nextCls === 'intl'
+          ? 'domToIntlMin'
+          : prevCls === 'intl' && nextCls === 'dom'
+            ? 'intlToDomMin'
+            : 'intlToIntlMin'
+    const limitMin = config[key]
+    if (!Number.isFinite(limitMin) || limitMin <= 0) continue
+    if (gapMin >= limitMin) continue
+
+    const comboLabel =
+      key === 'domToDomMin'
+        ? 'DOM→DOM'
+        : key === 'domToIntlMin'
+          ? 'DOM→INTL'
+          : key === 'intlToDomMin'
+            ? 'INTL→DOM'
+            : 'INTL→INTL'
+    out.push({
+      label: `Insufficient Ground Time (${fmtHHMM(gapMin)}/${fmtHHMM(limitMin)})`,
+      actual: fmtHHMM(gapMin),
+      limit: fmtHHMM(limitMin),
+      status: 'warning',
+      fdtlRef: `AC change · ${comboLabel} · ${prev.tailNumber} → ${next.tailNumber}`,
+    })
+  }
+  return out
+}
+
+/** Append soft checks to an FDTL result without letting them escalate the
+ *  overall status to 'violation'. A warning-only soft rule bumps `pass` up
+ *  to `warning`; existing `violation` stays violation. */
+function mergeSoftChecks(result: LegalityResult, soft: LegalityCheck[]): LegalityResult {
+  if (soft.length === 0) return result
+  const hasWarning = soft.some((c) => c.status === 'warning')
+  const overallStatus: LegalityResult['overallStatus'] =
+    result.overallStatus === 'violation' ? 'violation' : hasWarning ? 'warning' : result.overallStatus
+  return {
+    ...result,
+    checks: [...result.checks, ...soft],
+    overallStatus,
+  }
 }
 
 function complementToCockpit(key: 'standard' | 'aug1' | 'aug2' | 'custom'): number {

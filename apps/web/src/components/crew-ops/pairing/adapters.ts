@@ -1,6 +1,13 @@
 import type { PairingRef, PairingLegRef } from '@skyhub/api'
 import type { Pairing } from './types'
 
+function normalizeLegId(l: PairingLegRef): string {
+  const raw = typeof l.flightId === 'string' ? l.flightId : ''
+  const date = typeof l.flightDate === 'string' ? l.flightDate : ''
+  const sch = raw.split('__')[0] ?? ''
+  return `${sch}__${date}`
+}
+
 /** Adapt the API `PairingRef` shape to the component-local `Pairing` shape
  *  (notably `_id` → `id` and split-out deadheadFlightIds / flightIds arrays). */
 export function pairingFromApi(p: PairingRef): Pairing {
@@ -16,8 +23,12 @@ export function pairingFromApi(p: PairingRef): Pairing {
     pairingDays: p.pairingDays,
     startDate: p.startDate,
     endDate: p.endDate,
-    flightIds: p.legs.map((l: PairingLegRef) => l.flightId),
-    deadheadFlightIds: p.legs.filter((l: PairingLegRef) => l.isDeadhead).map((l: PairingLegRef) => l.flightId),
+    // Normalize leg ids to canonical `${scheduledFlightId}__${flightDate}` so
+    // coverage checks match `PairingFlight.id` regardless of how the server
+    // stored the leg (some code paths write the raw scheduledFlightId, others
+    // write the compound form — split-and-rebuild handles both).
+    flightIds: p.legs.map((l: PairingLegRef) => normalizeLegId(l)),
+    deadheadFlightIds: p.legs.filter((l: PairingLegRef) => l.isDeadhead).map((l: PairingLegRef) => normalizeLegId(l)),
     complementKey: p.complementKey,
     cockpitCount: p.cockpitCount,
     facilityClass: p.facilityClass,

@@ -1,7 +1,7 @@
 'use client'
 
 import { create } from 'zustand'
-import type { CrewComplementRef, CrewPositionRef } from '@skyhub/api'
+import type { CrewComplementRef, CrewPositionRef, OperatorPairingConfig } from '@skyhub/api'
 import type {
   PairingFilters,
   Pairing,
@@ -38,10 +38,26 @@ interface PairingStoreState {
   complements: CrewComplementRef[]
   /** Crew positions (columns for the complement grid) — loaded once. */
   positions: CrewPositionRef[]
+  /** ICAO type → family map, loaded once from /aircraft-types. Used for
+   *  cross-family pairing validation (e.g. block A350+A380, allow A320+A321). */
+  aircraftTypeFamilies: Record<string, string | null>
+  /** In-progress pairing's custom crew counts when complementKey === 'custom'.
+   *  Keyed by position code (CP, FO, PU, FA, …). Reset when key changes away. */
+  customCrewCounts: Record<string, number>
   /** Station → UTC offset hours. Loaded from `/airports` once at shell mount
    *  so the Gantt tooltips can render STD/STA in local time without per-hover
    *  network calls (mirrors the Movement Control gantt pattern). */
   stationUtcOffsets: Record<string, number>
+  /** Station ICAO/IATA → ISO2 country code. Loaded from `/airports` alongside
+   *  `stationUtcOffsets`. Used by the 4.1.5.4 aircraft-change ground-time
+   *  soft rule to decide dom/intl on each leg. */
+  stationCountries: Record<string, string>
+  /** 4.1.5.4 operator-level pairing-construction policy. `null` = not loaded
+   *  yet or no doc → soft rules simply don't fire. */
+  pairingConfig: OperatorPairingConfig | null
+  /** ISO2 country code of the operator's main base — used as the "home
+   *  country" when classifying a leg as domestic vs international. */
+  homeCountryIso2: string | null
   loading: boolean
   error: string | null
 
@@ -72,13 +88,12 @@ interface PairingStoreState {
   } | null
 
   // ── Pending-create request (text view) ──
-  // The grid's keyboard (Enter / Shift+Enter) and right-click Draft/Final
-  // items dispatch to the Inspector Panel via this field — the Inspector
-  // owns all save/dialog state, the grid just announces intent.
+  // The grid's Enter key and right-click "Create Pairing" item dispatch to
+  // the Inspector Panel via this field — the Inspector owns all save/dialog
+  // state, the grid just announces intent. All new pairings are created as
+  // committed (production); draft workflow has been removed from the UI.
   pendingCreateRequest: {
     ids: string[]
-    workflow: 'draft' | 'committed'
-    label: 'Draft' | 'Final'
   } | null
 
   // ── Actions ──
@@ -90,10 +105,18 @@ interface PairingStoreState {
   setPairings: (pairings: Pairing[]) => void
   setComplements: (complements: CrewComplementRef[]) => void
   setPositions: (positions: CrewPositionRef[]) => void
+  setAircraftTypeFamilies: (map: Record<string, string | null>) => void
+  setCustomCrewCounts: (counts: Record<string, number>) => void
   setStationUtcOffsets: (map: Record<string, number>) => void
+  setStationCountries: (map: Record<string, string>) => void
+  setPairingConfig: (cfg: OperatorPairingConfig | null) => void
+  setHomeCountryIso2: (iso: string | null) => void
   /** Append a new pairing AND mark its flights covered so the pool greys
    *  them out without a round-trip. */
   addPairing: (pairing: Pairing) => void
+  /** Replace an existing pairing in-place — used after a successful PATCH
+   *  from the Edit Pairing flow so the list + inspector reflect the update. */
+  replacePairing: (pairing: Pairing) => void
   /** Remove a pairing AND release its flights back to uncovered. */
   removePairing: (pairingId: string) => void
   setLoading: (loading: boolean) => void
@@ -109,12 +132,30 @@ interface PairingStoreState {
   setLayoverDays: (days: number) => void
   clearLayover: () => void
 
-  requestCreatePairing: (ids: string[], workflow: 'draft' | 'committed', label: 'Draft' | 'Final') => void
+  requestCreatePairing: (ids: string[]) => void
   clearCreateRequest: () => void
 }
 
 /** Default 7-day period starting today (UTC YYYY-MM-DD). */
+const PERIOD_STORAGE_KEY = 'pairing_period_v1'
+
 function defaultPeriod(): { from: string; to: string } {
+  // Restore the last-used period from localStorage so pairings created in
+  // a prior session remain visible after refresh. Falls back to today→+6
+  // when no persisted value exists (first visit or cleared storage).
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(PERIOD_STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw) as { from: string; to: string }
+        if (parsed.from && parsed.to && /^\d{4}-\d{2}-\d{2}$/.test(parsed.from)) {
+          return parsed
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
   const today = new Date()
   const from = today.toISOString().slice(0, 10)
   const end = new Date(today)
@@ -136,7 +177,12 @@ export const usePairingStore = create<PairingStoreState>((set, get) => ({
   pairings: [],
   complements: [],
   positions: [],
+  aircraftTypeFamilies: {},
+  customCrewCounts: {},
   stationUtcOffsets: {},
+  stationCountries: {},
+  pairingConfig: null,
+  homeCountryIso2: null,
   loading: false,
   error: null,
 
@@ -156,7 +202,14 @@ export const usePairingStore = create<PairingStoreState>((set, get) => ({
   layoverMode: null,
   pendingCreateRequest: null,
 
-  setPeriod: (from, to) => set({ periodFrom: from, periodTo: to }),
+  setPeriod: (from, to) => {
+    try {
+      localStorage.setItem(PERIOD_STORAGE_KEY, JSON.stringify({ from, to }))
+    } catch {
+      // ignore quota / SSR errors
+    }
+    set({ periodFrom: from, periodTo: to })
+  },
   commitPeriod: () => set({ periodCommitted: true }),
   setFilters: (filters) => set({ filters }),
 
@@ -164,13 +217,35 @@ export const usePairingStore = create<PairingStoreState>((set, get) => ({
   setPairings: (pairings) => set({ pairings }),
   setComplements: (complements) => set({ complements }),
   setPositions: (positions) => set({ positions }),
+  setAircraftTypeFamilies: (aircraftTypeFamilies) => set({ aircraftTypeFamilies }),
+  setCustomCrewCounts: (customCrewCounts) => set({ customCrewCounts }),
   setStationUtcOffsets: (stationUtcOffsets) => set({ stationUtcOffsets }),
+  setStationCountries: (stationCountries) => set({ stationCountries }),
+  setPairingConfig: (pairingConfig) => set({ pairingConfig }),
+  setHomeCountryIso2: (homeCountryIso2) => set({ homeCountryIso2 }),
   addPairing: (pairing) => {
     const { pairings, flights } = get()
     const covered = new Set(pairing.flightIds)
     set({
       pairings: [pairing, ...pairings],
       flights: flights.map((f) => (covered.has(f.id) ? { ...f, pairingId: pairing.id } : f)),
+    })
+  },
+  replacePairing: (pairing) => {
+    const { pairings, flights } = get()
+    const idx = pairings.findIndex((p) => p.id === pairing.id)
+    const next = idx >= 0 ? [...pairings.slice(0, idx), pairing, ...pairings.slice(idx + 1)] : [pairing, ...pairings]
+    const covered = new Set(pairing.flightIds)
+    // Recompute flight.pairingId membership for this pairing only.
+    set({
+      pairings: next,
+      flights: flights.map((f) =>
+        covered.has(f.id)
+          ? { ...f, pairingId: pairing.id }
+          : f.pairingId === pairing.id
+            ? { ...f, pairingId: null }
+            : f,
+      ),
     })
   },
   removePairing: (pairingId) => {
@@ -201,7 +276,7 @@ export const usePairingStore = create<PairingStoreState>((set, get) => ({
     set((s) => (s.layoverMode ? { layoverMode: { ...s.layoverMode, days: Math.max(1, days) } } : {})),
   clearLayover: () => set({ layoverMode: null }),
 
-  requestCreatePairing: (ids, workflow, label) => set({ pendingCreateRequest: { ids, workflow, label } }),
+  requestCreatePairing: (ids) => set({ pendingCreateRequest: { ids } }),
   clearCreateRequest: () => set({ pendingCreateRequest: null }),
 }))
 

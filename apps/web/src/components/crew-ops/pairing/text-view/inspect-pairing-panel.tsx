@@ -1,12 +1,10 @@
 'use client'
 
-import { Fragment, useMemo, useState } from 'react'
-import { Plane, Users, Trash2, CheckCircle2 } from 'lucide-react'
-import { api } from '@skyhub/api'
+import { Fragment, useMemo } from 'react'
+import { Plane, Users } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { usePairingStore, resolveComplementCounts } from '@/stores/use-pairing-store'
 import { PairingStatusBadge } from '../shared/pairing-status-badge'
-import { DeletePairingDialog } from '../dialogs/delete-pairing-dialog'
 import type { Pairing, PairingFlight } from '../types'
 import { usePairingLegality } from '../use-pairing-legality'
 import {
@@ -16,28 +14,25 @@ import {
   GroundTimeRow,
   LayoverRow,
   LegalityChecks,
-  ActionButton,
   complementLabel,
 } from './inspector-helpers'
 
 const LAYOVER_THRESHOLD_MIN = 24 * 60
 
 /**
- * Inspector in inspect mode: shows details of an existing pairing with
- * a header, leg list, legality summary, and row of actions. Delete and
- * Commit hit the real API; Copy is a stub (multi-day pattern UI pending).
+ * Inspector in inspect mode: read-only view of an existing pairing. Same
+ * visual grammar as the build-mode inspector (header with code + live
+ * legality badge, route chain + meta strip, Complement, Legs with
+ * ground-time rows, Legality) but no footer CTAs. Delete is still
+ * reachable via the pairing's right-click context menu + Del/Backspace
+ * shortcut from the gantt inspector.
  */
 export function InspectPairingPanel({ pairing, flights }: { pairing: Pairing; flights: PairingFlight[] }) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
-  const inspectPairing = usePairingStore((s) => s.inspectPairing)
-  const removePairing = usePairingStore((s) => s.removePairing)
-  const setPairings = usePairingStore((s) => s.setPairings)
-  const pairings = usePairingStore((s) => s.pairings)
   const complements = usePairingStore((s) => s.complements)
   const positions = usePairingStore((s) => s.positions)
-  const setError = usePairingStore((s) => s.setError)
 
   // Same fallback as the details dialog — resolve crewCounts from the 5.4.3
   // catalog when the pairing itself doesn't have it stored. Filter by the
@@ -68,9 +63,6 @@ export function InspectPairingPanel({ pairing, flights }: { pairing: Pairing; fl
       .reduce((sum, [, n]) => sum + (n || 0), 0)
   }, [resolvedCrewCounts, positions])
 
-  const [busy, setBusy] = useState<'idle' | 'deleting' | 'committing'>('idle')
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-
   const textPrimary = isDark ? 'rgba(255,255,255,0.92)' : 'rgba(15,23,42,0.92)'
   const textSecondary = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(71,85,105,0.75)'
   const textTertiary = isDark ? 'rgba(255,255,255,0.38)' : 'rgba(100,116,139,0.65)'
@@ -89,38 +81,6 @@ export function InspectPairingPanel({ pairing, flights }: { pairing: Pairing; fl
     deadheadIds: new Set(pairing.deadheadFlightIds),
   })
 
-  function handleDelete() {
-    setShowDeleteDialog(true)
-  }
-
-  async function confirmDelete() {
-    setBusy('deleting')
-    setError(null)
-    try {
-      await api.deletePairing(pairing.id)
-      removePairing(pairing.id)
-      inspectPairing(null)
-      setShowDeleteDialog(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete pairing')
-    } finally {
-      setBusy('idle')
-    }
-  }
-
-  async function handleCommit() {
-    setBusy('committing')
-    setError(null)
-    try {
-      await api.updatePairing(pairing.id, { workflowStatus: 'committed' })
-      setPairings(pairings.map((p) => (p.id === pairing.id ? { ...p, workflowStatus: 'committed' } : p)))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to commit pairing')
-    } finally {
-      setBusy('idle')
-    }
-  }
-
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
@@ -129,7 +89,15 @@ export function InspectPairingPanel({ pairing, flights }: { pairing: Pairing; fl
           <h3 className="text-[16px] font-bold tracking-tight tabular-nums" style={{ color: textPrimary }}>
             {pairing.pairingCode}
           </h3>
-          <PairingStatusBadge status={pairing.status} size="md" />
+          {/* Live legality — includes soft rules (4.1.5.4 aircraft-change
+              ground time). A pairing saved as 'legal' will downgrade to
+              'warning' here if a newly-configured soft threshold fails. */}
+          <PairingStatusBadge
+            status={
+              result.overallStatus === 'pass' ? 'legal' : result.overallStatus === 'warning' ? 'warning' : 'violation'
+            }
+            size="md"
+          />
         </div>
         <div
           className="flex items-center gap-1.5 text-[12px] font-medium tabular-nums mb-1"
@@ -215,44 +183,12 @@ export function InspectPairingPanel({ pairing, flights }: { pairing: Pairing; fl
         </div>
       </div>
 
-      {/* Legality — pinned directly above the action row so the FDTL result
-          is always visible next to the Commit button without scrolling. */}
+      {/* Legality — pinned to the bottom. No CTAs below; deletion lives on
+          the pairing pill's right-click menu + Del/Backspace shortcut. */}
       <div className="shrink-0 px-4 py-3 space-y-2" style={{ borderTop: `1px solid ${divider}` }}>
         <SectionHeader title="Legality" isDark={isDark} />
         <LegalityChecks result={result} isDark={isDark} />
       </div>
-
-      {/* Actions */}
-      <div className="shrink-0 px-4 py-3 flex items-center gap-2" style={{ borderTop: `1px solid ${divider}` }}>
-        <ActionButton
-          icon={Trash2}
-          label={busy === 'deleting' ? 'Deleting…' : 'Delete'}
-          isDark={isDark}
-          destructive
-          onClick={handleDelete}
-          disabled={busy !== 'idle'}
-        />
-        {pairing.workflowStatus === 'draft' && (
-          <ActionButton
-            icon={CheckCircle2}
-            label={busy === 'committing' ? 'Committing…' : 'Commit'}
-            isDark={isDark}
-            primary
-            onClick={handleCommit}
-            disabled={busy !== 'idle'}
-          />
-        )}
-      </div>
-
-      {showDeleteDialog && (
-        <DeletePairingDialog
-          pairingCode={pairing.pairingCode}
-          detail={`${pairing.flightIds.length} legs · ${pairing.routeChain}`}
-          busy={busy === 'deleting'}
-          onCancel={() => busy !== 'deleting' && setShowDeleteDialog(false)}
-          onConfirm={() => void confirmDelete()}
-        />
-      )}
     </div>
   )
 }

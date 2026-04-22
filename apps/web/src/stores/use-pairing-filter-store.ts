@@ -39,10 +39,39 @@ function defaultPeriod(): { from: string; to: string } {
 
 const init = defaultPeriod()
 
+const STORAGE_KEY_POSITION_FILTER = 'pairing-filter.positionFilter'
+
+function readStoredPositionFilter(): string[] | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY_POSITION_FILTER)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) && parsed.every((v) => typeof v === 'string') ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function writeStoredPositionFilter(v: string[] | null) {
+  if (typeof window === 'undefined') return
+  try {
+    if (v === null) window.localStorage.removeItem(STORAGE_KEY_POSITION_FILTER)
+    else window.localStorage.setItem(STORAGE_KEY_POSITION_FILTER, JSON.stringify(v))
+  } catch {
+    /* ignore */
+  }
+}
+
+const persistedFilters: PairingFilters = {
+  ...DEFAULT_FILTERS,
+  positionFilter: readStoredPositionFilter(),
+}
+
 export const usePairingFilterStore = create<PairingFilterStoreState>((set, get) => ({
   draftPeriodFrom: init.from,
   draftPeriodTo: init.to,
-  draftFilters: DEFAULT_FILTERS,
+  draftFilters: persistedFilters,
 
   activeCount: () => {
     const { draftFilters, draftPeriodFrom, draftPeriodTo } = get()
@@ -51,6 +80,7 @@ export const usePairingFilterStore = create<PairingFilterStoreState>((set, get) 
     if (draftPeriodTo) count += 1
     if (draftFilters.baseAirports !== null) count += 1
     if (draftFilters.aircraftTypes !== null) count += 1
+    if (draftFilters.positionFilter !== null && draftFilters.positionFilter.length > 0) count += 1
     if (draftFilters.statusFilter.length !== ALL_STATUS.length) count += 1
     if (draftFilters.workflowFilter.length !== ALL_WORKFLOW.length) count += 1
     if (draftFilters.durations.length > 0) count += 1
@@ -61,7 +91,10 @@ export const usePairingFilterStore = create<PairingFilterStoreState>((set, get) 
   setDraftPeriod: (from, to) => set({ draftPeriodFrom: from, draftPeriodTo: to }),
   setDraftFrom: (from) => set({ draftPeriodFrom: from }),
   setDraftTo: (to) => set({ draftPeriodTo: to }),
-  setDraftFilters: (patch) => set((s) => ({ draftFilters: { ...s.draftFilters, ...patch } })),
+  setDraftFilters: (patch) => {
+    set((s) => ({ draftFilters: { ...s.draftFilters, ...patch } }))
+    if ('positionFilter' in patch) writeStoredPositionFilter(patch.positionFilter ?? null)
+  },
 
   reset: () =>
     set({

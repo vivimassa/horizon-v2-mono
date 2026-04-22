@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Eye, Trash2, FileText } from 'lucide-react'
+import { Eye, Trash2, FileText, Copy, Pencil } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { usePairingStore } from '@/stores/use-pairing-store'
 import { usePairingGanttStore } from '@/stores/use-pairing-gantt-store'
@@ -16,6 +16,10 @@ interface PairingPillContextMenuProps {
   onShowDetails: (pairingId: string) => void
   /** Opens the shared `DeletePairingDialog` — state lives in the canvas. */
   onRequestDelete: (pairingId: string) => void
+  /** Opens `ReplicatePairingDialog` — state lives in the canvas. */
+  onReplicate: (pairingId: string) => void
+  /** Enters Edit mode: seeds build chain with the pairing's legs + complement. */
+  onEdit: (pairingId: string) => void
 }
 
 /**
@@ -32,6 +36,8 @@ export function PairingPillContextMenu({
   onClose,
   onShowDetails,
   onRequestDelete,
+  onReplicate,
+  onEdit,
 }: PairingPillContextMenuProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -81,9 +87,12 @@ export function PairingPillContextMenu({
   if (typeof document === 'undefined' || !pairing) return null
 
   const menuW = 240
-  const menuH = 160
-  const left = Math.min(x, window.innerWidth - menuW - 8)
-  const top = Math.min(y, window.innerHeight - menuH - 8)
+  // Conservative upper bound for menu height — header + 5 items + divider.
+  // Must be ≥ actual rendered height so viewport-edge clamping doesn't clip
+  // the last row (was 160 when only 3 items existed).
+  const menuH = 300
+  const left = Math.max(8, Math.min(x, window.innerWidth - menuW - 8))
+  const top = Math.max(8, Math.min(y, window.innerHeight - menuH - 8))
 
   function Item({
     icon,
@@ -162,6 +171,8 @@ export function PairingPillContextMenu({
           kbd="Ctrl+F1"
           onClick={() => onShowDetails(pairingId)}
         />
+        <Item icon={<Pencil size={14} />} label="Edit Pairing" kbd="Ctrl+E" onClick={() => onEdit(pairingId)} />
+        <Item icon={<Copy size={14} />} label="Replicate" kbd="Ctrl+R" onClick={() => onReplicate(pairingId)} />
         <Item icon={<Eye size={14} />} label="Show Flights" kbd="Ctrl+↑" onClick={handleShowFlights} />
         <div className="my-1 h-px" style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }} />
         <Item icon={<Trash2 size={14} />} label="Delete Pairing" kbd="Del" onClick={handleDelete} danger />

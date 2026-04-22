@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { MousePointer, Copy, Route, Eye } from 'lucide-react'
+import { Eye } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { usePairingStore } from '@/stores/use-pairing-store'
 import { usePairingGanttStore } from '@/stores/use-pairing-gantt-store'
@@ -22,8 +22,18 @@ export function FlightContextMenu({ x, y, flightId, onClose }: FlightContextMenu
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const flight = usePairingStore((s) => s.flights.find((f) => f.id === flightId) ?? null)
+  const pairings = usePairingStore((s) => s.pairings)
   const inspectPairing = usePairingStore((s) => s.inspectPairing)
-  const selectFlight = usePairingGanttStore((s) => s.selectFlight)
+
+  // All pairings that include this flight as a non-deadhead leg — client-side
+  // scan so the menu surfaces every covering pairing regardless of whether
+  // the server-returned `flight.pairingId` hint is missing / stale / filtered.
+  const coveringPairings = pairings.filter((p) => {
+    if (!flight) return false
+    if (!p.flightIds.includes(flight.id) && p.id !== flight.pairingId) return false
+    if (p.deadheadFlightIds.includes(flight.id)) return false
+    return true
+  })
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -44,8 +54,8 @@ export function FlightContextMenu({ x, y, flightId, onClose }: FlightContextMenu
 
   if (typeof document === 'undefined' || !flight) return null
 
-  const menuW = 220
-  const menuH = flight.pairingId ? 188 : 96
+  const menuW = 240
+  const menuH = coveringPairings.length > 0 ? 56 + coveringPairings.length * 36 : 70
   const left = Math.min(x, window.innerWidth - menuW - 8)
   const top = Math.min(y, window.innerHeight - menuH - 8)
 
@@ -113,32 +123,20 @@ export function FlightContextMenu({ x, y, flightId, onClose }: FlightContextMenu
         {flight.flightNumber} · {flight.departureAirport}-{flight.arrivalAirport}
       </div>
       <div className="py-1">
-        <Item icon={<MousePointer size={14} />} label="Select flight" onClick={() => selectFlight(flightId)} />
-        <Item
-          icon={<Copy size={14} />}
-          label="Copy flight info"
-          onClick={() => {
-            if (navigator.clipboard) {
-              navigator.clipboard.writeText(
-                `${flight.flightNumber} ${flight.departureAirport}-${flight.arrivalAirport} ${flight.instanceDate}`,
-              )
-            }
-          }}
-        />
-        {flight.pairingId && (
-          <>
-            <div className="my-1 h-px" style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }} />
+        {coveringPairings.length > 0 ? (
+          coveringPairings.map((p, i) => (
             <Item
+              key={p.id}
               icon={<Eye size={14} />}
-              label="Show pairing"
-              onClick={() => flight.pairingId && inspectPairing(flight.pairingId)}
+              label={coveringPairings.length === 1 ? 'Show pairing' : `Show ${p.pairingCode}`}
+              kbd={i === 0 ? 'Ctrl+P' : undefined}
+              onClick={() => inspectPairing(p.id)}
             />
-            <Item
-              icon={<Route size={14} />}
-              label="Inspect pairing"
-              onClick={() => flight.pairingId && inspectPairing(flight.pairingId)}
-            />
-          </>
+          ))
+        ) : (
+          <div className="px-3 py-2 text-[12px] italic" style={{ color: 'var(--hz-text-tertiary)' }}>
+            No pairing covers this flight.
+          </div>
         )}
       </div>
     </div>,

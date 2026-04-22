@@ -139,6 +139,8 @@ export interface PairingFilters {
   durations: DurationFilterValue[]
   /** Scenario id; null = production */
   scenarioId: string | null
+  /** Multi-select crew-position codes (CP, FO, …). null = all positions (no scoping). */
+  positionFilter: string[] | null
 }
 
 export const ALL_STATUS: PairingLegalityStatus[] = ['legal', 'warning', 'violation']
@@ -152,4 +154,5 @@ export const DEFAULT_FILTERS: PairingFilters = {
   workflowFilter: ALL_WORKFLOW,
   durations: [],
   scenarioId: null,
+  positionFilter: null,
 }

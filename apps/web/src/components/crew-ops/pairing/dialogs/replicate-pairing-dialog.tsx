@@ -4,11 +4,29 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CalendarDays, Copy, CheckCircle2, AlertTriangle, XCircle, X, Loader2 } from 'lucide-react'
 import { api, type PairingCreateInput } from '@skyhub/api'
+import { toLocal } from '@skyhub/logic'
 import { useTheme } from '@/components/theme-provider'
 import { Tooltip } from '@/components/ui/tooltip'
 import { usePairingStore } from '@/stores/use-pairing-store'
+import { useOperatorStore } from '@/stores/use-operator-store'
 import { pairingFromApi } from '../adapters'
 import type { Pairing, PairingFlight } from '../types'
+
+/** Convert a UTC ISO to an operator-local ISO string (no Z). Required for
+ *  the FDTL validator's `std`/`sta` fields which expect local HH:MM for
+ *  FDP band row lookup (CAAV §15.025). */
+function utcIsoToLocalIso(utcIso: string, tz: string): string {
+  try {
+    const local = toLocal(new Date(utcIso), tz)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return (
+      `${local.getUTCFullYear()}-${pad(local.getUTCMonth() + 1)}-${pad(local.getUTCDate())}` +
+      `T${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}:${pad(local.getUTCSeconds())}`
+    )
+  } catch {
+    return utcIso
+  }
+}
 
 interface ReplicatePairingDialogProps {
   /** The pairing being replicated. Must be a production pairing already in the store. */
@@ -48,6 +66,7 @@ export function ReplicatePairingDialog({ source, onClose }: ReplicatePairingDial
   const periodTo = usePairingStore((s) => s.periodTo)
   const addPairing = usePairingStore((s) => s.addPairing)
   const setError = usePairingStore((s) => s.setError)
+  const operatorTz = useOperatorStore((s) => s.operator?.timezone ?? 'UTC')
 
   // ── Build candidate dates for the current period ─────────────────────
   const candidates = useMemo<DayRow[]>(() => {
@@ -146,8 +165,8 @@ export function ReplicatePairingDialog({ source, onClose }: ReplicatePairingDial
             flightNumber: leg.flightNumber ?? '',
             departureAirport: leg.depStation,
             arrivalAirport: leg.arrStation,
-            std: shiftIsoDays(leg.stdUtcIso, shiftDaysFromSource),
-            sta: shiftIsoDays(leg.staUtcIso, shiftDaysFromSource),
+            std: utcIsoToLocalIso(shiftIsoDays(leg.stdUtcIso, shiftDaysFromSource), operatorTz),
+            sta: utcIsoToLocalIso(shiftIsoDays(leg.staUtcIso, shiftDaysFromSource), operatorTz),
             stdUtc: shiftIsoDays(leg.stdUtcIso, shiftDaysFromSource),
             staUtc: shiftIsoDays(leg.staUtcIso, shiftDaysFromSource),
             blockMinutes: leg.blockMinutes ?? 0,
@@ -175,7 +194,7 @@ export function ReplicatePairingDialog({ source, onClose }: ReplicatePairingDial
       rows.push({ date: ymd, weekday, status: 'ready-legal', flights: resolved, matchesFrequency })
     }
     return rows
-  }, [periodFrom, periodTo, flights, source])
+  }, [periodFrom, periodTo, flights, source, operatorTz])
 
   // SSIM frequency string (e.g. "1234567", "135") read off the source pairing's
   // first leg via the flight pool. All legs of a replicable pairing share the
@@ -306,7 +325,12 @@ export function ReplicatePairingDialog({ source, onClose }: ReplicatePairingDial
         aircraftTypeIcao: source.legs[0]?.aircraftTypeIcao ?? row.flights[0]?.aircraftType ?? null,
         complementKey: source.complementKey,
         cockpitCount: source.cockpitCount,
-        facilityClass: source.facilityClass,
+        // Fallback for legacy source pairings that were saved with null
+        // facilityClass — without it, the server-side FDTL engine falls back
+        // to unaugmented FDP limits and flags the copy as a violation even
+        // though the original was marked legal (canvas used CLASS_1 live).
+        facilityClass: source.facilityClass ?? (source.complementKey !== 'standard' ? 'CLASS_1' : null),
+        crewCounts: source.crewCounts,
         legs,
         fdtlStatus: 'legal' as const,
         workflowStatus: source.workflowStatus,

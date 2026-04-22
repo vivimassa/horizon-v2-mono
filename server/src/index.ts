@@ -37,6 +37,7 @@ import { worldMapRoutes } from './routes/world-map.js'
 import { disruptionRoutes } from './routes/disruptions.js'
 import { operatorDisruptionConfigRoutes } from './routes/operator-disruption-config.js'
 import { operatorMessagingConfigRoutes } from './routes/operator-messaging-config.js'
+import { operatorPairingConfigRoutes } from './routes/operator-pairing-config.js'
 import { asmSsmConsumerRoutes } from './routes/asm-ssm-consumers.js'
 import { integrationPullRoutes } from './routes/integration-pull.js'
 import { mlRoutes } from './routes/ml.js'
@@ -118,6 +119,7 @@ async function main(): Promise<void> {
   await app.register(disruptionRoutes)
   await app.register(operatorDisruptionConfigRoutes)
   await app.register(operatorMessagingConfigRoutes)
+  await app.register(operatorPairingConfigRoutes)
   await app.register(asmSsmConsumerRoutes)
   await app.register(integrationPullRoutes)
   await app.register(mlRoutes)

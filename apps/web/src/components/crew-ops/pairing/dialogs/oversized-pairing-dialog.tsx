@@ -12,8 +12,6 @@ interface OversizedPairingDialogProps {
   flightCount: number
   /** Maximum allowed pairing length before this dialog fires. */
   maxDays: number
-  /** Which workflow the user picked (Draft or Final). */
-  workflowLabel: 'Draft' | 'Final'
   onProceed: () => void
   onCancel: () => void
 }
@@ -32,7 +30,6 @@ export function OversizedPairingDialog({
   spanDays,
   flightCount,
   maxDays,
-  workflowLabel,
   onProceed,
   onCancel,
 }: OversizedPairingDialogProps) {
@@ -167,7 +164,7 @@ export function OversizedPairingDialog({
             }}
             title={`Create as one ${spanDays}-day pairing (will still run FDTL check afterwards)`}
           >
-            Create as {workflowLabel} anyway
+            Create anyway
           </button>
         </div>
       </div>

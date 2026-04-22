@@ -69,6 +69,15 @@ interface PairingGanttState {
   fullscreen: boolean
   buildMode: boolean
 
+  // ── Next-leg proposal (build mode helper) ──
+  proposalEnabled: boolean
+  /** 1..7 — how many days ahead of chain's last STA to surface candidates. */
+  proposalDays: number
+  /** Candidate flight ids — recomputed when chain / pairings / toggle / days change. */
+  proposalCandidateIds: Set<string>
+  /** Tail hosting the nearest candidate — pinned to top of layout while proposal is on. */
+  proposalPinnedRegistration: string | null
+
   // ── Overlays (mirror Movement Control) ──
   showTat: boolean
   centerTimebar: boolean
@@ -114,6 +123,9 @@ interface PairingGanttState {
   toggleSearch: () => void
   setFullscreen: (v: boolean) => void
   setBuildMode: (v: boolean) => void
+  toggleProposal: () => void
+  setProposalDays: (d: number) => void
+  setProposalCandidates: (ids: Set<string>, pinnedRegistration: string | null) => void
   toggleTat: () => void
   toggleCenterTimebar: () => void
   setRefreshIntervalMins: (mins: number) => void
@@ -136,6 +148,21 @@ const STORAGE_KEY_ZONE_RATIO = 'pairing-gantt.zoneHeightRatio'
 const STORAGE_KEY_ROW_HEIGHT = 'pairing-gantt.rowHeightLevel'
 const STORAGE_KEY_ZONE_OPEN = 'pairing-gantt.zoneOpen'
 const STORAGE_KEY_PLACEMENTS = 'pairing-gantt.virtualPlacements'
+const STORAGE_KEY_ZOOM = 'pairing-gantt.zoomLevel'
+const STORAGE_KEY_LABEL_MODE = 'pairing-gantt.barLabelMode'
+
+const VALID_ZOOMS: ZoomLevel[] = ['1D', '2D', '3D', '4D', '5D', '6D', '7D', '14D', '21D', '28D']
+
+function readStoredString<T extends string>(key: string, allowed: T[], fallback: T): T {
+  if (typeof window === 'undefined') return fallback
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) return fallback
+    return allowed.includes(raw as T) ? (raw as T) : fallback
+  } catch {
+    return fallback
+  }
+}
 
 function readStoredNumber(key: string, fallback: number): number {
   if (typeof window === 'undefined') return fallback
@@ -244,10 +271,10 @@ export const usePairingGanttStore = create<PairingGanttState>((set, get) => {
     periodTo: '',
 
     // View
-    zoomLevel: '7D',
+    zoomLevel: readStoredString<ZoomLevel>(STORAGE_KEY_ZOOM, VALID_ZOOMS, '3D'),
     rowHeightLevel: readStoredNumber(STORAGE_KEY_ROW_HEIGHT, 1),
     colorMode: 'status',
-    barLabelMode: 'flightNo',
+    barLabelMode: readStoredString<BarLabelMode>(STORAGE_KEY_LABEL_MODE, ['flightNo', 'sector'], 'sector'),
     fleetSortOrder: 'type',
     collapsedTypes: new Set<string>(),
     containerWidth: 0,
@@ -265,7 +292,13 @@ export const usePairingGanttStore = create<PairingGanttState>((set, get) => {
     // UI
     searchOpen: false,
     fullscreen: false,
-    buildMode: false,
+    buildMode: true,
+
+    // Proposal (session-only; resets on reload, defaults ON)
+    proposalEnabled: true,
+    proposalDays: 1,
+    proposalCandidateIds: new Set<string>(),
+    proposalPinnedRegistration: null,
 
     // Overlays
     showTat: false,
@@ -298,6 +331,7 @@ export const usePairingGanttStore = create<PairingGanttState>((set, get) => {
 
     // ── View actions ──
     setZoom: (z) => {
+      writeStored(STORAGE_KEY_ZOOM, z)
       set({ zoomLevel: z })
       scheduleRecompute(doRecompute)
     },
@@ -320,6 +354,7 @@ export const usePairingGanttStore = create<PairingGanttState>((set, get) => {
       scheduleRecompute(doRecompute)
     },
     setBarLabelMode: (m) => {
+      writeStored(STORAGE_KEY_LABEL_MODE, m)
       set({ barLabelMode: m })
       scheduleRecompute(doRecompute)
     },
@@ -383,6 +418,30 @@ export const usePairingGanttStore = create<PairingGanttState>((set, get) => {
     toggleSearch: () => set({ searchOpen: !get().searchOpen }),
     setFullscreen: (v) => set({ fullscreen: v }),
     setBuildMode: (v) => set({ buildMode: v, selectedFlightIds: new Set() }),
+    toggleProposal: () => {
+      const next = !get().proposalEnabled
+      set({
+        proposalEnabled: next,
+        // Clear candidates + unpin when turning off so layout reverts.
+        ...(next ? {} : { proposalCandidateIds: new Set<string>(), proposalPinnedRegistration: null }),
+      })
+      scheduleRecompute(doRecompute)
+    },
+    setProposalDays: (d) => {
+      const clamped = Math.max(1, Math.min(7, Math.round(d)))
+      if (clamped === get().proposalDays) return
+      set({ proposalDays: clamped })
+    },
+    setProposalCandidates: (ids, pinnedRegistration) => {
+      const state = get()
+      const prevIds = state.proposalCandidateIds
+      const prevPinned = state.proposalPinnedRegistration
+      const sameSet = prevIds.size === ids.size && [...ids].every((v) => prevIds.has(v))
+      if (sameSet && prevPinned === pinnedRegistration) return
+      // No scheduleRecompute — proposal now highlights + scrolls (C); fleet
+      // row order stays stable so the grid doesn't reshuffle on each chain edit.
+      set({ proposalCandidateIds: ids, proposalPinnedRegistration: pinnedRegistration })
+    },
     toggleTat: () => set({ showTat: !get().showTat }),
     toggleCenterTimebar: () => {
       const next = !get().centerTimebar

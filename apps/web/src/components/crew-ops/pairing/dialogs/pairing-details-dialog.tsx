@@ -229,19 +229,21 @@ export function PairingDetailsDialog({ pairing, onClose, periodOverride, assigne
             >
               {pairing.pairingCode}
             </h2>
-            <PairingStatusBadge status={pairing.status} size="md" />
-            {pairing.workflowStatus === 'draft' && (
-              <span
-                className="text-[11px] font-bold tracking-[0.04em] px-2 py-0.5 rounded-md"
-                style={{
-                  background: 'rgba(59,130,246,0.14)',
-                  color: '#3B82F6',
-                  border: '1px solid rgba(59,130,246,0.30)',
-                }}
-              >
-                DRAFT
-              </span>
-            )}
+            {/* Prefer the LIVE legality result (which includes soft rules
+                like 4.1.5.4 aircraft-change ground time) over the stored
+                status, so a pairing that was 'legal' at save time but falls
+                below a newly-configured soft threshold surfaces the warning
+                here instead of silently passing. */}
+            <PairingStatusBadge
+              status={
+                legality.overallStatus === 'pass'
+                  ? 'legal'
+                  : legality.overallStatus === 'warning'
+                    ? 'warning'
+                    : 'violation'
+              }
+              size="md"
+            />
             <div className="flex-1" />
             <button
               type="button"

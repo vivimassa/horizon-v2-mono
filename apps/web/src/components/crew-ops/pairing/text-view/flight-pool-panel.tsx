@@ -15,8 +15,9 @@ const ACCENT = '#7c3aed'
  * Center pane of Crew Pairing 4.1.5.1. Renders the Scheduling-XL grid and the
  * layover chip. Save/dialog state for create-pairing lives in the Inspector
  * Panel — the grid's Enter and right-click menu dispatch intent through
- * `usePairingStore.requestCreatePairing(ids, workflow, label)` which the
- * Inspector picks up and runs through its guard chain.
+ * `usePairingStore.requestCreatePairing(ids)` which the Inspector picks up
+ * and runs through its guard chain. All new pairings are committed
+ * (production); draft workflow has been removed.
  */
 export function FlightPoolPanel() {
   const { theme } = useTheme()
@@ -107,14 +108,13 @@ export function FlightPoolPanel() {
         </span>
         <span className="flex-1" />
         <span className="text-[11px]" style={{ color: textTertiary }}>
-          Drag to select · Shift+click to extend · Use the Inspector to create Draft or Final
+          Drag to select · Shift+click to extend · Enter to create pairing
         </span>
       </div>
 
       <FlightGrid
         canCreate
-        onCreateDraft={(ids) => requestCreatePairing(ids, 'draft', 'Draft')}
-        onCreateFinal={(ids) => requestCreatePairing(ids, 'committed', 'Final')}
+        onCreatePairing={(ids) => requestCreatePairing(ids)}
         onInspectPairing={(pairingId) => inspectPairing(pairingId)}
         onDeletePairing={(pairingId) => {
           const p = pairings.find((x) => x.id === pairingId)

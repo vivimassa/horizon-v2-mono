@@ -36,8 +36,6 @@ function violationReason(c: LegalityCheck): string {
 interface IllegalPairingDialogProps {
   /** The computed legality result (must have at least one violation). */
   result: LegalityResult
-  /** Workflow status the user was about to create (for the title). */
-  workflowLabel: 'Draft' | 'Final'
   onProceed: () => void
   onCancel: () => void
 }
@@ -48,7 +46,7 @@ interface IllegalPairingDialogProps {
  * Proceed / Cancel choice. Proceed creates the pairing anyway (for cases
  * where the operator has manager override).
  */
-export function IllegalPairingDialog({ result, workflowLabel, onProceed, onCancel }: IllegalPairingDialogProps) {
+export function IllegalPairingDialog({ result, onProceed, onCancel }: IllegalPairingDialogProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
@@ -101,8 +99,7 @@ export function IllegalPairingDialog({ result, workflowLabel, onProceed, onCance
               Illegal pairing — {violations.length} violation{violations.length === 1 ? '' : 's'}
             </h3>
             <p className="text-[13px] leading-relaxed" style={{ color: textSecondary }}>
-              The flights you selected break FDTL rules. Creating this pairing as <strong>{workflowLabel}</strong>{' '}
-              requires a manager-level override.
+              The flights you selected break FDTL rules. Creating this pairing requires a manager-level override.
             </p>
           </div>
           <button

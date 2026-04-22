@@ -190,8 +190,8 @@ export function buildMockPairings(flights: PairingFlight[]): Pairing[] {
 
   const pairings: Pairing[] = [
     buildPairing('P-0241', 'SGN', 'legal', 'committed', p1Flights),
-    buildPairing('P-0242', 'SGN', 'warning', 'draft', p2Flights),
-    buildPairing('P-0243', 'SGN', 'violation', 'draft', p3Flights),
+    buildPairing('P-0242', 'SGN', 'warning', 'committed', p2Flights),
+    buildPairing('P-0243', 'SGN', 'violation', 'committed', p3Flights),
   ]
 
   // Attach pairingId back onto the flights so the pool can gray them out.
@@ -272,13 +272,6 @@ export function mockLegalityResult(flights: PairingFlight[]): LegalityResult {
       limit: '9.0h',
       status: totalBlock > 9 * 60 ? 'violation' : 'pass',
       fdtlRef: 'CAAV §9.2 — max block 9:00',
-    },
-    {
-      label: 'Sectors',
-      actual: `${flights.length}`,
-      limit: '6',
-      status: flights.length > 6 ? 'violation' : 'pass',
-      fdtlRef: 'CAAV §9.3',
     },
     {
       label: 'Base Routing',

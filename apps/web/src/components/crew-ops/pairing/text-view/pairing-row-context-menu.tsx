@@ -9,7 +9,6 @@ interface PairingRowContextMenuProps {
   x: number
   y: number
   pairingCode: string
-  isDraft: boolean
   onClose: () => void
   /** Open the full Pairing Details dialog. */
   onShowDetails: () => void
@@ -29,7 +28,6 @@ export function PairingRowContextMenu({
   x,
   y,
   pairingCode,
-  isDraft,
   onClose,
   onShowDetails,
   onReplicate,
@@ -59,14 +57,13 @@ export function PairingRowContextMenu({
   const bg = isDark ? 'rgba(25,25,33,0.98)' : 'rgba(255,255,255,0.99)'
   const border = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)'
   const textPrimary = isDark ? '#F5F2FD' : '#1C1C28'
-  const textMuted = isDark ? '#8F90A6' : '#8F90A6'
   const hoverBg = isDark ? 'rgba(124,58,237,0.18)' : 'rgba(124,58,237,0.10)'
   const dangerHoverBg = isDark ? 'rgba(255,59,59,0.15)' : 'rgba(255,59,59,0.08)'
 
   const menuWidth = 240
-  const menuHeight = 220
-  const clampedX = Math.min(x, window.innerWidth - menuWidth - 4)
-  const clampedY = Math.min(y, window.innerHeight - menuHeight - 4)
+  const menuHeight = 240
+  const clampedX = Math.max(4, Math.min(x, window.innerWidth - menuWidth - 4))
+  const clampedY = Math.max(4, Math.min(y, window.innerHeight - menuHeight - 4))
 
   return createPortal(
     <div
@@ -95,11 +92,6 @@ export function PairingRowContextMenu({
         }}
       >
         Pairing {pairingCode}
-        {isDraft && (
-          <span className="ml-1.5" style={{ color: textMuted, fontWeight: 600 }}>
-            · DRAFT
-          </span>
-        )}
       </div>
       <Item
         icon={<FileText size={14} strokeWidth={2.2} />}
@@ -114,8 +106,8 @@ export function PairingRowContextMenu({
       />
       <Item
         icon={<Copy size={14} strokeWidth={2.2} />}
-        label="Replicate across period…"
-        accent
+        label="Replicate across period"
+        kbd="Ctrl+R"
         onClick={() => {
           onReplicate()
           onClose()

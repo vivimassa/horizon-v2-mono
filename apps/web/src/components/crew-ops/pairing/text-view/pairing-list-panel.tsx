@@ -63,6 +63,15 @@ export function PairingListPanel() {
           setDetailsPairing({ pairing: target })
         }
       }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R')) {
+        const id = usePairingStore.getState().inspectedPairingId
+        if (!id) return
+        const target = usePairingStore.getState().pairings.find((p) => p.id === id)
+        if (target) {
+          e.preventDefault()
+          setReplicateSource(target)
+        }
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -95,12 +104,16 @@ export function PairingListPanel() {
     return pairings.filter((p) => {
       if (filters.scenarioId !== null) return true // placeholder — scenario filtering handled server-side
       if (!filters.statusFilter.includes(p.status)) return false
-      if (!filters.workflowFilter.includes(p.workflowStatus)) return false
       if (filters.durations.length > 0) {
         const key = `${p.pairingDays}d` as (typeof filters.durations)[number]
         if (!filters.durations.includes(key)) return false
       }
       if (filters.baseAirports && !filters.baseAirports.includes(p.baseAirport)) return false
+      if (filters.positionFilter && filters.positionFilter.length > 0) {
+        const counts = p.crewCounts ?? {}
+        const hasAny = filters.positionFilter.some((code) => (counts[code] ?? 0) > 0)
+        if (!hasAny) return false
+      }
       if (q) {
         const hay = `${p.pairingCode} ${p.routeChain}`.toLowerCase()
         if (!hay.includes(q)) return false
@@ -273,7 +286,6 @@ export function PairingListPanel() {
           x={menu.x}
           y={menu.y}
           pairingCode={menu.pairing.pairingCode}
-          isDraft={menu.pairing.workflowStatus === 'draft'}
           onClose={() => setMenu(null)}
           onShowDetails={() => {
             if (menu.groupMembers && menu.groupMembers.length > 1) {
@@ -442,7 +454,6 @@ function PairingRow({
           {blockHours}h · {pairing.flightIds.length} legs
         </span>
         <span className="flex-1" />
-        <WorkflowPill status={pairing.workflowStatus} isDark={isDark} />
         <PairingStatusBadge status={pairing.status} size="sm" />
       </button>
     )
@@ -466,7 +477,6 @@ function PairingRow({
           <span className="text-[13px] font-bold tracking-tight" style={{ color: textPrimary }}>
             {pairing.pairingCode}
           </span>
-          <WorkflowPill status={pairing.workflowStatus} isDark={isDark} />
         </div>
         <PairingStatusBadge status={pairing.status} size="sm" />
       </div>
@@ -522,7 +532,6 @@ function PairingGroupHeader({
     legal: group.members.filter((p) => p.status === 'legal').length,
     warning: group.members.filter((p) => p.status === 'warning').length,
     violation: group.members.filter((p) => p.status === 'violation').length,
-    draft: group.members.filter((p) => p.workflowStatus === 'draft').length,
   }
   const first = group.members[0]
   const last = group.members[group.members.length - 1]
@@ -572,12 +581,6 @@ function PairingGroupHeader({
           <CalendarDays size={10} strokeWidth={2} />
           {formatDate(first.startDate)} → {formatDate(last.endDate)}
         </span>
-        {counts.draft > 0 && (
-          <>
-            <span>·</span>
-            <span style={{ color: '#3B82F6' }}>{counts.draft} draft</span>
-          </>
-        )}
       </div>
     </button>
   )
@@ -591,20 +594,6 @@ function AggregateBadge({ color, label, value }: { color: string; label: string;
       title={`${value} ${label}`}
     >
       {value} {label}
-    </span>
-  )
-}
-
-function WorkflowPill({ status, isDark }: { status: Pairing['workflowStatus']; isDark: boolean }) {
-  const isDraft = status === 'draft'
-  const color = isDraft ? '#3B82F6' : '#06C270'
-  const bg = isDraft ? 'rgba(59, 130, 246, 0.14)' : 'rgba(6, 194, 112, 0.14)'
-  return (
-    <span
-      className="inline-flex items-center px-1.5 h-4 rounded text-[9px] font-bold tracking-[0.1em] uppercase"
-      style={{ background: bg, color, border: `1px solid ${color}44`, letterSpacing: '0.08em' }}
-    >
-      {isDraft ? 'Draft' : 'Committed'}
     </span>
   )
 }

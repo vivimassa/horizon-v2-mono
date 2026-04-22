@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { FileText, CheckCircle2, X, Eye, Trash2, Moon, ArrowRightCircle } from 'lucide-react'
+import { CheckCircle2, X, Eye, Trash2, Moon, ArrowRightCircle } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 
 type FlightGridContextMenuProps =
@@ -15,8 +15,7 @@ type FlightGridContextMenuProps =
        *  menu item). Null when 0 or multiple flights are selected. */
       singleSelectionArr?: string | null
       onClose: () => void
-      onCreateDraft: () => void
-      onCreateFinal: () => void
+      onCreatePairing: () => void
       onClearSelection: () => void
       /** Fires when the planner picks "Layover at {ARR}". Parent stores the
        *  click coords so the chip can anchor in-place. */
@@ -50,7 +49,7 @@ type FlightGridContextMenuProps =
  * Portalled right-click menu for the Flight Pool grid. Two variants:
  *
  * - `create`: right-click on an empty / uncovered cell. Offers Create Pairing
- *   as Draft / Final (from the current grid selection) + Clear Selection.
+ *   (from the current grid selection) + Clear Selection.
  * - `pairing`: right-click on a PAIRING column cell with a code. Offers
  *   Replicate / Inspect / Delete, scoped to that specific pairing.
  *
@@ -136,8 +135,7 @@ export function FlightGridContextMenu(props: FlightGridContextMenuProps) {
 function CreateVariant({
   selectionCount,
   singleSelectionArr,
-  onCreateDraft,
-  onCreateFinal,
+  onCreatePairing,
   onClearSelection,
   onStartLayover,
   onClose,
@@ -165,21 +163,10 @@ function CreateVariant({
         border={border}
       />
       <MenuItem
-        icon={<FileText size={14} strokeWidth={2} />}
-        label="Create Pairing as Draft"
-        onClick={() => {
-          onCreateDraft()
-          onClose()
-        }}
-        disabled={disabled}
-        textPrimary={textPrimary}
-        hoverBg={hoverBg}
-      />
-      <MenuItem
         icon={<CheckCircle2 size={14} strokeWidth={2.2} />}
-        label="Create Pairing as Final"
+        label="Create Pairing"
         onClick={() => {
-          onCreateFinal()
+          onCreatePairing()
           onClose()
         }}
         disabled={disabled}

@@ -68,7 +68,11 @@ export function PairingGanttShell() {
   const setError = usePairingStore((s) => s.setError)
   const setComplements = usePairingStore((s) => s.setComplements)
   const setPositions = usePairingStore((s) => s.setPositions)
+  const setAircraftTypeFamilies = usePairingStore((s) => s.setAircraftTypeFamilies)
   const setStationUtcOffsets = usePairingStore((s) => s.setStationUtcOffsets)
+  const setStationCountries = usePairingStore((s) => s.setStationCountries)
+  const setPairingConfig = usePairingStore((s) => s.setPairingConfig)
+  const setHomeCountryIso2 = usePairingStore((s) => s.setHomeCountryIso2)
 
   // Gantt view store — push converted records here to trigger layout.
   const setGanttFlights = usePairingGanttStore((s) => s.setFlights)
@@ -114,6 +118,9 @@ export function PairingGanttShell() {
           // Convert into Movement Control shapes and push into the gantt store.
           const typeLookup = new Map(acTypesRaw.map((t) => [t._id, t]))
           setGanttAircraftTypes(acTypesRaw.map(toGanttAircraftType))
+          const familyMap: Record<string, string | null> = {}
+          for (const t of acTypesRaw) familyMap[t.icaoType] = t.family ?? null
+          setAircraftTypeFamilies(familyMap)
           setGanttAircraft(acRegs.map((r) => toGanttAircraft(r, typeLookup)))
           setGanttFlights((flightRows as PairingFlight[]).map(toGanttFlight))
         } catch (err) {
@@ -178,6 +185,7 @@ export function PairingGanttShell() {
     setGanttAircraft,
     setGanttAircraftTypes,
     setGanttPeriod,
+    setAircraftTypeFamilies,
   ])
 
   useEffect(() => {
@@ -192,22 +200,38 @@ export function PairingGanttShell() {
   // plus the STD/STA (Local) rows in the flight tooltip.
   useEffect(() => {
     let cancelled = false
-    Promise.all([api.getCrewComplements(getOperatorId()), api.getCrewPositions(getOperatorId()), api.getAirports()])
-      .then(([complements, positions, airports]) => {
+    Promise.all([
+      api.getCrewComplements(getOperatorId()),
+      api.getCrewPositions(getOperatorId()),
+      api.getAirports(),
+      api.getOperatorPairingConfig(getOperatorId()),
+      api.getOperator(getOperatorId()).catch(() => null),
+    ])
+      .then(([complements, positions, airports, pairingCfg, op]) => {
         if (cancelled) return
         setComplements(complements)
         setPositions(positions)
         // Prefer the explicit `utcOffsetHours` on the airport record; fall
         // back to computing it from the IANA `timezone` string so stations
         // that haven't had the numeric offset seeded still render local time.
-        const map: Record<string, number> = {}
+        const offsetMap: Record<string, number> = {}
+        const countryMap: Record<string, string> = {}
         for (const a of airports) {
           const offset = a.utcOffsetHours != null ? a.utcOffsetHours : a.timezone ? offsetFromTz(a.timezone) : null
-          if (offset == null) continue
-          if (a.icaoCode) map[a.icaoCode] = offset
-          if (a.iataCode) map[a.iataCode] = offset
+          if (offset != null) {
+            if (a.icaoCode) offsetMap[a.icaoCode] = offset
+            if (a.iataCode) offsetMap[a.iataCode] = offset
+          }
+          const country = a.countryIso2 ?? a.country ?? null
+          if (country) {
+            if (a.icaoCode) countryMap[a.icaoCode] = country
+            if (a.iataCode) countryMap[a.iataCode] = country
+          }
         }
-        setStationUtcOffsets(map)
+        setStationUtcOffsets(offsetMap)
+        setStationCountries(countryMap)
+        setPairingConfig(pairingCfg)
+        setHomeCountryIso2(op?.countryIso2 ?? null)
       })
       .catch((err) => {
         console.warn('Failed to load pairing workspace reference data:', err)
@@ -215,7 +239,7 @@ export function PairingGanttShell() {
     return () => {
       cancelled = true
     }
-  }, [setComplements, setPositions, setStationUtcOffsets])
+  }, [setComplements, setPositions, setStationUtcOffsets, setStationCountries, setPairingConfig, setHomeCountryIso2])
 
   // Layout is computed by the gantt store once data arrives. We use it as the
   // "ready" signal (matches Movement Control): toolbar + inspector only show

@@ -97,11 +97,13 @@ function matchesFilter(p: Pairing, filter: PairingLayoutInput['filter']): boolea
 }
 
 function getPairingStartMs(p: Pairing): number | null {
+  // Floor at pairing.startDate so cross-midnight pairings (first leg STD on the
+  // previous UTC date) sort into the declared start day, not the prior day.
+  const startDateMs = p.startDate ? Date.parse(`${p.startDate}T00:00:00Z`) : null
   const first = p.legs[0]
-  if (first?.stdUtcIso) return Date.parse(first.stdUtcIso)
-  if (first?.stdUtc) return Date.parse(first.stdUtc)
-  if (p.startDate) return Date.parse(`${p.startDate}T00:00:00Z`)
-  return null
+  const legMs = first?.stdUtcIso ? Date.parse(first.stdUtcIso) : null
+  if (legMs !== null && startDateMs !== null) return Math.max(startDateMs, legMs)
+  return legMs ?? startDateMs ?? null
 }
 
 function buildPills(legs: PairingLegMeta[], startMs: number, pph: number): PillLayout[] {
@@ -113,7 +115,9 @@ function buildPills(legs: PairingLegMeta[], startMs: number, pph: number): PillL
     const stdMs = Date.parse(stdIso)
     const staMs = Date.parse(staIso)
     if (Number.isNaN(stdMs) || Number.isNaN(staMs)) continue
-    const x = utcToX(stdMs, startMs, pph)
+    // Clamp to viewport start so cross-midnight legs (STD on the day before
+    // periodFrom) don't produce negative x and render off-screen left.
+    const x = Math.max(0, utcToX(stdMs, startMs, pph))
     const xEnd = utcToX(staMs, startMs, pph)
     // Match the flight-bar floor from the Movement Control layout engine so
     // pairing pills track 1:1 with the flight bar above them at every zoom.

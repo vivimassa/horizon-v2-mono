@@ -107,12 +107,21 @@ export function computeEfficiency(blockMinutes: number, tafbMinutes: number): nu
  * FRMS-approved company minimum), that takes precedence.
  */
 export function resolveRequiredRestMinutes(ruleSet?: SerializedRuleSetRef | null, dutyMinutes?: number): number {
-  // 1. Prefer explicit operator rule from the FDTL rule set.
+  // 1. Prefer explicit operator rule from the FDTL rule set. Try
+  //    location-aware codes first (CAAV home/away split), then legacy
+  //    generic codes, then the unified pre-FDP code.
   if (ruleSet) {
-    const rule = ruleSet.rules.find(
-      (r) => r.code === 'REST_MIN_HOURS' || r.code === 'MIN_REST_AFTER_DUTY' || r.code === 'MIN_REST',
-    )
-    if (rule) {
+    const codePriority = [
+      'MIN_REST_HOME_BASE',
+      'MIN_REST_PRE_FDP',
+      'MIN_REST_AWAY',
+      'REST_MIN_HOURS',
+      'MIN_REST_AFTER_DUTY',
+      'MIN_REST',
+    ]
+    for (const code of codePriority) {
+      const rule = ruleSet.rules.find((r) => r.code === code)
+      if (!rule) continue
       const v = rule.value.trim()
       const hhmm = v.match(/^(\d+):(\d{2})$/)
       if (hhmm) return parseInt(hhmm[1], 10) * 60 + parseInt(hhmm[2], 10)

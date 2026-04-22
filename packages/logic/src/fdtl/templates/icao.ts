@@ -16,6 +16,19 @@ export interface RuleTemplate {
   directionality?: 'MAX_LIMIT' | 'MIN_LIMIT' | 'BOOLEAN' | 'ENUM' | 'FORMULA'
   crew_type?: 'all' | 'cockpit' | 'cabin'
   is_active?: boolean
+  /** Data-driven evaluator key (RuleComputationType from engine-types).
+   *  When absent, the validator infers from `rule_code`. Templates for
+   *  unusual rule naming should set this explicitly. */
+  computation_type?:
+    | 'rolling_cumulative'
+    | 'min_rest_between_events'
+    | 'min_rest_after_augmented'
+    | 'min_rest_in_window'
+    | 'per_duty_limit'
+    | 'consecutive_count'
+    | 'custom'
+  /** Params consumed by the evaluator (e.g. `{ window: '7D' }`). */
+  params?: Record<string, unknown>
 }
 
 export type RuleOverride = { rule_code: string } & Partial<Omit<RuleTemplate, 'rule_code'>>

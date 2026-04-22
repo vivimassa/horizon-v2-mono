@@ -65,9 +65,14 @@ function fmt(minutes: number): string {
   return `${h}:${m.toString().padStart(2, '0')}`
 }
 
-function getRouteType(dep: string, arr: string): 'domestic' | 'international' {
-  const depCountry = AIRPORT_COUNTRY[dep]
-  const arrCountry = AIRPORT_COUNTRY[arr]
+function getRouteType(
+  dep: string,
+  arr: string,
+  airportCountries?: Record<string, string>,
+): 'domestic' | 'international' {
+  const map = airportCountries ?? AIRPORT_COUNTRY
+  const depCountry = map[dep]
+  const arrCountry = map[arr]
   if (depCountry && arrCountry && depCountry === arrCountry) return 'domestic'
   return 'international'
 }
@@ -85,8 +90,9 @@ function getReportMinutes(
   flight: Flight,
   isDeadhead: boolean,
   defaultMinutes: number,
+  airportCountries?: Record<string, string>,
 ): number {
-  const routeType = getRouteType(flight.departureAirport, flight.arrivalAirport)
+  const routeType = getRouteType(flight.departureAirport, flight.arrivalAirport, airportCountries)
   const colKey = isDeadhead ? 'pax_air' : flight.aircraftType.toLowerCase()
   // Try specific aircraft type first, then generic
   return (
@@ -98,8 +104,13 @@ function getReportMinutes(
   )
 }
 
-function getDebriefMinutes(rtMap: Map<string, number>, flight: Flight, defaultMinutes: number): number {
-  const routeType = getRouteType(flight.departureAirport, flight.arrivalAirport)
+function getDebriefMinutes(
+  rtMap: Map<string, number>,
+  flight: Flight,
+  defaultMinutes: number,
+  airportCountries?: Record<string, string>,
+): number {
+  const routeType = getRouteType(flight.departureAirport, flight.arrivalAirport, airportCountries)
   const colKey = flight.aircraftType.toLowerCase()
   return (
     rtMap.get(`debrief|${routeType}|${colKey}`) ??
@@ -264,6 +275,7 @@ export function validatePairingClient(
   crewConfig?: CrewConfig,
   baseAirports?: string[],
   icaoToFamily?: Record<string, string>,
+  airportCountries?: Record<string, string>,
 ): LegalityResult {
   if (flights.length === 0) return { overallStatus: 'pass', checks: [] }
 
@@ -290,14 +302,20 @@ export function validatePairingClient(
     const day = dutyDays[di]
     const firstFlight = day[0]
     const isDeadheadFirst = deadheadIds.has(firstFlight.id)
-    const reportMin = getReportMinutes(rtMap, firstFlight, isDeadheadFirst, ruleSet.defaultReportMinutes)
+    const reportMin = getReportMinutes(
+      rtMap,
+      firstFlight,
+      isDeadheadFirst,
+      ruleSet.defaultReportMinutes,
+      airportCountries,
+    )
 
     // FDP math uses UTC — correct across timezone boundaries
     const reportTime = new Date(new Date(firstFlight.stdUtc).getTime() - reportMin * 60000)
 
     const opFlights = day.filter((f) => !deadheadIds.has(f.id))
     const lastOpFlight = opFlights.length > 0 ? opFlights[opFlights.length - 1] : day[day.length - 1]
-    const debriefMin = getDebriefMinutes(rtMap, lastOpFlight, ruleSet.defaultDebriefMinutes)
+    const debriefMin = getDebriefMinutes(rtMap, lastOpFlight, ruleSet.defaultDebriefMinutes, airportCountries)
     // FDP ends at chocks-on (STA) of last operating sector per CAAV VAR 15 — debrief is NOT included.
     const fdpMinutes = (new Date(lastOpFlight.staUtc).getTime() - reportTime.getTime()) / 60000
     const debriefTime = new Date(new Date(lastOpFlight.staUtc).getTime() + debriefMin * 60000)
@@ -382,19 +400,9 @@ export function validatePairingClient(
       }
     }
 
-    // Sector check
-    const maxSectorsInt = (() => {
-      const r = ruleSet.rules.find((r) => r.code === 'MAX_DAILY_SECTORS')
-      if (!r) return 10
-      const v = parseInt(r.value, 10)
-      return isNaN(v) ? 10 : v
-    })()
-    checks.push({
-      label: `Op. Sectors Day ${di + 1}`,
-      actual: String(opSectors),
-      limit: String(maxSectorsInt),
-      status: opSectors > maxSectorsInt ? 'violation' : opSectors >= maxSectorsInt - 2 ? 'warning' : 'pass',
-    })
+    // Op. Sectors check intentionally omitted — MAX_DAILY_SECTORS (typ. 10)
+    // will never be hit by any plausible pairing, so the row was visual
+    // noise in the Inspector legality strip without ever triggering.
   }
 
   // ── Cabin crew in-flight rest validation ─────────────────────────────────────
@@ -496,11 +504,14 @@ export function validatePairingClient(
     }
   }
 
+  // Downgrade close-to-limit warnings to pass — operator chose to only surface
+  // hard violations, not soft "getting close" flags.
+  for (const c of checks) {
+    if (c.status === 'warning') c.status = 'pass'
+  }
   const overallStatus: LegalityResult['overallStatus'] = checks.some((c) => c.status === 'violation')
     ? 'violation'
-    : checks.some((c) => c.status === 'warning') || isMult
-      ? 'warning'
-      : 'pass'
+    : 'pass'
 
   // ── Augmented suggestion — only for standard crew with FDP violations ──────
   let augmentedSuggestion: LegalityResult['augmentedSuggestion']

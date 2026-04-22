@@ -619,6 +619,8 @@ export const CAAV_RULES: RuleTemplate[] = [
     legal_reference: 'VAR 15 §15.037(a)(1)',
     directionality: 'MIN_LIMIT',
     sort_order: 10,
+    computation_type: 'min_rest_between_events',
+    params: { context: 'home', mustMatchPrecedingDuty: true },
   },
 
   {

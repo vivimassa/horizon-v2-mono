@@ -81,6 +81,7 @@ export const usePairingFilterStore = create<PairingFilterStoreState>((set, get) 
     if (draftFilters.baseAirports !== null) count += 1
     if (draftFilters.aircraftTypes !== null) count += 1
     if (draftFilters.positionFilter !== null && draftFilters.positionFilter.length > 0) count += 1
+    if (draftFilters.crewGroupIds !== null && draftFilters.crewGroupIds.length > 0) count += 1
     if (draftFilters.statusFilter.length !== ALL_STATUS.length) count += 1
     if (draftFilters.workflowFilter.length !== ALL_WORKFLOW.length) count += 1
     if (draftFilters.durations.length > 0) count += 1

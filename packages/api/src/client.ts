@@ -2390,6 +2390,74 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  // ── 4.1.6.3 Scheduling Configurations ──
+  getOperatorSchedulingConfig: (operatorId: string) =>
+    request<OperatorSchedulingConfig | null>(
+      `/operator-scheduling-config?operatorId=${encodeURIComponent(operatorId)}`,
+    ).catch((err) => {
+      if (err instanceof Error && /^API 404/.test(err.message)) return null
+      throw err
+    }),
+
+  upsertOperatorSchedulingConfig: (body: OperatorSchedulingConfigUpsert) =>
+    request<OperatorSchedulingConfig>('/operator-scheduling-config', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  bulkDeleteAssignments: (params: { periodFrom: string; periodTo: string }) => {
+    const qs = new URLSearchParams({ periodFrom: params.periodFrom, periodTo: params.periodTo })
+    return request<{ success: true; deletedCount: number }>(`/crew-schedule/assignments/bulk?${qs.toString()}`, {
+      method: 'DELETE',
+    })
+  },
+
+  // ── 4.1.6.1 Auto Roster ──
+  startAutoRoster: (params: StartAutoRosterParams) =>
+    request<{ runId: string }>('/auto-roster/run', { method: 'POST', body: JSON.stringify(params) }),
+
+  cancelAutoRoster: (runId: string) =>
+    request<{ success: true }>(`/auto-roster/${encodeURIComponent(runId)}`, { method: 'DELETE' }),
+
+  getAutoRosterHistory: (operatorId: string) => {
+    const qs = new URLSearchParams({ operatorId })
+    return request<AutoRosterRun[]>(`/auto-roster/history?${qs.toString()}`)
+  },
+
+  getAutoRosterRun: (runId: string) => request<AutoRosterRun>(`/auto-roster/${encodeURIComponent(runId)}`),
+
+  getAutoRosterPeriodSummary: (operatorId: string, periodFrom: string, periodTo: string) => {
+    const qs = new URLSearchParams({ operatorId, periodFrom, periodTo })
+    return request<PeriodSummary>(`/auto-roster/period-summary?${qs.toString()}`)
+  },
+
+  getAutoRosterFilterOptions: (operatorId: string) =>
+    request<AutoRosterFilterOptions>(`/auto-roster/filter-options?operatorId=${encodeURIComponent(operatorId)}`),
+
+  getAutoRosterPeriodBreakdown: (
+    operatorId: string,
+    periodFrom: string,
+    periodTo: string,
+    filters?: {
+      base?: string | string[]
+      position?: string | string[]
+      acType?: string | string[]
+      crewGroup?: string | string[]
+    },
+  ) => {
+    const qs = new URLSearchParams({ operatorId, periodFrom, periodTo })
+    const appendList = (key: string, v: string | string[] | undefined) => {
+      if (!v) return
+      const arr = Array.isArray(v) ? v : [v]
+      for (const x of arr) if (x) qs.append(key, x)
+    }
+    appendList('base', filters?.base)
+    appendList('position', filters?.position)
+    appendList('acType', filters?.acType)
+    appendList('crewGroup', filters?.crewGroup)
+    return request<PeriodBreakdown>(`/auto-roster/period-breakdown?${qs.toString()}`)
+  },
+
   resolveFlight: (q: { operatorId: string; flightNumber: string; date: string; dep?: string; arr?: string }) => {
     const params = new URLSearchParams({ operatorId: q.operatorId, flightNumber: q.flightNumber, date: q.date })
     if (q.dep) params.set('dep', q.dep)
@@ -2792,11 +2860,19 @@ export const api = {
   getFdtlRuleSet: () => request<SerializedRuleSetRef>('/fdtl/rule-set'),
 
   // ── 4.1.6 Crew Schedule ──
-  getCrewSchedule: (params: { from: string; to: string; base?: string; position?: string; acType?: string }) => {
+  getCrewSchedule: (params: {
+    from: string
+    to: string
+    base?: string
+    position?: string
+    acType?: string
+    crewGroup?: string
+  }) => {
     const qs = new URLSearchParams({ from: params.from, to: params.to })
     if (params.base) qs.set('base', params.base)
     if (params.position) qs.set('position', params.position)
     if (params.acType) qs.set('acType', params.acType)
+    if (params.crewGroup) qs.set('crewGroup', params.crewGroup)
     return request<CrewScheduleResponse>(`/crew-schedule?${qs.toString()}`)
   },
 
@@ -3439,6 +3515,174 @@ export interface OperatorPairingConfig {
 export interface OperatorPairingConfigUpsert {
   operatorId: string
   aircraftChangeGroundTime?: Partial<AircraftChangeGroundTimeConfig>
+}
+
+// ── 4.1.6.3 Scheduling Configurations ──
+
+export interface SchedulingDaysOffConfig {
+  /** Minimum days off per period per crew. Drives the day-off projection
+   *  in Manpower Check and the solver's floor. Default 8 (≈ FDTL-aligned). */
+  minPerPeriodDays: number
+  maxPerPeriodDays: number
+  maxConsecutiveDutyDays: number
+  maxConsecutiveMorningDuties: number
+  maxConsecutiveAfternoonDuties: number
+}
+
+export interface SchedulingStandbyConfig {
+  usePercentage: boolean
+  minPerDayFlat: number
+  minPerDayPct: number
+  homeStandbyRatioPct: number
+  startTimeMode: 'auto' | 'fixed'
+  autoLeadTimeMin: number
+  fixedStartTimes: string[]
+  minDurationMin: number
+  maxDurationMin: number
+  requireLegalRestAfter: boolean
+  extraRestAfterMin: number
+}
+
+export interface SchedulingDestinationRule {
+  _id: string
+  scope: 'airport' | 'country'
+  code: string
+  maxLayoversPerPeriod: number | null
+  minSeparationDays: number | null
+  enabled: boolean
+}
+
+export interface SchedulingObjectivesConfig {
+  genderBalanceOnLayovers: boolean
+  genderBalanceWeight: number
+  /** Solver objective keys in priority order (first = highest). User-reorderable
+   *  in 4.1.6.1 Roster Analysis step. Canonical keys:
+   *    'coverage' | 'blockHours' | 'legCount' | 'genderBalance' | 'destinationRules'
+   *  Empty array = use compiled defaults. */
+  priorityOrder: string[]
+}
+
+export interface OperatorSchedulingConfig {
+  _id: string
+  operatorId: string
+  carrierMode: 'lcc' | 'legacy'
+  daysOff: SchedulingDaysOffConfig
+  standby: SchedulingStandbyConfig
+  destinationRules: SchedulingDestinationRule[]
+  objectives: SchedulingObjectivesConfig
+  createdAt: string
+  updatedAt: string
+}
+
+export interface OperatorSchedulingConfigUpsert {
+  operatorId: string
+  carrierMode?: 'lcc' | 'legacy'
+  daysOff?: Partial<SchedulingDaysOffConfig>
+  standby?: Partial<SchedulingStandbyConfig>
+  destinationRules?: SchedulingDestinationRule[]
+  objectives?: Partial<SchedulingObjectivesConfig>
+}
+
+// ── 4.1.6.1 Auto Roster ──
+
+export interface AutoRosterRunStats {
+  pairingsTotal: number
+  crewTotal: number
+  assignedPairings: number
+  unassignedPairings: number
+  durationMs: number
+  objectiveScore: number
+}
+
+export interface AutoRosterRun {
+  _id: string
+  operatorId: string
+  periodFrom: string
+  periodTo: string
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
+  startedAt: string | null
+  completedAt: string | null
+  stats: AutoRosterRunStats | null
+  error: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type AutoRosterMode = 'general' | 'daysOff' | 'standby' | 'longDuties' | 'training'
+
+export interface StartAutoRosterParams {
+  operatorId: string
+  periodFrom: string
+  periodTo: string
+  timeLimitSec?: number
+  /** Assignment mode. Defaults to 'general' (assign day-offs, flights, standby — no training). */
+  mode?: AutoRosterMode
+  /** Minimum pairing length in days when mode === 'longDuties'. */
+  longDutiesMinDays?: number
+  base?: string
+  position?: string
+  acType?: string | string[]
+  crewGroup?: string | string[]
+}
+
+export interface PeriodSummaryCrew {
+  total: number
+  onLeave: number
+  inTraining: number
+  available: number
+  /** Σ crew-available days (pool − leave − training − day-off) across the period. */
+  crewDaysSupply?: number
+}
+
+export interface PeriodSummaryPairings {
+  total: number
+  committed: number
+  draft: number
+  alreadyAssigned: number
+  unassigned: number
+  totalBlockHours: number
+  /** Σ crew-days required by all pairings active in the period (seats × days). */
+  crewDaysDemand?: number
+}
+
+export interface PeriodSummary {
+  crew: PeriodSummaryCrew
+  pairings: PeriodSummaryPairings
+}
+
+export interface DayBreakdown {
+  date: string
+  dayOfWeek: string
+  assigned: number
+  onLeave: number
+  onDayOff: number
+  onStandby: number
+  /** Home-based standby crew (split from onStandby). */
+  onStandbyHome?: number
+  /** Airport standby crew (split from onStandby). */
+  onStandbyAirport?: number
+  inTraining: number
+  /** Crew on ground duty (activity flagged `is_ground_duty`). */
+  onGroundDuty?: number
+  pairingsDemand: number
+  pairingsUnassigned: number
+  /** Seats required by pairings active this day (respects position filter). */
+  seatsDemand?: number
+  /** Crew available this day (pool − leave − training − day-off). */
+  availableCrew?: number
+}
+
+export interface PeriodBreakdown {
+  crewTotal: number
+  summary: PeriodSummary
+  days: DayBreakdown[]
+}
+
+export interface AutoRosterFilterOptions {
+  bases: string[]
+  positions: string[]
+  acTypes: string[]
+  crewGroups: { id: string; name: string }[]
 }
 
 export type AsmSsmDeliveryMode = 'pull_api' | 'sftp' | 'smtp'

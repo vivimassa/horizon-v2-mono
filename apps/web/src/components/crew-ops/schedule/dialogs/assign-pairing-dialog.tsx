@@ -34,6 +34,7 @@ export function AssignPairingDialog({ crewId, dateIso, onClose, onAfterMutate }:
   const tempBases = useCrewScheduleStore((s) => s.tempBases)
   const assignmentsAll = useCrewScheduleStore((s) => s.assignments)
   const activitiesAll = useCrewScheduleStore((s) => s.activities)
+  const activityCodesAll = useCrewScheduleStore((s) => s.activityCodes)
   const pairingsAll = useCrewScheduleStore((s) => s.pairings)
   const ruleSet = useCrewScheduleStore((s) => s.ruleSet)
   const setAssignmentBlocked = useCrewScheduleStore((s) => s.setAssignmentBlocked)
@@ -103,6 +104,7 @@ export function AssignPairingDialog({ crewId, dateIso, onClose, onAfterMutate }:
             tempBases: tempBases.filter((t) => t.crewId === crew._id),
             assignments: assignmentsAll,
             activities: activitiesAll,
+            activityCodes: activityCodesAll,
             pairings: pairingsAll,
             ruleSet,
           }),

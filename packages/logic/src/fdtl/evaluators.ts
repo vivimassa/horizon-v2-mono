@@ -181,6 +181,9 @@ export function evaluateRollingCumulative(resolved: ResolvedRule, ctx: Evaluator
   const floorMs = refMs - windowMs
   let total = 0
   for (const d of pool) {
+    // Rest blocks (annual leave, day off, rest period) never contribute
+    // to cumulative duty / block / FDP / landings counters.
+    if (d.kind === 'rest') continue
     if (d.endUtcMs <= floorMs || d.startUtcMs >= refMs) continue
     const overlap = Math.max(0, Math.min(d.endUtcMs, refMs) - Math.max(d.startUtcMs, floorMs))
     const span = Math.max(1, d.endUtcMs - d.startUtcMs)
@@ -224,8 +227,13 @@ export function evaluateMinRestBetween(resolved: ResolvedRule, ctx: EvaluatorCon
   const context = paramStr(resolved.params, 'context') ?? 'any'
   const mustMatchDuty = paramBool(resolved.params, 'mustMatchPrecedingDuty')
 
-  const others = ctx.existing.filter((d) => d.id !== ctx.candidate.id)
+  // Rest blocks (annual leave, day off, rest period) are not duty
+  // endpoints — they ARE rest. Walk past them to find the actual prior /
+  // next duty. The candidate itself, when emitted from a rest activity,
+  // wouldn't reach this evaluator (skipped below).
+  const others = ctx.existing.filter((d) => d.id !== ctx.candidate.id && d.kind !== 'rest')
   const out: ScheduleLegalityCheck[] = []
+  if (ctx.candidate.kind === 'rest') return out
 
   const adjacencies: Array<{ prev: ScheduleDuty; next: ScheduleDuty }> = []
   const prev = others.filter((d) => d.endUtcMs <= ctx.candidate.startUtcMs).sort((a, b) => b.endUtcMs - a.endUtcMs)[0]
@@ -324,9 +332,12 @@ export function evaluateMinRestInWindow(resolved: ResolvedRule, ctx: EvaluatorCo
   const windowMin = windowRuleValue ?? hmmToMinutes(defaultWin) ?? 168 * 60
   const windowMs = windowMin * 60_000
 
-  const pool = [...ctx.existing.filter((d) => d.id !== ctx.candidate.id), ctx.candidate].sort(
-    (a, b) => a.startUtcMs - b.startUtcMs,
-  )
+  // Only DUTY blocks (pairings + duty-flagged activities) form the
+  // "merged" intervals whose gaps we measure. Rest blocks ARE rest and
+  // contribute to the gap by their absence from this list.
+  const pool = [...ctx.existing.filter((d) => d.id !== ctx.candidate.id), ctx.candidate]
+    .filter((d) => d.kind !== 'rest')
+    .sort((a, b) => a.startUtcMs - b.startUtcMs)
   if (pool.length === 0) return []
 
   const refMs = pool.reduce((m, d) => (d.endUtcMs > m ? d.endUtcMs : m), ctx.candidate.endUtcMs)
@@ -420,7 +431,11 @@ export function evaluatePerDutyLimit(resolved: ResolvedRule, ctx: EvaluatorConte
 export function evaluateConsecutiveCount(resolved: ResolvedRule, ctx: EvaluatorContext): ScheduleLegalityCheck[] {
   const limit = parseInt(resolved.rule.value, 10)
   if (!Number.isFinite(limit) || limit <= 0) return []
-  const pool = [...ctx.existing.filter((d) => d.id !== ctx.candidate.id), ctx.candidate]
+  // Consecutive-DUTY-day count — rest blocks (leave/off/rest period)
+  // must NOT extend the streak.
+  const pool = [...ctx.existing.filter((d) => d.id !== ctx.candidate.id), ctx.candidate].filter(
+    (d) => d.kind !== 'rest',
+  )
   const days = new Set<string>()
   for (const d of pool) {
     let t = d.startUtcMs

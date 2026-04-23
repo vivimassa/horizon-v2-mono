@@ -232,7 +232,7 @@ export function drawBars(
       // Dialled back from the earlier bolder scale — planners said the
       // labels felt too heavy. 600-weight + slightly smaller sizes keeps
       // them legible without dominating the bar.
-      const fs = bar.height >= 48 ? 13 : bar.height >= 36 ? 12 : bar.height >= 28 ? 11 : 10
+      const fs = bar.height >= 48 ? 11 : bar.height >= 36 ? 10 : bar.height >= 28 ? 9 : 8
       ctx.fillStyle = bar.textColor
       ctx.font = `600 ${fs}px "JetBrains Mono", ui-monospace, monospace`
       const maxTextW = bar.width - 12
@@ -244,7 +244,7 @@ export function drawBars(
         // Two-line stacked rendering. Match the single-line font size when
         // the bar is tall enough; only shrink when two rows of `fs` would
         // overflow the bar height.
-        const smallFs = Math.max(9, Math.min(fs, Math.floor((bar.height - 2) / 2)))
+        const smallFs = Math.max(8, Math.min(fs, Math.floor((bar.height - 2) / 2)))
         ctx.font = `600 ${smallFs}px "JetBrains Mono", ui-monospace, monospace`
         const dep = bar.flight.depStation
         const arr = bar.flight.arrStation

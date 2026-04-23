@@ -688,6 +688,7 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
                 tempBases: s.tempBases.filter((t) => t.crewId === targetCrewId),
                 assignments: s.assignments,
                 activities: s.activities,
+                activityCodes: s.activityCodes,
                 pairings: s.pairings,
                 ruleSet: s.ruleSet,
               }),
@@ -922,6 +923,7 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
               assignments: s.assignments,
               pairingsById,
               activities: s.activities,
+              activityCodes: s.activityCodes,
               ruleSet: s.ruleSet,
             })
             legality = { level: full.level, reason: full.reason, checks: full.checks, overridable: full.overridable }

@@ -10,6 +10,7 @@
 // their domain shapes via the minimal interfaces exported here.
 
 import type { ScheduleDuty } from './crew-schedule-validator-types'
+import { categorizeActivityFlags } from './activity-category'
 
 export interface AssignmentLike {
   _id: string
@@ -38,6 +39,15 @@ export interface ActivityLike {
   crewId: string
   startUtcIso: string
   endUtcIso: string
+  /** Foreign key to ActivityCode. Required to look up flags via
+   *  `activityCodesById`. When absent (or no entry in the map), the
+   *  activity defaults to `kind: 'rest'` — opt-in safety, since an
+   *  unclassified activity must not silently inflate duty counters. */
+  activityCodeId?: string | null
+}
+
+export interface ActivityCodeMeta {
+  flags: string[]
 }
 
 export interface BuildScheduleDutiesInput {
@@ -45,6 +55,10 @@ export interface BuildScheduleDutiesInput {
   assignments: AssignmentLike[]
   activities: ActivityLike[]
   pairingsById: Map<string, PairingLike>
+  /** Activity-code metadata (flags) keyed by activityCodeId. When omitted
+   *  or missing entries, all unclassified activities are treated as `rest`
+   *  to avoid the AL-counts-as-168h-duty class of false-positive. */
+  activityCodesById?: Map<string, ActivityCodeMeta>
 }
 
 export function buildScheduleDuties(input: BuildScheduleDutiesInput): ScheduleDuty[] {
@@ -74,25 +88,55 @@ export function buildScheduleDuties(input: BuildScheduleDutiesInput): ScheduleDu
       commanderDiscretion: a.commanderDiscretion === true,
     })
   }
-  for (const act of input.activities) {
-    if (act.crewId !== input.crewId) continue
-    const startMs = new Date(act.startUtcIso).getTime()
-    const endMs = new Date(act.endUtcIso).getTime()
-    if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) continue
-    const durMin = Math.max(0, (endMs - startMs) / 60_000)
+  // Group contiguous same-code activities (touching within ≤ 5 min) into
+  // a single ScheduleDuty. Without this, a 7-day Annual Leave assignment
+  // — stored as 7 daily rows with a 1-min seam between days — looks to
+  // the rest evaluator like 7 separate "duty" blocks with 0:01 gaps.
+  const crewActs = input.activities
+    .filter((a) => a.crewId === input.crewId)
+    .map((a) => {
+      const s = new Date(a.startUtcIso).getTime()
+      const e = new Date(a.endUtcIso).getTime()
+      return { ...a, startMs: s, endMs: e }
+    })
+    .filter((a) => Number.isFinite(a.startMs) && Number.isFinite(a.endMs))
+    .sort((a, b) => a.startMs - b.startMs)
+
+  type Coalesced = { ids: string[]; codeId: string | null; startMs: number; endMs: number }
+  const coalesced: Coalesced[] = []
+  const SEAM_MS = 5 * 60_000
+  for (const a of crewActs) {
+    const codeId = a.activityCodeId ?? null
+    const last = coalesced[coalesced.length - 1]
+    if (last && last.codeId === codeId && a.startMs - last.endMs <= SEAM_MS) {
+      last.endMs = Math.max(last.endMs, a.endMs)
+      last.ids.push(a._id)
+    } else {
+      coalesced.push({ ids: [a._id], codeId, startMs: a.startMs, endMs: a.endMs })
+    }
+  }
+
+  for (const c of coalesced) {
+    const durMin = Math.max(0, (c.endMs - c.startMs) / 60_000)
+    const meta = c.codeId ? input.activityCodesById?.get(c.codeId) : undefined
+    // Default to 'rest' when the code isn't classified — duty inflation
+    // (the AL = 168h-duty bug) is the worse failure mode than under-counting.
+    const cat = meta
+      ? categorizeActivityFlags(meta.flags)
+      : { category: 'rest' as const, countsDuty: false, countsBlock: false, countsFdp: false }
     out.push({
-      id: act._id,
-      kind: 'activity',
-      startUtcMs: startMs,
-      endUtcMs: endMs,
-      dutyMinutes: durMin,
-      blockMinutes: 0,
-      fdpMinutes: 0,
+      id: c.ids[0],
+      kind: cat.category === 'rest' ? 'rest' : 'activity',
+      startUtcMs: c.startMs,
+      endUtcMs: c.endMs,
+      dutyMinutes: cat.category === 'duty' && cat.countsDuty ? durMin : 0,
+      blockMinutes: cat.category === 'duty' && cat.countsBlock ? durMin : 0,
+      fdpMinutes: cat.category === 'duty' && cat.countsFdp ? durMin : 0,
       landings: 0,
       departureStation: null,
       arrivalStation: null,
       isAugmented: false,
-      label: 'activity',
+      label: cat.category === 'rest' ? 'rest' : 'activity',
     })
   }
   return out

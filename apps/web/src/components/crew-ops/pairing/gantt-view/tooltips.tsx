@@ -335,11 +335,13 @@ export const PairingTooltip = memo(function PairingTooltip({ pairing, clientX, c
   const complements = usePairingStore((s) => s.complements)
   const positions = usePairingStore((s) => s.positions)
   const pairingFlights = useMemo(() => resolvePairingFlights(pairing, pool), [pairing, pool])
+  const deadheadIds = useMemo(() => new Set(pairing.deadheadFlightIds), [pairing.deadheadFlightIds])
   const { result: legality } = usePairingLegality(pairingFlights, {
     complementKey: pairing.complementKey as 'standard' | 'aug1' | 'aug2' | 'custom',
     facilityClass: pairing.facilityClass ?? undefined,
     cockpitCount: pairing.cockpitCount,
     homeBase: pairing.baseAirport,
+    deadheadIds,
   })
   const fdpCheck = legality.checks.find(
     (c) => c.label === 'Flight Duty Period' || c.label.toUpperCase().includes('FDP'),

@@ -46,6 +46,7 @@ export function CrewScheduleFilterPanel({ onGo }: Props) {
   const [draftBase, setDraftBase] = useState<string[]>(storeFilters.baseIds)
   const [draftPositions, setDraftPositions] = useState<string[]>(storeFilters.positionIds)
   const [draftAcTypes, setDraftAcTypes] = useState<string[]>(storeFilters.acTypeIcaos)
+  const [draftCrewGroups, setDraftCrewGroups] = useState<string[]>(storeFilters.crewGroupIds)
 
   const baseOptions: MultiSelectOption[] = useMemo(
     () => context.bases.map((b) => ({ key: b._id, label: b.iataCode ?? b.name })),
@@ -69,9 +70,16 @@ export function CrewScheduleFilterPanel({ onGo }: Props) {
     () => context.acTypes.map((t) => ({ key: t, label: t })),
     [context.acTypes],
   )
+  const crewGroupOptions: MultiSelectOption[] = useMemo(
+    () => context.crewGroups.map((g) => ({ key: g._id, label: g.name })),
+    [context.crewGroups],
+  )
 
   const activeCount =
-    (draftBase.length > 0 ? 1 : 0) + (draftPositions.length > 0 ? 1 : 0) + (draftAcTypes.length > 0 ? 1 : 0)
+    (draftBase.length > 0 ? 1 : 0) +
+    (draftPositions.length > 0 ? 1 : 0) +
+    (draftAcTypes.length > 0 ? 1 : 0) +
+    (draftCrewGroups.length > 0 ? 1 : 0)
 
   function handleGo() {
     setPeriod(draftFrom, draftTo)
@@ -79,6 +87,7 @@ export function CrewScheduleFilterPanel({ onGo }: Props) {
       baseIds: draftBase,
       positionIds: draftPositions,
       acTypeIcaos: draftAcTypes,
+      crewGroupIds: draftCrewGroups,
     })
     setTimeout(() => onGo(), 0)
   }
@@ -123,6 +132,18 @@ export function CrewScheduleFilterPanel({ onGo }: Props) {
           onChange={setDraftAcTypes}
           allLabel="All Types"
           noneLabel="All Types"
+        />
+      </FilterSection>
+
+      <FilterSection label="Crew Group">
+        <MultiSelectField
+          options={crewGroupOptions}
+          value={draftCrewGroups}
+          onChange={setDraftCrewGroups}
+          allLabel="All Groups"
+          noneLabel="All Groups"
+          searchable
+          searchPlaceholder="Search groups…"
         />
       </FilterSection>
     </FilterPanel>

@@ -1,5 +1,5 @@
 import crypto from 'node:crypto'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { z } from 'zod'
 import { CrewAssignment } from '../models/CrewAssignment.js'
 import { CrewActivity } from '../models/CrewActivity.js'
@@ -15,6 +15,7 @@ import { FdtlRule } from '../models/FdtlRule.js'
 import { Airport } from '../models/Airport.js'
 import { AssignmentViolationOverride } from '../models/AssignmentViolationOverride.js'
 import { CrewQualification } from '../models/CrewQualification.js'
+import { CrewGroupAssignment } from '../models/CrewGroupAssignment.js'
 import { AircraftType } from '../models/AircraftType.js'
 import { CrewTempBase } from '../models/CrewTempBase.js'
 import { loadSerializedRuleSet } from '../services/fdtl-rule-set.js'
@@ -145,6 +146,13 @@ const patchAssignmentSchema = z
   })
   .strict()
 
+const WRITE_ROLES = new Set(['administrator', 'manager', 'operator'])
+async function requireOpsRole(req: FastifyRequest, reply: FastifyReply) {
+  if (!WRITE_ROLES.has(req.userRole)) {
+    return reply.code(403).send({ error: 'Forbidden — ops role required' })
+  }
+}
+
 export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
   // ── GET /crew-schedule — aggregator for a period ─────────────────────
   app.get('/crew-schedule', async (req, reply) => {
@@ -166,6 +174,13 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
     const crewFilter: Record<string, unknown> = { operatorId, status: { $ne: 'inactive' } }
     if (q.base) crewFilter.base = q.base
     if (q.position) crewFilter.position = q.position
+    if (q.crewGroup) {
+      const groupCrewIds = (await CrewGroupAssignment.distinct('crewId', {
+        operatorId,
+        groupId: q.crewGroup,
+      })) as string[]
+      crewFilter._id = { $in: groupCrewIds.length > 0 ? groupCrewIds : ['__no_match__'] }
+    }
 
     const assignmentFilter: Record<string, unknown> = {
       operatorId,
@@ -1538,5 +1553,25 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
     const res = await CrewTempBase.deleteOne({ _id: id, operatorId })
     if (res.deletedCount === 0) return reply.code(404).send({ error: 'Not found' })
     return { success: true }
+  })
+
+  // ── DELETE /crew-schedule/assignments/bulk — wipe all crew assignments for
+  //    a period before an auto-roster run. Scoped to operatorId from JWT so
+  //    cross-tenant deletion is impossible. Requires ops role. ──
+  app.delete('/crew-schedule/assignments/bulk', { preHandler: requireOpsRole }, async (req, reply) => {
+    const q = req.query as Record<string, string>
+    if (!q.periodFrom || !q.periodTo) {
+      return reply.code(400).send({ error: 'periodFrom and periodTo are required (ISO date YYYY-MM-DD)' })
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(q.periodFrom) || !/^\d{4}-\d{2}-\d{2}$/.test(q.periodTo)) {
+      return reply.code(400).send({ error: 'periodFrom and periodTo must be YYYY-MM-DD' })
+    }
+    const operatorId = req.operatorId
+    const res = await CrewAssignment.deleteMany({
+      operatorId,
+      startUtcIso: { $lte: `${q.periodTo}T23:59:59.999Z` },
+      endUtcIso: { $gte: `${q.periodFrom}T00:00:00.000Z` },
+    })
+    return { success: true, deletedCount: res.deletedCount }
   })
 }

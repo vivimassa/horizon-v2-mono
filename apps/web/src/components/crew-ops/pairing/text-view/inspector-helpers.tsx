@@ -68,7 +68,17 @@ export function ComplementSelector({
 }
 
 /* ── One row in the selected-flights list ─────────────────────── */
-export function SelectedLegRow({ index, flight, isDark }: { index: number; flight: PairingFlight; isDark: boolean }) {
+export function SelectedLegRow({
+  index,
+  flight,
+  isDeadhead = false,
+  isDark,
+}: {
+  index: number
+  flight: PairingFlight
+  isDeadhead?: boolean
+  isDark: boolean
+}) {
   const textPrimary = isDark ? 'rgba(255,255,255,0.92)' : 'rgba(15,23,42,0.92)'
   const textSecondary = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(71,85,105,0.75)'
   const textTertiary = isDark ? 'rgba(255,255,255,0.38)' : 'rgba(100,116,139,0.65)'
@@ -78,8 +88,14 @@ export function SelectedLegRow({ index, flight, isDark }: { index: number; fligh
     <div
       className="flex items-center gap-2 px-2.5 py-1.5 rounded-md"
       style={{
-        background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)',
-        border: `1px solid ${divider}`,
+        background: isDeadhead
+          ? isDark
+            ? 'rgba(30,41,59,0.60)'
+            : 'rgba(30,41,59,0.08)'
+          : isDark
+            ? 'rgba(255,255,255,0.02)'
+            : 'rgba(15,23,42,0.02)',
+        border: `1px solid ${isDeadhead ? 'rgba(148,163,184,0.25)' : divider}`,
       }}
     >
       <span
@@ -95,6 +111,14 @@ export function SelectedLegRow({ index, flight, isDark }: { index: number; fligh
         <span className="text-[12px] font-medium tabular-nums" style={{ color: textSecondary }}>
           {flight.departureAirport} → {flight.arrivalAirport}
         </span>
+        {isDeadhead && (
+          <span
+            className="text-[10px] font-bold tracking-wide px-1 py-px rounded"
+            style={{ background: 'rgba(30,41,59,0.80)', color: '#94A3B8', border: '1px solid rgba(148,163,184,0.30)' }}
+          >
+            DHD
+          </span>
+        )}
       </div>
       <span className="text-[11px] tabular-nums" style={{ color: textTertiary }}>
         {flight.stdUtc.slice(11, 16)}

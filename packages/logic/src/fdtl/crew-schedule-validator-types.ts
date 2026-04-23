@@ -2,7 +2,11 @@
 
 export interface ScheduleDuty {
   id: string
-  kind: 'pairing' | 'activity'
+  /** `rest` = activity that does NOT count as duty (annual leave, day off,
+   *  rest period, home standby, etc). Treated as rest by all evaluators —
+   *  ignored by cumulative-duty caps, satisfies weekly-rest gaps, and is
+   *  not a duty endpoint for between-duty rest checks. */
+  kind: 'pairing' | 'activity' | 'rest'
   startUtcMs: number
   endUtcMs: number
   dutyMinutes: number

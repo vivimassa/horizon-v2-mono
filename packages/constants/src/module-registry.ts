@@ -663,6 +663,17 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
     level: 3,
   },
   {
+    code: '4.1.6.3',
+    name: 'Scheduling Configurations',
+    description:
+      'Operator soft-rule policy for crew scheduling: days off caps, standby quotas, destination rules, and optimizer objectives',
+    icon: 'SlidersHorizontal',
+    route: '/crew-ops/control/crew-scheduling/scheduling-config',
+    parent_code: '4.1.6',
+    module: 'workforce',
+    level: 3,
+  },
+  {
     code: '4.1.7',
     name: 'Crew Tracking',
     description: 'Real-time crew tracking with list, Gantt, and map views',

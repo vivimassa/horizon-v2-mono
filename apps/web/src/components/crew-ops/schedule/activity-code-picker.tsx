@@ -113,6 +113,7 @@ export function ActivityCodePicker({
           </svg>
           <input
             type="text"
+            autoFocus
             placeholder={searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}

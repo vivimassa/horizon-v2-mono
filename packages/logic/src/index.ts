@@ -7,6 +7,7 @@ export * from './fdtl/validator'
 export * from './fdtl/crew-schedule-validator'
 export * from './fdtl/evaluators'
 export * from './fdtl/schedule-duty-builder'
+export * from './fdtl/activity-category'
 export * from './fdtl/utils'
 export * from './fdtl/seed-operator-rules'
 
@@ -23,6 +24,8 @@ export * from './crew/activity-flags'
 export * from './crew/crew-complement-templates'
 export * from './crew/expiry-formulas'
 export * from './crew/expiry-severity'
+export * from './crew/seat-eligibility'
+export * from './crew/soft-rules-checker'
 
 // Pairing
 export * from './pairing/mpp-engine'

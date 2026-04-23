@@ -197,9 +197,24 @@ export function NumberStepper({
 }) {
   const btn =
     'w-10 h-10 flex items-center justify-center text-[15px] font-semibold text-hz-text-secondary hover:bg-hz-border/30 disabled:opacity-30 transition-colors'
+  const [draft, setDraft] = React.useState<string>(String(value))
+  const [focused, setFocused] = React.useState(false)
+  React.useEffect(() => {
+    if (!focused) setDraft(String(value))
+  }, [value, focused])
+  const commit = () => {
+    const parsed = Number(draft)
+    if (!Number.isFinite(parsed)) {
+      setDraft(String(value))
+      return
+    }
+    const clamped = Math.max(min, Math.min(max, Math.round(parsed / step) * step))
+    if (clamped !== value) onChange(clamped)
+    setDraft(String(clamped))
+  }
   return (
     <div
-      className="flex items-center rounded-lg overflow-hidden"
+      className="inline-flex items-center rounded-lg overflow-hidden w-fit"
       style={{ border: '1px solid var(--color-hz-border)' }}
     >
       <button
@@ -210,8 +225,37 @@ export function NumberStepper({
       >
         −
       </button>
-      <div className="h-10 min-w-[80px] px-3 flex items-center justify-center text-[13px] font-mono font-medium text-hz-text border-x border-hz-border/60">
-        {value} {suffix}
+      <div className="h-10 w-[88px] px-2 flex items-center justify-center gap-1 text-[13px] font-mono font-medium text-hz-text border-x border-hz-border/60">
+        <input
+          type="text"
+          inputMode="numeric"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value.replace(/[^0-9.\-]/g, ''))}
+          onFocus={(e) => {
+            setFocused(true)
+            e.currentTarget.select()
+          }}
+          onBlur={() => {
+            commit()
+            setFocused(false)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.currentTarget.blur()
+            } else if (e.key === 'Escape') {
+              setDraft(String(value))
+              e.currentTarget.blur()
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault()
+              onChange(Math.min(max, value + step))
+            } else if (e.key === 'ArrowDown') {
+              e.preventDefault()
+              onChange(Math.max(min, value - step))
+            }
+          }}
+          className="w-full bg-transparent text-right outline-none text-[13px] font-mono font-medium text-hz-text"
+        />
+        <span className="text-hz-text-tertiary shrink-0">{suffix}</span>
       </div>
       <button
         type="button"

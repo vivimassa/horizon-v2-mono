@@ -1,4 +1,10 @@
-import type { CrewActivityRef, CrewAssignmentRef, CrewMemberListItemRef, PairingRef } from '@skyhub/api'
+import type {
+  ActivityCodeRef,
+  CrewActivityRef,
+  CrewAssignmentRef,
+  CrewMemberListItemRef,
+  PairingRef,
+} from '@skyhub/api'
 import { validateCrewAssignment, buildScheduleDuties, buildCandidateDuty } from '@skyhub/logic'
 
 /**
@@ -40,6 +46,10 @@ export interface CheckViolationsInput {
    *  checks don't run. */
   assignments?: CrewAssignmentRef[]
   activities?: CrewActivityRef[]
+  /** Activity-code master data — required for the FDTL validator to
+   *  classify each activity as duty vs rest. Without this, all activities
+   *  are conservatively treated as rest. */
+  activityCodes?: ActivityCodeRef[]
   pairings?: PairingRef[]
   ruleSet?: unknown | null
 }
@@ -51,6 +61,7 @@ export function checkAssignmentViolations({
   tempBases,
   assignments,
   activities,
+  activityCodes,
   pairings,
   ruleSet,
 }: CheckViolationsInput): AssignmentViolation[] {
@@ -119,11 +130,15 @@ export function checkAssignmentViolations({
   // the planner can still proceed with a commander-discretion audit row.
   if (ruleSet && assignments && pairings) {
     const pairingsById = new Map(pairings.map((p) => [p._id, p]))
+    const activityCodesById = activityCodes
+      ? new Map(activityCodes.map((c) => [c._id, { flags: c.flags ?? [] }]))
+      : undefined
     const existing = buildScheduleDuties({
       crewId: crew._id,
       assignments,
       activities: activities ?? [],
       pairingsById,
+      activityCodesById,
     })
     const candidate = buildCandidateDuty(pairing)
     if (candidate) {

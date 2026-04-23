@@ -159,7 +159,12 @@ export function InspectPairingPanel({ pairing, flights }: { pairing: Pairing; fl
             if (!next) {
               return (
                 <Fragment key={f.id}>
-                  <SelectedLegRow index={i} flight={f} isDark={isDark} />
+                  <SelectedLegRow
+                    index={i}
+                    flight={f}
+                    isDeadhead={pairing.deadheadFlightIds.includes(f.id)}
+                    isDark={isDark}
+                  />
                 </Fragment>
               )
             }

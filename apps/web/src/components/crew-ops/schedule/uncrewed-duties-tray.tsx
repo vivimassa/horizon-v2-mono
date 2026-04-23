@@ -236,6 +236,7 @@ export const UncrewedDutiesTray = memo(function UncrewedDutiesTray({
         assignments: s.assignments,
         pairingsById,
         activities: s.activities,
+        activityCodes: s.activityCodes,
         ruleSet: s.ruleSet,
       })
       s.setDragState({
@@ -283,6 +284,7 @@ export const UncrewedDutiesTray = memo(function UncrewedDutiesTray({
         assignments: s.assignments,
         pairingsById,
         activities: s.activities,
+        activityCodes: s.activityCodes,
         ruleSet: s.ruleSet,
       })
       // Hard block only. FDTL violations overridable — proceed to assign
@@ -400,6 +402,7 @@ export const UncrewedDutiesTray = memo(function UncrewedDutiesTray({
         tempBases,
         assignments: storeState.assignments,
         activities: storeState.activities,
+        activityCodes: storeState.activityCodes,
         pairings: storeState.pairings,
         ruleSet: storeState.ruleSet,
       })

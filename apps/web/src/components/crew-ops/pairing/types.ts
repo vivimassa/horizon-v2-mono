@@ -141,6 +141,8 @@ export interface PairingFilters {
   scenarioId: string | null
   /** Multi-select crew-position codes (CP, FO, …). null = all positions (no scoping). */
   positionFilter: string[] | null
+  /** Crew group ids (UUIDs). null = all groups (no scoping). */
+  crewGroupIds: string[] | null
 }
 
 export const ALL_STATUS: PairingLegalityStatus[] = ['legal', 'warning', 'violation']
@@ -155,4 +157,5 @@ export const DEFAULT_FILTERS: PairingFilters = {
   durations: [],
   scenarioId: null,
   positionFilter: null,
+  crewGroupIds: null,
 }

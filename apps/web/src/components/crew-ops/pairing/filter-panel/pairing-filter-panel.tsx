@@ -11,18 +11,7 @@ import {
 } from '@/components/filter-panel'
 import { usePairingFilterStore } from '@/stores/use-pairing-filter-store'
 import { usePairingStore } from '@/stores/use-pairing-store'
-
-// Seed values while ref-data fetches are not yet wired.
-const SEED_BASES: MultiSelectOption[] = [
-  { key: 'SGN', label: 'SGN — Tan Son Nhat' },
-  { key: 'HAN', label: 'HAN — Noi Bai' },
-  { key: 'DAD', label: 'DAD — Da Nang' },
-]
-const SEED_AIRCRAFT: MultiSelectOption[] = [
-  { key: 'A320', label: 'A320' },
-  { key: 'A321', label: 'A321' },
-  { key: 'A330', label: 'A330' },
-]
+import { useCrewScheduleStore } from '@/stores/use-crew-schedule-store'
 
 interface PairingFilterPanelProps {
   /** Optional override fired when the user hits Go. Defaults to committing
@@ -31,10 +20,10 @@ interface PairingFilterPanelProps {
 }
 
 /**
- * Filter panel for 4.1.5 Crew Pairing. Composes SkyHub's shared `<FilterPanel>`
- * kit with pairing-specific fields: Period, Base, Fleet, Pairing Status,
- * Workflow, Duration. Draft state lives in `use-pairing-filter-store`; the Go
- * button commits it to `use-pairing-store` which owns the applied filters.
+ * Filter panel for 4.1.5 Crew Pairing. Visually 1:1 with 4.1.6.2 Crew Schedule
+ * Gantt — pulls real reference data (bases, A/C types) from
+ * `useCrewScheduleStore.context`. Draft state lives in `usePairingFilterStore`;
+ * the Go button commits it into `usePairingStore`.
  */
 export function PairingFilterPanel({ onGo }: PairingFilterPanelProps) {
   const draftFrom = usePairingFilterStore((s) => s.draftPeriodFrom)
@@ -48,33 +37,65 @@ export function PairingFilterPanel({ onGo }: PairingFilterPanelProps) {
   const setFilters = usePairingStore((s) => s.setFilters)
   const commitPeriod = usePairingStore((s) => s.commitPeriod)
 
+  // Shared reference data (bases, acTypes) — same source as 4.1.6.2.
+  const context = useCrewScheduleStore((s) => s.context)
+  const loadContext = useCrewScheduleStore((s) => s.loadContext)
+  useEffect(() => {
+    void loadContext()
+  }, [loadContext])
+
   const [mounted, setMounted] = useState(false)
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  const baseKeys = useMemo(() => SEED_BASES.map((o) => o.key), [])
-  const aircraftKeys = useMemo(() => SEED_AIRCRAFT.map((o) => o.key), [])
+  // Positions — pairing store owns these; pairing filter keys are `code`.
   const positions = usePairingStore((s) => s.positions)
   const positionOptions = useMemo<MultiSelectOption[]>(
     () =>
       [...positions]
         .filter((p) => p.isActive)
-        .sort((a, b) => a.rankOrder - b.rankOrder)
-        .map((p) => ({ key: p.code, label: `${p.code} — ${p.name}`, color: p.color ?? undefined })),
+        .sort((a, b) => {
+          if (a.category !== b.category) return a.category === 'cockpit' ? -1 : 1
+          return (a.rankOrder ?? 9999) - (b.rankOrder ?? 9999)
+        })
+        .map((p) => ({ key: p.code, label: `${p.code} · ${p.name}`, color: p.color ?? undefined })),
     [positions],
   )
-  const positionKeys = useMemo(() => positionOptions.map((o) => o.key), [positionOptions])
 
-  const selectedBases = draft.baseAirports ?? baseKeys
-  const selectedAircraft = draft.aircraftTypes ?? aircraftKeys
-  const selectedPositions = draft.positionFilter ?? positionKeys
+  // Bases — key is IATA code (matches pairing consumer `p.baseAirport`).
+  // Label is code-only to match 4.1.6.1 / 4.1.6.2.
+  const baseOptions = useMemo<MultiSelectOption[]>(
+    () =>
+      context.bases
+        .filter((b) => !!b.iataCode)
+        .map((b) => ({ key: b.iataCode as string, label: b.iataCode as string })),
+    [context.bases],
+  )
+
+  // A/C types — key is ICAO (matches `api.getPairingFlightPool({ aircraftTypes })`).
+  const acTypeOptions = useMemo<MultiSelectOption[]>(
+    () => context.acTypes.map((t) => ({ key: t, label: t })),
+    [context.acTypes],
+  )
+
+  const crewGroupOptions = useMemo<MultiSelectOption[]>(
+    () => context.crewGroups.map((g) => ({ key: g._id, label: g.name })),
+    [context.crewGroups],
+  )
+
+  const selectedBases = draft.baseAirports ?? []
+  const selectedAircraft = draft.aircraftTypes ?? []
+  const selectedPositions = draft.positionFilter ?? []
+  const selectedCrewGroups = draft.crewGroupIds ?? []
 
   const activeCount = mounted
-    ? [draftFrom, draftTo].filter(Boolean).length +
-      (draft.baseAirports !== null ? 1 : 0) +
-      (draft.aircraftTypes !== null ? 1 : 0) +
-      (draft.positionFilter !== null && draft.positionFilter.length > 0 ? 1 : 0)
+    ? (draftFrom ? 1 : 0) +
+      (draftTo ? 1 : 0) +
+      (selectedBases.length > 0 ? 1 : 0) +
+      (selectedAircraft.length > 0 ? 1 : 0) +
+      (selectedPositions.length > 0 ? 1 : 0) +
+      (selectedCrewGroups.length > 0 ? 1 : 0)
     : 0
 
   function handleGo() {
@@ -97,19 +118,13 @@ export function PairingFilterPanel({ onGo }: PairingFilterPanelProps) {
 
       <FilterSection label="Base">
         <MultiSelectField
-          options={SEED_BASES}
+          options={baseOptions}
           value={selectedBases}
-          onChange={(keys) => setDraftFilters({ baseAirports: keys.length === baseKeys.length ? null : keys })}
+          onChange={(keys) => setDraftFilters({ baseAirports: keys.length === 0 ? null : keys })}
           allLabel="All Bases"
-        />
-      </FilterSection>
-
-      <FilterSection label="Fleet">
-        <MultiSelectField
-          options={SEED_AIRCRAFT}
-          value={selectedAircraft}
-          onChange={(keys) => setDraftFilters({ aircraftTypes: keys.length === aircraftKeys.length ? null : keys })}
-          allLabel="All Fleets"
+          noneLabel="All Bases"
+          searchable
+          searchPlaceholder="Search bases…"
         />
       </FilterSection>
 
@@ -117,12 +132,33 @@ export function PairingFilterPanel({ onGo }: PairingFilterPanelProps) {
         <MultiSelectField
           options={positionOptions}
           value={selectedPositions}
-          onChange={(keys) =>
-            setDraftFilters({
-              positionFilter: keys.length === positionKeys.length || keys.length === 0 ? null : keys,
-            })
-          }
+          onChange={(keys) => setDraftFilters({ positionFilter: keys.length === 0 ? null : keys })}
           allLabel="All Positions"
+          noneLabel="All Positions"
+          searchable
+          searchPlaceholder="Search positions…"
+        />
+      </FilterSection>
+
+      <FilterSection label="A/C Type">
+        <MultiSelectField
+          options={acTypeOptions}
+          value={selectedAircraft}
+          onChange={(keys) => setDraftFilters({ aircraftTypes: keys.length === 0 ? null : keys })}
+          allLabel="All Types"
+          noneLabel="All Types"
+        />
+      </FilterSection>
+
+      <FilterSection label="Crew Group">
+        <MultiSelectField
+          options={crewGroupOptions}
+          value={selectedCrewGroups}
+          onChange={(keys) => setDraftFilters({ crewGroupIds: keys.length === 0 ? null : keys })}
+          allLabel="All Groups"
+          noneLabel="All Groups"
+          searchable
+          searchPlaceholder="Search groups…"
         />
       </FilterSection>
     </FilterPanel>

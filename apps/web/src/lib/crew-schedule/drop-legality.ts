@@ -1,4 +1,5 @@
 import type {
+  ActivityCodeRef,
   CrewActivityRef,
   CrewAssignmentRef,
   CrewMemberListItemRef,
@@ -48,6 +49,10 @@ export interface ComputeDropLegalityInput {
    *  pre-FDP rest / cumulative duty / cumulative block / rest-after-aug
    *  checks simply don't run (never false positives). */
   activities?: CrewActivityRef[]
+  /** Activity-code master data — needed for the FDTL validator to
+   *  classify activities (annual leave, day off, training…) as duty vs
+   *  rest. Without this, all activities default to rest. */
+  activityCodes?: ActivityCodeRef[]
   ruleSet?: unknown | null
 }
 
@@ -141,6 +146,7 @@ export function computeDropLegality(input: ComputeDropLegalityInput): DropLegali
     pairing: input.pairing,
     assignments: input.assignments,
     activities: input.activities,
+    activityCodes: input.activityCodes,
     pairingsById: input.pairingsById,
     ruleSet: input.ruleSet ?? null,
   })
@@ -169,6 +175,7 @@ interface FdtlCheckInput {
   pairing: PairingRef
   assignments: CrewAssignmentRef[]
   activities?: CrewActivityRef[]
+  activityCodes?: ActivityCodeRef[]
   pairingsById: Map<string, PairingRef>
   ruleSet: unknown | null
 }
@@ -177,11 +184,15 @@ function runFdtlChecks(
   input: FdtlCheckInput,
 ): { level: DropLegalityLevel; reason: string; checks: DropLegalityResult['checks'] } | null {
   if (!input.ruleSet) return null
+  const activityCodesById = input.activityCodes
+    ? new Map(input.activityCodes.map((c) => [c._id, { flags: c.flags ?? [] }]))
+    : undefined
   const existing = buildScheduleDuties({
     crewId: input.targetCrew._id,
     assignments: input.assignments,
     activities: input.activities ?? [],
     pairingsById: input.pairingsById,
+    activityCodesById,
   })
   const candidate = buildCandidateDuty(input.pairing)
   if (!candidate) return null
@@ -221,6 +232,7 @@ export interface ComputeAssignFromUncrewedInput {
   assignments: CrewAssignmentRef[]
   pairingsById: Map<string, PairingRef>
   activities?: CrewActivityRef[]
+  activityCodes?: ActivityCodeRef[]
   ruleSet?: unknown | null
 }
 
@@ -322,6 +334,7 @@ export function computeAssignFromUncrewedLegality(input: ComputeAssignFromUncrew
     pairing: input.pairing,
     assignments: input.assignments,
     activities: input.activities,
+    activityCodes: input.activityCodes,
     pairingsById: input.pairingsById,
     ruleSet: input.ruleSet ?? null,
   })

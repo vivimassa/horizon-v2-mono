@@ -15,16 +15,22 @@ import {
   Users as UsersIcon,
   Trash2,
   CheckCircle2,
+  Layers,
+  ListPlus,
+  Zap,
+  Copy,
 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
+import { Tooltip } from '@/components/ui/tooltip'
 import { api, type PairingCreateInput } from '@skyhub/api'
-import { usePairingStore, resolveComplementCounts } from '@/stores/use-pairing-store'
+import { usePairingStore, resolveComplementCounts, type BulkQueuedPairing } from '@/stores/use-pairing-store'
 import { usePairingGanttStore } from '@/stores/use-pairing-gantt-store'
 import { usePairingLegality } from '../../use-pairing-legality'
 import { pairingFromApi } from '../../adapters'
 import { InspectPairingPanel } from '../../text-view/inspect-pairing-panel'
 import { IllegalPairingDialog } from '../../dialogs/illegal-pairing-dialog'
 import { DeletePairingDialog } from '../../dialogs/delete-pairing-dialog'
+import { BulkReplicateConfirmDialog } from '../../dialogs/bulk-replicate-confirm-dialog'
 import { CrossFamilyPairingDialog } from '../../dialogs/cross-family-pairing-dialog'
 import { validateCrossFamily, type CrossFamilyConflict } from '@/lib/crew-coverage/validate-cross-family'
 import {
@@ -74,11 +80,20 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
   const aircraftTypeFamilies = usePairingStore((s) => s.aircraftTypeFamilies)
   const positionFilter = usePairingStore((s) => s.filters.positionFilter)
 
+  const bulkQueue = usePairingStore((s) => s.bulkQueue)
+  const addToBulkQueue = usePairingStore((s) => s.addToBulkQueue)
+  const removeFromBulkQueue = usePairingStore((s) => s.removeFromBulkQueue)
+  const clearBulkQueue = usePairingStore((s) => s.clearBulkQueue)
+
   const selectedFlightIds = usePairingGanttStore((s) => s.selectedFlightIds)
   const clearSelection = usePairingGanttStore((s) => s.clearSelection)
   const buildMode = usePairingGanttStore((s) => s.buildMode)
   const setBuildMode = usePairingGanttStore((s) => s.setBuildMode)
+  const bulkMode = usePairingGanttStore((s) => s.bulkMode)
+  const deadheadFlightIds = usePairingGanttStore((s) => s.deadheadFlightIds)
+  const toggleDeadheadFlight = usePairingGanttStore((s) => s.toggleDeadheadFlight)
   const [saving, setSaving] = useState(false)
+  const [bulkSaving, setBulkSaving] = useState(false)
   // When the planner clicks Create on a violating chain we stash a flag so
   // the IllegalPairingDialog can surface the specific rule failures and ask
   // for an override. `false` dismisses the dialog.
@@ -91,6 +106,7 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
     routeChain: string
   } | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [pendingBulkReplicate, setPendingBulkReplicate] = useState(false)
 
   const selectedFlight = useMemo(() => {
     if (selectedFlightIds.size !== 1) return null
@@ -163,6 +179,7 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
     complementKey: activeComplementKey,
     facilityClass: activeComplementKey === 'standard' ? undefined : 'CLASS_1',
     homeBase: debouncedBuildFlights[0]?.departureAirport,
+    deadheadIds: deadheadFlightIds,
   })
 
   /** Persist the pairing as committed. If `override` is false and the chain
@@ -197,7 +214,7 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
           flightId: f.id,
           flightDate: f.instanceDate,
           legOrder: i,
-          isDeadhead: false,
+          isDeadhead: deadheadFlightIds.has(f.id),
           dutyDay: 1,
           depStation: f.departureAirport,
           arrStation: f.arrivalAirport,
@@ -278,9 +295,255 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
     ],
   )
 
+  // Queue the current flight chain for bulk commit without writing to DB.
+  const handleAddToQueue = useCallback(() => {
+    if (selectedBuildFlights.length < 2) return
+    const fam = validateCrossFamily(selectedBuildFlights, aircraftTypeFamilies)
+    if (!fam.ok && fam.conflict) {
+      setCrossFamilyConflict(fam.conflict)
+      return
+    }
+    const aircraftTypeIcao = selectedBuildFlights[0].aircraftType || null
+    const crewCounts =
+      activeComplementKey === 'custom'
+        ? customCrewCounts
+        : resolveComplementCounts(complements, aircraftTypeIcao, activeComplementKey)
+    const virtualPlacements = usePairingGanttStore.getState().layout?.virtualPlacements
+    const legs = selectedBuildFlights.map((f, i) => ({
+      flightId: f.id,
+      flightDate: f.instanceDate,
+      legOrder: i,
+      isDeadhead: deadheadFlightIds.has(f.id),
+      dutyDay: 1,
+      depStation: f.departureAirport,
+      arrStation: f.arrivalAirport,
+      flightNumber: f.flightNumber,
+      stdUtcIso: f.stdUtc,
+      staUtcIso: f.staUtc,
+      blockMinutes: f.blockMinutes,
+      aircraftTypeIcao: f.aircraftType || null,
+      tailNumber: virtualPlacements?.get(f.id) ?? f.tailNumber ?? null,
+    }))
+    const fdtlStatus =
+      liveLegality.overallStatus === 'pass'
+        ? 'legal'
+        : liveLegality.overallStatus === 'warning'
+          ? 'warning'
+          : 'violation'
+    addToBulkQueue({
+      localId: crypto.randomUUID(),
+      flightIds: selectedBuildFlights.map((f) => f.id),
+      pairingCode: makePairingCode(selectedBuildFlights[0]),
+      baseAirport: selectedBuildFlights[0].departureAirport,
+      aircraftTypeIcao,
+      complementKey: activeComplementKey,
+      cockpitCount: computeCockpitCount(activeComplementKey, crewCounts),
+      facilityClass: activeComplementKey === 'standard' ? null : 'CLASS_1',
+      crewCounts,
+      legs,
+      fdtlStatus,
+      lastLegalityResult: liveLegality,
+    })
+    clearSelection()
+  }, [
+    selectedBuildFlights,
+    aircraftTypeFamilies,
+    activeComplementKey,
+    customCrewCounts,
+    complements,
+    liveLegality,
+    addToBulkQueue,
+    clearSelection,
+  ])
+
+  // Write all queued pairings to DB in a single bulk request.
+  const handleBulkCreate = useCallback(async () => {
+    if (bulkQueue.length === 0 || bulkSaving) return
+    setBulkSaving(true)
+    setError(null)
+    try {
+      const items: PairingCreateInput[] = bulkQueue.map((q) => ({
+        pairingCode: q.pairingCode,
+        baseAirport: q.baseAirport,
+        aircraftTypeIcao: q.aircraftTypeIcao,
+        complementKey: q.complementKey,
+        cockpitCount: q.cockpitCount,
+        facilityClass: q.facilityClass,
+        crewCounts: q.crewCounts,
+        legs: q.legs,
+        fdtlStatus: q.fdtlStatus,
+        workflowStatus: 'committed',
+        lastLegalityResult: q.lastLegalityResult,
+      }))
+      const { created, failed } = await api.bulkCreatePairings(items)
+      for (const c of created) addPairing(pairingFromApi(c))
+      clearBulkQueue()
+      if (failed > 0) setError(`${failed} pairing(s) failed to save`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Bulk create failed')
+    } finally {
+      setBulkSaving(false)
+    }
+  }, [bulkQueue, bulkSaving, addPairing, clearBulkQueue, setError])
+
+  // Bulk create every queued pairing, then replicate each across the loaded
+  // period. Strict match only: for every candidate date, each source leg must
+  // resolve to a pool instance with identical flightNumber, dep/arr, and UTC
+  // std/sta (±1 min). Missing pool instance, schedule-time drift, or pairing
+  // already covered by another → that date is silently skipped.
+  const handleBulkCreateAndReplicate = useCallback(async () => {
+    if (bulkQueue.length === 0 || bulkSaving) return
+    setBulkSaving(true)
+    setError(null)
+    try {
+      const pool = usePairingStore.getState().flights
+      const periodFrom = usePairingStore.getState().periodFrom
+      const periodTo = usePairingStore.getState().periodTo
+
+      const parseYmd = (ymd: string): number => {
+        return Date.UTC(Number(ymd.slice(0, 4)), Number(ymd.slice(5, 7)) - 1, Number(ymd.slice(8, 10)))
+      }
+      const addDaysUtc = (ymd: string, days: number): string => {
+        const d = new Date(`${ymd}T00:00:00Z`)
+        d.setUTCDate(d.getUTCDate() + days)
+        return d.toISOString().slice(0, 10)
+      }
+      const shiftIsoDays = (iso: string, days: number): string => {
+        const d = new Date(iso)
+        d.setUTCDate(d.getUTCDate() + days)
+        return d.toISOString()
+      }
+      const TIME_TOLERANCE_MS = 60_000 // ±1 minute
+
+      const items: PairingCreateInput[] = []
+
+      for (const q of bulkQueue) {
+        // Original queued pairing — always included.
+        items.push({
+          pairingCode: q.pairingCode,
+          baseAirport: q.baseAirport,
+          aircraftTypeIcao: q.aircraftTypeIcao,
+          complementKey: q.complementKey,
+          cockpitCount: q.cockpitCount,
+          facilityClass: q.facilityClass,
+          crewCounts: q.crewCounts,
+          legs: q.legs,
+          fdtlStatus: q.fdtlStatus,
+          workflowStatus: 'committed',
+          lastLegalityResult: q.lastLegalityResult,
+        })
+
+        if (q.legs.length === 0 || !periodFrom || !periodTo) continue
+
+        const sourceStartDate = q.legs[0].flightDate
+        const sourceStartMs = parseYmd(sourceStartDate)
+        const legOffsets = q.legs.map((l) => Math.round((parseYmd(l.flightDate) - sourceStartMs) / 86400000))
+
+        const start = new Date(`${periodFrom}T00:00:00Z`)
+        const end = new Date(`${periodTo}T00:00:00Z`)
+        for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+          const candidate = d.toISOString().slice(0, 10)
+          if (candidate === sourceStartDate) continue
+          const shiftDays = Math.round((parseYmd(candidate) - sourceStartMs) / 86400000)
+
+          const resolved: PairingFlight[] = []
+          let ok = true
+          for (let i = 0; i < q.legs.length; i += 1) {
+            const leg = q.legs[i]
+            const targetDate = addDaysUtc(candidate, legOffsets[i] ?? 0)
+            const pooled = pool.find(
+              (x) =>
+                x.flightNumber === leg.flightNumber &&
+                x.departureAirport === leg.depStation &&
+                x.arrivalAirport === leg.arrStation &&
+                x.instanceDate === targetDate,
+            )
+            if (!pooled) {
+              ok = false
+              break
+            }
+            if (pooled.pairingId) {
+              ok = false
+              break
+            }
+            const expectedStdMs = Date.parse(shiftIsoDays(leg.stdUtcIso, shiftDays))
+            const expectedStaMs = Date.parse(shiftIsoDays(leg.staUtcIso, shiftDays))
+            const pooledStdMs = Date.parse(pooled.stdUtc)
+            const pooledStaMs = Date.parse(pooled.staUtc)
+            if (!Number.isFinite(expectedStdMs) || !Number.isFinite(pooledStdMs)) {
+              ok = false
+              break
+            }
+            if (Math.abs(pooledStdMs - expectedStdMs) > TIME_TOLERANCE_MS) {
+              ok = false
+              break
+            }
+            if (Math.abs(pooledStaMs - expectedStaMs) > TIME_TOLERANCE_MS) {
+              ok = false
+              break
+            }
+            resolved.push(pooled)
+          }
+          if (!ok) continue
+
+          items.push({
+            pairingCode: q.pairingCode,
+            baseAirport: q.baseAirport,
+            aircraftTypeIcao: q.aircraftTypeIcao,
+            complementKey: q.complementKey,
+            cockpitCount: q.cockpitCount,
+            facilityClass: q.facilityClass,
+            crewCounts: q.crewCounts,
+            legs: resolved.map((f, idx) => ({
+              flightId: f.id,
+              flightDate: f.instanceDate,
+              legOrder: idx,
+              isDeadhead: q.legs[idx]?.isDeadhead ?? false,
+              dutyDay: 1,
+              depStation: f.departureAirport,
+              arrStation: f.arrivalAirport,
+              flightNumber: f.flightNumber,
+              stdUtcIso: f.stdUtc,
+              staUtcIso: f.staUtc,
+              blockMinutes: f.blockMinutes,
+              aircraftTypeIcao: f.aircraftType || null,
+            })),
+            fdtlStatus: q.fdtlStatus,
+            workflowStatus: 'committed',
+            lastLegalityResult: q.lastLegalityResult,
+          })
+        }
+      }
+
+      // Server caps /pairings/bulk at 500 items per request. Client chunk
+      // is held at 20 as a conservative safety limit — month-scale replicates
+      // (e.g. 35 × 30 = 1050) fan out into ~53 sequential requests instead
+      // of one oversized payload.
+      const CHUNK = 20
+      let totalFailed = 0
+      for (let i = 0; i < items.length; i += CHUNK) {
+        const slice = items.slice(i, i + CHUNK)
+        const { created, failed } = await api.bulkCreatePairings(slice)
+        for (const c of created) addPairing(pairingFromApi(c))
+        totalFailed += failed
+      }
+      clearBulkQueue()
+      if (totalFailed > 0) setError(`${totalFailed} pairing(s) failed to save`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Bulk create and replicate failed')
+    } finally {
+      setBulkSaving(false)
+    }
+  }, [bulkQueue, bulkSaving, addPairing, clearBulkQueue, setError])
+
+  // Clear bulk queue whenever bulk mode is turned off.
+  useEffect(() => {
+    if (!bulkMode) clearBulkQueue()
+  }, [bulkMode, clearBulkQueue])
+
   // Global keyboard shortcuts for this view.
   //   B             — toggle Build mode ON/OFF (same as the toolbar button).
-  //   Enter         — Create pairing  (build mode only)
+  //   Enter         — In bulk mode: queue current chain. Otherwise: create pairing.
   //   Escape        — exit build mode
   //   Del/Backspace — delete inspected pairing
   useEffect(() => {
@@ -291,9 +554,38 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
     }
     function onKey(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return
+
+      // Ctrl+Shift+Enter — open the Bulk Create + Replicate confirm dialog
+      // (bulk mode only). Handled before the generic modifier bailout below.
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'Enter' && bulkMode) {
+        if (bulkQueue.length === 0 || bulkSaving) return
+        e.preventDefault()
+        setPendingBulkReplicate(true)
+        return
+      }
+
       // Ignore modifier-qualified presses we haven't opted into, so the user's
       // Ctrl+A / Cmd+B keybinds from the OS still work.
       if (e.ctrlKey || e.metaKey || e.altKey) return
+
+      // Shift+Enter — bulk commit all queued pairings (bulk mode only).
+      if (e.shiftKey && e.key === 'Enter' && bulkMode) {
+        e.preventDefault()
+        void handleBulkCreate()
+        return
+      }
+
+      // Ignore remaining shift combos.
+      if (e.shiftKey) return
+
+      // D — toggle deadhead on the hovered flight (build mode only).
+      if ((e.key === 'd' || e.key === 'D') && buildMode) {
+        e.preventDefault()
+        const hovered = usePairingGanttStore.getState().hoveredFlightId
+        const selected = usePairingGanttStore.getState().selectedFlightIds
+        if (hovered && selected.has(hovered)) toggleDeadheadFlight(hovered)
+        return
+      }
 
       // Toggle Build mode. Mnemonic: "B" for Build.
       if (e.key === 'b' || e.key === 'B') {
@@ -310,12 +602,16 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
         return
       }
 
-      // Create shortcut only fires while building AND a valid chain is picked.
+      // Enter: in bulk mode queue the chain; otherwise create immediately.
       if (e.key === 'Enter' && buildMode) {
-        if (saving) return
         if (selectedBuildFlights.length < 2) return
         e.preventDefault()
-        void handleCreatePairing(false)
+        if (bulkMode) {
+          handleAddToQueue()
+        } else {
+          if (saving) return
+          void handleCreatePairing(false)
+        }
         return
       }
 
@@ -333,6 +629,7 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
     return () => window.removeEventListener('keydown', onKey)
   }, [
     buildMode,
+    bulkMode,
     setBuildMode,
     clearSelection,
     inspectedPairing,
@@ -341,6 +638,11 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
     saving,
     selectedBuildFlights.length,
     handleCreatePairing,
+    handleAddToQueue,
+    handleBulkCreate,
+    toggleDeadheadFlight,
+    bulkQueue.length,
+    bulkSaving,
   ])
 
   const glassBg = isDark ? 'rgba(20,20,28,0.92)' : 'rgba(255,255,255,0.92)'
@@ -414,6 +716,13 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
             legality={liveLegality}
             legalityUsingMock={legalityUsingMock}
             saving={saving}
+            bulkMode={bulkMode}
+            bulkQueue={bulkQueue}
+            bulkSaving={bulkSaving}
+            onAddToQueue={handleAddToQueue}
+            onBulkCreate={handleBulkCreate}
+            onBulkCreateAndReplicate={() => setPendingBulkReplicate(true)}
+            onRemoveFromQueue={removeFromBulkQueue}
             onCreate={() => handleCreatePairing(false)}
             onCancel={() => {
               // Cancel clears the chain and any in-progress edit; build mode
@@ -427,6 +736,7 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
               next.delete(id)
               usePairingGanttStore.setState({ selectedFlightIds: next })
             }}
+            deadheadFlightIds={deadheadFlightIds}
             isDark={isDark}
           />
         )}
@@ -469,6 +779,22 @@ export function PairingGanttInspector({ open, onToggle }: InspectorProps) {
             } finally {
               setDeleting(false)
             }
+          }}
+        />
+      )}
+
+      {pendingBulkReplicate && (
+        <BulkReplicateConfirmDialog
+          queueCount={bulkQueue.length}
+          periodFrom={usePairingStore.getState().periodFrom}
+          periodTo={usePairingStore.getState().periodTo}
+          busy={bulkSaving}
+          onCancel={() => {
+            if (!bulkSaving) setPendingBulkReplicate(false)
+          }}
+          onConfirm={async () => {
+            setPendingBulkReplicate(false)
+            await handleBulkCreateAndReplicate()
           }}
         />
       )}
@@ -583,9 +909,17 @@ function InspectorBuild({
   legality,
   legalityUsingMock,
   saving,
+  bulkMode,
+  bulkQueue,
+  bulkSaving,
+  onAddToQueue,
+  onBulkCreate,
+  onBulkCreateAndReplicate,
+  onRemoveFromQueue,
   onCreate,
   onCancel,
   onRemoveFlight,
+  deadheadFlightIds,
   isDark,
 }: {
   selectedFlights: PairingFlight[]
@@ -594,9 +928,17 @@ function InspectorBuild({
   legality: LegalityResult
   legalityUsingMock: boolean
   saving: boolean
+  bulkMode: boolean
+  bulkQueue: BulkQueuedPairing[]
+  bulkSaving: boolean
+  onAddToQueue: () => void
+  onBulkCreate: () => void
+  onBulkCreateAndReplicate: () => void
+  onRemoveFromQueue: (localId: string) => void
   onCreate: () => void
   onCancel: () => void
   onRemoveFlight: (id: string) => void
+  deadheadFlightIds: Set<string>
   isDark: boolean
 }) {
   // Pull complement/positions from the store so the "(X cockpit, Y cabin)"
@@ -815,14 +1157,26 @@ function InspectorBuild({
               if (!next) {
                 return (
                   <Fragment key={f.id}>
-                    <BuildLegRow index={i} flight={f} onRemove={() => onRemoveFlight(f.id)} isDark={isDark} />
+                    <BuildLegRow
+                      index={i}
+                      flight={f}
+                      isDeadhead={deadheadFlightIds.has(f.id)}
+                      onRemove={() => onRemoveFlight(f.id)}
+                      isDark={isDark}
+                    />
                   </Fragment>
                 )
               }
               const gap = groundTimeMinutes(f, next)
               return (
                 <Fragment key={f.id}>
-                  <BuildLegRow index={i} flight={f} onRemove={() => onRemoveFlight(f.id)} isDark={isDark} />
+                  <BuildLegRow
+                    index={i}
+                    flight={f}
+                    isDeadhead={deadheadFlightIds.has(f.id)}
+                    onRemove={() => onRemoveFlight(f.id)}
+                    isDark={isDark}
+                  />
                   {gap >= LAYOVER_THRESHOLD_MIN ? (
                     <LayoverRow minutes={gap} station={f.arrivalAirport} isDark={isDark} />
                   ) : (
@@ -862,49 +1216,172 @@ function InspectorBuild({
 
       {/* Actions */}
       <div className="shrink-0 px-4 pt-3 pb-3 space-y-2" style={{ borderTop: `1px solid ${divider}` }}>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={saving}
-            title="Cancel build (Esc)"
-            className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-lg text-[13px] font-semibold transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40"
-            style={{
-              background: 'rgba(230,53,53,0.12)',
-              color: '#E63535',
-              border: '1px solid rgba(230,53,53,0.35)',
-            }}
-          >
-            <Trash2 size={13} strokeWidth={2.2} />
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={selectedFlights.length < 2 || saving}
-            onClick={onCreate}
-            title={
-              legality.overallStatus === 'violation'
-                ? 'Create with FDTL violation (Enter — requires override confirmation)'
-                : selectedFlights.length < 2
-                  ? 'Select at least 2 flights'
-                  : 'Create (Enter)'
-            }
-            className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-lg text-[13px] font-semibold text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{
-              background: legality.overallStatus === 'violation' ? '#FF3B3B' : INSPECTOR_ACCENT,
-              border: `1px solid ${legality.overallStatus === 'violation' ? '#FF3B3B' : INSPECTOR_ACCENT}`,
-            }}
-          >
-            {saving ? (
-              <Loader2 size={13} className="animate-spin" />
-            ) : legality.overallStatus === 'violation' ? (
-              <AlertTriangle size={13} strokeWidth={2.2} />
-            ) : (
-              <CheckCircle2 size={13} strokeWidth={2.2} />
+        {bulkMode ? (
+          <>
+            {/* Bulk Queue strip */}
+            {bulkQueue.length > 0 && (
+              <div className="mb-2">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Layers size={12} style={{ color: INSPECTOR_ACCENT }} />
+                  <span className="text-[12px] font-semibold" style={{ color: INSPECTOR_ACCENT }}>
+                    Queue ({bulkQueue.length})
+                  </span>
+                </div>
+                <div className="space-y-1 max-h-[156px] overflow-y-auto">
+                  {bulkQueue.map((q) => {
+                    const routeChain =
+                      q.legs.length > 0
+                        ? [q.legs[0].depStation, ...q.legs.map((l) => l.arrStation)].join('→')
+                        : q.pairingCode
+                    const statusColor =
+                      q.fdtlStatus === 'violation' ? '#FF3B3B' : q.fdtlStatus === 'warning' ? '#FF8800' : '#06C270'
+                    return (
+                      <div
+                        key={q.localId}
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-md"
+                        style={{
+                          background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)',
+                          border: `1px solid ${divider}`,
+                        }}
+                      >
+                        <span
+                          className="inline-flex items-center justify-center w-2 h-2 rounded-full shrink-0"
+                          style={{ background: statusColor }}
+                        />
+                        <span className="flex-1 text-[12px] font-medium truncate" style={{ color: textPrimary }}>
+                          {routeChain}
+                        </span>
+                        <span className="text-[11px]" style={{ color: textTertiary }}>
+                          {q.legs.length}L
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onRemoveFromQueue(q.localId)}
+                          className="shrink-0 p-0.5 rounded hover:opacity-70 transition-opacity"
+                          style={{ color: textTertiary }}
+                          title="Remove from queue"
+                        >
+                          <X size={11} />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             )}
-            {saving ? (editingPairingId ? 'Updating…' : 'Creating…') : editingPairingId ? 'Update' : 'Create'}
-          </button>
-        </div>
+
+            <Tooltip content={selectedFlights.length < 2 ? 'Select at least 2 flights' : 'Add to queue (Enter)'}>
+              <button
+                type="button"
+                disabled={selectedFlights.length < 2}
+                onClick={onAddToQueue}
+                className="w-full inline-flex items-center justify-center gap-1.5 h-9 rounded-lg text-[13px] font-semibold transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.04)',
+                  color: textPrimary,
+                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.14)'}`,
+                }}
+              >
+                <ListPlus size={13} strokeWidth={2.2} />
+                Add to Queue
+              </button>
+            </Tooltip>
+            <Tooltip
+              content={
+                bulkQueue.length === 0
+                  ? 'No pairings queued'
+                  : `Write ${bulkQueue.length} pairing(s) to database (Shift+Enter)`
+              }
+            >
+              <button
+                type="button"
+                disabled={bulkQueue.length === 0 || bulkSaving}
+                onClick={onBulkCreate}
+                className="w-full inline-flex items-center justify-center gap-1.5 h-9 rounded-lg text-[13px] font-semibold transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.04)',
+                  color: textPrimary,
+                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.14)'}`,
+                }}
+              >
+                {bulkSaving ? <Loader2 size={13} className="animate-spin" /> : <Zap size={13} strokeWidth={2.2} />}
+                {bulkSaving ? 'Saving…' : `Bulk Create (${bulkQueue.length})`}
+              </button>
+            </Tooltip>
+            <Tooltip
+              content={
+                bulkQueue.length === 0
+                  ? 'No pairings queued'
+                  : 'Bulk Create, then replicate each queued pairing across the loaded period. Dates with missing flights or schedule mismatches are skipped. (Ctrl+Shift+Enter)'
+              }
+              multiline
+              maxWidth={260}
+            >
+              <button
+                type="button"
+                disabled={bulkQueue.length === 0 || bulkSaving}
+                onClick={onBulkCreateAndReplicate}
+                className="w-full inline-flex items-center justify-center gap-1.5 h-9 rounded-lg text-[13px] font-semibold transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.04)',
+                  color: textPrimary,
+                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.14)'}`,
+                }}
+              >
+                {bulkSaving ? <Loader2 size={13} className="animate-spin" /> : <Copy size={13} strokeWidth={2.2} />}
+                {bulkSaving ? 'Saving…' : 'Bulk Create and Replicate'}
+              </button>
+            </Tooltip>
+          </>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Tooltip content="Cancel build (Esc)">
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={saving}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-lg text-[13px] font-semibold transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40"
+                style={{
+                  background: 'rgba(230,53,53,0.12)',
+                  color: '#E63535',
+                  border: '1px solid rgba(230,53,53,0.35)',
+                }}
+              >
+                <Trash2 size={13} strokeWidth={2.2} />
+                Cancel
+              </button>
+            </Tooltip>
+            <Tooltip
+              content={
+                legality.overallStatus === 'violation'
+                  ? 'Create with FDTL violation (Enter — requires override confirmation)'
+                  : selectedFlights.length < 2
+                    ? 'Select at least 2 flights'
+                    : 'Create (Enter)'
+              }
+            >
+              <button
+                type="button"
+                disabled={selectedFlights.length < 2 || saving}
+                onClick={onCreate}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 rounded-lg text-[13px] font-semibold text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  background: legality.overallStatus === 'violation' ? '#FF3B3B' : INSPECTOR_ACCENT,
+                  border: `1px solid ${legality.overallStatus === 'violation' ? '#FF3B3B' : INSPECTOR_ACCENT}`,
+                }}
+              >
+                {saving ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : legality.overallStatus === 'violation' ? (
+                  <AlertTriangle size={13} strokeWidth={2.2} />
+                ) : (
+                  <CheckCircle2 size={13} strokeWidth={2.2} />
+                )}
+                {saving ? (editingPairingId ? 'Updating…' : 'Creating…') : editingPairingId ? 'Update' : 'Create'}
+              </button>
+            </Tooltip>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -941,11 +1418,13 @@ function KbdHint({ keys, label, isDark }: { keys: string[]; label: string; isDar
 function BuildLegRow({
   index,
   flight,
+  isDeadhead,
   onRemove,
   isDark,
 }: {
   index: number
   flight: PairingFlight
+  isDeadhead: boolean
   onRemove: () => void
   isDark: boolean
 }) {
@@ -958,8 +1437,14 @@ function BuildLegRow({
     <div
       className="flex items-center gap-2 px-2.5 py-1.5 rounded-md"
       style={{
-        background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(15,23,42,0.02)',
-        border: `1px solid ${divider}`,
+        background: isDeadhead
+          ? isDark
+            ? 'rgba(30,41,59,0.60)'
+            : 'rgba(30,41,59,0.08)'
+          : isDark
+            ? 'rgba(255,255,255,0.02)'
+            : 'rgba(15,23,42,0.02)',
+        border: `1px solid ${isDeadhead ? 'rgba(148,163,184,0.25)' : divider}`,
       }}
     >
       <span
@@ -975,6 +1460,14 @@ function BuildLegRow({
         <span className="text-[12px] font-medium tabular-nums" style={{ color: textSecondary }}>
           {flight.departureAirport} → {flight.arrivalAirport}
         </span>
+        {isDeadhead && (
+          <span
+            className="text-[10px] font-bold tracking-wide px-1 py-px rounded"
+            style={{ background: 'rgba(30,41,59,0.80)', color: '#94A3B8', border: '1px solid rgba(148,163,184,0.30)' }}
+          >
+            DHD
+          </span>
+        )}
       </div>
       <span className="text-[11px] tabular-nums" style={{ color: textTertiary }}>
         {flight.stdUtc.slice(11, 16)}

@@ -53,28 +53,42 @@ export function PairingListPanel() {
   // Ctrl+F1 — open Pairing Details for the currently inspected pairing.
   // (F1 alone is reserved globally for Help — see project memory.)
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'F1') {
-        const id = usePairingStore.getState().inspectedPairingId
-        if (!id) return
-        const target = usePairingStore.getState().pairings.find((p) => p.id === id)
-        if (target) {
-          e.preventDefault()
-          setDetailsPairing({ pairing: target })
-        }
-      }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R')) {
-        const id = usePairingStore.getState().inspectedPairingId
-        if (!id) return
-        const target = usePairingStore.getState().pairings.find((p) => p.id === id)
-        if (target) {
-          e.preventDefault()
-          setReplicateSource(target)
-        }
-      }
+    const isTypingTarget = (el: EventTarget | null): boolean => {
+      if (!(el instanceof HTMLElement)) return false
+      const tag = el.tagName
+      return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    const onKey = (e: KeyboardEvent) => {
+      const ctrl = e.ctrlKey || e.metaKey
+      if (!ctrl) return
+      const k = e.key
+      const isF1 = k === 'F1'
+      const isR = k === 'r' || k === 'R'
+      const isC = k === 'c' || k === 'C'
+      if (!isF1 && !isR && !isC) return
+      if (isC && isTypingTarget(e.target)) return
+
+      e.preventDefault()
+      e.stopPropagation()
+
+      const id = usePairingStore.getState().inspectedPairingId
+      if (!id) return
+      const target = usePairingStore.getState().pairings.find((p) => p.id === id)
+      if (!target) return
+      if (isF1) setDetailsPairing({ pairing: target })
+      else if (isR || isC) setReplicateSource(target)
+    }
+    const onCopy = (e: ClipboardEvent) => {
+      if (isTypingTarget(e.target)) return
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    window.addEventListener('keydown', onKey, { capture: true })
+    window.addEventListener('copy', onCopy, { capture: true })
+    return () => {
+      window.removeEventListener('keydown', onKey, { capture: true } as EventListenerOptions)
+      window.removeEventListener('copy', onCopy, { capture: true } as EventListenerOptions)
+    }
   }, [])
   /** pairingCode set — groups currently expanded. Single-member groups render flat. */
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())

@@ -12,9 +12,11 @@ import {
   type CrewMemoRef,
   type CrewPositionRef,
   type CrewSchedulePublicationRef,
+  type OperatorSchedulingConfig,
   type PairingRef,
   type UncrewedPairingRef,
 } from '@skyhub/api'
+import { checkSoftRules, type SoftRuleViolation } from '@skyhub/logic'
 import type { BarLabelMode, CrewScheduleZoom } from '@/lib/crew-schedule/layout'
 import { sortCrewRoster } from '@/lib/crew-schedule/layout'
 import { useOperatorStore } from '@/stores/use-operator-store'
@@ -34,6 +36,7 @@ interface Filters {
   baseIds: string[]
   positionIds: string[]
   acTypeIcaos: string[]
+  crewGroupIds: string[]
 }
 
 export interface UncrewedFilterState {
@@ -119,11 +122,16 @@ interface Data {
   /** Roster-level FDTL issues for the visible window. */
   crewIssues: CrewLegalityIssueRef[]
   aircraftTypes: Array<{ icaoType: string; family: string | null }>
+  /** Operator scheduling soft-rule config (4.1.6.3). Loaded once per commitPeriod. */
+  schedulingConfig: OperatorSchedulingConfig | null
+  /** Soft-rule violations keyed by crewId. Amber warnings in Gantt row headers. */
+  softViolations: Record<string, SoftRuleViolation[]>
 }
 
 interface ContextRefs {
   bases: Array<{ _id: string; iataCode: string | null; name: string }>
   acTypes: string[]
+  crewGroups: Array<{ _id: string; name: string }>
   loaded: boolean
 }
 
@@ -648,6 +656,88 @@ function defaultPeriod(): { from: string; to: string } {
   return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }
 }
 
+/** Compute UTC offset in hours from an IANA timezone string (e.g. "Asia/Ho_Chi_Minh" → 7). */
+function resolveUtcOffsetHours(timezone: string): number {
+  try {
+    const now = new Date()
+    const parts = new Intl.DateTimeFormat('en', {
+      timeZone: timezone,
+      timeZoneName: 'shortOffset',
+    }).formatToParts(now)
+    const tzName = parts.find((p) => p.type === 'timeZoneName')?.value ?? ''
+    const match = tzName.match(/GMT([+-])(\d+)(?::(\d+))?/)
+    if (!match) return 0
+    const sign = match[1] === '+' ? 1 : -1
+    const h = parseInt(match[2], 10)
+    const m = parseInt(match[3] ?? '0', 10)
+    return sign * (h + m / 60)
+  } catch {
+    return 0
+  }
+}
+
+/** Build pairingsById map for soft-rule destination checks. */
+function buildPairingsById(
+  pairings: PairingRef[],
+): Map<string, { layoverStations: string[]; layoverCountryCodes: string[] }> {
+  const map = new Map<string, { layoverStations: string[]; layoverCountryCodes: string[] }>()
+  for (const p of pairings) {
+    if (!p.legs?.length) {
+      map.set(p._id, { layoverStations: [], layoverCountryCodes: [] })
+      continue
+    }
+    const maxDutyDay = Math.max(...p.legs.map((l) => l.dutyDay))
+    const layoverStations: string[] = []
+    for (let day = 1; day < maxDutyDay; day++) {
+      const dayLegs = p.legs.filter((l) => l.dutyDay === day)
+      if (!dayLegs.length) continue
+      const last = dayLegs.reduce((a, b) => (a.legOrder > b.legOrder ? a : b))
+      layoverStations.push(last.arrStation)
+    }
+    // Country code derivation is left empty here; destination rules with scope='country'
+    // require airport→country mapping not available in the store. Airline users typically
+    // configure scope='airport' rules. Country-scope is computed server-side in the solver.
+    map.set(p._id, { layoverStations, layoverCountryCodes: [] })
+  }
+  return map
+}
+
+async function loadSchedulingConfigAndViolations(
+  get: () => State,
+  set: (partial: Partial<State>) => void,
+  periodFromIso: string,
+  periodToIso: string,
+) {
+  const opId = useOperatorStore.getState().operator?._id
+  const operatorTimezone = useOperatorStore.getState().operator?.timezone ?? 'UTC'
+  if (!opId) return
+
+  try {
+    const cfg = await api.getOperatorSchedulingConfig(opId)
+    if (!cfg) {
+      set({ schedulingConfig: null, softViolations: {} })
+      return
+    }
+
+    const { crew, assignments, pairings } = get()
+    const utcOffset = resolveUtcOffsetHours(operatorTimezone)
+    const pairingsById = buildPairingsById(pairings)
+
+    const softViolations: Record<string, SoftRuleViolation[]> = {}
+    for (const member of crew) {
+      const memberAssignments = assignments
+        .filter((a) => a.crewId === member._id && a.status !== 'cancelled')
+        .map((a) => ({ pairingId: a.pairingId, startUtcIso: a.startUtcIso, endUtcIso: a.endUtcIso }))
+      const violations = checkSoftRules(memberAssignments, pairingsById, cfg, periodFromIso, periodToIso, utcOffset)
+      if (violations.length > 0) softViolations[member._id] = violations
+    }
+
+    set({ schedulingConfig: cfg, softViolations })
+  } catch {
+    // Silent — soft violations are best-effort; stale state is self-healing on next commitPeriod.
+  }
+}
+
 export const useCrewScheduleStore = create<State>((set, get) => {
   const { from, to } = defaultPeriod()
   return {
@@ -671,11 +761,13 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     ruleSet: null,
     crewIssues: [],
     aircraftTypes: [],
+    schedulingConfig: null,
+    softViolations: {},
 
     // Committed view state
     periodFromIso: from,
     periodToIso: to,
-    filters: { baseIds: [], positionIds: [], acTypeIcaos: [] },
+    filters: { baseIds: [], positionIds: [], acTypeIcaos: [], crewGroupIds: [] },
 
     // View state
     zoom: '7D',
@@ -741,7 +833,7 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     error: null,
 
     // Context
-    context: { bases: [], acTypes: [], loaded: false },
+    context: { bases: [], acTypes: [], crewGroups: [], loaded: false },
 
     // ── Committed period + fetch ──
     setPeriod: (from, to) => set({ periodFromIso: from, periodToIso: to }),
@@ -757,6 +849,7 @@ export const useCrewScheduleStore = create<State>((set, get) => {
           base: s.filters.baseIds.length === 1 ? s.filters.baseIds[0] : undefined,
           position: s.filters.positionIds.length === 1 ? s.filters.positionIds[0] : undefined,
           acType: s.filters.acTypeIcaos.length === 1 ? s.filters.acTypeIcaos[0] : undefined,
+          crewGroup: s.filters.crewGroupIds.length === 1 ? s.filters.crewGroupIds[0] : undefined,
         })
         const sortedCrew = sortCrewRoster({
           crew: res.crew,
@@ -785,6 +878,8 @@ export const useCrewScheduleStore = create<State>((set, get) => {
           loading: false,
           error: null,
         })
+        // Load scheduling config + compute soft violations in background.
+        void loadSchedulingConfigAndViolations(get, set, s.periodFromIso, s.periodToIso)
       } catch (e) {
         set({
           loading: false,
@@ -802,6 +897,7 @@ export const useCrewScheduleStore = create<State>((set, get) => {
           base: s.filters.baseIds.length === 1 ? s.filters.baseIds[0] : undefined,
           position: s.filters.positionIds.length === 1 ? s.filters.positionIds[0] : undefined,
           acType: s.filters.acTypeIcaos.length === 1 ? s.filters.acTypeIcaos[0] : undefined,
+          crewGroup: s.filters.crewGroupIds.length === 1 ? s.filters.crewGroupIds[0] : undefined,
         })
         // Preserve the row order of the last commit so optimistic
         // mutations (assign / delete / swap) never reshuffle the Gantt.
@@ -864,10 +960,11 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     loadContext: async () => {
       if (get().context.loaded) return
       try {
-        const [airports, types, positions] = await Promise.all([
+        const [airports, types, positions, crewGroups] = await Promise.all([
           api.getAirports({ crewBase: true }),
           api.getAircraftTypes(),
           api.getCrewPositions(),
+          api.getCrewGroups(),
         ])
         // Seed `positions` so the Position filter is selectable before the
         // first Go. The crew-schedule aggregator will overwrite this list
@@ -877,13 +974,17 @@ export const useCrewScheduleStore = create<State>((set, get) => {
           context: {
             bases: airports.map((a) => ({ _id: a._id, iataCode: a.iataCode, name: a.name })),
             acTypes: [...new Set(types.map((t) => t.icaoType))].sort(),
+            crewGroups: crewGroups
+              .filter((g) => g.isActive)
+              .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
+              .map((g) => ({ _id: g._id, name: g.name })),
             loaded: true,
           },
           positions: prevPositions.length > 0 ? prevPositions : positions,
         })
       } catch {
         // non-fatal — filter dropdowns will remain empty
-        set({ context: { bases: [], acTypes: [], loaded: true } })
+        set({ context: { bases: [], acTypes: [], crewGroups: [], loaded: true } })
       }
     },
 

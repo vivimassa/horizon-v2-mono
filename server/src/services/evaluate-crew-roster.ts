@@ -3,6 +3,7 @@ import { validateCrewAssignment } from '@skyhub/logic/src/fdtl/crew-schedule-val
 import { buildScheduleDuties } from '@skyhub/logic/src/fdtl/schedule-duty-builder'
 import { CrewAssignment } from '../models/CrewAssignment.js'
 import { CrewActivity } from '../models/CrewActivity.js'
+import { ActivityCode } from '../models/ActivityCode.js'
 import { CrewMember } from '../models/CrewMember.js'
 import { Pairing } from '../models/Pairing.js'
 import { CrewLegalityIssue } from '../models/CrewLegalityIssue.js'
@@ -37,7 +38,7 @@ export async function evaluateCrewRoster(
   const historyFromMs = fromMs - 30 * 86_400_000
   const historyFromIso = new Date(historyFromMs).toISOString().slice(0, 10)
 
-  const [crewList, pairings, assignments, activities, overrides] = await Promise.all([
+  const [crewList, pairings, assignments, activities, activityCodes, overrides] = await Promise.all([
     CrewMember.find({ operatorId }, { _id: 1, base: 1 }).lean(),
     Pairing.find({ operatorId }).lean(),
     CrewAssignment.find({
@@ -53,12 +54,17 @@ export async function evaluateCrewRoster(
       endUtcIso: { $gte: historyFromIso },
       startUtcIso: { $lte: toIso + 'T23:59:59Z' },
     }).lean(),
+    ActivityCode.find({ operatorId }, { _id: 1, flags: 1 }).lean(),
     AssignmentViolationOverride.find({
       operatorId,
       scenarioId,
       overriddenAtUtc: { $gte: new Date(historyFromMs).toISOString() },
     }).lean(),
   ])
+
+  const activityCodesById = new Map<string, { flags: string[] }>(
+    activityCodes.map((c) => [c._id as string, { flags: (c.flags ?? []) as string[] }]),
+  )
 
   // Resolve crew.base (airport UUID) → IATA code. The validator compares
   // station strings (IATA) so a raw UUID in `homeBase` would spuriously
@@ -137,8 +143,10 @@ export async function evaluateCrewRoster(
         crewId: x.crewId,
         startUtcIso: x.startUtcIso,
         endUtcIso: x.endUtcIso,
+        activityCodeId: (x as { activityCodeId?: string | null }).activityCodeId ?? null,
       })),
       pairingsById,
+      activityCodesById,
     })
 
     allDuties.sort((a, b) => a.startUtcMs - b.startUtcMs)

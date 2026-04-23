@@ -18,6 +18,8 @@ interface PairingPillContextMenuProps {
   onRequestDelete: (pairingId: string) => void
   /** Opens `ReplicatePairingDialog` — state lives in the canvas. */
   onReplicate: (pairingId: string) => void
+  /** Opens `BulkDeletePairingDialog` — finds and deletes all matching instances. */
+  onBulkDelete: (pairingId: string) => void
   /** Enters Edit mode: seeds build chain with the pairing's legs + complement. */
   onEdit: (pairingId: string) => void
 }
@@ -37,6 +39,7 @@ export function PairingPillContextMenu({
   onShowDetails,
   onRequestDelete,
   onReplicate,
+  onBulkDelete,
   onEdit,
 }: PairingPillContextMenuProps) {
   const { theme } = useTheme()
@@ -172,11 +175,17 @@ export function PairingPillContextMenu({
           onClick={() => onShowDetails(pairingId)}
         />
         <Item icon={<Pencil size={14} />} label="Edit Pairing" kbd="Ctrl+E" onClick={() => onEdit(pairingId)} />
-        <Item icon={<Copy size={14} />} label="Replicate" kbd="Ctrl+R" onClick={() => onReplicate(pairingId)} />
+        <Item icon={<Copy size={14} />} label="Replicate" kbd="Ctrl+C" onClick={() => onReplicate(pairingId)} />
         <Item icon={<Eye size={14} />} label="Show Flights" kbd="Ctrl+↑" onClick={handleShowFlights} />
         <div className="my-1 h-px" style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }} />
         <Item icon={<Trash2 size={14} />} label="Delete Pairing" kbd="Del" onClick={handleDelete} danger />
-        <Item icon={<Trash2 size={14} />} label="Bulk Delete…" kbd="Ctrl+D" disabled danger />
+        <Item
+          icon={<Trash2 size={14} />}
+          label="Bulk Delete"
+          kbd="Ctrl+D"
+          onClick={() => onBulkDelete(pairingId)}
+          danger
+        />
       </div>
     </div>,
     document.body,

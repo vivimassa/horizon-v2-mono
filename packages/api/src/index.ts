@@ -209,6 +209,23 @@ export type {
   CrewSchedulePublicationAssignmentRef,
   CrewSchedulePublicationActivityRef,
   ApiError,
+  // 4.1.6.3 Scheduling Configurations
+  SchedulingDaysOffConfig,
+  SchedulingStandbyConfig,
+  SchedulingDestinationRule,
+  SchedulingObjectivesConfig,
+  OperatorSchedulingConfig,
+  OperatorSchedulingConfigUpsert,
+  // 4.1.6.1 Auto Roster
+  AutoRosterRunStats,
+  AutoRosterRun,
+  StartAutoRosterParams,
+  PeriodSummaryCrew,
+  PeriodSummaryPairings,
+  PeriodSummary,
+  DayBreakdown,
+  PeriodBreakdown,
+  AutoRosterFilterOptions,
 } from './client'
 
 // ─── React Query layer ───

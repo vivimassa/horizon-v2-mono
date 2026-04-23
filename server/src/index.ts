@@ -38,6 +38,7 @@ import { disruptionRoutes } from './routes/disruptions.js'
 import { operatorDisruptionConfigRoutes } from './routes/operator-disruption-config.js'
 import { operatorMessagingConfigRoutes } from './routes/operator-messaging-config.js'
 import { operatorPairingConfigRoutes } from './routes/operator-pairing-config.js'
+import { operatorSchedulingConfigRoutes } from './routes/operator-scheduling-config.js'
 import { asmSsmConsumerRoutes } from './routes/asm-ssm-consumers.js'
 import { integrationPullRoutes } from './routes/integration-pull.js'
 import { mlRoutes } from './routes/ml.js'
@@ -50,6 +51,7 @@ import { ensureSystemFolders } from './services/ensure-crew-document-folders.js'
 import { manpowerRoutes } from './routes/manpower.js'
 import { pairingRoutes } from './routes/pairings.js'
 import { crewScheduleRoutes } from './routes/crew-schedule.js'
+import { autoRosterRoutes } from './routes/auto-roster.js'
 import { ensureManpowerBasePlan } from './services/ensure-manpower-base-plan.js'
 import { startWeatherPoll } from './jobs/weather-poll.js'
 import { startAutoTransmitScheduler } from './jobs/mvt-auto-transmit.js'
@@ -70,6 +72,23 @@ async function main(): Promise<void> {
   await app.register(cors, { origin: env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN })
   await app.register(jwt, {
     secret: env.JWT_SECRET,
+    // Browser EventSource can't set Authorization header — accept ?token= on
+    // SSE endpoints (e.g. /auto-roster/:runId/stream) as a fallback.
+    // Note: this runs in onRequest where request.query isn't parsed yet,
+    // so we parse the raw URL ourselves.
+    verify: {
+      extractToken: (request) => {
+        const auth = request.headers.authorization
+        if (auth?.startsWith('Bearer ')) return auth.slice(7)
+        const qIdx = request.url.indexOf('?')
+        if (qIdx >= 0) {
+          const params = new URLSearchParams(request.url.slice(qIdx + 1))
+          const tok = params.get('token')
+          if (tok) return tok
+        }
+        return undefined
+      },
+    },
   })
   await app.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } }) // 20MB — covers crew documents (PDFs, scans)
   await app.register(fastifyStatic, {
@@ -120,6 +139,7 @@ async function main(): Promise<void> {
   await app.register(operatorDisruptionConfigRoutes)
   await app.register(operatorMessagingConfigRoutes)
   await app.register(operatorPairingConfigRoutes)
+  await app.register(operatorSchedulingConfigRoutes)
   await app.register(asmSsmConsumerRoutes)
   await app.register(integrationPullRoutes)
   await app.register(mlRoutes)
@@ -131,6 +151,7 @@ async function main(): Promise<void> {
   await app.register(manpowerRoutes)
   await app.register(pairingRoutes)
   await app.register(crewScheduleRoutes)
+  await app.register(autoRosterRoutes)
 
   // ── Bootstrap: ensure every active operator has the 4 system document
   // folders (Crew Photos / Passports & Licenses / Medical Certificates /

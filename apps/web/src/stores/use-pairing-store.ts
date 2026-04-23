@@ -1,15 +1,32 @@
 'use client'
 
 import { create } from 'zustand'
-import type { CrewComplementRef, CrewPositionRef, OperatorPairingConfig } from '@skyhub/api'
+import type { CrewComplementRef, CrewPositionRef, OperatorPairingConfig, PairingCreateInput } from '@skyhub/api'
 import type {
   PairingFilters,
   Pairing,
   PairingFlight,
   PairingOptions,
   PairingLegalityStatus,
+  LegalityResult,
 } from '@/components/crew-ops/pairing/types'
 import { DEFAULT_FILTERS } from '@/components/crew-ops/pairing/types'
+
+/** A pairing staged for bulk commit — built in memory, not yet written to DB. */
+export interface BulkQueuedPairing {
+  localId: string
+  flightIds: string[]
+  pairingCode: string
+  baseAirport: string
+  aircraftTypeIcao: string | null
+  complementKey: string
+  cockpitCount: number
+  facilityClass: string | null
+  crewCounts: Record<string, number> | null
+  legs: PairingCreateInput['legs']
+  fdtlStatus: 'legal' | 'warning' | 'violation'
+  lastLegalityResult: LegalityResult
+}
 
 /**
  * Workspace state for 4.1.5 Crew Pairing. Shared across 4.1.5.1 Text, 4.1.5.2
@@ -134,6 +151,12 @@ interface PairingStoreState {
 
   requestCreatePairing: (ids: string[]) => void
   clearCreateRequest: () => void
+
+  // ── Bulk queue (Gantt bulk mode — staged before DB write) ──
+  bulkQueue: BulkQueuedPairing[]
+  addToBulkQueue: (item: BulkQueuedPairing) => void
+  removeFromBulkQueue: (localId: string) => void
+  clearBulkQueue: () => void
 }
 
 /** Default 7-day period starting today (UTC YYYY-MM-DD). */
@@ -201,6 +224,7 @@ export const usePairingStore = create<PairingStoreState>((set, get) => ({
 
   layoverMode: null,
   pendingCreateRequest: null,
+  bulkQueue: [],
 
   setPeriod: (from, to) => {
     try {
@@ -278,6 +302,10 @@ export const usePairingStore = create<PairingStoreState>((set, get) => ({
 
   requestCreatePairing: (ids) => set({ pendingCreateRequest: { ids } }),
   clearCreateRequest: () => set({ pendingCreateRequest: null }),
+
+  addToBulkQueue: (item) => set((s) => ({ bulkQueue: [...s.bulkQueue, item] })),
+  removeFromBulkQueue: (localId) => set((s) => ({ bulkQueue: s.bulkQueue.filter((q) => q.localId !== localId) })),
+  clearBulkQueue: () => set({ bulkQueue: [] }),
 }))
 
 function complementToCockpit(key: 'standard' | 'aug1' | 'aug2' | 'custom'): number {

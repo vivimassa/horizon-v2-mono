@@ -107,7 +107,7 @@ export function PairingRowContextMenu({
       <Item
         icon={<Copy size={14} strokeWidth={2.2} />}
         label="Replicate across period"
-        kbd="Ctrl+R"
+        kbd="Ctrl+C"
         onClick={() => {
           onReplicate()
           onClose()

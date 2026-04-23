@@ -17,6 +17,10 @@ import {
   ChevronDown,
   Lightbulb,
   CalendarDays,
+  Layers,
+  ListFilter,
+  SlidersHorizontal,
+  Check,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
@@ -24,6 +28,8 @@ import { colors } from '@skyhub/ui/theme'
 import { Tooltip } from '@/components/ui/tooltip'
 import { usePairingStore } from '@/stores/use-pairing-store'
 import { usePairingGanttStore } from '@/stores/use-pairing-gantt-store'
+import type { ReviewFilterMode } from '@/stores/use-pairing-gantt-store'
+import { SmartFiltersDialog } from '../dialogs/smart-filters-dialog'
 import { RibbonSection, RibbonBtn, RibbonDivider } from '@/components/ui/ribbon-primitives'
 import { ROW_HEIGHT_LEVELS } from '@/lib/gantt/types'
 import type { ZoomLevel } from '@/lib/gantt/types'
@@ -59,6 +65,8 @@ export function PairingGanttToolbar() {
   const setFullscreen = usePairingGanttStore((s) => s.setFullscreen)
   const buildMode = usePairingGanttStore((s) => s.buildMode)
   const setBuildMode = usePairingGanttStore((s) => s.setBuildMode)
+  const bulkMode = usePairingGanttStore((s) => s.bulkMode)
+  const setBulkMode = usePairingGanttStore((s) => s.setBulkMode)
   const proposalEnabled = usePairingGanttStore((s) => s.proposalEnabled)
   const toggleProposal = usePairingGanttStore((s) => s.toggleProposal)
   const proposalDays = usePairingGanttStore((s) => s.proposalDays)
@@ -70,9 +78,17 @@ export function PairingGanttToolbar() {
   const refreshIntervalMins = usePairingGanttStore((s) => s.refreshIntervalMins)
   const setRefreshIntervalMins = usePairingGanttStore((s) => s.setRefreshIntervalMins)
   const goToToday = usePairingGanttStore((s) => s.goToToday)
+  const reviewFilterMode = usePairingGanttStore((s) => s.reviewFilterMode)
+  const setReviewFilterMode = usePairingGanttStore((s) => s.setReviewFilterMode)
+  const smartFilters = usePairingGanttStore((s) => s.smartFilters)
   const periodCommitted = usePairingStore((s) => s.periodCommitted)
 
   const [collapsed, setCollapsed] = useState(false)
+  const [smartFiltersOpen, setSmartFiltersOpen] = useState(false)
+  const [pairingsDropOpen, setPairingsDropOpen] = useState(false)
+  const pairingsBtnRef = useRef<HTMLButtonElement>(null)
+  const pairingsDropRef = useRef<HTMLDivElement>(null)
+  const [pairingsDropPos, setPairingsDropPos] = useState({ top: 0, left: 0 })
 
   const glassBg = isDark ? 'rgba(25,25,33,0.85)' : 'rgba(255,255,255,0.85)'
   const glassBorder = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)'
@@ -165,6 +181,25 @@ export function PairingGanttToolbar() {
     return () => document.removeEventListener('mousedown', handler)
   }, [formatOpen])
 
+  useEffect(() => {
+    if (!pairingsDropOpen) return
+    const btn = pairingsBtnRef.current
+    if (!btn) return
+    const rect = btn.getBoundingClientRect()
+    setPairingsDropPos({ top: rect.bottom + 4, left: rect.left })
+  }, [pairingsDropOpen])
+
+  useEffect(() => {
+    if (!pairingsDropOpen) return
+    const handler = (e: MouseEvent) => {
+      const t = e.target as HTMLElement
+      if (pairingsDropRef.current?.contains(t) || pairingsBtnRef.current?.contains(t)) return
+      setPairingsDropOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [pairingsDropOpen])
+
   const rowH = ROW_HEIGHT_LEVELS[rowHeightLevel].rowH
 
   // ── Unified item list (used by both collapsed and expanded views) ──
@@ -238,6 +273,16 @@ export function PairingGanttToolbar() {
       onClick: () => setBuildMode(!buildMode),
       active: buildMode,
       disabled: !periodCommitted,
+    },
+    {
+      icon: Layers,
+      label: bulkMode ? 'Bulk: ON' : 'Bulk: OFF',
+      tooltip: bulkMode
+        ? 'Bulk mode ON — Enter queues pairings; Bulk Create writes all at once'
+        : 'Enable bulk mode to queue multiple pairings before writing',
+      onClick: () => setBulkMode(!bulkMode),
+      active: bulkMode,
+      disabled: !buildMode,
     },
     {
       icon: Lightbulb,
@@ -432,6 +477,21 @@ export function PairingGanttToolbar() {
                   : 'Build mode disabled — click to enable'
               }
             />
+            <RibbonBtn
+              icon={Layers}
+              label={bulkMode ? 'Bulk: ON' : 'Bulk: OFF'}
+              onClick={() => setBulkMode(!bulkMode)}
+              disabled={!buildMode}
+              active={bulkMode}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip={
+                bulkMode
+                  ? 'Bulk mode ON — Enter queues pairings; Bulk Create writes all at once'
+                  : 'Enable bulk mode to queue multiple pairings before writing'
+              }
+            />
             <div
               className="flex items-center rounded-xl overflow-hidden"
               style={{
@@ -470,6 +530,34 @@ export function PairingGanttToolbar() {
                 tooltip="Days ahead to search for next-leg candidates"
               />
             </div>
+          </RibbonSection>
+          <RibbonDivider isDark={isDark} />
+
+          {/* Review */}
+          <RibbonSection label="Review">
+            {/* Pairings quick-filter dropdown */}
+            <RibbonBtn
+              ref={pairingsBtnRef}
+              icon={ListFilter}
+              label="Pairings"
+              onClick={() => setPairingsDropOpen((o) => !o)}
+              active={pairingsDropOpen || reviewFilterMode !== 'all'}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Quick-filter pairing zone by type"
+            />
+            {/* Smart filters dialog */}
+            <RibbonBtn
+              icon={SlidersHorizontal}
+              label="Filters"
+              onClick={() => setSmartFiltersOpen(true)}
+              active={smartFilters !== null}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Advanced multi-criteria pairing filters"
+            />
           </RibbonSection>
 
           {/* Collapse chevron — top-right */}
@@ -543,6 +631,76 @@ export function PairingGanttToolbar() {
           document.body,
         )}
 
+      {/* ── Pairings quick-filter dropdown ── */}
+      {pairingsDropOpen &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={pairingsDropRef}
+            className="fixed z-9999 rounded-xl overflow-hidden select-none"
+            style={{
+              top: pairingsDropPos.top,
+              left: pairingsDropPos.left,
+              width: 320,
+              background: panelBg,
+              border: `1px solid ${panelBorder}`,
+              boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 32px rgba(96,97,112,0.14)',
+            }}
+          >
+            <div
+              className="px-3 py-2 text-[11px] uppercase tracking-wider font-semibold"
+              style={{
+                color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)',
+                borderBottom: `1px solid ${panelBorder}`,
+              }}
+            >
+              Filter pairing zone
+            </div>
+            <div className="py-1">
+              {(
+                [
+                  ['all', 'All Crew Routes'],
+                  ['operating', 'Has operating leg (no Pax/Ground duties)'],
+                  ['unfinalized', 'Unfinalized routes only'],
+                  ['deadhead', 'Dead-heading routes only'],
+                  ['non_base_to_base', 'Non base-to-base routes only'],
+                  ['illegal', 'Illegal routes only'],
+                  ['partial_uncovered', 'Associated with partially uncovered A/C legs'],
+                  ['over_covered', 'Associated with over-covered A/C legs'],
+                  ['over_and_under', 'Associated with over and under-covered A/C legs'],
+                  ['any_coverage', 'Associated with A/C legs with any coverage problem'],
+                ] as Array<[ReviewFilterMode, string]>
+              ).map(([mode, label], i) => {
+                const isActive = reviewFilterMode === mode
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => {
+                      setReviewFilterMode(mode)
+                      setPairingsDropOpen(false)
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-[13px] transition-colors text-left"
+                    style={{ color: isActive ? (isDark ? '#5B8DEF' : '#1e40af') : isDark ? '#E5E7EB' : '#1F2937' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = hoverBg)}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <span
+                      className="shrink-0 w-4 h-4 flex items-center justify-center rounded text-[11px] font-semibold"
+                      style={{ color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)' }}
+                    >
+                      {i + 1}
+                    </span>
+                    <span className="flex-1">{label}</span>
+                    {isActive && <Check size={13} style={{ color: isDark ? '#5B8DEF' : '#1e40af', flexShrink: 0 }} />}
+                  </button>
+                )
+              })}
+            </div>
+          </div>,
+          document.body,
+        )}
+
       {/* ── Proposal days popover ── */}
       {daysOpen &&
         typeof document !== 'undefined' &&
@@ -572,6 +730,8 @@ export function PairingGanttToolbar() {
           </div>,
           document.body,
         )}
+
+      {smartFiltersOpen && <SmartFiltersDialog onClose={() => setSmartFiltersOpen(false)} />}
     </div>
   )
 }

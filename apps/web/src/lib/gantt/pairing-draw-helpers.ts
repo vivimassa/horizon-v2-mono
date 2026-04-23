@@ -94,7 +94,30 @@ export function drawPairingPills(
 
   // Match the flight-bar font ladder so pairing pill text reads identically
   // to the bars above them at every zoom level.
-  const fs = pillHeight >= 48 ? 13 : pillHeight >= 36 ? 12 : pillHeight >= 28 ? 11 : 10
+  const fs = pillHeight >= 48 ? 11 : pillHeight >= 36 ? 10 : pillHeight >= 28 ? 9 : 8
+
+  // Stripe pattern for deadhead pills — created once per draw call only when needed.
+  let dhPattern: CanvasPattern | null = null
+  const hasDh = packed.some((p) => p.pills.some((pill) => pill.isDeadhead))
+  if (hasDh) {
+    const off = document.createElement('canvas')
+    off.width = 8
+    off.height = 8
+    const sCtx = off.getContext('2d')
+    if (sCtx) {
+      sCtx.strokeStyle = 'rgba(255,255,255,0.45)'
+      sCtx.lineWidth = 2
+      sCtx.beginPath()
+      sCtx.moveTo(0, 8)
+      sCtx.lineTo(8, 0)
+      sCtx.moveTo(-4, 8)
+      sCtx.lineTo(4, 0)
+      sCtx.moveTo(4, 8)
+      sCtx.lineTo(12, 0)
+      sCtx.stroke()
+      dhPattern = ctx.createPattern(off, 'repeat')
+    }
+  }
 
   for (const p of packed) {
     if (p.xMax < scrollX || p.xMin > viewportR) continue
@@ -145,24 +168,28 @@ export function drawPairingPills(
     for (const pill of p.pills) {
       if (pill.x + pill.width < scrollX || pill.x > viewportR) continue
 
-      ctx.fillStyle = fill
+      const isDh = pill.isDeadhead
+      const pillFill = isDh ? '#1E293B' : fill
+      const pillText = isDh ? '#94A3B8' : text
+      const pillBorder = isDh ? 'rgba(148,163,184,0.35)' : border
+
+      ctx.fillStyle = pillFill
       rr(ctx, pill.x, y, pill.width, pillHeight, 4)
       ctx.fill()
 
       // Border
-      ctx.strokeStyle = border
+      ctx.strokeStyle = pillBorder
       ctx.lineWidth = isInspected ? 1.5 : 0.75
       rr(ctx, pill.x, y, pill.width, pillHeight, 4)
       ctx.stroke()
 
-      // Deadhead dashed outline
-      if (pill.isDeadhead) {
+      // Deadhead stripe overlay — dark slate + diagonal light lines.
+      if (isDh && dhPattern) {
         ctx.save()
-        ctx.setLineDash([3, 2])
-        ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.55)'
-        ctx.lineWidth = 1.25
         rr(ctx, pill.x + 1, y + 1, pill.width - 2, pillHeight - 2, 3)
-        ctx.stroke()
+        ctx.clip()
+        ctx.fillStyle = dhPattern
+        ctx.fillRect(pill.x, y, pill.width, pillHeight)
         ctx.restore()
       }
 
@@ -172,7 +199,7 @@ export function drawPairingPills(
       // sector mode, narrow pills that can't fit "DEP-ARR" on a single
       // line switch to a two-row stack (DEP on top, ARR on bottom).
       if (pill.width > 14) {
-        ctx.fillStyle = text
+        ctx.fillStyle = pillText
         ctx.textBaseline = 'middle'
         ctx.textAlign = 'center'
         const maxTextW = pill.width - 4

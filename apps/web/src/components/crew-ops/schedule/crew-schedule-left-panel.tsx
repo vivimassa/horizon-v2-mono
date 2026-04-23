@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { EyeOff, ShieldAlert } from 'lucide-react'
+import { AlertTriangle, EyeOff, ShieldAlert } from 'lucide-react'
 import type { CrewPositionRef } from '@skyhub/api'
 import { useCrewScheduleStore } from '@/stores/use-crew-schedule-store'
 import type { CrewRowLayout } from '@/lib/crew-schedule/layout'
@@ -65,6 +65,7 @@ export const CrewScheduleLeftPanel = memo(function CrewScheduleLeftPanel({ rows,
   const scrollTop = useCrewScheduleStore((s) => s.scrollTop)
   const openContextMenu = useCrewScheduleStore((s) => s.openContextMenu)
   const crewIssues = useCrewScheduleStore((s) => s.crewIssues)
+  const softViolations = useCrewScheduleStore((s) => s.softViolations)
   const ruleSet = useCrewScheduleStore((s) => s.ruleSet)
   const blockLimit28dMin = useMemo(() => resolveBlock28dLimit(ruleSet), [ruleSet])
 
@@ -208,6 +209,21 @@ export const CrewScheduleLeftPanel = memo(function CrewScheduleLeftPanel({ rows,
                           >
                             <ShieldAlert className="w-3 h-3" />
                             {iss.violations}
+                          </span>
+                        )
+                      })()}
+                      {(() => {
+                        const sv = softViolations[c._id]
+                        if (!sv?.length) return null
+                        const tip = sv.map((v) => v.message).join('\n')
+                        return (
+                          <span
+                            className="shrink-0 inline-flex items-center gap-0.5 px-1 rounded font-semibold"
+                            style={{ background: 'rgba(255,136,0,0.14)', color: '#FF8800' }}
+                            title={tip}
+                          >
+                            <AlertTriangle className="w-3 h-3" />
+                            {sv.length}
                           </span>
                         )
                       })()}

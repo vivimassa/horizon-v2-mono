@@ -146,6 +146,35 @@ const patchAssignmentSchema = z
   })
   .strict()
 
+/**
+ * In-flight roster-evaluation guard. Keyed by `${operatorId}|${from}|${to}`.
+ * Set populated when a background sweep kicks off; cleared on settle.
+ * Prevents duplicate concurrent evals when the client polls while the
+ * first-page sweep is still running, and keeps the client roster-issues
+ * endpoint honest about whether fresh data is still pending.
+ */
+const ROSTER_EVAL_IN_FLIGHT = new Set<string>()
+
+function rosterEvalKey(operatorId: string, from: string, to: string): string {
+  return `${operatorId}|${from}|${to}`
+}
+
+/**
+ * Kick off a background roster evaluation. Caller-driven (Legality
+ * dialog, Publish preflight) — not triggered from the aggregator. Uses
+ * the in-flight guard to de-duplicate concurrent requests for the same
+ * window. Returns true regardless so the caller can poll uniformly.
+ */
+function kickoffRosterEvaluation(operatorId: string, from: string, to: string, log: FastifyRequest['log']): boolean {
+  const key = rosterEvalKey(operatorId, from, to)
+  if (ROSTER_EVAL_IN_FLIGHT.has(key)) return true
+  ROSTER_EVAL_IN_FLIGHT.add(key)
+  void evaluateCrewRoster(operatorId, from, to)
+    .catch((err) => log.warn({ err }, 'Background roster evaluation failed'))
+    .finally(() => ROSTER_EVAL_IN_FLIGHT.delete(key))
+  return true
+}
+
 const WRITE_ROLES = new Set(['administrator', 'manager', 'operator'])
 async function requireOpsRole(req: FastifyRequest, reply: FastifyReply) {
   if (!WRITE_ROLES.has(req.userRole)) {
@@ -162,24 +191,57 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
     const operatorId = req.operatorId
     const scenarioFilter = { $in: [null, undefined] as Array<string | null | undefined> }
 
+    // Query filters accept comma-separated arrays. Single value still works
+    // (treated as 1-element array). Empty/missing → no filter on that axis.
+    const parseList = (v: string | undefined): string[] =>
+      !v
+        ? []
+        : v
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+    const acTypeList = parseList(q.acType)
+    const baseList = parseList(q.base)
+    const positionList = parseList(q.position)
+    const crewGroupList = parseList(q.crewGroup)
+
     const pairingFilter: Record<string, unknown> = {
       operatorId,
       scenarioId: scenarioFilter,
       endDate: { $gte: q.from },
       startDate: { $lte: q.to },
     }
-    if (q.acType) pairingFilter.aircraftTypeIcao = q.acType
+    if (acTypeList.length > 0) pairingFilter.aircraftTypeIcao = { $in: acTypeList }
     if (q.baseAirport) pairingFilter.baseAirport = q.baseAirport
 
     const crewFilter: Record<string, unknown> = { operatorId, status: { $ne: 'inactive' } }
-    if (q.base) crewFilter.base = q.base
-    if (q.position) crewFilter.position = q.position
-    if (q.crewGroup) {
+    if (baseList.length === 1) crewFilter.base = baseList[0]
+    else if (baseList.length > 1) crewFilter.base = { $in: baseList }
+    if (positionList.length === 1) crewFilter.position = positionList[0]
+    else if (positionList.length > 1) crewFilter.position = { $in: positionList }
+
+    // Intersect crew id set across group membership + aircraft qualification.
+    const crewIdSets: string[][] = []
+    if (crewGroupList.length > 0) {
       const groupCrewIds = (await CrewGroupAssignment.distinct('crewId', {
         operatorId,
-        groupId: q.crewGroup,
+        groupId: { $in: crewGroupList },
       })) as string[]
-      crewFilter._id = { $in: groupCrewIds.length > 0 ? groupCrewIds : ['__no_match__'] }
+      crewIdSets.push(groupCrewIds)
+    }
+    if (acTypeList.length > 0) {
+      const qualCrewIds = (await CrewQualification.distinct('crewId', {
+        operatorId,
+        aircraftType: { $in: acTypeList },
+      })) as string[]
+      crewIdSets.push(qualCrewIds)
+    }
+    if (crewIdSets.length > 0) {
+      const intersected = crewIdSets.reduce((acc, arr) => {
+        const s = new Set(arr)
+        return acc.filter((id) => s.has(id))
+      })
+      crewFilter._id = { $in: intersected.length > 0 ? intersected : ['__no_match__'] }
     }
 
     const assignmentFilter: Record<string, unknown> = {
@@ -359,7 +421,7 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
             { crewId: 1, aircraftType: 1, acFamilyQualified: 1 },
           ).lean()
         : Promise.resolve([] as Array<{ crewId: string; aircraftType: string; acFamilyQualified?: boolean }>),
-      AircraftType.find({ operatorId }, { icaoType: 1, family: 1 }).lean(),
+      AircraftType.find({ operatorId }, { icaoType: 1, family: 1, color: 1 }).lean(),
     ])
     const qualsByCrew = new Map<string, Array<{ aircraftType: string; acFamilyQualified: boolean }>>()
     for (const q of quals) {
@@ -373,7 +435,11 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
         c as unknown as { qualifications: Array<{ aircraftType: string; acFamilyQualified: boolean }> }
       ).qualifications = qualsByCrew.get(c._id as string) ?? []
     }
-    const aircraftTypes = acTypes.map((t) => ({ icaoType: t.icaoType, family: t.family ?? null }))
+    const aircraftTypes = acTypes.map((t) => ({
+      icaoType: t.icaoType,
+      family: t.family ?? null,
+      color: (t as unknown as { color?: string | null }).color ?? null,
+    }))
 
     // Crew temp-base assignments that overlap the visible window. Kept
     // simple (overlap check in JS) since the table is small per operator.
@@ -404,20 +470,30 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       periodFromIso: q.from,
       periodToIso: q.to,
     }).lean()
-    if (crewIssues.length === 0 && ruleSet) {
-      // First-time fetch for this window — run synchronously so the
-      // planner sees findings on load. Subsequent calls hit the cache.
-      try {
-        await evaluateCrewRoster(operatorId, q.from, q.to)
-        crewIssues = await CrewLegalityIssue.find({
-          operatorId,
-          periodFromIso: q.from,
-          periodToIso: q.to,
-        }).lean()
-      } catch (err) {
-        req.log.warn({ err }, 'Roster evaluation failed inline')
+
+    // Self-heal stale cache: if the cache references pairing/assignment
+    // IDs that no longer exist (e.g. after Clear Schedule), purge and
+    // re-evaluate. Without this, red shields linger on an empty roster
+    // until the nightly sweep runs.
+    if (crewIssues.length > 0) {
+      const liveAssignIds = new Set(assignments.map((a) => a._id as string))
+      const anyStale = crewIssues.some((iss) => {
+        const refs = (iss as unknown as { assignmentIds?: string[] }).assignmentIds ?? []
+        if (refs.length === 0) return false
+        return refs.some((id) => !liveAssignIds.has(id))
+      })
+      if (anyStale) {
+        await CrewLegalityIssue.deleteMany({ operatorId, periodFromIso: q.from, periodToIso: q.to })
+        crewIssues = []
       }
     }
+
+    // Roster-FDTL sweep is now fully on-demand — no auto-kickoff on page
+    // load. Clients that need fresh findings (Legality Check dialog,
+    // Publish preflight) call `POST /crew-schedule/reevaluate-roster`
+    // explicitly. Mutation paths (assign/swap/delete) still trigger a
+    // server-side eval so individual edits stay accurate.
+    const rosterEvaluating = false
 
     return {
       pairings,
@@ -432,9 +508,27 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       fdtl,
       ruleSet,
       crewIssues,
+      rosterEvaluating,
       aircraftTypes,
       tempBases,
     }
+  })
+
+  // GET /crew-schedule/roster-issues — lightweight poll endpoint. Client
+  // calls this after a first /crew-schedule fetch when `rosterEvaluating`
+  // was true. Returns the latest cached issues + whether a sweep is still
+  // running. No expensive joins — pure CrewLegalityIssue read.
+  app.get('/crew-schedule/roster-issues', async (req, reply) => {
+    const q = req.query as Record<string, string>
+    if (!q.from || !q.to) return reply.code(400).send({ error: 'from and to are required (ISO date)' })
+    const operatorId = req.operatorId
+    const issues = await CrewLegalityIssue.find({
+      operatorId,
+      periodFromIso: q.from,
+      periodToIso: q.to,
+    }).lean()
+    const evaluating = ROSTER_EVAL_IN_FLIGHT.has(rosterEvalKey(operatorId, q.from, q.to))
+    return { issues, evaluating }
   })
 
   // POST /crew-schedule/reevaluate-roster — on-demand roster FDTL sweep.
@@ -1572,6 +1666,156 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       startUtcIso: { $lte: `${q.periodTo}T23:59:59.999Z` },
       endUtcIso: { $gte: `${q.periodFrom}T00:00:00.000Z` },
     })
-    return { success: true, deletedCount: res.deletedCount }
+    // Purge cached roster-legality issues for any window that overlaps the
+    // cleared period. Otherwise the Gantt shields stay red against an empty
+    // roster until the nightly sweep rewrites them.
+    const legality = await CrewLegalityIssue.deleteMany({
+      operatorId,
+      periodFromIso: { $lte: q.periodTo },
+      periodToIso: { $gte: q.periodFrom },
+    })
+    return {
+      success: true,
+      deletedCount: res.deletedCount,
+      deletedLegalityIssues: legality.deletedCount ?? 0,
+    }
+  })
+
+  // ── DELETE /crew-schedule/activities/bulk — wipe crew activities (day-off,
+  //    standby, training, etc.) for a period. Optional `source=auto-roster`
+  //    narrows to activities tagged with `notes: 'auto-roster:*'` so manually
+  //    created activities are preserved. ──
+  app.delete('/crew-schedule/activities/bulk', { preHandler: requireOpsRole }, async (req, reply) => {
+    const q = req.query as Record<string, string>
+    if (!q.periodFrom || !q.periodTo) {
+      return reply.code(400).send({ error: 'periodFrom and periodTo are required (ISO date YYYY-MM-DD)' })
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(q.periodFrom) || !/^\d{4}-\d{2}-\d{2}$/.test(q.periodTo)) {
+      return reply.code(400).send({ error: 'periodFrom and periodTo must be YYYY-MM-DD' })
+    }
+    const operatorId = req.operatorId
+    const filter: Record<string, unknown> = {
+      operatorId,
+      startUtcIso: { $lte: `${q.periodTo}T23:59:59.999Z` },
+      endUtcIso: { $gte: `${q.periodFrom}T00:00:00.000Z` },
+    }
+    if (q.source === 'auto-roster') {
+      filter.notes = { $regex: '^auto-roster:' }
+    }
+    const res = await CrewActivity.deleteMany(filter)
+    return { success: true, deletedCount: res.deletedCount ?? 0 }
+  })
+
+  // ── DELETE /crew-schedule/bulk-clear — tiered Clear Schedule ─────────────
+  //    Single endpoint for the auto-roster "Clear Crew Schedule" card.
+  //    Retention flags let planners preserve whichever buckets they need:
+  //
+  //      retainPreAssigned   (default true)  — keep manually-created pairings
+  //                                             (CrewAssignment without sourceRunId)
+  //      retainDayOff        (default true)  — keep OFF activities (SYS 'OFF')
+  //      retainStandby       (default true)  — keep SBY activities (SYS 'SBY')
+  //
+  //    Other activities (AL, sick, medical, training) are NEVER deleted —
+  //    manual leaves are always preserved. Only pairings + OFF + SBY are in
+  //    scope for this endpoint.
+  app.delete('/crew-schedule/bulk-clear', { preHandler: requireOpsRole }, async (req, reply) => {
+    const q = req.query as Record<string, string>
+    if (!q.periodFrom || !q.periodTo) {
+      return reply.code(400).send({ error: 'periodFrom and periodTo are required (ISO date YYYY-MM-DD)' })
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(q.periodFrom) || !/^\d{4}-\d{2}-\d{2}$/.test(q.periodTo)) {
+      return reply.code(400).send({ error: 'periodFrom and periodTo must be YYYY-MM-DD' })
+    }
+    const operatorId = req.operatorId
+    const parseFlag = (v: string | undefined, fallback: boolean): boolean =>
+      v === undefined ? fallback : v === 'true' || v === '1'
+    const retainPreAssigned = parseFlag(q.retainPreAssigned, true)
+    const retainDayOff = parseFlag(q.retainDayOff, true)
+    const retainStandby = parseFlag(q.retainStandby, true)
+
+    // ── Pairings (CrewAssignment) ────────────────────────────────────────
+    const assignFilter: Record<string, unknown> = {
+      operatorId,
+      startUtcIso: { $lte: `${q.periodTo}T23:59:59.999Z` },
+      endUtcIso: { $gte: `${q.periodFrom}T00:00:00.000Z` },
+    }
+    if (retainPreAssigned) {
+      // Only rows marked with a sourceRunId belong to prior auto-roster runs.
+      assignFilter.sourceRunId = { $exists: true, $ne: null }
+    }
+    const assignRes = await CrewAssignment.deleteMany(assignFilter)
+
+    // ── Activities — resolve codes to delete ──────────────────────────────
+    // "Pre-assigned" covers manual leave categories — AL, sick, medical,
+    // training, personal off. Unchecking retainPreAssigned means the planner
+    // wants a full reset including these. Day-off and standby have their
+    // own retain flags and are layered on top.
+    const deleteCodeIds: string[] = []
+    if (!retainDayOff) {
+      const offCodes = await ActivityCode.find({
+        operatorId,
+        $or: [{ code: 'OFF' }, { flags: 'is_day_off' }],
+        isActive: true,
+      })
+        .lean()
+        .select('_id')
+      for (const c of offCodes) deleteCodeIds.push(c._id as string)
+    }
+    if (!retainStandby) {
+      const sbyCodes = await ActivityCode.find({
+        operatorId,
+        $or: [{ code: 'SBY' }, { flags: { $in: ['is_home_standby', 'is_airport_standby', 'is_reserve'] } }],
+        isActive: true,
+      })
+        .lean()
+        .select('_id')
+      for (const c of sbyCodes) deleteCodeIds.push(c._id as string)
+    }
+    if (!retainPreAssigned) {
+      const manualCodes = await ActivityCode.find({
+        operatorId,
+        flags: {
+          $in: [
+            'is_annual_leave',
+            'is_sick_leave',
+            'is_medical',
+            'is_training',
+            'is_simulator',
+            'is_ground_training',
+            'is_personal',
+          ],
+        },
+        isActive: true,
+      })
+        .lean()
+        .select('_id')
+      for (const c of manualCodes) deleteCodeIds.push(c._id as string)
+    }
+    let activityDeleted = 0
+    if (deleteCodeIds.length > 0) {
+      const activityRes = await CrewActivity.deleteMany({
+        operatorId,
+        activityCodeId: { $in: deleteCodeIds },
+        startUtcIso: { $lte: `${q.periodTo}T23:59:59.999Z` },
+        endUtcIso: { $gte: `${q.periodFrom}T00:00:00.000Z` },
+      })
+      activityDeleted = activityRes.deletedCount ?? 0
+    }
+
+    // Purge cached legality issues for overlapping windows — Gantt shields
+    // would stay red against an empty roster until the nightly sweep runs.
+    const legality = await CrewLegalityIssue.deleteMany({
+      operatorId,
+      periodFromIso: { $lte: q.periodTo },
+      periodToIso: { $gte: q.periodFrom },
+    })
+
+    return {
+      success: true,
+      deletedAssignments: assignRes.deletedCount ?? 0,
+      deletedActivities: activityDeleted,
+      deletedLegalityIssues: legality.deletedCount ?? 0,
+      retention: { retainPreAssigned, retainDayOff, retainStandby },
+    }
   })
 }

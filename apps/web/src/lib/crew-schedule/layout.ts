@@ -41,6 +41,9 @@ export interface AssignmentBarLayout {
   hasMemo?: boolean
   /** Diff vs published snapshot (AIMS F10). Unset when overlay is off. */
   diff?: 'added' | 'reassigned' | 'unchanged'
+  /** Fill colour derived from the pairing's AircraftType.color (falls
+   *  back to a palette slot, and finally to accent when unresolved). */
+  color?: string
 }
 
 /** Published-but-removed assignment rendered as a ghost bar in the
@@ -165,6 +168,10 @@ export interface BuildLayoutInput {
    *  assignment bar anchors a zebra "mandatory rest" strip immediately
    *  after it, width = `max(minHoursForBase, precedingDutyMinutes)`. */
   restRules?: { homeBaseMinMinutes: number; awayMinMinutes: number }
+  /** AircraftType color map — ICAO → HEX. Drives bar fill so pairings
+   *  colour-code by fleet. Falls back to a stable palette when `.color`
+   *  is null, and to the accent when the ICAO is unresolved. */
+  aircraftTypes?: Array<{ icaoType: string; color: string | null }>
 }
 
 /**
@@ -350,6 +357,15 @@ export function buildCrewScheduleLayout(input: BuildLayoutInput): CrewScheduleLa
   }
   const currentAssignmentIds = new Set(input.assignments.map((a) => a._id))
 
+  // AC type colour map — stored colour wins, else a deterministic palette
+  // slot. Indexed by ICAO type so pairings with the same fleet read the
+  // same hue across the Gantt.
+  const acTypeColorMap = new Map<string, string>()
+  const AC_TYPE_PALETTE = ['#0d9488', '#2563eb', '#d97706', '#7c3aed', '#059669', '#e11d48', '#0284c7', '#ca8a04']
+  ;(input.aircraftTypes ?? []).forEach((t, i) => {
+    acTypeColorMap.set(t.icaoType, t.color ?? AC_TYPE_PALETTE[i % AC_TYPE_PALETTE.length])
+  })
+
   const bars: AssignmentBarLayout[] = []
   for (const a of input.assignments) {
     const row = rowByCrew.get(a.crewId)
@@ -381,6 +397,7 @@ export function buildCrewScheduleLayout(input: BuildLayoutInput): CrewScheduleLa
       hasDeadhead: pairing.legs.some((l) => l.isDeadhead),
       hasMemo: pairingsWithMemo.has(a.pairingId),
       diff,
+      color: pairing.aircraftTypeIcao ? acTypeColorMap.get(pairing.aircraftTypeIcao) : undefined,
     })
   }
 

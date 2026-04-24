@@ -121,7 +121,7 @@ interface Data {
   ruleSet: unknown | null
   /** Roster-level FDTL issues for the visible window. */
   crewIssues: CrewLegalityIssueRef[]
-  aircraftTypes: Array<{ icaoType: string; family: string | null }>
+  aircraftTypes: Array<{ icaoType: string; family: string | null; color: string | null }>
   /** Operator scheduling soft-rule config (4.1.6.3). Loaded once per commitPeriod. */
   schedulingConfig: OperatorSchedulingConfig | null
   /** Soft-rule violations keyed by crewId. Amber warnings in Gantt row headers. */
@@ -650,9 +650,11 @@ function persistGrouping(g: CrewGroupingState | null) {
 }
 
 function defaultPeriod(): { from: string; to: string } {
+  // Open on the calendar month that contains today (UTC). Month view is the
+  // broadest built-in zoom — gives planners the full cycle on first load.
   const now = new Date()
-  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
-  const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 6))
+  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+  const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0))
   return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }
 }
 
@@ -770,7 +772,7 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     filters: { baseIds: [], positionIds: [], acTypeIcaos: [], crewGroupIds: [] },
 
     // View state
-    zoom: '7D',
+    zoom: 'M',
     barLabelMode: 'pairing',
     rowHeightLevel: 1,
     refreshIntervalMins: 15,
@@ -880,6 +882,10 @@ export const useCrewScheduleStore = create<State>((set, get) => {
         })
         // Load scheduling config + compute soft violations in background.
         void loadSchedulingConfigAndViolations(get, set, s.periodFromIso, s.periodToIso)
+        // Roster-FDTL sweep is now on-demand — triggered by the Legality
+        // Check dialog, not by page load. Avoids mid-view flicker from a
+        // late response updating `crewIssues` while the planner is
+        // interacting with the Gantt.
       } catch (e) {
         set({
           loading: false,

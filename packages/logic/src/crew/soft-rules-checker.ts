@@ -77,16 +77,10 @@ export function checkSoftRules(
     dutyDateSet.add(dateStr)
   }
 
-  // ── 1. Max days off in period ────────────────────────────────────────────
-  const daysOff = periodDates.filter((d) => !dutyDateSet.has(d))
-  if (daysOff.length > config.daysOff.maxPerPeriodDays) {
-    violations.push({
-      rule: 'maxDaysOff',
-      severity: 'warning',
-      message: `${daysOff.length} days off exceeds max of ${config.daysOff.maxPerPeriodDays}`,
-      affectedDates: daysOff.slice(config.daysOff.maxPerPeriodDays),
-    })
-  }
+  // ── 1. Max days off in period — REMOVED ───────────────────────────────
+  // maxPerPeriodDays is a solver target, not a GCS legality rule. Empty
+  // rosters (pre-assignment) would flag every crew as "30 days off > 10".
+  // Still used by the auto-roster day-off runner as an assignment cap.
 
   // ── 2. Max consecutive duty days ─────────────────────────────────────────
   const consecutiveDutyRuns = findConsecutiveRuns(periodDates, (d) => dutyDateSet.has(d))

@@ -73,6 +73,7 @@ export function CrewScheduleShell() {
   const activityGroups = useCrewScheduleStore((s) => s.activityGroups)
   const memos = useCrewScheduleStore((s) => s.memos)
   const fdtl = useCrewScheduleStore((s) => s.fdtl)
+  const aircraftTypes = useCrewScheduleStore((s) => s.aircraftTypes)
   const publishedOverlay = useCrewScheduleStore((s) => s.publishedOverlay)
   const publishedOverlayVisible = useCrewScheduleStore((s) => s.publishedOverlayVisible)
   const uncrewedTrayVisible = useCrewScheduleStore((s) => s.uncrewedTrayVisible)
@@ -277,6 +278,7 @@ export function CrewScheduleShell() {
       positions,
       grouping: crewGrouping ?? undefined,
       restRules: fdtl.restRules,
+      aircraftTypes,
     })
   }, [
     periodCommitted,
@@ -301,6 +303,7 @@ export function CrewScheduleShell() {
     positions,
     crewGrouping,
     fdtl,
+    aircraftTypes,
   ])
 
   const pairingsById = useMemo(() => new Map(pairings.map((p) => [p._id, p])), [pairings])

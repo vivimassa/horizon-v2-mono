@@ -1306,6 +1306,7 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
               pairing={pairing}
               positions={store.positions}
               assignments={store.assignments}
+              assignment={assign}
               clientX={pairingHoverPos.x}
               clientY={pairingHoverPos.y}
             />
@@ -1536,11 +1537,14 @@ function drawBar(
   isSelected: boolean,
   isHovered: boolean,
 ) {
-  // Match the uncrewed tray pill shape (rounded-[5px]) so assigned and
+  // Match the uncrewed tray pill shape so assigned and
   // uncrewed bars read as the same visual element.
-  const r = 5
-  // Fill
-  let fill = accentColor
+  const r = 3
+  // Fill — colour-coded by the pairing's aircraft type (falls back to
+  // accent when the pairing is unassigned-type or AC type is unknown).
+  // Saturation knocked down to 70% so the palette reads calmer against
+  // dense rosters without losing hue identity between AC types.
+  let fill = bar.color ? desaturateHex(bar.color, 0.7) : accentColor
   if (bar.status === 'cancelled') fill = '#9A9BA8'
   ctx.fillStyle = fill
   drawRoundedRect(ctx, x, y, bar.width, bar.height, r)
@@ -1636,7 +1640,7 @@ function drawGhostBar(
   x: number,
   y: number,
 ) {
-  const r = 5
+  const r = 3
   // Pale fill at low opacity + red dashed strike-through outline to read
   // as "this was here but is no longer".
   ctx.save()
@@ -1719,7 +1723,7 @@ function drawActivityBar(
   isSelected: boolean,
   isHovered: boolean,
 ) {
-  const r = 5
+  const r = 3
   // Fill with activity code colour at slightly reduced opacity so it
   // reads as "background duty state" rather than a primary pairing bar.
   ctx.fillStyle = hexToRgba(bar.color, 0.75)
@@ -1766,6 +1770,62 @@ function drawActivityBar(
     }
     ctx.fillText(label, x + 6, y + bar.height / 2)
   }
+}
+
+/**
+ * Desaturate a hex colour by scaling its HSL saturation. 1 = original,
+ * 0 = fully grayscale. Used on pairing bars so the AC-type palette reads
+ * calmer against the dark Gantt canvas — the raw palette hues were too
+ * loud for dense rosters. Returns the input untouched if the parse fails.
+ */
+function desaturateHex(hex: string, factor: number): string {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex)
+  if (!m) return hex
+  const full =
+    m[1].length === 3
+      ? m[1]
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : m[1]
+  const r = parseInt(full.slice(0, 2), 16) / 255
+  const g = parseInt(full.slice(2, 4), 16) / 255
+  const b = parseInt(full.slice(4, 6), 16) / 255
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const l = (max + min) / 2
+  let h = 0
+  let s = 0
+  if (max !== min) {
+    const d = max - min
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+    switch (max) {
+      case r:
+        h = (g - b) / d + (g < b ? 6 : 0)
+        break
+      case g:
+        h = (b - r) / d + 2
+        break
+      default:
+        h = (r - g) / d + 4
+    }
+    h /= 6
+  }
+  s *= factor
+  const hue2rgb = (p: number, q: number, t: number) => {
+    if (t < 0) t += 1
+    if (t > 1) t -= 1
+    if (t < 1 / 6) return p + (q - p) * 6 * t
+    if (t < 1 / 2) return q
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
+    return p
+  }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+  const p = 2 * l - q
+  const nr = Math.round(hue2rgb(p, q, h + 1 / 3) * 255)
+  const ng = Math.round(hue2rgb(p, q, h) * 255)
+  const nb = Math.round(hue2rgb(p, q, h - 1 / 3) * 255)
+  return `#${[nr, ng, nb].map((v) => v.toString(16).padStart(2, '0')).join('')}`
 }
 
 function hexToRgba(hex: string, alpha: number): string {

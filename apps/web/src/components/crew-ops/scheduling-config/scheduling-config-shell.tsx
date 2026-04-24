@@ -46,6 +46,8 @@ import {
   NumberStepper,
   SectionCard,
 } from '@/components/admin/_shared/form-primitives'
+import { Tooltip } from '@/components/ui/tooltip'
+import { HelpCircle } from 'lucide-react'
 import { GeneralHero, DaysOffHero, StandbyHero, DestinationHero, OptimizationHero } from './section-heroes'
 
 const MODULE_ACCENT = MODULE_THEMES.workforce.accent
@@ -77,9 +79,13 @@ interface Draft {
   daysOff: {
     minPerPeriodDays: number
     maxPerPeriodDays: number
+    maxConsecutiveDaysOff: number
     maxConsecutiveDutyDays: number
+    maxConsecutiveDutyDaysRule: { enabled: boolean; weight: number }
     maxConsecutiveMorningDuties: number
+    maxConsecutiveMorningDutiesRule: { enabled: boolean; weight: number }
     maxConsecutiveAfternoonDuties: number
+    maxConsecutiveAfternoonDutiesRule: { enabled: boolean; weight: number }
   }
   standby: {
     usePercentage: boolean
@@ -102,9 +108,13 @@ const DEFAULT_DRAFT: Draft = {
   daysOff: {
     minPerPeriodDays: 8,
     maxPerPeriodDays: 10,
+    maxConsecutiveDaysOff: 3,
     maxConsecutiveDutyDays: 4,
+    maxConsecutiveDutyDaysRule: { enabled: true, weight: 5 },
     maxConsecutiveMorningDuties: 4,
+    maxConsecutiveMorningDutiesRule: { enabled: true, weight: 3 },
     maxConsecutiveAfternoonDuties: 4,
+    maxConsecutiveAfternoonDutiesRule: { enabled: true, weight: 3 },
   },
   standby: {
     usePercentage: true,
@@ -120,6 +130,68 @@ const DEFAULT_DRAFT: Draft = {
   },
   destinationRules: [],
   objectives: { genderBalanceOnLayovers: true, genderBalanceWeight: 80 },
+}
+
+function SoftRuleFormRow({
+  label,
+  description,
+  limit,
+  onLimitChange,
+  rule,
+  onRuleChange,
+  accent,
+}: {
+  label: string
+  description?: string
+  limit: number
+  onLimitChange: (v: number) => void
+  rule: { enabled: boolean; weight: number }
+  onRuleChange: (r: { enabled: boolean; weight: number }) => void
+  accent: string
+}) {
+  const weightTier = rule.weight <= 3 ? 'Soft' : rule.weight <= 6 ? 'Balanced' : 'Strong'
+  const weightColor = rule.weight <= 3 ? '#8F90A6' : rule.weight <= 6 ? '#0063F7' : '#FF8800'
+  return (
+    <FormRow label={label} description={description ?? ''}>
+      <div className="flex flex-col items-end gap-1">
+        <div className="flex items-center gap-3">
+          <Toggle checked={rule.enabled} onChange={(v) => onRuleChange({ ...rule, enabled: v })} accent={accent} />
+          <NumberStepper value={limit} onChange={onLimitChange} min={1} max={14} suffix="days" />
+          <div className="flex items-center gap-1.5" style={{ opacity: rule.enabled ? 1 : 0.5 }}>
+            <span className="text-[13px] text-hz-text-tertiary">Weight</span>
+            <Tooltip
+              multiline
+              maxWidth={320}
+              content={
+                'Weight 1-10 scales how hard the solver avoids breaking this rule. Coverage of pairings always beats any soft rule.'
+              }
+            >
+              <button
+                type="button"
+                aria-label="Weight help"
+                className="inline-flex items-center justify-center w-4 h-4 text-hz-text-tertiary hover:text-hz-text-secondary"
+              >
+                <HelpCircle className="w-4 h-4" />
+              </button>
+            </Tooltip>
+            <NumberStepper
+              value={rule.weight}
+              onChange={(v) => onRuleChange({ ...rule, weight: v })}
+              min={1}
+              max={10}
+              suffix=""
+            />
+          </div>
+        </div>
+        <div
+          className="text-[13px] font-semibold tabular-nums"
+          style={{ color: rule.enabled ? weightColor : 'var(--color-hz-text-tertiary)' }}
+        >
+          {weightTier}
+        </div>
+      </div>
+    </FormRow>
+  )
 }
 
 function configToDraft(cfg: OperatorSchedulingConfig | null): Draft {
@@ -527,39 +599,45 @@ function SectionBody({
               suffix="days"
             />
           </FormRow>
-          <FormRow label="Max Consecutive Duty Days" description="Amber warning after this many duty days in a row.">
+          <FormRow
+            label="Max Consecutive Days Off"
+            description="Auto-roster won't place more than N OFF days in a row. Prevents long mini-holiday blocks. Legacy 3-4, LCC 2-3."
+          >
             <NumberStepper
-              value={draft.daysOff.maxConsecutiveDutyDays}
-              onChange={(v) => patchDaysOff({ maxConsecutiveDutyDays: v })}
+              value={draft.daysOff.maxConsecutiveDaysOff}
+              onChange={(v) => patchDaysOff({ maxConsecutiveDaysOff: v })}
               min={1}
-              max={14}
+              max={7}
               suffix="days"
             />
           </FormRow>
-          <FormRow
+          <SoftRuleFormRow
+            label="Max Consecutive Duty Days"
+            description="Solver penalises rosters that push crew beyond this streak. Weight = how aggressively to avoid it."
+            limit={draft.daysOff.maxConsecutiveDutyDays}
+            onLimitChange={(v) => patchDaysOff({ maxConsecutiveDutyDays: v })}
+            rule={draft.daysOff.maxConsecutiveDutyDaysRule}
+            onRuleChange={(r) => patchDaysOff({ maxConsecutiveDutyDaysRule: r })}
+            accent={accent}
+          />
+          <SoftRuleFormRow
             label="Max Consecutive Morning Duties"
-            description="Morning = report before 12:00 local. Amber warning after N in a row."
-          >
-            <NumberStepper
-              value={draft.daysOff.maxConsecutiveMorningDuties}
-              onChange={(v) => patchDaysOff({ maxConsecutiveMorningDuties: v })}
-              min={1}
-              max={14}
-              suffix="days"
-            />
-          </FormRow>
-          <FormRow
+            description="Morning = report before 12:00 local. Solver penalises streaks exceeding the limit."
+            limit={draft.daysOff.maxConsecutiveMorningDuties}
+            onLimitChange={(v) => patchDaysOff({ maxConsecutiveMorningDuties: v })}
+            rule={draft.daysOff.maxConsecutiveMorningDutiesRule}
+            onRuleChange={(r) => patchDaysOff({ maxConsecutiveMorningDutiesRule: r })}
+            accent={accent}
+          />
+          <SoftRuleFormRow
             label="Max Consecutive Afternoon Duties"
-            description="Afternoon = report 12:00–18:00 local. Amber warning after N in a row."
-          >
-            <NumberStepper
-              value={draft.daysOff.maxConsecutiveAfternoonDuties}
-              onChange={(v) => patchDaysOff({ maxConsecutiveAfternoonDuties: v })}
-              min={1}
-              max={14}
-              suffix="days"
-            />
-          </FormRow>
+            description="Afternoon = report 12:00–18:00 local. Solver penalises streaks exceeding the limit."
+            limit={draft.daysOff.maxConsecutiveAfternoonDuties}
+            onLimitChange={(v) => patchDaysOff({ maxConsecutiveAfternoonDuties: v })}
+            rule={draft.daysOff.maxConsecutiveAfternoonDutiesRule}
+            onRuleChange={(r) => patchDaysOff({ maxConsecutiveAfternoonDutiesRule: r })}
+            accent={accent}
+          />
         </div>
       )
 

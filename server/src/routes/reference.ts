@@ -2031,7 +2031,11 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
     const existing = await ActivityCode.findById(id).lean()
     if (!existing) return reply.code(404).send({ error: 'Activity code not found' })
     if (existing.isSystem) {
-      // System codes: only allow color updates
+      // System codes: only allow color updates — except SBY, which is locked
+      // to the STBY group color so its Gantt appearance matches HSBY.
+      if (existing.code === 'SBY' && parsed.data.color !== undefined) {
+        return reply.code(403).send({ error: 'Color of SBY is locked and cannot be edited' })
+      }
       const allowed = { color: parsed.data.color, updatedAt: new Date().toISOString() } as Record<string, unknown>
       Object.keys(allowed).forEach((k) => {
         if (allowed[k] === undefined) delete allowed[k]
@@ -2104,7 +2108,7 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
       { code: 'DUTY', name: 'Flight Duty', color: '#dc2626', sortOrder: 10 },
       { code: 'STBY', name: 'Standby', color: '#f59e0b', sortOrder: 20 },
       { code: 'TRAIN', name: 'Training', color: '#3b82f6', sortOrder: 30 },
-      { code: 'LEAVE', name: 'Leave & Off', color: '#10b981', sortOrder: 40 },
+      { code: 'LEAVE', name: 'Leave & Off', color: '#06b6d4', sortOrder: 40 },
       { code: 'MED', name: 'Medical', color: '#8b5cf6', sortOrder: 50 },
       { code: 'SYS', name: 'System', color: '#6b7280', sortOrder: 90 },
     ]
@@ -2258,6 +2262,18 @@ export async function referenceRoutes(app: FastifyInstance): Promise<void> {
         description: 'Generic off day — used by automated rostering for unspecified off periods',
         flags: ['is_day_off'],
         isSystem: true,
+        color: '#0063F7',
+      },
+      {
+        groupCode: 'SYS',
+        code: 'SBY',
+        name: 'Standby',
+        description:
+          'System-reserved home standby code — used exclusively by the auto-roster solver for standby allocation. Duration and start time governed by Auto-Roster Standby config.',
+        flags: ['is_home_standby'],
+        defaultDurationMin: 480,
+        isSystem: true,
+        color: '#f59e0b',
       },
     ]
 

@@ -271,41 +271,41 @@ export function ActivityCodeDetail({
 
           {/* Actions */}
           <div className="flex items-center gap-1.5">
-            {!isSystem && (
+            {editing ? (
               <>
-                {editing ? (
-                  <>
-                    <button
-                      onClick={handleSave}
-                      disabled={saving}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[13px] font-medium text-white"
-                      style={{ backgroundColor: '#7c3aed' }}
-                    >
-                      <Save className="h-3.5 w-3.5" />
-                      {saving ? 'Saving...' : 'Save'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditing(false)
-                        setDraft({})
-                      }}
-                      className="p-1.5 rounded-lg hover:bg-hz-card"
-                    >
-                      <X className="h-4 w-4 text-hz-text-secondary" />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => setEditing(true)}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-hz-border text-hz-text-secondary hover:text-hz-text"
-                    >
-                      <Pencil className="h-3.5 w-3.5" /> Edit
-                    </button>
-                    <button onClick={() => onDelete?.(code._id)} className="p-1.5 rounded-lg hover:bg-red-500/10">
-                      <Trash2 className="h-4 w-4 text-red-400" />
-                    </button>
-                  </>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[13px] font-medium text-white"
+                  style={{ backgroundColor: '#7c3aed' }}
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => {
+                    setEditing(false)
+                    setDraft({})
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-hz-card"
+                >
+                  <X className="h-4 w-4 text-hz-text-secondary" />
+                </button>
+              </>
+            ) : (
+              <>
+                {(!isSystem || code.code !== 'SBY') && (
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[13px] font-medium border border-hz-border text-hz-text-secondary hover:text-hz-text"
+                  >
+                    <Pencil className="h-3.5 w-3.5" /> Edit
+                  </button>
+                )}
+                {!isSystem && (
+                  <button onClick={() => onDelete?.(code._id)} className="p-1.5 rounded-lg hover:bg-red-500/10">
+                    <Trash2 className="h-4 w-4 text-red-400" />
+                  </button>
                 )}
               </>
             )}
@@ -449,7 +449,7 @@ function GeneralTab({
           )}
         </FieldBlock>
         <FieldBlock label="Color">
-          {editing ? (
+          {editing && code.code !== 'SBY' ? (
             <div className="flex items-center gap-2">
               <input
                 type="color"

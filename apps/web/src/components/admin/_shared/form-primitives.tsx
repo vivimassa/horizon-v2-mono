@@ -253,9 +253,9 @@ export function NumberStepper({
               onChange(Math.max(min, value - step))
             }
           }}
-          className="w-full bg-transparent text-right outline-none text-[13px] font-mono font-medium text-hz-text"
+          className={`w-full bg-transparent outline-none text-[13px] font-mono font-medium text-hz-text ${suffix ? 'text-right' : 'text-center'}`}
         />
-        <span className="text-hz-text-tertiary shrink-0">{suffix}</span>
+        {suffix ? <span className="text-hz-text-tertiary shrink-0">{suffix}</span> : null}
       </div>
       <button
         type="button"

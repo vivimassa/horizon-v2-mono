@@ -16,6 +16,7 @@
     "seed:crew-passports": "tsx src/seed-crew-passports.ts",
     "seed:crew-phones": "tsx src/seed-crew-phones.ts",
     "seed:crew-expiries": "tsx src/seed-crew-expiries.ts",
+    "seed:crew-hotels": "tsx src/seed-crew-hotels.ts",
     "reseed:seniority": "tsx src/reseed-seniority.ts",
     "backfill:pairing-legality": "tsx src/backfill-pairing-legality.ts",
     "migrate": "tsx src/migrate-from-supabase.ts"

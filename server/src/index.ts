@@ -52,6 +52,7 @@ import { manpowerRoutes } from './routes/manpower.js'
 import { pairingRoutes } from './routes/pairings.js'
 import { crewScheduleRoutes } from './routes/crew-schedule.js'
 import { autoRosterRoutes } from './routes/auto-roster.js'
+import { crewHotelRoutes } from './routes/crew-hotels.js'
 import { ensureManpowerBasePlan } from './services/ensure-manpower-base-plan.js'
 import { startWeatherPoll } from './jobs/weather-poll.js'
 import { startAutoTransmitScheduler } from './jobs/mvt-auto-transmit.js'
@@ -152,6 +153,7 @@ async function main(): Promise<void> {
   await app.register(pairingRoutes)
   await app.register(crewScheduleRoutes)
   await app.register(autoRosterRoutes)
+  await app.register(crewHotelRoutes)
 
   // ── Bootstrap: ensure every active operator has the 4 system document
   // folders (Crew Photos / Passports & Licenses / Medical Certificates /
@@ -165,6 +167,19 @@ async function main(): Promise<void> {
     console.log(`✓ Ensured manpower base plans for ${operators.length} operator(s)`)
   } catch (e) {
     console.error('  ensureSystemFolders bootstrap error:', (e as Error).message)
+  }
+
+  // Lock SBY activity-code color to STBY-group orange (#f59e0b) so it matches
+  // HSBY on the Gantt. Idempotent — runs every boot.
+  try {
+    const { ActivityCode } = await import('./models/ActivityCode.js')
+    const res = await ActivityCode.updateMany(
+      { code: 'SBY', isSystem: true, $or: [{ color: { $ne: '#f59e0b' } }, { color: null }] },
+      { $set: { color: '#f59e0b', updatedAt: new Date().toISOString() } },
+    )
+    if (res.modifiedCount > 0) console.log(`✓ SBY color backfilled on ${res.modifiedCount} record(s)`)
+  } catch (e) {
+    console.error('  SBY color backfill error:', (e as Error).message)
   }
 
   // Start

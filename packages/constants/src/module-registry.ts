@@ -977,6 +977,16 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
     module: 'admin',
     level: 2,
   },
+  {
+    code: '5.4.10',
+    name: 'Crew Hotels',
+    description: 'Layover hotels per airport — contracts, rates, shuttle bus',
+    icon: 'BedDouble',
+    route: '/admin/crew-hotels',
+    parent_code: '5.4',
+    module: 'admin',
+    level: 2,
+  },
 
   // ──────────────────────────────────────────────
   // 6. INTEGRATION
@@ -1163,7 +1173,7 @@ export const MODULE_THEMES: Record<string, { accent: string; bg: string; bgSubtl
   ground: { accent: '#059669', bg: '#d1fae5', bgSubtle: '#ecfdf5' },
   workforce: { accent: '#7c3aed', bg: '#ede9fe', bgSubtle: '#f5f3ff' },
   integration: { accent: '#0891b2', bg: '#cffafe', bgSubtle: '#ecfeff' },
-  admin: { accent: '#64748b', bg: '#e2e8f0', bgSubtle: '#f8fafc' },
+  admin: { accent: '#4338ca', bg: '#e0e7ff', bgSubtle: '#eef2ff' },
   sysadmin: { accent: '#B45309', bg: '#fed7aa', bgSubtle: '#ffedd5' },
   settings: { accent: '#64748b', bg: '#e2e8f0', bgSubtle: '#f8fafc' },
 }

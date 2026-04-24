@@ -26,6 +26,7 @@ import {
   CalendarDays,
   ClipboardCheck,
   Contact,
+  BedDouble,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -221,6 +222,13 @@ const SECTIONS: SectionDef[] = [
         desc: 'Training & recruitment lead times for manpower planning',
         icon: Timer,
         href: '/admin/mpp-lead-times',
+      },
+      {
+        code: '5.4.10',
+        label: 'Crew Hotels',
+        desc: 'Layover hotels per airport — contracts, rates, shuttle bus',
+        icon: BedDouble,
+        href: '/admin/crew-hotels',
       },
     ],
   },

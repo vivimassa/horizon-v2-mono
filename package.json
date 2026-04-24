@@ -8,7 +8,9 @@
     "server"
   ],
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "concurrently -n turbo,solver -c cyan,magenta \"npm:dev:turbo\" \"npm:dev:solver\"",
+    "dev:turbo": "turbo dev",
+    "dev:solver": "cd services/auto-roster-solver && python -m uvicorn app.main:app --host 0.0.0.0 --port 8082 --reload",
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
@@ -31,6 +33,7 @@
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
+    "concurrently": "^9.2.1",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-only-warn": "^1.2.1",

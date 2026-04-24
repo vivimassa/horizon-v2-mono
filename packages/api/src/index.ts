@@ -219,6 +219,7 @@ export type {
   // 4.1.6.1 Auto Roster
   AutoRosterRunStats,
   AutoRosterRun,
+  AutoRosterActiveRun,
   StartAutoRosterParams,
   PeriodSummaryCrew,
   PeriodSummaryPairings,
@@ -226,6 +227,15 @@ export type {
   DayBreakdown,
   PeriodBreakdown,
   AutoRosterFilterOptions,
+  // 5.4.10 Crew Hotels
+  CrewHotelRef,
+  HotelContact,
+  HotelEmail,
+  HotelContract,
+  HotelShuttle,
+  HotelCriteria,
+  HotelDailyRateRule,
+  CrewHotelBulkResult,
 } from './client'
 
 // ─── React Query layer ───

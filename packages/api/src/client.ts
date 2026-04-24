@@ -346,6 +346,103 @@ export interface AircraftRegistrationRef {
   updatedAt: string | null
 }
 
+// ─── Crew Hotel types ─────────────────────────────────────
+export interface HotelContact {
+  _id: string
+  name: string | null
+  telephone: string | null
+  fax: string | null
+}
+
+export interface HotelEmail {
+  _id: string
+  address: string
+  isDefault: boolean
+}
+
+export interface HotelDailyRateRule {
+  _id: string
+  stayType: string | null
+  fromDays: number | null
+  toDays: number | null
+  operation: string | null
+  durationHrs: number | null
+  percentage: number | null
+  rate: number | null
+}
+
+export interface HotelContract {
+  _id: string
+  priority: number
+  startDateUtcMs: number | null
+  endDateUtcMs: number | null
+  weekdayMask: boolean[]
+  checkInLocal: string | null
+  checkOutLocal: string | null
+  contractNo: string | null
+  contractRate: number | null
+  currency: string
+  roomsPerNight: number
+  releaseTime: string
+  roomRate: number
+  dailyRateRules: HotelDailyRateRule[]
+}
+
+export interface HotelShuttle {
+  _id: string
+  fromDateUtcMs: number | null
+  toDateUtcMs: number | null
+  fromTimeLocal: string | null
+  toTimeLocal: string | null
+  weekdayMask: boolean[]
+}
+
+export interface HotelCriteria {
+  blockToBlockRestMinutes: number | null
+  crewPositions: string[]
+  aircraftTypes: string[]
+  crewCategories: string[]
+  charterers: string[]
+}
+
+export interface CrewHotelRef {
+  _id: string
+  operatorId: string
+  airportIcao: string
+  hotelName: string
+  priority: number
+  isActive: boolean
+  effectiveFromUtcMs: number | null
+  effectiveUntilUtcMs: number | null
+  isTrainingHotel: boolean
+  isAllInclusive: boolean
+  addressLine1: string | null
+  addressLine2: string | null
+  addressLine3: string | null
+  latitude: number | null
+  longitude: number | null
+  distanceFromAirportMinutes: number | null
+  shuttleAlwaysAvailable: boolean
+  standardCheckInLocal: string
+  standardCheckOutLocal: string
+  criteria: HotelCriteria
+  contacts: HotelContact[]
+  emails: HotelEmail[]
+  contracts: HotelContract[]
+  shuttles: HotelShuttle[]
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export interface CrewHotelBulkResult {
+  totalRows: number
+  created: number
+  updated: number
+  skipped: number
+  errors: Array<{ row: number; field?: string; reason: string }>
+  dryRun: boolean
+}
+
 export interface CountryRef {
   _id: string
   isoCode2: string
@@ -1001,6 +1098,87 @@ export const api = {
     request<AirportRef>(`/airports/${airportId}/runways/${runwayId}`, {
       method: 'DELETE',
     }),
+
+  // ─── Crew Hotels ────────────────────────────────────────
+  getCrewHotels: (params?: { airportIcao?: string; active?: boolean; search?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.airportIcao) qs.set('airportIcao', params.airportIcao)
+    if (params?.active) qs.set('active', 'true')
+    if (params?.search) qs.set('search', params.search)
+    const query = qs.toString()
+    return request<CrewHotelRef[]>(`/crew-hotels${query ? `?${query}` : ''}`)
+  },
+
+  getCrewHotel: (id: string) => request<CrewHotelRef>(`/crew-hotels/${id}`),
+
+  createCrewHotel: (data: Partial<CrewHotelRef>) =>
+    request<CrewHotelRef>('/crew-hotels', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateCrewHotel: (id: string, data: Partial<CrewHotelRef>) =>
+    request<CrewHotelRef>(`/crew-hotels/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteCrewHotel: (id: string) =>
+    request<{ success: boolean }>(`/crew-hotels/${id}`, {
+      method: 'DELETE',
+    }),
+
+  addHotelContract: (hotelId: string, data: Partial<HotelContract>) =>
+    request<CrewHotelRef>(`/crew-hotels/${hotelId}/contracts`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateHotelContract: (hotelId: string, contractId: string, data: Partial<HotelContract>) =>
+    request<CrewHotelRef>(`/crew-hotels/${hotelId}/contracts/${contractId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteHotelContract: (hotelId: string, contractId: string) =>
+    request<CrewHotelRef>(`/crew-hotels/${hotelId}/contracts/${contractId}`, {
+      method: 'DELETE',
+    }),
+
+  addHotelShuttle: (hotelId: string, data: Partial<HotelShuttle>) =>
+    request<CrewHotelRef>(`/crew-hotels/${hotelId}/shuttles`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateHotelShuttle: (hotelId: string, shuttleId: string, data: Partial<HotelShuttle>) =>
+    request<CrewHotelRef>(`/crew-hotels/${hotelId}/shuttles/${shuttleId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteHotelShuttle: (hotelId: string, shuttleId: string) =>
+    request<CrewHotelRef>(`/crew-hotels/${hotelId}/shuttles/${shuttleId}`, {
+      method: 'DELETE',
+    }),
+
+  uploadCrewHotelBulk: async (type: 'details' | 'effective-dates', file: File | Blob, dryRun = false) => {
+    const path = dryRun ? '/crew-hotels/bulk/validate' : `/crew-hotels/bulk/${type}`
+    const form = new FormData()
+    form.append('file', file, 'upload.csv')
+    if (dryRun) form.append('type', type)
+    const token = _authCallbacks?.getAccessToken() ?? null
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    const res = await fetch(`${_baseUrl}${path}`, { method: 'POST', headers, body: form })
+    if (!res.ok) {
+      const body = await res.text()
+      throw new Error(`API ${res.status}: ${body}`)
+    }
+    return res.json() as Promise<CrewHotelBulkResult>
+  },
+
+  crewHotelTemplateUrl: (type: 'details' | 'effective-dates') => `${_baseUrl}/crew-hotels/templates/${type}`,
 
   getAircraftTypes: (operatorId = '') => request<AircraftTypeRef[]>(`/aircraft-types?operatorId=${operatorId}`),
 
@@ -2412,6 +2590,34 @@ export const api = {
     })
   },
 
+  /**
+   * Tiered Clear Crew Schedule — single endpoint replacing the pairings-only
+   * bulk delete. Retention flags default to `true` (safe). Pass `false` to
+   * include that bucket in the wipe.
+   */
+  bulkClearSchedule: (params: {
+    periodFrom: string
+    periodTo: string
+    retainPreAssigned?: boolean
+    retainDayOff?: boolean
+    retainStandby?: boolean
+  }) => {
+    const qs = new URLSearchParams({
+      periodFrom: params.periodFrom,
+      periodTo: params.periodTo,
+      retainPreAssigned: String(params.retainPreAssigned ?? true),
+      retainDayOff: String(params.retainDayOff ?? true),
+      retainStandby: String(params.retainStandby ?? true),
+    })
+    return request<{
+      success: true
+      deletedAssignments: number
+      deletedActivities: number
+      deletedLegalityIssues: number
+      retention: { retainPreAssigned: boolean; retainDayOff: boolean; retainStandby: boolean }
+    }>(`/crew-schedule/bulk-clear?${qs.toString()}`, { method: 'DELETE' })
+  },
+
   // ── 4.1.6.1 Auto Roster ──
   startAutoRoster: (params: StartAutoRosterParams) =>
     request<{ runId: string }>('/auto-roster/run', { method: 'POST', body: JSON.stringify(params) }),
@@ -2425,6 +2631,11 @@ export const api = {
   },
 
   getAutoRosterRun: (runId: string) => request<AutoRosterRun>(`/auto-roster/${encodeURIComponent(runId)}`),
+
+  getAutoRosterActive: (operatorId: string) => {
+    const qs = new URLSearchParams({ operatorId })
+    return request<{ active: AutoRosterActiveRun | null }>(`/auto-roster/active?${qs.toString()}`)
+  },
 
   getAutoRosterPeriodSummary: (operatorId: string, periodFrom: string, periodTo: string) => {
     const qs = new URLSearchParams({ operatorId, periodFrom, periodTo })
@@ -2863,18 +3074,38 @@ export const api = {
   getCrewSchedule: (params: {
     from: string
     to: string
-    base?: string
-    position?: string
-    acType?: string
-    crewGroup?: string
+    /** Airport _id(s) — comma-joined when multiple. */
+    base?: string | string[]
+    position?: string | string[]
+    /** ICAO type code(s) — comma-joined when multiple. */
+    acType?: string | string[]
+    crewGroup?: string | string[]
   }) => {
     const qs = new URLSearchParams({ from: params.from, to: params.to })
-    if (params.base) qs.set('base', params.base)
-    if (params.position) qs.set('position', params.position)
-    if (params.acType) qs.set('acType', params.acType)
-    if (params.crewGroup) qs.set('crewGroup', params.crewGroup)
+    const join = (v: string | string[] | undefined): string | null => {
+      if (!v) return null
+      if (Array.isArray(v)) return v.length > 0 ? v.join(',') : null
+      return v || null
+    }
+    const b = join(params.base)
+    const p = join(params.position)
+    const a = join(params.acType)
+    const g = join(params.crewGroup)
+    if (b) qs.set('base', b)
+    if (p) qs.set('position', p)
+    if (a) qs.set('acType', a)
+    if (g) qs.set('crewGroup', g)
     return request<CrewScheduleResponse>(`/crew-schedule?${qs.toString()}`)
   },
+
+  /** Poll the background roster-FDTL sweep status for a window. Used
+   *  by the crew-schedule store when the first aggregator response
+   *  flagged `rosterEvaluating: true` — the client waits on this
+   *  endpoint rather than blocking the initial page load. */
+  getCrewScheduleRosterIssues: (params: { from: string; to: string }) =>
+    request<{ issues: CrewLegalityIssueRef[]; evaluating: boolean }>(
+      `/crew-schedule/roster-issues?from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}`,
+    ),
 
   /** Crew currently assigned to a single pairing — display-ready rows
    *  joined server-side. Used by the shared Pairing Details dialog when
@@ -3041,6 +3272,8 @@ export interface CrewAssignmentRef {
   endUtcIso: string
   assignedByUserId: string | null
   assignedAtUtc: string
+  /** Auto-roster run id that produced this row (null when manual). */
+  sourceRunId?: string | null
   legalityResult: unknown
   lastLegalityCheckUtcIso: string | null
   notes: string | null
@@ -3085,6 +3318,8 @@ export interface CrewActivityRef {
   notes: string | null
   assignedByUserId: string | null
   assignedAtUtc: string
+  /** Auto-roster run id that produced this row (null when manual). */
+  sourceRunId?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -3214,9 +3449,13 @@ export interface CrewScheduleResponse {
    *  Upserted by the `reevaluate-roster` service; drives left-panel
    *  badges and the Legality Check dialog. */
   crewIssues: CrewLegalityIssueRef[]
+  /** True when a background roster-FDTL sweep is running for this
+   *  window. Clients should poll `getCrewScheduleRosterIssues` until it
+   *  flips to false (or a reasonable timeout) to pick up findings. */
+  rosterEvaluating?: boolean
   /** All aircraft types defined for the operator — ICAO → family map
    *  used by the client-side AC-type-not-qualified hard-block. */
-  aircraftTypes: Array<{ icaoType: string; family: string | null }>
+  aircraftTypes: Array<{ icaoType: string; family: string | null; color: string | null }>
   /** Temporary base assignments overlapping [from, to]. Used to paint
    *  the Gantt band and to suppress `base_mismatch` violations. */
   tempBases: TempBaseRef[]
@@ -3519,14 +3758,27 @@ export interface OperatorPairingConfigUpsert {
 
 // ── 4.1.6.3 Scheduling Configurations ──
 
+/** Soft-rule toggle — planner decides whether the solver penalises violations
+ *  of the associated limit, and how heavily (1 = nudge, 10 = strong). */
+export interface SchedulingSoftRule {
+  enabled: boolean
+  weight: number
+}
+
 export interface SchedulingDaysOffConfig {
   /** Minimum days off per period per crew. Drives the day-off projection
    *  in Manpower Check and the solver's floor. Default 8 (≈ FDTL-aligned). */
   minPerPeriodDays: number
   maxPerPeriodDays: number
+  /** Hard cap on consecutive OFF days the auto-roster may place in a row.
+   *  Prevents "mini holiday" blocks. Default 3. */
+  maxConsecutiveDaysOff: number
   maxConsecutiveDutyDays: number
+  maxConsecutiveDutyDaysRule?: SchedulingSoftRule
   maxConsecutiveMorningDuties: number
+  maxConsecutiveMorningDutiesRule?: SchedulingSoftRule
   maxConsecutiveAfternoonDuties: number
+  maxConsecutiveAfternoonDutiesRule?: SchedulingSoftRule
 }
 
 export interface SchedulingStandbyConfig {
@@ -3592,6 +3844,24 @@ export interface AutoRosterRunStats {
   unassignedPairings: number
   durationMs: number
   objectiveScore: number
+  /** Total virtual-seat slots emitted by the orchestrator (sum of crewCounts per pairing). */
+  virtualSeatsTotal?: number
+  /** Number of OFF activities committed by the chained day-off pass (general mode). */
+  daysOffInserted?: number
+  /** Crew skipped because already at or above min quota. */
+  daysOffSkippedCrew?: number
+  /** Crew with errors during day-off pass. */
+  daysOffErroredCrew?: number
+  /** Number of SBY activities committed by the chained standby pass (general mode). */
+  standbyInserted?: number
+  /** Home vs airport standby split. */
+  standbyHome?: number
+  standbyAirport?: number
+  /** Solver status string (OPTIMAL / FEASIBLE / INFEASIBLE / UNKNOWN). */
+  solverStatus?: string
+  /** Mode-specific stats — daysOff / standby runs carry their own shape. */
+  mode?: string
+  [key: string]: unknown
 }
 
 export interface AutoRosterRun {
@@ -3608,6 +3878,20 @@ export interface AutoRosterRun {
   updatedAt: string
 }
 
+export interface AutoRosterActiveRun {
+  runId: string
+  status: 'queued' | 'running'
+  startedAt: string | null
+  startedByUserId: string | null
+  startedByUserName: string | null
+  pct: number
+  message: string | null
+  periodFrom: string
+  periodTo: string
+  /** true when someone else owns the running run (lock banner state). */
+  lockedForYou: boolean
+}
+
 export type AutoRosterMode = 'general' | 'daysOff' | 'standby' | 'longDuties' | 'training'
 
 export interface StartAutoRosterParams {
@@ -3619,6 +3903,9 @@ export interface StartAutoRosterParams {
   mode?: AutoRosterMode
   /** Minimum pairing length in days when mode === 'longDuties'. */
   longDutiesMinDays?: number
+  /** Activity code id to stamp for mode === 'daysOff'. When omitted, server
+   *  picks first active code with is_day_off flag (SYSTEM default). */
+  daysOffActivityCodeId?: string | null
   base?: string
   position?: string
   acType?: string | string[]

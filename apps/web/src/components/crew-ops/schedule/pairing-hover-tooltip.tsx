@@ -28,6 +28,9 @@ interface Props {
    *  per-seat delta (shortage = "-N", surplus = "+N") on the Complement
    *  row. Omit to render required counts only. */
   assignments?: CrewAssignmentRef[]
+  /** The specific assignment being hovered — drives the source badge
+   *  ("AUTO" vs "ASSIGNED BY USER"). */
+  assignment?: CrewAssignmentRef
   clientX: number
   clientY: number
 }
@@ -82,6 +85,7 @@ export const PairingHoverTooltip = memo(function PairingHoverTooltip({
   pairing,
   positions,
   assignments,
+  assignment,
   clientX,
   clientY,
 }: Props) {
@@ -152,7 +156,15 @@ export const PairingHoverTooltip = memo(function PairingHoverTooltip({
   if (typeof document === 'undefined') return null
 
   const status = getStatusPill(pairing.fdtlStatus, isDark)
-  const workflow = pairing.workflowStatus === 'committed' ? 'COMMITTED' : 'DRAFT'
+  const sourceLabel = assignment
+    ? assignment.sourceRunId
+      ? 'AUTO'
+      : assignment.assignedByUserId
+        ? `ASSIGNED BY USER ${assignment.assignedByUserId}`
+        : 'MANUAL'
+    : pairing.workflowStatus === 'committed'
+      ? 'COMMITTED'
+      : 'DRAFT'
 
   const bg = isDark ? 'rgba(244,244,245,0.92)' : 'rgba(24,24,27,0.88)'
   const border = isDark ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'
@@ -200,7 +212,7 @@ export const PairingHoverTooltip = memo(function PairingHoverTooltip({
             </span>
           )}
           <span className="text-[11px] font-medium tracking-wider uppercase shrink-0" style={{ color: muted }}>
-            {workflow} · {status.text}
+            {sourceLabel}
           </span>
         </div>
         <div className="text-[11px] font-medium" style={{ color: muted }}>

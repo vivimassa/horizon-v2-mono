@@ -69,9 +69,29 @@ export const ActivityHoverTooltip = memo(function ActivityHoverTooltip({ activit
   const pillBg = code?.color ?? '#3E7BFA'
   const label = code?.shortLabel ?? code?.code ?? '—'
   const name = code?.name ?? 'Activity'
-  const hasWindow = code?.requiresTime && !!activity.startUtcIso && !!activity.endUtcIso
+  const flags = (code?.flags ?? []) as string[]
+  const isStandby =
+    flags.includes('is_home_standby') ||
+    flags.includes('is_airport_standby') ||
+    flags.includes('is_reserve') ||
+    code?.code === 'SBY'
+  // Standby always shows its time window — min/max duration is policy, not
+  // an all-day block. Other timed codes still gated by `requiresTime`.
+  const hasWindow = (isStandby || code?.requiresTime) && !!activity.startUtcIso && !!activity.endUtcIso
   const from = hasWindow ? formatTimeInTz(activity.startUtcIso, operatorTz) : null
   const to = hasWindow ? formatTimeInTz(activity.endUtcIso, operatorTz) : null
+
+  // Source label — prefer the structured `sourceRunId` field; fall back to
+  // the legacy `notes: 'auto-roster:<runId>'` convention for rows written
+  // before the schema field was added.
+  const isAuto =
+    !!(activity as { sourceRunId?: string | null }).sourceRunId ||
+    (!!activity.notes && /^auto-roster:/.test(activity.notes))
+  const sourceLabel = isAuto
+    ? 'AUTO'
+    : activity.assignedByUserId
+      ? `ASSIGNED BY USER ${activity.assignedByUserId}`
+      : null
 
   const bg = isDark ? 'rgba(244,244,245,0.92)' : 'rgba(24,24,27,0.88)'
   const border = isDark ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'
@@ -125,9 +145,9 @@ export const ActivityHoverTooltip = memo(function ActivityHoverTooltip({ activit
             </span>
           </div>
         )}
-        {activity.notes && (
-          <div className="mt-1.5 text-[12px] leading-snug" style={{ color: muted }}>
-            {activity.notes}
+        {sourceLabel && (
+          <div className="mt-1.5 text-[11px] font-medium tracking-wider uppercase" style={{ color: muted }}>
+            {sourceLabel}
           </div>
         )}
       </div>

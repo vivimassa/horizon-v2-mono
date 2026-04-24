@@ -38,6 +38,11 @@ const crewAssignmentSchema = new Schema(
     assignedByUserId: { type: String, default: null },
     assignedAtUtc: { type: String, default: () => new Date().toISOString() },
 
+    /** AutoRosterRun._id when this assignment was written by the auto-roster
+     *  pipeline. Null for manual seat placements. Drives the AUTO vs
+     *  ASSIGNED BY USER vs MANUAL badge in the schedule tooltips. */
+    sourceRunId: { type: String, default: null, index: true },
+
     /** Cached output of validatePairingClient from packages/logic/src/fdtl. */
     legalityResult: { type: Schema.Types.Mixed, default: null },
     lastLegalityCheckUtcIso: { type: String, default: null },

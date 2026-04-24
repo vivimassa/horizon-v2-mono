@@ -26,6 +26,10 @@ const crewActivitySchema = new Schema(
     assignedByUserId: { type: String, default: null },
     assignedAtUtc: { type: String, default: () => new Date().toISOString() },
 
+    /** AutoRosterRun._id when this activity was placed by the auto-roster
+     *  pipeline. Null for manual placements. */
+    sourceRunId: { type: String, default: null, index: true },
+
     createdAt: { type: String, default: () => new Date().toISOString() },
     updatedAt: { type: String, default: () => new Date().toISOString() },
   },
@@ -35,6 +39,9 @@ const crewActivitySchema = new Schema(
 crewActivitySchema.index({ operatorId: 1, scenarioId: 1, startUtcIso: 1, endUtcIso: 1 })
 crewActivitySchema.index({ operatorId: 1, crewId: 1, startUtcIso: 1 })
 crewActivitySchema.index({ operatorId: 1, activityCodeId: 1 })
+// Auto-roster upsert filter: { operatorId, crewId, dateIso, activityCodeId }.
+// Without this index, each upsert is a collection scan — ~30k scans per run.
+crewActivitySchema.index({ operatorId: 1, crewId: 1, dateIso: 1, activityCodeId: 1 })
 
 export type CrewActivityDoc = InferSchemaType<typeof crewActivitySchema>
 export const CrewActivity = mongoose.model('CrewActivity', crewActivitySchema)

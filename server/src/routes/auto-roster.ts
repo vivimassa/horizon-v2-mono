@@ -64,6 +64,22 @@ function emitToBus(runId: string, event: AutoRosterEvent): void {
       console.error('[auto-roster bus] subscriber threw', err)
     }
   }
+  // Persist latest progress snapshot to the run doc so a late-arriving client
+  // (screen refresh, second planner opening Step 3) can paint the UI at the
+  // right pct + message without waiting for the next SSE tick. Also
+  // keeps lastProgressAt current for stale-lock sweep.
+  if (event.event === 'progress') {
+    const data = event.data as { pct?: number; message?: string } | undefined
+    void AutoRosterRun.updateOne(
+      { _id: runId },
+      {
+        lastProgressAt: new Date().toISOString(),
+        lastProgressPct: Math.round(data?.pct ?? 0),
+        lastProgressMessage: data?.message ?? null,
+        updatedAt: new Date().toISOString(),
+      },
+    ).catch(() => null)
+  }
   if (event.event === 'committed' || event.event === 'error') {
     bus.done = true
     setTimeout(() => runBuses.delete(runId), 30_000)
@@ -212,7 +228,15 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
       ActivityCode.find({ operatorId, flags: { $in: TRAINING_FLAGS } }).distinct('_id'),
       ActivityCode.find({ operatorId, flags: { $in: GROUND_DUTY_FLAGS } }).distinct('_id'),
       CrewMember.countDocuments(crewBaseFilter),
-      OperatorSchedulingConfig.findOne({ operatorId }).lean(),
+      (async () => {
+        // Mirror orchestrator scope: per-user config wins, operator default is fallback.
+        // Prevents slider edits from looking ignored when the user has their own override.
+        if (req.userId) {
+          const userDoc = await OperatorSchedulingConfig.findOne({ operatorId, userId: req.userId }).lean()
+          if (userDoc) return userDoc
+        }
+        return OperatorSchedulingConfig.findOne({ operatorId, userId: null }).lean()
+      })(),
     ])
     const standbyCodeIds = [...standbyHomeCodeIds, ...standbyAirportCodeIds]
 
@@ -390,8 +414,12 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
-      // Project day-off floor when no actuals exist (pre-solver view).
-      const dayOffEffective = Math.max(dayoffCrew.size, dayOffProjectedPerDay)
+      // Projection = pre-roster reference only. Once actuals exist (post
+      // auto-roster or manual placement), report what is actually on the
+      // roster. Taking Math.max here previously hid real numbers behind the
+      // projection floor whenever the solver placed fewer OFF/SBY than the
+      // quota target — chart looked untouched after a run.
+      const dayOffEffective = dayoffCrew.size > 0 ? dayoffCrew.size : dayOffProjectedPerDay
 
       const dayPairings = (pairingDocsFiltered as PairingDoc[]).filter((p) => p.startDate <= day && p.endDate >= day)
       const seatsDemandDay = dayPairings.reduce((sum, p) => sum + (seatsByPairingId.get(String(p._id)) ?? 0), 0)
@@ -399,9 +427,21 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
       // "Crew operating that day" = crew filling flight duties that day.
       // For the pre-solver projection this equals seatsDemand. Standby = %
       // of operating crew (per scheduling-config). Flat mode = absolute N.
+      // On a blank roster (no pairings → seatsDemand = 0) the percentage
+      // path collapses to 0, making the config slider look broken. Fall
+      // back to "% of pool available that day" so changing the % actually
+      // scales the projected standby.
       const standbyActual = standbyHomeCrew.size + standbyAirportCrew.size
-      const standbyProjected = standbyUsePct ? Math.ceil(seatsDemandDay * (standbyMinPct / 100)) : standbyMinFlat
-      const standbyTotal = Math.max(standbyActual, standbyProjected)
+      const poolAvailableDay = Math.max(
+        0,
+        crewTotal - leaveCrew.size - trainingCrew.size - groundDutyCrew.size - dayOffEffective,
+      )
+      const standbyProjected = standbyUsePct
+        ? seatsDemandDay > 0
+          ? Math.ceil(seatsDemandDay * (standbyMinPct / 100))
+          : Math.max(standbyMinFlat, Math.ceil(poolAvailableDay * (standbyMinPct / 100)))
+        : standbyMinFlat
+      const standbyTotal = standbyActual > 0 ? standbyActual : standbyProjected
       const homeRatio = ((standbyCfg as { homeStandbyRatioPct?: number }).homeStandbyRatioPct ?? 80) / 100
       const standbyHomeEffective = standbyActual > 0 ? standbyHomeCrew.size : Math.round(standbyTotal * homeRatio)
       const standbyAirportEffective = standbyActual > 0 ? standbyAirportCrew.size : standbyTotal - standbyHomeEffective
@@ -563,6 +603,7 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
       timeLimitSec?: number
       mode?: 'general' | 'daysOff' | 'standby' | 'longDuties' | 'training'
       longDutiesMinDays?: number
+      daysOffActivityCodeId?: string | null
       base?: string | null
       position?: string | null
       acType?: string | string[] | null
@@ -587,9 +628,49 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
     }
     const longDutiesMinDays = Math.min(14, Math.max(1, body.longDutiesMinDays ?? 2))
 
-    const timeLimitSec = Math.min(3600, Math.max(10, body.timeLimitSec ?? 600))
+    const timeLimitSec = Math.min(7200, Math.max(10, body.timeLimitSec ?? 1800))
     const runId = crypto.randomUUID()
     const now = new Date().toISOString()
+
+    // Sweep stale locks — if a prior run's process died without writing a
+    // terminal state, its row is still `running`. Age-out based on
+    // lastProgressAt (or startedAt if no progress event was recorded).
+    // 5 min idle window is comfortable for normal solver ticks (~1/s).
+    const staleCutoff = new Date(Date.now() - 5 * 60_000).toISOString()
+    await AutoRosterRun.updateMany(
+      {
+        operatorId,
+        status: 'running',
+        $or: [{ lastProgressAt: { $lt: staleCutoff } }, { lastProgressAt: null, startedAt: { $lt: staleCutoff } }],
+      },
+      {
+        status: 'failed',
+        error: 'Stale lock — orchestrator did not emit progress for 5 min',
+        completedAt: now,
+        updatedAt: now,
+      },
+    )
+
+    // Single-run lock per operator. Another planner's run in flight → 409.
+    const existing = await AutoRosterRun.findOne({
+      operatorId,
+      status: { $in: ['queued', 'running'] },
+    }).lean()
+    if (existing) {
+      return reply.code(409).send({
+        error: 'Another auto-roster run is already in progress for this operator',
+        runId: existing._id,
+        startedByUserId: (existing as { startedByUserId?: string | null }).startedByUserId ?? null,
+        startedByUserName: (existing as { startedByUserName?: string | null }).startedByUserName ?? null,
+        startedAt: existing.startedAt,
+        pct: (existing as { lastProgressPct?: number }).lastProgressPct ?? 0,
+        message: (existing as { lastProgressMessage?: string | null }).lastProgressMessage ?? null,
+      })
+    }
+
+    // Resolve the caller's display name once so the lock banner other
+    // planners see has something friendlier than a UUID.
+    const userName = (req as { userName?: string | null }).userName ?? null
 
     await AutoRosterRun.create({
       _id: runId,
@@ -599,6 +680,11 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
       status: 'queued',
       startedAt: null,
       completedAt: null,
+      startedByUserId: req.userId ?? null,
+      startedByUserName: userName,
+      lastProgressAt: now,
+      lastProgressPct: 0,
+      lastProgressMessage: 'Starting…',
       stats: null,
       error: null,
       createdAt: now,
@@ -632,6 +718,7 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
         acTypes: toArr(body.acType),
         crewGroupIds: toArr(body.crewGroup),
       },
+      body.daysOffActivityCodeId ?? null,
     ).finally(() => activeRuns.delete(runId))
 
     return reply.code(202).send({ runId })
@@ -756,6 +843,51 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
     )
 
     return { success: true }
+  })
+
+  // ── GET /auto-roster/active — return the currently running run (if any)
+  // for this operator. Used by Step 3 on mount to reattach after a refresh,
+  // and to show a "locked by X" banner to other planners.
+  app.get('/auto-roster/active', async (req, reply) => {
+    const operatorId = (req.query as Record<string, string>).operatorId ?? req.operatorId
+
+    // Age out stale locks first so a dead orchestrator doesn't keep the UI
+    // locked forever. Same 5-min idle window as POST /run.
+    const staleCutoff = new Date(Date.now() - 5 * 60_000).toISOString()
+    const nowIso = new Date().toISOString()
+    await AutoRosterRun.updateMany(
+      {
+        operatorId,
+        status: 'running',
+        $or: [{ lastProgressAt: { $lt: staleCutoff } }, { lastProgressAt: null, startedAt: { $lt: staleCutoff } }],
+      },
+      {
+        status: 'failed',
+        error: 'Stale lock — orchestrator did not emit progress for 5 min',
+        completedAt: nowIso,
+        updatedAt: nowIso,
+      },
+    )
+
+    const active = await AutoRosterRun.findOne({
+      operatorId,
+      status: { $in: ['queued', 'running'] },
+    }).lean()
+    if (!active) return reply.send({ active: null })
+    return reply.send({
+      active: {
+        runId: active._id,
+        status: active.status,
+        startedAt: active.startedAt,
+        startedByUserId: (active as { startedByUserId?: string | null }).startedByUserId ?? null,
+        startedByUserName: (active as { startedByUserName?: string | null }).startedByUserName ?? null,
+        pct: (active as { lastProgressPct?: number }).lastProgressPct ?? 0,
+        message: (active as { lastProgressMessage?: string | null }).lastProgressMessage ?? null,
+        periodFrom: active.periodFrom,
+        periodTo: active.periodTo,
+        lockedForYou: (active as { startedByUserId?: string | null }).startedByUserId !== (req.userId ?? null),
+      },
+    })
   })
 
   // ── GET /auto-roster/history — list runs for operator ─────────────────

@@ -1,11 +1,17 @@
 """CP-SAT crew assignment solver.
 
-Objectives (lexicographic priority):
-  1. Minimize unassigned pairings (coverage — highest priority)
-  2. Minimize block-hour variance across crew (fairness)
-  3. Minimize leg-count variance
-  4. Minimize layover destination concentration (soft destination rules)
-  5. Gender balance (configurable weight)
+Objectives (weighted-sum, priority approximated by large weight ratios):
+  1. Minimise unassigned pairings (coverage — highest priority)
+  2. Minimise idle qualified crew (soft load distribution)
+  3. Minimise block-hour max-min spread across crew (fairness)
+  4. Reward mixed-gender staffing on layover pairings (configurable)
+
+Hard constraints:
+  - Each pairing covered by at most one crew (slack variable absorbs the rest)
+  - Sibling-seat mutex: a crew cannot take two seats on the same parent pairing
+  - Pairwise overlap + minimum rest between assigned pairings per crew
+  - Rolling-window cumulative caps (MAX_BLOCK_*D, MAX_DUTY_*D, MAX_LANDINGS_*D)
+    from the operator's FDTL ruleset
 """
 from __future__ import annotations
 
@@ -20,6 +26,18 @@ from app.models import SolveRequest
 
 def _days_overlap(days_a: list[str], days_b: list[str]) -> bool:
     return bool(set(days_a) & set(days_b))
+
+
+def _windows_conflict(a_start: int, a_end: int, b_start: int, b_end: int, rest_min_ms: int) -> bool:
+    """True if two pairing windows overlap OR the gap between them is
+    below the required minimum rest. Used for CP-SAT mutex constraints
+    so the solver never co-assigns two pairings that violate FDTL rest.
+    """
+    if a_start <= 0 or a_end <= 0 or b_start <= 0 or b_end <= 0:
+        return False
+    # Extend each window by rest buffer on trailing edge.
+    # Conflict if extended ranges overlap.
+    return a_start < b_end + rest_min_ms and b_start < a_end + rest_min_ms
 
 
 async def solve(request: SolveRequest) -> AsyncIterator[dict]:
@@ -57,21 +75,216 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
             # no eligible crew at all — always unassigned
             model.add(s == 1)
 
-    # ── Hard constraint 2: no crew assigned to two overlapping pairings ────
+    # ── Hard constraint 1b: sibling-seat mutex ────────────────────────────
+    # For multi-seat pairings the orchestrator sends N virtual pairings
+    # sharing the same parent_pairing_id. A single crew must occupy AT MOST
+    # one seat of the same parent. Express as explicit sum constraint —
+    # cheaper than the O(N²) intra-parent pairwise rest constraints below.
+    parent_groups: dict[str, list[int]] = {}
+    for pi, pid in enumerate(pairing_ids):
+        parent = pairing_by_id[pid].parent_pairing_id or pid
+        parent_groups.setdefault(parent, []).append(pi)
+    for parent, pis in parent_groups.items():
+        if len(pis) < 2:
+            continue
+        for ci, cid in enumerate(crew_ids):
+            sibling_vars = [x[(ci, pi)] for pi in pis if (ci, pi) in x]
+            if len(sibling_vars) >= 2:
+                model.add(sum(sibling_vars) <= 1)
+
+    # ── Hard constraint 2: no crew assigned to two overlapping OR
+    # insufficient-rest pairings. Uses precise UTC windows when provided;
+    # falls back to day-string overlap for legacy payloads. Rest buffer
+    # comes from FDTL MIN_REST_HOME_BASE (passed via config.min_rest_min).
+    rest_min_ms = int(request.config.min_rest_min) * 60 * 1000
     for ci, cid in enumerate(crew_ids):
         assigned_pairings = [(pi, pid) for pi, pid in enumerate(pairing_ids) if (ci, pi) in x]
-        for i in range(len(assigned_pairings)):
-            for j in range(i + 1, len(assigned_pairings)):
-                pi, pid = assigned_pairings[i]
-                pj, pjd = assigned_pairings[j]
-                if _days_overlap(pairing_by_id[pid].days, pairing_by_id[pjd].days):
+        # Sort by start time to enable O(N × window) neighbour scan instead
+        # of O(N²) — the rest window bounds how far we ever need to look.
+        indexed = []
+        for pi, pid in assigned_pairings:
+            p = pairing_by_id[pid]
+            indexed.append((p.start_utc_ms, pi, pid))
+        indexed.sort(key=lambda t: t[0])
+        for i in range(len(indexed)):
+            a_start, pi, pid = indexed[i]
+            a_end = pairing_by_id[pid].end_utc_ms
+            if a_start <= 0 or a_end <= 0:
+                # Fallback to day overlap for legacy payloads missing window.
+                for j in range(i + 1, len(indexed)):
+                    _, pj, pjd = indexed[j]
+                    if _days_overlap(pairing_by_id[pid].days, pairing_by_id[pjd].days):
+                        model.add(x[(ci, pi)] + x[(ci, pj)] <= 1)
+                continue
+            horizon = a_end + rest_min_ms
+            for j in range(i + 1, len(indexed)):
+                b_start, pj, pjd = indexed[j]
+                if b_start >= horizon:
+                    break  # all later pairings are clear of rest window
+                b_end = pairing_by_id[pjd].end_utc_ms
+                if _windows_conflict(a_start, a_end, b_start, b_end, rest_min_ms):
                     model.add(x[(ci, pi)] + x[(ci, pj)] <= 1)
 
-    # ── Objective: lexicographic via weighted sum (scaled priority) ────────
-    # Priority weights: coverage >> BH variance > leg variance > destination
+    # ── Hard constraint 3: rolling cumulative FDTL caps ────────────────────
+    # For each crew and each FDTL rolling-window limit, enumerate day-anchored
+    # 7/14/28-day windows within the solve horizon and bound the sum of
+    # (field-value × x) over pairings whose time range intersects the window.
+    #
+    # Complexity: crew × limits × days × mean-pairings-in-window. For a
+    # 30-day solve with 50 FAs + 4 rule types, that's ~6k constraints. Well
+    # within CP-SAT budget; if this ever grows tight we can drop daily
+    # granularity in favour of per-pairing anchors only.
+    fdtl_limits = request.config.fdtl_limits or []
+    if fdtl_limits and crew_ids and pairing_ids:
+        # Snap horizon to day boundaries in UTC. Start at min pairing start,
+        # end at max pairing end; step 1 day.
+        valid_starts = [p.start_utc_ms for p in request.pairings if p.start_utc_ms > 0]
+        valid_ends = [p.end_utc_ms for p in request.pairings if p.end_utc_ms > 0]
+        if valid_starts and valid_ends:
+            horizon_start_ms = min(valid_starts)
+            horizon_end_ms = max(valid_ends)
+            DAY_MS = 86_400_000
+            first_day = (horizon_start_ms // DAY_MS) * DAY_MS
+            last_day = ((horizon_end_ms // DAY_MS) + 1) * DAY_MS
+
+            # Pre-compute each pairing's field values.
+            def field_val(p, field: str) -> int:
+                if field == "block":
+                    return int(p.bh_min or 0)
+                if field == "duty":
+                    return int(p.duty_min or p.bh_min or 0)
+                if field == "landings":
+                    return int(p.landings or 0)
+                return 0
+
+            anchor = first_day
+            while anchor <= last_day:
+                for lim in fdtl_limits:
+                    window_start = anchor - lim.window_ms
+                    # Which pairings fall inside (window_start, anchor]?
+                    in_window_pi: list[tuple[int, int]] = []
+                    for pi, pid in enumerate(pairing_ids):
+                        p = pairing_by_id[pid]
+                        if p.end_utc_ms <= window_start or p.start_utc_ms > anchor:
+                            continue
+                        v = field_val(p, lim.field)
+                        if v > 0:
+                            in_window_pi.append((pi, v))
+                    if not in_window_pi:
+                        continue
+                    for ci, cid in enumerate(crew_ids):
+                        terms = [v * x[(ci, pi)] for (pi, v) in in_window_pi if (ci, pi) in x]
+                        if terms:
+                            model.add(sum(terms) <= lim.limit)
+                anchor += DAY_MS
+
+    # ── Hard constraint 4: weekly extended-recovery rest ──────────────────
+    # CAAV §15.037(d): 36h continuous rest within every 168h rolling window.
+    # We approximate at day granularity: per crew, per sliding 7-day window,
+    # require at least N_FREE days where the crew has no pairing assigned.
+    # N_FREE = ceil(rest_min / 1440). Two consecutive free days paired with
+    # the inter-pairing min-rest constraint typically yields > 36h continuous.
+    weekly_rest = request.config.weekly_rest
+    if weekly_rest and weekly_rest.rest_min > 0 and crew_ids and pairing_ids:
+        DAY_MS = 86_400_000
+        window_days = max(1, round(weekly_rest.window_hours / 24))
+        n_free = max(1, -(-weekly_rest.rest_min // 1440))  # ceil division
+        # Day-level indicator: pairing_day[ci, d_idx] = OR of x[ci, pi] for
+        # pairings whose window overlaps day d. If any pairing occupies day d
+        # for crew ci, pairing_day[ci, d] = 1.
+        valid_starts = [p.start_utc_ms for p in request.pairings if p.start_utc_ms > 0]
+        valid_ends = [p.end_utc_ms for p in request.pairings if p.end_utc_ms > 0]
+        if valid_starts and valid_ends:
+            first_day_ms = (min(valid_starts) // DAY_MS) * DAY_MS
+            last_day_ms = ((max(valid_ends) // DAY_MS) + 1) * DAY_MS
+            horizon_days = max(1, int((last_day_ms - first_day_ms) // DAY_MS))
+            for ci, cid in enumerate(crew_ids):
+                day_vars: list[cp_model.IntVar] = []
+                for d_idx in range(horizon_days):
+                    day_start = first_day_ms + d_idx * DAY_MS
+                    day_end = day_start + DAY_MS
+                    pairing_on_day = [
+                        x[(ci, pi)]
+                        for pi, pid in enumerate(pairing_ids)
+                        if (ci, pi) in x
+                        and pairing_by_id[pid].start_utc_ms < day_end
+                        and pairing_by_id[pid].end_utc_ms > day_start
+                    ]
+                    day_var = model.new_bool_var(f"on_duty_{ci}_{d_idx}")
+                    if pairing_on_day:
+                        # day_var = 1 iff any pairing on that day for this crew.
+                        model.add_max_equality(day_var, pairing_on_day)
+                    else:
+                        model.add(day_var == 0)
+                    day_vars.append(day_var)
+                # Sliding window: sum of busy days ≤ window_days - n_free.
+                max_busy = window_days - n_free
+                if max_busy < 0:
+                    max_busy = 0
+                for start in range(0, max(1, horizon_days - window_days + 1)):
+                    window = day_vars[start : start + window_days]
+                    if len(window) == window_days:
+                        model.add(sum(window) <= max_busy)
+
+    # ── Soft consecutive-duty rules (planner-tunable) ────────────────────
+    # For each configured rule, per crew, per sliding (limit+1)-day window:
+    # excess = max(0, sum_duty_days_in_window - limit). Penalty = excess ×
+    # weight × SOFT_CONSEC_WEIGHT_SCALE added to the objective.
+    SOFT_CONSEC_WEIGHT_SCALE = 200  # 1 excess day @ weight 5 → 1000 obj points
+    soft_excess_terms: list[tuple[cp_model.IntVar, int]] = []
+    soft_rules = request.config.soft_consec_duty or []
+    if soft_rules and crew_ids and pairing_ids:
+        DAY_MS = 86_400_000
+        valid_starts = [p.start_utc_ms for p in request.pairings if p.start_utc_ms > 0]
+        valid_ends = [p.end_utc_ms for p in request.pairings if p.end_utc_ms > 0]
+        if valid_starts and valid_ends:
+            first_day_ms = (min(valid_starts) // DAY_MS) * DAY_MS
+            last_day_ms = ((max(valid_ends) // DAY_MS) + 1) * DAY_MS
+            horizon_days = max(1, int((last_day_ms - first_day_ms) // DAY_MS))
+            for rule in soft_rules:
+                limit = max(1, int(rule.limit_days))
+                weight = max(0, int(rule.weight)) * SOFT_CONSEC_WEIGHT_SCALE
+                if weight <= 0:
+                    continue
+                variant = rule.variant or "any"
+                def qualifies(p):
+                    if variant == "morning":
+                        return int(getattr(p, "morning_flag", 0) or 0) == 1
+                    if variant == "afternoon":
+                        return int(getattr(p, "afternoon_flag", 0) or 0) == 1
+                    return True
+                for ci, cid in enumerate(crew_ids):
+                    # Build per-day duty indicator for this crew (qualifying pairings only).
+                    day_vars: list[cp_model.IntVar] = []
+                    for d_idx in range(horizon_days):
+                        day_start = first_day_ms + d_idx * DAY_MS
+                        day_end = day_start + DAY_MS
+                        terms = [
+                            x[(ci, pi)]
+                            for pi, pid in enumerate(pairing_ids)
+                            if (ci, pi) in x
+                            and qualifies(pairing_by_id[pid])
+                            and pairing_by_id[pid].start_utc_ms < day_end
+                            and pairing_by_id[pid].end_utc_ms > day_start
+                        ]
+                        dv = model.new_bool_var(f"soft_{variant}_duty_{ci}_{d_idx}")
+                        if terms:
+                            model.add_max_equality(dv, terms)
+                        else:
+                            model.add(dv == 0)
+                        day_vars.append(dv)
+                    # Sliding (limit+1)-day window — excess = max(0, sum - limit).
+                    for start in range(0, max(1, horizon_days - limit)):
+                        window = day_vars[start : start + limit + 1]
+                        if len(window) < limit + 1:
+                            break
+                        excess = model.new_int_var(0, limit + 1, f"excess_{variant}_{ci}_{start}")
+                        model.add(excess >= sum(window) - limit)
+                        soft_excess_terms.append((excess, weight))
+
+    # ── Objective: weighted sum — priority approximated by weight ratios ──
     COVERAGE_WEIGHT = 1_000_000
     BH_FAIRNESS_WEIGHT = 100
-    LEG_FAIRNESS_WEIGHT = 10
     GENDER_WEIGHT_SCALE = request.config.gender_balance_weight  # 0-100
 
     # Block hours per crew (scaled to integers — multiply by 1 since bh_min already int)
@@ -105,6 +318,26 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
     # Objective: minimise (unassigned * COVERAGE_WEIGHT) + (bh_spread * BH_FAIRNESS_WEIGHT)
     obj_terms = [s * COVERAGE_WEIGHT for s in slack]
     obj_terms.append(bh_spread * BH_FAIRNESS_WEIGHT)
+
+    # Planner-defined soft consecutive-duty penalties.
+    for excess_var, w in soft_excess_terms:
+        obj_terms.append(excess_var * w)
+
+    # Idle-crew soft penalty: a qualified crew with at least one legal pairing
+    # but zero assignments is penalised — strong enough to beat BH fairness
+    # (which would otherwise be content leaving crew empty as long as max-min
+    # stays small) but weaker than coverage (never sacrifice a pairing just
+    # to load a crew). Crew with no legal pairings (unqualified for any seat
+    # in this run) are skipped so we never introduce infeasibility.
+    IDLE_PENALTY = COVERAGE_WEIGHT // 10  # 100_000
+    for ci, cid in enumerate(crew_ids):
+        legal_vars = [x[(ci, pi)] for pi, pid in enumerate(pairing_ids) if (ci, pi) in x]
+        if not legal_vars:
+            continue
+        idle = model.new_bool_var(f"idle_{ci}")
+        # sum(legal) + idle >= 1  →  either at least one assignment, or idle=1
+        model.add(sum(legal_vars) + idle >= 1)
+        obj_terms.append(idle * IDLE_PENALTY)
 
     # Gender balance bonus: pairings with mixed-gender crew on layovers
     # Proxy: penalise same-gender assignments on layover pairings
@@ -152,16 +385,27 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
             super().__init__()
             self._queue = queue
             self._best = None
+            self.last_pct = 20
+            self.last_covered = 0
+            self.solution_count = 0
+            self.last_improvement_ts = time.monotonic()
 
         def on_solution_callback(self):
             obj = int(self.objective_value)
             unassigned = obj // COVERAGE_WEIGHT
+            covered = len(pairing_ids) - unassigned
             pct = max(0, min(99, 100 - int(100 * unassigned / max(1, len(pairing_ids)))))
+            improved = self._best is None or obj < self._best
+            if improved:
+                self.last_improvement_ts = time.monotonic()
+            self.last_pct = pct
+            self.last_covered = covered
+            self.solution_count += 1
             event = {
                 "event": "progress",
                 "data": {
                     "pct": pct,
-                    "message": f"Solution found — {len(pairing_ids) - unassigned}/{len(pairing_ids)} pairings covered",
+                    "message": f"Roster #{self.solution_count}: {covered}/{len(pairing_ids)} positions filled ({pct}%)",
                     "best_obj": obj,
                 },
             }
@@ -175,14 +419,74 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
     queue: asyncio.Queue = asyncio.Queue(maxsize=64)
     cb = ProgressCallback(queue)
 
-    # Emit initial queued event
-    yield {"event": "progress", "data": {"pct": 0, "message": "Solver starting…", "best_obj": None}}
+    # Emit initial event with model size so client knows work was accepted
+    yield {
+        "event": "progress",
+        "data": {
+            "pct": 20,
+            "message": f"Optimizer starting — {n_crew} crew, {len(pairing_ids)} open positions",
+            "best_obj": None,
+        },
+    }
 
     # Run solver in thread to avoid blocking event loop
     def run_solver():
         return solver.solve(model, cb)
 
-    status = await loop.run_in_executor(None, run_solver)
+    solver_future = loop.run_in_executor(None, run_solver)
+
+    # Interleave: drain queue + heartbeat while solver runs.
+    # CP-SAT may spend long time before first feasible solution; without
+    # heartbeats the SSE stream looks dead to the client.
+    # Early stop: if no improvement for NO_IMPROVEMENT_STOP_SEC, abort search.
+    NO_IMPROVEMENT_STOP_SEC = 30.0
+    heartbeat_interval = 2.0
+    next_heartbeat = time.monotonic() + heartbeat_interval
+    early_stopped = False
+    while not solver_future.done():
+        try:
+            event = await asyncio.wait_for(queue.get(), timeout=0.5)
+            yield event
+        except asyncio.TimeoutError:
+            pass
+        now = time.monotonic()
+        # Early stop check — only after we have at least one solution.
+        if (
+            not early_stopped
+            and cb.solution_count > 0
+            and (now - cb.last_improvement_ts) >= NO_IMPROVEMENT_STOP_SEC
+        ):
+            solver.stop_search()
+            early_stopped = True
+            yield {
+                "event": "progress",
+                "data": {
+                    "pct": cb.last_pct,
+                    "message": f"No further improvement — accepting best roster ({cb.last_pct}% filled)",
+                    "best_obj": cb._best,
+                },
+            }
+        if now >= next_heartbeat:
+            elapsed = int(now - start_ts)
+            if cb.solution_count > 0:
+                stagnant = int(now - cb.last_improvement_ts)
+                msg = (
+                    f"Optimizing — best {cb.last_pct}% filled "
+                    f"({cb.last_covered}/{len(pairing_ids)}), {stagnant}s since last improvement"
+                )
+            else:
+                msg = f"Searching for first legal roster — {elapsed}s / {request.time_limit_sec}s"
+            yield {
+                "event": "progress",
+                "data": {
+                    "pct": cb.last_pct,
+                    "message": msg,
+                    "best_obj": cb._best,
+                },
+            }
+            next_heartbeat = now + heartbeat_interval
+
+    status = await solver_future
 
     # Drain any remaining progress events
     while not queue.empty():
@@ -219,6 +523,6 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
         yield {
             "event": "error",
             "data": {
-                "message": f"Solver ended with status {status_name} after {elapsed_ms}ms — no feasible solution found",
+                "message": f"No feasible roster — solver ended {status_name} after {elapsed_ms / 1000:.1f}s",
             },
         }

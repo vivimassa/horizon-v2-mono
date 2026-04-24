@@ -26,13 +26,30 @@ const destinationRuleSchema = new Schema(
   { _id: false },
 )
 
+// Soft-rule toggle: planner picks whether the solver penalises violations
+// and how heavily. Weight 1 = nudge, 10 = strong preference (short of hard).
+const softRuleSchema = new Schema(
+  {
+    enabled: { type: Boolean, default: true },
+    /** 1-10. Scales the per-violation penalty added to the solver objective. */
+    weight: { type: Number, default: 5, min: 1, max: 10 },
+  },
+  { _id: false },
+)
+
 const daysOffSchema = new Schema(
   {
     minPerPeriodDays: { type: Number, default: 8, min: 0, max: 31 },
     maxPerPeriodDays: { type: Number, default: 10, min: 0, max: 31 },
+    /** Hard cap on consecutive OFF days placed by auto-roster. Day-off pass
+     *  deterministic — respects the cap structurally, no penalty needed. */
+    maxConsecutiveDaysOff: { type: Number, default: 3, min: 1, max: 7 },
     maxConsecutiveDutyDays: { type: Number, default: 4, min: 1, max: 14 },
+    maxConsecutiveDutyDaysRule: { type: softRuleSchema, default: () => ({}) },
     maxConsecutiveMorningDuties: { type: Number, default: 4, min: 1, max: 14 },
+    maxConsecutiveMorningDutiesRule: { type: softRuleSchema, default: () => ({}) },
     maxConsecutiveAfternoonDuties: { type: Number, default: 4, min: 1, max: 14 },
+    maxConsecutiveAfternoonDutiesRule: { type: softRuleSchema, default: () => ({}) },
   },
   { _id: false },
 )

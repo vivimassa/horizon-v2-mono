@@ -21,13 +21,24 @@ const destinationRuleSchema = z.object({
   enabled: z.boolean().optional(),
 })
 
+const softRuleSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    weight: z.number().int().min(1).max(10).optional(),
+  })
+  .optional()
+
 const daysOffSchema = z
   .object({
     minPerPeriodDays: z.number().int().min(0).max(31).optional(),
     maxPerPeriodDays: z.number().int().min(0).max(31).optional(),
+    maxConsecutiveDaysOff: z.number().int().min(1).max(7).optional(),
     maxConsecutiveDutyDays: z.number().int().min(1).max(14).optional(),
+    maxConsecutiveDutyDaysRule: softRuleSchema,
     maxConsecutiveMorningDuties: z.number().int().min(1).max(14).optional(),
+    maxConsecutiveMorningDutiesRule: softRuleSchema,
     maxConsecutiveAfternoonDuties: z.number().int().min(1).max(14).optional(),
+    maxConsecutiveAfternoonDutiesRule: softRuleSchema,
   })
   .optional()
 

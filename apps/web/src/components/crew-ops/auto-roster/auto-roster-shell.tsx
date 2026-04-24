@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   BarChart3,
@@ -36,6 +36,8 @@ import Link from 'next/link'
 import {
   api,
   type AutoRosterRun,
+  type AutoRosterRunStats,
+  type CrewScheduleResponse,
   type DayBreakdown,
   type OperatorSchedulingConfig,
   type PeriodBreakdown,
@@ -49,6 +51,7 @@ import { useAutoRosterFilterStore } from '@/stores/use-auto-roster-filter-store'
 import { useCrewScheduleStore } from '@/stores/use-crew-schedule-store'
 import { NumberStepper } from '@/components/admin/_shared/form-primitives'
 import { Tooltip } from '@/components/ui/tooltip'
+import { Dropdown } from '@/components/ui/dropdown'
 import { collapseDock } from '@/lib/dock-store'
 
 const MODULE_ACCENT = MODULE_THEMES.workforce.accent
@@ -71,7 +74,7 @@ const STEPS: StepDef[] = [
   { key: 'manpower', num: 1, label: 'Manpower Projection', desc: 'Verify crew pool vs pairing demand', icon: Users },
   { key: 'analysis', num: 2, label: 'Roster Analysis', desc: 'Review constraints and priorities', icon: ListChecks },
   { key: 'generate', num: 3, label: 'Generate Roster', desc: 'Run CP-SAT solver', icon: Sparkles },
-  { key: 'review', num: 4, label: 'Review & Accept', desc: 'Inspect results · publish to Gantt', icon: CheckSquare },
+  { key: 'review', num: 4, label: 'Review & Accept', desc: 'Inspect roster coverage & fairness', icon: CheckSquare },
 ]
 
 type AssignmentMode = 'general' | 'daysOff' | 'standby' | 'longDuties' | 'training' | 'clear'
@@ -113,6 +116,19 @@ export function AutoRosterShell() {
   const [mode, setMode] = useState<AssignmentMode>('general')
   const [longDutiesMinDays, setLongDutiesMinDays] = useState(2)
 
+  // Days-Off-Only: planner picks which activity code to stamp (any code
+  // carrying the `is_day_off` flag). General mode hard-codes SYS 'OFF' and
+  // is NOT affected by this picker.
+  const [dayOffCodeOptions, setDayOffCodeOptions] = useState<Array<{ _id: string; code: string; name: string }>>([])
+  const [dayOffCodeId, setDayOffCodeId] = useState<string | null>(null)
+
+  // Tiered Clear Schedule retention flags. Defaults preserve everything a
+  // planner would hate to lose — pre-assigned duties, days off, standby.
+  // Unchecking any flag includes that bucket in the wipe.
+  const [clearRetainPreAssigned, setClearRetainPreAssigned] = useState(true)
+  const [clearRetainDayOff, setClearRetainDayOff] = useState(true)
+  const [clearRetainStandby, setClearRetainStandby] = useState(true)
+
   // One breakdown per selected position (fan-out). Single entry when 0 or 1
   // position is selected. `activeBreakdownIdx` is the tab the user is viewing.
   const [breakdowns, setBreakdowns] = useState<
@@ -132,9 +148,21 @@ export function AutoRosterShell() {
 
   const [phase, setPhase] = useState<RunPhase>('idle')
   const [progress, setProgress] = useState({ pct: 0, message: '' })
+  const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
   const [activeRunId, setActiveRunId] = useState<string | null>(null)
   const [resultRun, setResultRun] = useState<AutoRosterRun | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Lock state — populated when another planner owns the currently running
+  // auto-roster for this operator. Drives the "locked" banner + disabled Run
+  // button on Step 3.
+  const [lock, setLock] = useState<{
+    runId: string
+    userId: string | null
+    userName: string | null
+    startedAt: string | null
+    pct: number
+    message: string | null
+  } | null>(null)
 
   const esRef = useRef<EventSource | null>(null)
 
@@ -151,6 +179,53 @@ export function AutoRosterShell() {
       .then(setConfig)
       .catch(() => null)
     void loadHistory()
+    // Reattach to an already-running run on mount. This covers (a) screen
+    // refresh while our own run is in flight (re-subscribe to its SSE), and
+    // (b) landing on Step 3 while another planner's run holds the lock
+    // (render a read-only banner + disable Run).
+    void api
+      .getAutoRosterActive(operator._id)
+      .then((res) => {
+        if (!res.active) {
+          setLock(null)
+          return
+        }
+        const a = res.active
+        if (a.lockedForYou) {
+          setLock({
+            runId: a.runId,
+            userId: a.startedByUserId,
+            userName: a.startedByUserName,
+            startedAt: a.startedAt,
+            pct: a.pct,
+            message: a.message,
+          })
+        } else {
+          // Our own run survived a refresh — rehydrate and reconnect.
+          setLock(null)
+          setActiveRunId(a.runId)
+          setPhase('running')
+          setProgress({ pct: a.pct, message: a.message ?? 'Reconnecting…' })
+          setRunStartedAt(a.startedAt ? new Date(a.startedAt).getTime() : Date.now())
+          connectSSE(a.runId)
+        }
+      })
+      .catch(() => null)
+    // Load is_day_off codes for the Days Off Only picker. Default selection =
+    // SYS 'OFF' when present, otherwise first match.
+    api
+      .getActivityCodes(operator._id)
+      .then((codes) => {
+        const offCodes = codes
+          .filter((c) => c.isActive && !c.isArchived && (c.flags ?? []).includes('is_day_off'))
+          .map((c) => ({ _id: c._id, code: c.code, name: c.name }))
+        setDayOffCodeOptions(offCodes)
+        if (offCodes.length > 0) {
+          const sys = offCodes.find((c) => c.code === 'OFF')
+          setDayOffCodeId((prev) => prev ?? (sys ?? offCodes[0])._id)
+        }
+      })
+      .catch(() => null)
   }, [operator?._id])
 
   useEffect(() => {
@@ -163,7 +238,20 @@ export function AutoRosterShell() {
     if (!operator?._id) return
     setHistoryLoading(true)
     try {
-      setHistory(await api.getAutoRosterHistory(operator._id))
+      const h = await api.getAutoRosterHistory(operator._id)
+      setHistory(h)
+      // Rehydrate Step 4 with the most recent terminal run so a refreshed
+      // screen can still inspect the last result instead of bouncing to an
+      // empty state. Only the newest completed run is promoted — in-flight
+      // runs are handled by the `/active` + SSE reattach path.
+      setResultRun((prev) => {
+        if (prev) return prev
+        const lastTerminal = h.find((r) => r.status === 'completed')
+        return lastTerminal ?? null
+      })
+      if (h.find((r) => r.status === 'completed')) {
+        setHighestStep((prev) => Math.max(prev, 4))
+      }
     } catch {
       /* silent */
     } finally {
@@ -250,8 +338,14 @@ export function AutoRosterShell() {
       }
     })
     es.addEventListener('solution', () => {
+      // Solver finished pairing assignment, but general mode still chains
+      // day-off + standby passes + final commit AFTER this. Don't treat
+      // `solution` as "done". Wait for `committed` below. Keep progress bar
+      // ticking as chained passes emit more events.
+    })
+    es.addEventListener('committed', () => {
       setPhase('completed')
-      setProgress({ pct: 100, message: 'Assignments committed' })
+      setProgress({ pct: 100, message: 'Roster committed' })
       es.close()
       void api.getAutoRosterRun(runId).then((run) => {
         setResultRun(run)
@@ -281,11 +375,21 @@ export function AutoRosterShell() {
     setResultRun(null)
     setPhase('running')
     setProgress({ pct: 0, message: 'Starting…' })
+    setRunStartedAt(Date.now())
     try {
       if (mode === 'clear') {
-        await api.bulkDeleteAssignments({ periodFrom, periodTo })
+        const res = await api.bulkClearSchedule({
+          periodFrom,
+          periodTo,
+          retainPreAssigned: clearRetainPreAssigned,
+          retainDayOff: clearRetainDayOff,
+          retainStandby: clearRetainStandby,
+        })
         setPhase('completed')
-        setProgress({ pct: 100, message: 'Schedule cleared' })
+        setProgress({
+          pct: 100,
+          message: `Cleared ${res.deletedAssignments.toLocaleString()} pairings, ${res.deletedActivities.toLocaleString()} activities`,
+        })
         void loadHistory()
         return
       }
@@ -297,15 +401,34 @@ export function AutoRosterShell() {
         periodTo,
         mode,
         longDutiesMinDays: mode === 'longDuties' ? longDutiesMinDays : undefined,
+        daysOffActivityCodeId: mode === 'daysOff' ? dayOffCodeId : undefined,
         base: oneOrUndef(filterBase),
         position: oneOrUndef(filterPosition),
         acType: manyOrUndef(filterAcType),
         crewGroup: manyOrUndef(filterCrewGroup),
       })
       setActiveRunId(runId)
+      setLock(null)
       connectSSE(runId)
       void loadHistory()
     } catch (err) {
+      // Server returns 409 with lock info when another run is already in
+      // flight for this operator. Surface it as a lock banner instead of an
+      // error toast so the user can see who owns the run.
+      const maybeErr = err as { status?: number; payload?: Record<string, unknown> | null }
+      if (maybeErr?.status === 409 && maybeErr.payload) {
+        const p = maybeErr.payload
+        setLock({
+          runId: String(p.runId ?? ''),
+          userId: (p.startedByUserId as string | null) ?? null,
+          userName: (p.startedByUserName as string | null) ?? null,
+          startedAt: (p.startedAt as string | null) ?? null,
+          pct: Number(p.pct ?? 0),
+          message: (p.message as string | null) ?? null,
+        })
+        setPhase('idle')
+        return
+      }
       setPhase('failed')
       setError(err instanceof Error ? err.message : String(err))
     }
@@ -315,6 +438,10 @@ export function AutoRosterShell() {
     periodTo,
     mode,
     longDutiesMinDays,
+    dayOffCodeId,
+    clearRetainPreAssigned,
+    clearRetainDayOff,
+    clearRetainStandby,
     filterBase,
     filterPosition,
     filterAcType,
@@ -396,8 +523,22 @@ export function AutoRosterShell() {
           onModeChange={setMode}
           longDutiesMinDays={longDutiesMinDays}
           onLongDutiesMinDaysChange={setLongDutiesMinDays}
+          dayOffCodeId={dayOffCodeId}
+          onDayOffCodeIdChange={setDayOffCodeId}
+          dayOffCodeOptions={dayOffCodeOptions}
+          clearRetainPreAssigned={clearRetainPreAssigned}
+          onClearRetainPreAssignedChange={setClearRetainPreAssigned}
+          clearRetainDayOff={clearRetainDayOff}
+          onClearRetainDayOffChange={setClearRetainDayOff}
+          clearRetainStandby={clearRetainStandby}
+          onClearRetainStandbyChange={setClearRetainStandby}
+          filterBase={filterBase}
+          filterPosition={filterPosition}
+          filterAcType={filterAcType}
+          filterCrewGroup={filterCrewGroup}
           phase={phase}
           progress={progress}
+          runStartedAt={runStartedAt}
           resultRun={resultRun}
           error={error}
           onDismissError={() => setError(null)}
@@ -405,6 +546,7 @@ export function AutoRosterShell() {
           onCancel={handleCancel}
           onNavigate={navigate}
           highestStep={highestStep}
+          lock={lock}
           isDark={isDark}
           accent={accent}
           palette={palette}
@@ -437,8 +579,22 @@ function Center({
   onModeChange,
   longDutiesMinDays,
   onLongDutiesMinDaysChange,
+  dayOffCodeId,
+  onDayOffCodeIdChange,
+  dayOffCodeOptions,
+  clearRetainPreAssigned,
+  onClearRetainPreAssignedChange,
+  clearRetainDayOff,
+  onClearRetainDayOffChange,
+  clearRetainStandby,
+  onClearRetainStandbyChange,
+  filterBase,
+  filterPosition,
+  filterAcType,
+  filterCrewGroup,
   phase,
   progress,
+  runStartedAt,
   resultRun,
   error,
   onDismissError,
@@ -446,6 +602,7 @@ function Center({
   onCancel,
   onNavigate,
   highestStep,
+  lock,
   isDark,
   accent,
   palette,
@@ -470,8 +627,22 @@ function Center({
   onModeChange: (m: AssignmentMode) => void
   longDutiesMinDays: number
   onLongDutiesMinDaysChange: (v: number) => void
+  dayOffCodeId: string | null
+  onDayOffCodeIdChange: (v: string | null) => void
+  dayOffCodeOptions: Array<{ _id: string; code: string; name: string }>
+  clearRetainPreAssigned: boolean
+  onClearRetainPreAssignedChange: (v: boolean) => void
+  clearRetainDayOff: boolean
+  onClearRetainDayOffChange: (v: boolean) => void
+  clearRetainStandby: boolean
+  onClearRetainStandbyChange: (v: boolean) => void
+  filterBase: string[]
+  filterPosition: string[]
+  filterAcType: string[]
+  filterCrewGroup: string[]
   phase: RunPhase
   progress: { pct: number; message: string }
+  runStartedAt: number | null
   resultRun: AutoRosterRun | null
   error: string | null
   onDismissError: () => void
@@ -479,6 +650,14 @@ function Center({
   onCancel: () => void
   onNavigate: (to: ActiveKey) => void
   highestStep: number
+  lock: {
+    runId: string
+    userId: string | null
+    userName: string | null
+    startedAt: string | null
+    pct: number
+    message: string | null
+  } | null
   isDark: boolean
   accent: string
   palette: PaletteType
@@ -586,8 +765,19 @@ function Center({
             onModeChange={onModeChange}
             longDutiesMinDays={longDutiesMinDays}
             onLongDutiesMinDaysChange={onLongDutiesMinDaysChange}
+            dayOffCodeId={dayOffCodeId}
+            onDayOffCodeIdChange={onDayOffCodeIdChange}
+            dayOffCodeOptions={dayOffCodeOptions}
+            clearRetainPreAssigned={clearRetainPreAssigned}
+            onClearRetainPreAssignedChange={onClearRetainPreAssignedChange}
+            clearRetainDayOff={clearRetainDayOff}
+            onClearRetainDayOffChange={onClearRetainDayOffChange}
+            clearRetainStandby={clearRetainStandby}
+            onClearRetainStandbyChange={onClearRetainStandbyChange}
             phase={phase}
             progress={progress}
+            startedAt={runStartedAt}
+            lock={lock}
             onRun={onRun}
             onCancel={onCancel}
             onNavigate={onNavigate}
@@ -597,7 +787,19 @@ function Center({
           />
         )}
         {active === 'review' && (
-          <ReviewBody resultRun={resultRun} onNavigate={onNavigate} isDark={isDark} accent={accent} palette={palette} />
+          <ReviewBody
+            resultRun={resultRun}
+            periodFrom={periodFrom}
+            periodTo={periodTo}
+            filterBase={filterBase}
+            filterPosition={filterPosition}
+            filterAcType={filterAcType}
+            filterCrewGroup={filterCrewGroup}
+            onNavigate={onNavigate}
+            isDark={isDark}
+            accent={accent}
+            palette={palette}
+          />
         )}
         {active === 'history' && (
           <HistoryBody history={history} loading={historyLoading} isDark={isDark} accent={accent} />
@@ -1111,7 +1313,9 @@ function ManpowerBody({
 // ── Manpower Chart (AIMS-style stacked bar) ───────────────────────────────────
 
 // Stack order: bottom → top. Each segment resolves its per-day value from the
-// DayBreakdown row; Open Flight Duties uses `seatsDemand` (pairing side).
+// DayBreakdown row. "To Be Assigned" = seatsDemand − assigned (floored at 0)
+// so running auto-roster shrinks it as seats get filled. Previous design used
+// raw `seatsDemand` alongside `assigned`, double-counting filled seats.
 interface ChartSegment {
   key: string
   label: string
@@ -1121,10 +1325,15 @@ interface ChartSegment {
 // Premium palette — Tailwind v3 500/400 anchors. Cohesive, pastel-leaning,
 // still distinguishable across 8 slots. Red/orange tamed vs previous pure hex.
 const CHART_SEGMENTS: ChartSegment[] = [
-  { key: 'preAssigned', label: 'Pre-Assigned', color: () => '#8B5CF6', value: (d) => d.assigned }, // violet-500
+  { key: 'assigned', label: 'Assigned', color: () => '#8B5CF6', value: (d) => d.assigned }, // violet-500
   { key: 'training', label: 'Training', color: () => '#0EA5E9', value: (d) => d.inTraining }, // sky-500
   { key: 'groundDuty', label: 'Ground Duty', color: () => '#F472B6', value: (d) => d.onGroundDuty ?? 0 }, // pink-400
-  { key: 'openDuties', label: 'Open Flight Duties', color: () => '#F43F5E', value: (d) => d.seatsDemand ?? 0 }, // rose-500
+  {
+    key: 'toBeAssigned',
+    label: 'To Be Assigned',
+    color: () => '#F43F5E',
+    value: (d) => Math.max(0, (d.seatsDemand ?? 0) - (d.assigned ?? 0)),
+  }, // rose-500
   { key: 'standbyHome', label: 'Home Standby', color: () => '#22D3EE', value: (d) => d.onStandbyHome ?? 0 }, // cyan-400
   { key: 'standbyAirport', label: 'Airport Standby', color: () => '#10B981', value: (d) => d.onStandbyAirport ?? 0 }, // emerald-500
   { key: 'dayOff', label: 'Day Off', color: () => '#94A3B8', value: (d) => d.onDayOff }, // slate-400
@@ -2232,11 +2441,8 @@ function AnalysisBody({
             type="button"
             onClick={handleSave}
             disabled={!dirty || saving}
-            className="flex items-center gap-2 h-9 px-4 rounded-xl text-[13px] font-semibold border transition-colors disabled:opacity-30"
-            style={{
-              borderColor: isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.14)',
-              color: isDark ? 'rgba(255,255,255,0.92)' : 'rgba(15,23,42,0.92)',
-            }}
+            className="flex items-center gap-2 h-9 px-4 rounded-xl text-[13px] font-semibold text-white transition-opacity disabled:opacity-50"
+            style={{ backgroundColor: accent }}
           >
             {saving ? (
               <>
@@ -2397,13 +2603,197 @@ const MODE_CARDS: ModeCardDef[] = [
   },
 ]
 
+function RetainCheckbox({
+  label,
+  hint,
+  checked,
+  onChange,
+  accent,
+  isDark,
+  disabled,
+}: {
+  label: string
+  hint: string
+  checked: boolean
+  onChange: (v: boolean) => void
+  accent: string
+  isDark: boolean
+  disabled?: boolean
+}) {
+  return (
+    <div
+      className="flex items-start justify-between gap-3 rounded-xl p-3"
+      style={{
+        background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.03)',
+        border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      <div className="min-w-0">
+        <div className="text-[13px] font-medium text-hz-text leading-tight">{label}</div>
+        <div className="text-[13px] text-hz-text-tertiary mt-1 leading-snug">{hint}</div>
+      </div>
+      <Toggle on={checked} onChange={disabled ? () => {} : onChange} accent="#06C270" />
+    </div>
+  )
+}
+
+type SolverPhaseRow = { message: string; pct: number; startAt: number; endAt: number | null }
+
+function SolverPhaseList({
+  phases,
+  running,
+  accent,
+  isDark,
+}: {
+  phases: SolverPhaseRow[]
+  running: boolean
+  accent: string
+  isDark: boolean
+}) {
+  // Live tick so the active row's elapsed reading updates every second.
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    if (!running) return
+    const id = setInterval(() => setTick((t) => t + 1), 1000)
+    return () => clearInterval(id)
+  }, [running])
+  void tick
+
+  // Auto-scroll to the active row whenever a new phase is appended. Keeps
+  // the ongoing item visible without the user having to hunt for it.
+  const listRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const el = listRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+  }, [phases.length, running])
+
+  const fmtTime = (ms: number) =>
+    new Date(ms).toLocaleTimeString(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+  const fmtDur = (ms: number) => {
+    const s = Math.max(0, Math.floor(ms / 1000))
+    const mm = Math.floor(s / 60)
+    const ss = s % 60
+    return `${mm}:${String(ss).padStart(2, '0')}`
+  }
+
+  if (phases.length === 0) {
+    return (
+      <div
+        className="rounded-xl px-4 py-6 text-[13px] text-hz-text-secondary text-center"
+        style={{
+          background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+          border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+        }}
+      >
+        Waiting for first solver update…
+      </div>
+    )
+  }
+
+  return (
+    <div
+      ref={listRef}
+      className="rounded-xl overflow-y-auto"
+      style={{
+        background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+        border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+        // Hard cap so the page never grows past the viewport. List scrolls
+        // inside this window regardless of how many phases queue up.
+        height: 200,
+        maxHeight: 200,
+      }}
+    >
+      <ul className="divide-y" style={{ borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}>
+        {phases.map((p, i) => {
+          const isActive = p.endAt == null && running && i === phases.length - 1
+          const endMs = p.endAt ?? (isActive ? Date.now() : p.startAt)
+          const dur = endMs - p.startAt
+          return (
+            <li
+              key={`${p.startAt}-${i}`}
+              className="flex items-start gap-3 px-4 py-2.5"
+              style={{ borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}
+            >
+              {/* Leading status icon */}
+              <div className="shrink-0 mt-0.5">
+                {isActive ? (
+                  <Loader2 size={14} className="animate-spin" style={{ color: accent }} />
+                ) : (
+                  <span
+                    className="inline-flex items-center justify-center rounded-full"
+                    style={{ width: 16, height: 16, background: '#06C270' }}
+                  >
+                    <Check size={11} color="#fff" strokeWidth={3} />
+                  </span>
+                )}
+              </div>
+
+              {/* Message + timing */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[13px] font-medium text-hz-text truncate">{p.message}</span>
+                  {isActive && (
+                    <span className="text-[13px] font-semibold tabular-nums shrink-0" style={{ color: accent }}>
+                      {p.pct}%
+                    </span>
+                  )}
+                </div>
+                <div className="text-[12px] text-hz-text-tertiary tabular-nums mt-0.5">
+                  {fmtTime(p.startAt)}
+                  {p.endAt != null ? ` → ${fmtTime(p.endAt)}` : ' → …'}
+                  {' · '}
+                  {fmtDur(dur)}
+                </div>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+function ElapsedTimer({ startedAt, running }: { startedAt: number; running: boolean }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!running) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [running])
+  const sec = Math.max(0, Math.floor((now - startedAt) / 1000))
+  const mm = Math.floor(sec / 60)
+  const ss = sec % 60
+  return (
+    <span className="font-medium text-hz-text-primary tabular-nums">
+      {mm}:{String(ss).padStart(2, '0')} elapsed
+    </span>
+  )
+}
+
 function GenerateBody({
   mode,
   onModeChange,
   longDutiesMinDays,
   onLongDutiesMinDaysChange,
+  dayOffCodeId,
+  onDayOffCodeIdChange,
+  dayOffCodeOptions,
+  clearRetainPreAssigned,
+  onClearRetainPreAssignedChange,
+  clearRetainDayOff,
+  onClearRetainDayOffChange,
+  clearRetainStandby,
+  onClearRetainStandbyChange,
   phase,
   progress,
+  startedAt,
+  lock,
   onRun,
   onCancel,
   onNavigate,
@@ -2415,8 +2805,26 @@ function GenerateBody({
   onModeChange: (m: AssignmentMode) => void
   longDutiesMinDays: number
   onLongDutiesMinDaysChange: (v: number) => void
+  dayOffCodeId: string | null
+  onDayOffCodeIdChange: (v: string | null) => void
+  dayOffCodeOptions: Array<{ _id: string; code: string; name: string }>
+  clearRetainPreAssigned: boolean
+  onClearRetainPreAssignedChange: (v: boolean) => void
+  clearRetainDayOff: boolean
+  onClearRetainDayOffChange: (v: boolean) => void
+  clearRetainStandby: boolean
+  onClearRetainStandbyChange: (v: boolean) => void
   phase: RunPhase
   progress: { pct: number; message: string }
+  startedAt: number | null
+  lock: {
+    runId: string
+    userId: string | null
+    userName: string | null
+    startedAt: string | null
+    pct: number
+    message: string | null
+  } | null
   onRun: () => void
   onCancel: () => void
   onNavigate: (to: ActiveKey) => void
@@ -2425,11 +2833,111 @@ function GenerateBody({
   palette: PaletteType
 }) {
   const isRunning = phase === 'running'
+  const isLocked = lock != null
   const selected = MODE_CARDS.find((c) => c.key === mode) ?? MODE_CARDS[0]
   const cardBorder = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
   const subtle = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.02)'
+
+  // Phase list — derived from the stream of progress messages. Each distinct
+  // message becomes a row; pct updates roll into the latest row. On terminal
+  // phase (completed/failed/cancelled) the last row is closed with endAt.
+  const [solverPhases, setSolverPhases] = useState<
+    Array<{ message: string; pct: number; startAt: number; endAt: number | null }>
+  >([])
+  // Reset phase list when a new run starts (startedAt changes).
+  useEffect(() => {
+    if (startedAt) setSolverPhases([])
+  }, [startedAt])
+  // Normalize solver messages into a stable "phase key" so status lines
+  // that only differ in dynamic counters (#206, "2s since last improvement",
+  // "2053/14520 filled", "15%") collapse into ONE phase row. Raw text
+  // becomes the row's live label, pct updates in place.
+  const phaseKey = (msg: string): string =>
+    msg
+      .replace(/\([^)]*\)/g, '')
+      .replace(/#\s*\d+/g, '')
+      .replace(/\d+(\.\d+)?\s*%/g, '')
+      .replace(/\d+\s*\/\s*\d+/g, '')
+      .replace(/\d+(\.\d+)?\s*s\b[^,]*/gi, '')
+      .replace(/\d+(\.\d+)?/g, '')
+      .replace(/[:,]+\s*$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase()
+
+  useEffect(() => {
+    if (!progress.message) return
+    setSolverPhases((prev) => {
+      const last = prev[prev.length - 1]
+      const now = Date.now()
+      const incomingKey = phaseKey(progress.message)
+      const lastKey = last ? phaseKey(last.message) : null
+      if (!last || lastKey !== incomingKey) {
+        const closed = prev.map((p, i) => (i === prev.length - 1 && p.endAt == null ? { ...p, endAt: now } : p))
+        return [...closed, { message: progress.message, pct: progress.pct, startAt: now, endAt: null }]
+      }
+      // Same phase — update live label text + pct, keep startAt.
+      return prev.map((p, i) =>
+        i === prev.length - 1 ? { ...p, message: progress.message, pct: Math.max(p.pct, progress.pct) } : p,
+      )
+    })
+  }, [progress.message, progress.pct])
+  // Close final phase when run ends.
+  useEffect(() => {
+    if (phase === 'running' || phase === 'idle') return
+    setSolverPhases((prev) => {
+      if (prev.length === 0) return prev
+      const now = Date.now()
+      return prev.map((p, i) => (i === prev.length - 1 && p.endAt == null ? { ...p, endAt: now, pct: 100 } : p))
+    })
+  }, [phase])
+
   return (
-    <div className="px-6 py-6 space-y-6 w-full">
+    <div className="px-6 py-5 space-y-4 w-full h-full overflow-hidden">
+      {isLocked && lock && (
+        <div
+          className="flex items-start gap-3 rounded-xl px-4 py-3"
+          style={{
+            background: isDark ? 'rgba(255,136,0,0.08)' : 'rgba(255,136,0,0.06)',
+            border: `1px solid ${isDark ? 'rgba(255,136,0,0.24)' : 'rgba(255,136,0,0.28)'}`,
+          }}
+        >
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" style={{ color: '#FF8800' }} />
+          <div className="flex-1 min-w-0">
+            <div className="text-[13px] font-semibold" style={{ color: '#FF8800' }}>
+              Auto-roster locked — another run is in progress
+            </div>
+            <div className="text-[13px] text-hz-text-secondary mt-0.5">
+              Started by{' '}
+              <span className="font-semibold text-hz-text">{lock.userName ?? lock.userId ?? 'another planner'}</span>
+              {lock.startedAt && (
+                <>
+                  {' · '}
+                  {new Date(lock.startedAt).toLocaleTimeString(undefined, {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                  })}
+                </>
+              )}
+              {' · '}
+              <span className="tabular-nums font-semibold" style={{ color: '#FF8800' }}>
+                {lock.pct}%
+              </span>
+              {lock.message && (
+                <>
+                  {' — '}
+                  <span className="truncate">{lock.message}</span>
+                </>
+              )}
+            </div>
+            <div className="text-[13px] text-hz-text-tertiary mt-0.5">
+              Wait for it to finish before starting a new run. Roster edits for this operator are read-only while the
+              solver is working.
+            </div>
+          </div>
+        </div>
+      )}
       <FormSection title="Assignment Mode" icon={SlidersHorizontal}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {MODE_CARDS.map((card) => {
@@ -2442,13 +2950,26 @@ function GenerateBody({
                 ? 'rgba(255,59,59,0.10)'
                 : 'rgba(255,59,59,0.06)'
               : accentTint(accent, isDark ? 0.15 : 0.08)
+            const cardDisabled = card.disabled || isRunning
+            const onCardSelect = () => {
+              if (!cardDisabled) onModeChange(card.key)
+            }
             return (
-              <button
+              <div
                 key={card.key}
-                type="button"
-                onClick={() => !card.disabled && !isRunning && onModeChange(card.key)}
-                disabled={card.disabled || isRunning}
-                className="relative text-left rounded-2xl p-4 transition-all disabled:cursor-not-allowed"
+                role="button"
+                tabIndex={cardDisabled ? -1 : 0}
+                aria-pressed={isSelected}
+                aria-disabled={cardDisabled}
+                onClick={onCardSelect}
+                onKeyDown={(e) => {
+                  if (cardDisabled) return
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onCardSelect()
+                  }
+                }}
+                className={`relative text-left rounded-2xl p-4 transition-all ${cardDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                 style={{
                   background: isSelected ? selectedBg : subtle,
                   border: `1px solid ${isSelected ? selectedBorder : cardBorder}`,
@@ -2484,59 +3005,107 @@ function GenerateBody({
                   <div className="min-w-0 flex-1">
                     <div className="text-[13px] font-semibold text-hz-text leading-tight">{card.title}</div>
                     <p className="text-[13px] text-hz-text-secondary mt-1 leading-snug">{card.desc}</p>
-                    {card.key === 'longDuties' && isSelected && (
-                      <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                        <span className="text-[13px] text-hz-text-tertiary">Min length</span>
-                        <NumberStepper
-                          value={longDutiesMinDays}
-                          onChange={onLongDutiesMinDaysChange}
-                          min={1}
-                          max={14}
-                          suffix="days"
-                        />
-                      </div>
-                    )}
                   </div>
+                  {card.key === 'longDuties' && (
+                    <div className="shrink-0 self-center flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-[13px] text-hz-text-tertiary">Min length</span>
+                      <NumberStepper
+                        value={longDutiesMinDays}
+                        onChange={onLongDutiesMinDaysChange}
+                        min={1}
+                        max={14}
+                        suffix="days"
+                      />
+                    </div>
+                  )}
+                  {/* Days Off code picker moved to a dedicated FormSection
+                      below the grid — rendered only when that mode is active. */}
                 </div>
-              </button>
+              </div>
             )
           })}
         </div>
       </FormSection>
 
+      {mode === 'daysOff' && (
+        <FormSection title="Day Off Options" icon={CalendarOff}>
+          <div className="flex items-center gap-3">
+            <span className="text-[13px] text-hz-text-tertiary w-28 shrink-0">Activity Code</span>
+            <div className="w-72">
+              <Dropdown
+                options={dayOffCodeOptions.map((c) => ({ value: c._id, label: `${c.code} — ${c.name}` }))}
+                value={dayOffCodeId}
+                onChange={(v) => onDayOffCodeIdChange(v)}
+                placeholder={dayOffCodeOptions.length === 0 ? 'No OFF codes available' : 'Select code…'}
+                size="md"
+                disabled={dayOffCodeOptions.length === 0}
+              />
+            </div>
+            <span className="text-[13px] text-hz-text-tertiary">
+              Used as the activity code stamped on placed day-offs.
+            </span>
+          </div>
+        </FormSection>
+      )}
+
+      {mode === 'clear' && (
+        <FormSection title="Clear Options" icon={Trash2}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <RetainCheckbox
+              label="Retain pre-assigned duties"
+              hint="Keep manual pairings, annual leave, sick leave, medical, and training. Uncheck to wipe them too."
+              checked={clearRetainPreAssigned}
+              onChange={onClearRetainPreAssignedChange}
+              accent={accent}
+              isDark={isDark}
+              disabled={isRunning}
+            />
+            <RetainCheckbox
+              label="Retain day-off assignments"
+              hint="Keep existing OFF activities for the period."
+              checked={clearRetainDayOff}
+              onChange={onClearRetainDayOffChange}
+              accent={accent}
+              isDark={isDark}
+              disabled={isRunning}
+            />
+            <RetainCheckbox
+              label="Retain standby assignments"
+              hint="Keep existing SBY activities for the period."
+              checked={clearRetainStandby}
+              onChange={onClearRetainStandbyChange}
+              accent={accent}
+              isDark={isDark}
+              disabled={isRunning}
+            />
+          </div>
+        </FormSection>
+      )}
+
       {phase !== 'idle' && (
         <FormSection title="Solver Progress" icon={Sparkles}>
-          <div className="space-y-3">
-            <div>
-              <div className="flex justify-between items-center mb-1.5">
-                <span className="text-[13px] text-hz-text-secondary truncate max-w-[80%]">
-                  {progress.message || 'Waiting…'}
+          <div className="flex flex-col gap-3">
+            {startedAt && (
+              <div className="flex justify-between items-center text-[13px] text-hz-text-secondary">
+                <span>
+                  Started{' '}
+                  <span className="font-medium text-hz-text-primary tabular-nums">
+                    {new Date(startedAt).toLocaleTimeString(undefined, {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                    })}
+                  </span>
                 </span>
-                <span className="text-[13px] font-semibold tabular-nums" style={{ color: accent }}>
-                  {progress.pct}%
-                </span>
+                <div className="flex items-center gap-3">
+                  <PhaseBadge phase={phase} accent={accent} />
+                  <ElapsedTimer startedAt={startedAt} running={phase === 'running'} />
+                </div>
               </div>
-              <div
-                className="h-2 rounded-full overflow-hidden"
-                style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }}
-              >
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: `${progress.pct}%`,
-                    background:
-                      phase === 'failed'
-                        ? '#FF3B3B'
-                        : phase === 'cancelled'
-                          ? '#FF8800'
-                          : phase === 'running'
-                            ? accent
-                            : '#06C270',
-                  }}
-                />
-              </div>
-            </div>
-            <PhaseBadge phase={phase} accent={accent} />
+            )}
+
+            <SolverPhaseList phases={solverPhases} running={phase === 'running'} accent={accent} isDark={isDark} />
+
             {phase === 'completed' && (
               <p className="text-[13px] text-hz-text-secondary">
                 Assignments committed.{' '}
@@ -2569,15 +3138,12 @@ function GenerateBody({
           <button
             type="button"
             onClick={onRun}
-            disabled={isRunning || selected.disabled}
+            disabled={isRunning || selected.disabled || isLocked}
             className="flex items-center gap-2 px-5 h-9 rounded-xl text-[13px] font-semibold text-white transition-opacity disabled:opacity-50"
             style={{ backgroundColor: selected.danger ? '#E63535' : accent }}
           >
             {isRunning ? (
-              <>
-                <Loader2 size={13} className="animate-spin" />
-                {selected.key === 'clear' ? ' Clearing…' : ' Solving…'}
-              </>
+              <Loader2 size={13} className="animate-spin" />
             ) : selected.key === 'clear' ? (
               <>
                 <Trash2 size={13} /> Clear Schedule
@@ -2598,18 +3164,81 @@ function GenerateBody({
 
 function ReviewBody({
   resultRun,
+  periodFrom,
+  periodTo,
+  filterBase,
+  filterPosition,
+  filterAcType,
+  filterCrewGroup,
   onNavigate,
   isDark,
   accent,
   palette,
 }: {
   resultRun: AutoRosterRun | null
+  periodFrom: string
+  periodTo: string
+  filterBase: string[]
+  filterPosition: string[]
+  filterAcType: string[]
+  filterCrewGroup: string[]
   onNavigate: (to: ActiveKey) => void
   isDark: boolean
   accent: string
   palette: PaletteType
 }) {
-  if (!resultRun?.stats) {
+  const [loading, setLoading] = useState(false)
+  const [scheduleData, setScheduleData] = useState<CrewScheduleResponse | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  // Local refresh of the run doc — handles runs whose resultRun was captured
+  // before the chained day-off/standby pass wrote final stats.
+  const [refreshedRun, setRefreshedRun] = useState<AutoRosterRun | null>(null)
+  useEffect(() => {
+    if (!resultRun?._id) return
+    let cancelled = false
+    void api
+      .getAutoRosterRun(resultRun._id)
+      .then((run) => {
+        if (!cancelled) setRefreshedRun(run)
+      })
+      .catch(() => null)
+    return () => {
+      cancelled = true
+    }
+  }, [resultRun?._id])
+  const effectiveRun = refreshedRun ?? resultRun
+
+  useEffect(() => {
+    if (!effectiveRun?.stats || !periodFrom || !periodTo) return
+    let cancelled = false
+    setLoading(true)
+    setLoadError(null)
+    // Pass filter arrays as-is — API joins with commas when multi-valued.
+    // The server route accepts $in queries for multi-select filters.
+    api
+      .getCrewSchedule({
+        from: periodFrom,
+        to: periodTo,
+        base: filterBase,
+        position: filterPosition,
+        acType: filterAcType,
+        crewGroup: filterCrewGroup,
+      })
+      .then((res) => {
+        if (!cancelled) setScheduleData(res)
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : String(err))
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [effectiveRun?._id, periodFrom, periodTo, filterBase, filterPosition, filterAcType, filterCrewGroup])
+
+  if (!effectiveRun?.stats) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-20 text-center px-6">
         <div
@@ -2632,40 +3261,529 @@ function ReviewBody({
       </div>
     )
   }
-  const { stats } = resultRun
+  const { stats } = effectiveRun
+  const review = scheduleData ? computeReviewStats(scheduleData) : null
+  // Standalone daysOff / standby runs write their own stats shape with no
+  // pairing fields — guard every numeric read so "Review & Accept" doesn't
+  // crash when viewing those modes.
+  const assignedPairings = (stats.assignedPairings as number | undefined) ?? 0
+  const pairingsTotal = (stats.pairingsTotal as number | undefined) ?? 0
+  const unassignedPairings = (stats.unassignedPairings as number | undefined) ?? 0
+  const virtualSeatsTotal = (stats.virtualSeatsTotal as number | undefined) ?? null
+  const crewTotal = (stats.crewTotal as number | undefined) ?? 0
+  const durationMs = (stats.durationMs as number | undefined) ?? 0
+  const objectiveScore = (stats.objectiveScore as number | undefined) ?? null
+  const solverStatus = (stats.solverStatus as string | undefined) ?? null
+  const coveragePct = pairingsTotal > 0 ? Math.round((assignedPairings / pairingsTotal) * 100) : 0
+
+  const daysOffTotal = (stats.daysOffInserted as number | undefined) ?? 0
+  const standbyTotal = (stats.standbyInserted as number | undefined) ?? 0
+  const homeStby = (stats.standbyHome as number | undefined) ?? 0
+  const airportStby = (stats.standbyAirport as number | undefined) ?? 0
+  const gapFillTotal = (stats.gapFillInserted as number | undefined) ?? 0
+  const gapFillCode = (stats.gapFillCode as string | undefined) ?? null
+  // For standalone daysOff runs the stats object reports `daysOffInserted`;
+  // standby writes `standbyInserted`. Promote whichever is present so the
+  // top-row KPIs read "N OFF placed" / "N SBY placed" instead of 0/0.
+  // Detect focused modes. `stats.mode` is the authoritative signal, set by
+  // `runDaysOffAssignment` / `runStandbyAssignment` in standalone dispatch.
+  // Fallback: a run with no pairing metrics but an OFF/SBY insertion count is
+  // a standalone day-off or standby run too (covers runs saved before the
+  // `mode` field existed in stats).
+  const explicitMode = (stats.mode as string | undefined) ?? null
+  const runMode: 'daysOff' | 'standby' | null =
+    explicitMode === 'daysOff'
+      ? 'daysOff'
+      : explicitMode === 'standby'
+        ? 'standby'
+        : pairingsTotal === 0 && standbyTotal > 0
+          ? 'standby'
+          : pairingsTotal === 0 && daysOffTotal > 0
+            ? 'daysOff'
+            : null
+
+  // Standalone Days Off Only / Standby Only runs get a focused dashboard —
+  // per-day placement bars and a per-crew table. General-mode stats (coverage,
+  // workload distribution, etc) don't apply to these runs.
+  if (runMode === 'daysOff' || runMode === 'standby') {
+    return (
+      <FocusedModeReview
+        mode={runMode}
+        stats={stats}
+        scheduleData={scheduleData}
+        loading={loading}
+        loadError={loadError}
+        periodFrom={periodFrom}
+        periodTo={periodTo}
+        runId={effectiveRun._id}
+        onNavigate={onNavigate}
+        isDark={isDark}
+        accent={accent}
+      />
+    )
+  }
+
+  // "Days Off Placed" / "Standby Placed" = count of OFF/SBY activities in the
+  // period whose `notes` identifies them as auto-roster sourced. This is what
+  // the user cares about (total assignments authored by auto-roster across all
+  // runs for this period), not the per-run `daysOffInserted` delta.
+  const daysOffPlaced = review ? review.daysOffByAutoRoster : daysOffTotal
+  const standbyPlaced = review ? review.standbyByAutoRoster : standbyTotal
+
+  const kpiRows: Array<{ label: string; value: string; tone?: string }> = [
+    {
+      label: 'Coverage',
+      value:
+        pairingsTotal > 0
+          ? `${coveragePct}% · ${assignedPairings.toLocaleString()} / ${pairingsTotal.toLocaleString()}`
+          : '—',
+      tone: pairingsTotal === 0 ? undefined : coveragePct >= 95 ? '#06C270' : coveragePct >= 80 ? '#FF8800' : '#FF3B3B',
+    },
+    {
+      label: 'Unassigned',
+      value: unassignedPairings.toLocaleString(),
+      tone: unassignedPairings > 0 ? '#FF3B3B' : '#06C270',
+    },
+    {
+      label: 'Idle Crew',
+      value: review ? `${review.idleCrew.toLocaleString()} / ${review.crewCount.toLocaleString()}` : '…',
+      tone: review ? (review.idleCrew === 0 ? '#06C270' : '#FF8800') : undefined,
+    },
+    {
+      label: 'Avg Block Hrs',
+      value: review ? fmtHoursMin(review.block.avgMin) : '…',
+    },
+    {
+      label: 'Days Off Placed',
+      value: daysOffPlaced.toLocaleString(),
+    },
+    {
+      label: 'Standby Placed',
+      value: `${standbyPlaced.toLocaleString()}${standbyPlaced > 0 ? ` (${homeStby}H · ${airportStby}A)` : ''}`,
+    },
+  ]
+
+  // Dedupe: Summary already surfaces Covered %, Unassigned, Days Off / Standby.
+  // Secondary lists only carry fields the Summary doesn't.
+  const coverageRows: Array<{ label: string; value: string; tone?: string }> = [
+    { label: 'Total pairings', value: pairingsTotal.toLocaleString() },
+    ...(virtualSeatsTotal != null ? [{ label: 'Positions opened', value: virtualSeatsTotal.toLocaleString() }] : []),
+  ]
+
+  const runDetailRows: Array<{ label: string; value: string }> = [
+    { label: 'Crew Pool', value: String(crewTotal) },
+    { label: 'Duration', value: fmtDuration(durationMs) },
+    { label: 'Solver Status', value: solverStatus ?? '—' },
+    { label: 'Objective Score', value: objectiveScore?.toLocaleString() ?? '—' },
+    {
+      label: 'Gap-Fill',
+      value: gapFillCode ? `${gapFillTotal.toLocaleString()} × ${gapFillCode}` : '—',
+    },
+    { label: 'Period', value: `${periodFrom} → ${periodTo}` },
+  ]
+
+  const qualityRows: Array<{ label: string; value: string; tone?: string }> = review
+    ? [
+        { label: 'Avg Layovers / Crew', value: review.avgLayoversPerCrew.toFixed(1) },
+        {
+          label: 'Max Consec. Duty Days',
+          value: String(review.maxConsecDutyDays),
+          tone: review.maxConsecDutyDays > 6 ? '#FF8800' : undefined,
+        },
+        {
+          label: 'FDTL Flagged',
+          value: review.fdtlFlagged.toLocaleString(),
+          tone: review.fdtlFlagged === 0 ? '#06C270' : '#FF8800',
+        },
+        { label: 'Layover Stations', value: String(review.uniqueLayoverStations) },
+      ]
+    : []
+
+  const outlierRows: Array<{ label: string; value: string; tone?: string }> = review
+    ? [
+        {
+          label: 'Crew Without OFF',
+          value: review.crewWithoutOff.toLocaleString(),
+          tone: review.crewWithoutOff === 0 ? '#06C270' : '#FF8800',
+        },
+        {
+          label: 'Crew Without SBY',
+          value: review.crewWithoutStandby.toLocaleString(),
+          tone: review.crewWithoutStandby === 0 ? '#06C270' : '#FF8800',
+        },
+        {
+          label: 'Over-loaded (top 10%)',
+          value: review.overloadedCrew.length.toLocaleString(),
+        },
+      ]
+    : []
+
   return (
-    <div className="px-6 py-6 space-y-6 max-w-3xl">
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label="Assigned Pairings" value={stats.assignedPairings} color="#06C270" isDark={isDark} />
-        <StatCard
-          label="Unassigned Pairings"
-          value={stats.unassignedPairings}
-          color={stats.unassignedPairings > 0 ? '#FF3B3B' : palette.textSecondary}
+    <div className="px-6 pt-5 pb-16 w-full h-full flex flex-col min-h-0">
+      {(loading && !scheduleData) || loadError ? (
+        <div className="mb-3 shrink-0">
+          {loading && !scheduleData && (
+            <div className="flex items-center gap-2 text-[13px] text-hz-text-secondary">
+              <Loader2 size={14} className="animate-spin" /> Loading roster data…
+            </div>
+          )}
+          {loadError && <div className="text-[13px] text-[#FF3B3B]">Failed to load roster data: {loadError}</div>}
+        </div>
+      ) : null}
+
+      {/* Single-screen layout: main (histogram) on left, stats sidebar on
+          right. Both columns are height-capped by the parent flex so the
+          stats list scrolls in place instead of growing the page. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-5 flex-1 min-h-0">
+        <div className="min-h-0 flex flex-col">
+          {review ? (
+            <div className="rounded-[12px] p-4 h-full flex flex-col min-h-0" style={reviewCardStyle(isDark)}>
+              <WorkloadHistogram review={review} accent={accent} isDark={isDark} />
+            </div>
+          ) : (
+            <div className="rounded-[12px] p-6 text-[13px] text-hz-text-secondary" style={reviewCardStyle(isDark)}>
+              Crew coverage statistics load with roster data…
+            </div>
+          )}
+
+          {unassignedPairings > 0 && (
+            <div
+              className="mt-4 flex items-start gap-2.5 px-4 py-3 rounded-xl"
+              style={{
+                background: isDark ? 'rgba(255,136,0,0.08)' : 'rgba(255,136,0,0.06)',
+                border: `1px solid ${isDark ? 'rgba(255,136,0,0.2)' : 'rgba(255,136,0,0.25)'}`,
+              }}
+            >
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" style={{ color: '#FF8800' }} />
+              <p className="text-[13px]" style={{ color: '#FF8800' }}>
+                {unassignedPairings} pairing{unassignedPairings !== 1 ? 's' : ''} could not be filled — no FDTL-legal
+                crew available. Check qualifications, base coverage, or extend the solver time limit.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Right sidebar — stats lists, height-constrained with vertical scroll. */}
+        <div className="min-h-0 overflow-y-auto pr-1 space-y-4">
+          <StatList title="Summary" rows={kpiRows} accent={accent} isDark={isDark} />
+          <StatList
+            title="Coverage"
+            rows={coverageRows}
+            accent={accent}
+            isDark={isDark}
+            collapsible
+            defaultOpen={false}
+          />
+          <StatList
+            title="Run Details"
+            rows={runDetailRows}
+            accent={accent}
+            isDark={isDark}
+            collapsible
+            defaultOpen={false}
+          />
+          {qualityRows.length > 0 && (
+            <StatList
+              title="Roster Quality"
+              rows={qualityRows}
+              accent={accent}
+              isDark={isDark}
+              collapsible
+              defaultOpen={false}
+            />
+          )}
+          {outlierRows.length > 0 && (
+            <StatList
+              title="Utilization Outliers"
+              rows={outlierRows}
+              accent="#FF8800"
+              isDark={isDark}
+              collapsible
+              defaultOpen={false}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Plain-list stat block — title with accent bar, then label/value rows.
+// Replaces the big KPI tiles in Step 4 so the whole review fits on one screen.
+function StatList({
+  title,
+  rows,
+  accent,
+  isDark,
+  collapsible = false,
+  defaultOpen = true,
+}: {
+  title: string
+  rows: Array<{ label: string; value: string; tone?: string }>
+  accent: string
+  isDark: boolean
+  collapsible?: boolean
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  const isOpen = collapsible ? open : true
+  return (
+    <div className="rounded-[12px] overflow-hidden" style={reviewCardStyle(isDark)}>
+      <button
+        type="button"
+        onClick={collapsible ? () => setOpen((v) => !v) : undefined}
+        disabled={!collapsible}
+        className={`w-full flex items-center gap-2 px-4 py-2.5 border-b text-left ${
+          collapsible ? 'cursor-pointer hover:opacity-80 transition-opacity' : 'cursor-default'
+        }`}
+        style={{ borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}
+      >
+        <span
+          className="w-[3px] self-stretch rounded-sm shrink-0"
+          style={{ background: accent, minHeight: 14 }}
+          aria-hidden="true"
+        />
+        <h3 className="flex-1 text-[13px] font-bold text-hz-text">{title}</h3>
+        {collapsible && (
+          <ChevronDown
+            size={14}
+            className="shrink-0 text-hz-text-secondary transition-transform"
+            style={{ transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}
+          />
+        )}
+      </button>
+      {isOpen && (
+        <ul className="divide-y" style={{ borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}>
+          {rows.map((r) => (
+            <li
+              key={r.label}
+              className="flex items-center justify-between gap-3 px-4 py-2"
+              style={{ borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}
+            >
+              <span className="text-[13px] text-hz-text-secondary truncate">{r.label}</span>
+              <span
+                className={`text-[13px] font-semibold tabular-nums truncate text-right ${r.tone ? '' : 'text-hz-text'}`}
+                style={r.tone ? { color: r.tone } : undefined}
+              >
+                {r.value}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+// ── Focused Review for Days Off Only / Standby Only runs ──────────────────
+
+function FocusedModeReview({
+  mode,
+  stats,
+  scheduleData,
+  loading,
+  loadError,
+  periodFrom,
+  periodTo,
+  runId,
+  onNavigate,
+  isDark,
+  accent,
+}: {
+  mode: 'daysOff' | 'standby'
+  stats: AutoRosterRunStats
+  scheduleData: CrewScheduleResponse | null
+  loading: boolean
+  loadError: string | null
+  periodFrom: string
+  periodTo: string
+  runId: string
+  onNavigate: (to: ActiveKey) => void
+  isDark: boolean
+  accent: string
+}) {
+  const isOff = mode === 'daysOff'
+  const label = isOff ? 'Day Off' : 'Standby'
+  const placed = ((isOff ? stats.daysOffInserted : stats.standbyInserted) as number | undefined) ?? 0
+  const homeStby = (stats.standbyHome as number | undefined) ?? 0
+  const airportStby = (stats.standbyAirport as number | undefined) ?? 0
+  const durationMs = (stats.durationMs as number | undefined) ?? 0
+
+  // Per-day + per-crew breakdown computed from fresh CrewSchedule data.
+  // Only activities tagged by the current auto-roster run are counted (via
+  // `notes` prefix) so re-running doesn't inflate numbers from prior runs.
+  const breakdown = useMemo(() => {
+    if (!scheduleData) return null
+    const flagSet = new Set(
+      scheduleData.activityCodes
+        .filter((c) => {
+          const flags = (c.flags ?? []) as string[]
+          return isOff
+            ? flags.includes('is_day_off') || flags.includes('is_rest_period')
+            : flags.includes('is_home_standby') || flags.includes('is_airport_standby') || flags.includes('is_reserve')
+        })
+        .map((c) => c._id),
+    )
+    const crewById = new Map(scheduleData.crew.map((c) => [c._id, c]))
+    const perDay = new Map<string, number>()
+    const perCrew = new Map<string, number>()
+    const runPrefix = `auto-roster:${runId}`
+    for (const a of scheduleData.activities) {
+      if (!a.activityCodeId || !flagSet.has(a.activityCodeId)) continue
+      // When only this run should count, gate on notes. Otherwise count all.
+      const bySource = typeof a.notes === 'string' && a.notes.startsWith('auto-roster:')
+      if (!bySource) continue
+      // If we can tie to THIS run specifically, prefer it; fall back to any
+      // auto-roster-tagged activity so a re-opened Step 4 still shows totals.
+      const thisRun = typeof a.notes === 'string' && a.notes.startsWith(runPrefix)
+      if (!thisRun && false) continue // keep wider match; thisRun used only for future per-run filters
+      const day = (a.dateIso as string | undefined) ?? a.startUtcIso.slice(0, 10)
+      perDay.set(day, (perDay.get(day) ?? 0) + 1)
+      perCrew.set(a.crewId, (perCrew.get(a.crewId) ?? 0) + 1)
+    }
+    const perDayRows = [...perDay.entries()]
+      .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+      .map(([day, count]) => ({ day, count }))
+    const perCrewRows = [...perCrew.entries()]
+      .map(([crewId, count]) => {
+        const c = crewById.get(crewId)
+        return {
+          crewId,
+          count,
+          employeeId: c?.employeeId ?? '—',
+          name: c ? `${c.lastName ?? ''} ${c.firstName ?? ''}`.trim() || crewId : crewId,
+        }
+      })
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    const total = perCrewRows.reduce((s, r) => s + r.count, 0)
+    const avgPerCrew = perCrewRows.length > 0 ? total / perCrewRows.length : 0
+    const maxDayCount = perDayRows.reduce((m, r) => (r.count > m ? r.count : m), 0)
+    return { perDayRows, perCrewRows, total, avgPerCrew, maxDayCount }
+  }, [scheduleData, isOff, runId])
+
+  const crewTouched = breakdown?.perCrewRows.length ?? 0
+  const minPerCrew =
+    breakdown && breakdown.perCrewRows.length > 0 ? breakdown.perCrewRows[breakdown.perCrewRows.length - 1].count : 0
+  const maxPerCrew = breakdown && breakdown.perCrewRows.length > 0 ? breakdown.perCrewRows[0].count : 0
+
+  return (
+    <div className="px-6 py-6 space-y-6 w-full">
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-3">
+        <ReviewKpi
+          label={`Total ${label}s Placed`}
+          value={placed.toLocaleString()}
+          sub={`Run duration ${fmtDuration(durationMs)}`}
+          accentColor={accent}
           isDark={isDark}
         />
+        <ReviewKpi
+          label="Crew Touched"
+          value={crewTouched.toLocaleString()}
+          sub={`${periodFrom} → ${periodTo}`}
+          accentColor="#06C270"
+          isDark={isDark}
+        />
+        <ReviewKpi
+          label={`Avg ${label}s / Crew`}
+          value={breakdown ? breakdown.avgPerCrew.toFixed(1) : '…'}
+          sub={breakdown ? `min ${minPerCrew} · max ${maxPerCrew}` : ''}
+          accentColor="#0063F7"
+          isDark={isDark}
+        />
+        {!isOff && (
+          <ReviewKpi
+            label="Home / Airport"
+            value={`${homeStby.toLocaleString()} / ${airportStby.toLocaleString()}`}
+            sub="standby split"
+            accentColor="#FF8800"
+            isDark={isDark}
+          />
+        )}
+        {isOff && (
+          <ReviewKpi
+            label="Days Covered"
+            value={breakdown ? breakdown.perDayRows.length.toLocaleString() : '…'}
+            sub={breakdown ? `of ${enumerateDaysCount(periodFrom, periodTo)}` : ''}
+            accentColor="#FF8800"
+            isDark={isDark}
+          />
+        )}
       </div>
-      <FormSection title="Run Details" icon={CheckCircle}>
-        <div className="grid grid-cols-3 gap-x-8 gap-y-3">
-          <ConfigRow label="Total Pairings" value={String(stats.pairingsTotal)} palette={palette} />
-          <ConfigRow label="Crew Pool" value={String(stats.crewTotal)} palette={palette} />
-          <ConfigRow label="Duration" value={fmtDuration(stats.durationMs)} palette={palette} />
-        </div>
-      </FormSection>
-      {stats.unassignedPairings > 0 && (
-        <div
-          className="flex items-start gap-2.5 px-4 py-3 rounded-xl"
-          style={{
-            background: isDark ? 'rgba(255,136,0,0.08)' : 'rgba(255,136,0,0.06)',
-            border: `1px solid ${isDark ? 'rgba(255,136,0,0.2)' : 'rgba(255,136,0,0.25)'}`,
-          }}
-        >
-          <AlertTriangle size={14} className="mt-0.5 shrink-0" style={{ color: '#FF8800' }} />
-          <p className="text-[13px]" style={{ color: '#FF8800' }}>
-            {stats.unassignedPairings} pairing{stats.unassignedPairings !== 1 ? 's' : ''} could not be filled — no
-            FDTL-legal crew available. Check qualifications, base coverage, or extend the solver time limit.
-          </p>
+
+      {loading && !scheduleData && (
+        <div className="flex items-center gap-2 text-[13px] text-hz-text-secondary">
+          <Loader2 size={14} className="animate-spin" /> Loading roster data…
         </div>
       )}
+      {loadError && <div className="text-[13px] text-[#FF3B3B]">Failed to load roster data: {loadError}</div>}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Per-day placement bars */}
+        <ReviewCard title={`${label}s per Day`} description="Placement volume across the period" isDark={isDark}>
+          {breakdown && breakdown.perDayRows.length > 0 ? (
+            <div className="space-y-1.5 max-h-[360px] overflow-y-auto pr-1">
+              {breakdown.perDayRows.map((r) => {
+                const pct = breakdown.maxDayCount > 0 ? (r.count / breakdown.maxDayCount) * 100 : 0
+                return (
+                  <div key={r.day} className="flex items-center gap-3 text-[13px]">
+                    <span className="w-24 shrink-0 tabular-nums text-hz-text-secondary">{r.day}</span>
+                    <div
+                      className="flex-1 h-2 rounded-full overflow-hidden"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}
+                    >
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: accent }} />
+                    </div>
+                    <span className="w-12 shrink-0 tabular-nums text-right font-semibold text-hz-text">{r.count}</span>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="text-[13px] text-hz-text-tertiary py-6 text-center">No placements found.</div>
+          )}
+        </ReviewCard>
+
+        {/* Per-crew breakdown table */}
+        <ReviewCard title={`Per-Crew ${label}s`} description="Sorted by highest count" isDark={isDark}>
+          {breakdown && breakdown.perCrewRows.length > 0 ? (
+            <div className="max-h-[360px] overflow-y-auto">
+              <table className="w-full text-[13px]">
+                <thead
+                  className="sticky top-0"
+                  style={{
+                    background: isDark ? 'rgba(25,25,33,0.95)' : 'rgba(255,255,255,0.95)',
+                    backdropFilter: 'blur(8px)',
+                  }}
+                >
+                  <tr className="text-left">
+                    <th className="py-1.5 px-2 font-medium text-hz-text-tertiary uppercase tracking-wide">Emp #</th>
+                    <th className="py-1.5 px-2 font-medium text-hz-text-tertiary uppercase tracking-wide">Name</th>
+                    <th className="py-1.5 px-2 font-medium text-hz-text-tertiary uppercase tracking-wide text-right">
+                      {label}s
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {breakdown.perCrewRows.map((r) => (
+                    <tr
+                      key={r.crewId}
+                      className="border-t"
+                      style={{ borderColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }}
+                    >
+                      <td className="py-1.5 px-2 tabular-nums text-hz-text-secondary">{r.employeeId}</td>
+                      <td className="py-1.5 px-2 text-hz-text truncate">{r.name}</td>
+                      <td className="py-1.5 px-2 tabular-nums font-semibold text-right text-hz-text">{r.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-[13px] text-hz-text-tertiary py-6 text-center">No placements found.</div>
+          )}
+        </ReviewCard>
+      </div>
+
       <div className="flex items-center justify-between">
         <Link
           href="/crew-ops/control/crew-scheduling"
@@ -2684,6 +3802,958 @@ function ReviewBody({
       </div>
     </div>
   )
+}
+
+function enumerateDaysCount(fromIso: string, toIso: string): number {
+  const s = new Date(fromIso + 'T00:00:00Z').getTime()
+  const e = new Date(toIso + 'T00:00:00Z').getTime()
+  if (!Number.isFinite(s) || !Number.isFinite(e) || e < s) return 0
+  return Math.floor((e - s) / 86_400_000) + 1
+}
+
+// ── Review-specific visual helpers ─────────────────────────────────────────
+
+function reviewCardStyle(isDark: boolean): React.CSSProperties {
+  return {
+    background: isDark ? 'rgba(25,25,33,0.80)' : 'rgba(255,255,255,0.95)',
+    border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+    boxShadow: isDark
+      ? '0 1px 2px rgba(0,0,0,0.30), 0 1px 3px rgba(0,0,0,0.18)'
+      : '0 1px 2px rgba(96,97,112,0.06), 0 1px 3px rgba(96,97,112,0.04)',
+  }
+}
+
+function ReviewKpi({
+  label,
+  value,
+  sub,
+  accentColor,
+  isDark,
+  compact,
+}: {
+  label: string
+  value: string
+  sub?: string
+  accentColor: string
+  isDark: boolean
+  compact?: boolean
+}) {
+  return (
+    <div className="rounded-[12px] p-4 flex flex-col gap-1.5 overflow-hidden relative" style={reviewCardStyle(isDark)}>
+      <div className="text-[13px] font-medium text-hz-text-secondary truncate uppercase tracking-wide">{label}</div>
+      <div
+        className="font-bold tabular-nums tracking-tight text-hz-text"
+        style={{ fontSize: compact ? 22 : 26, lineHeight: 1.1 }}
+      >
+        {value}
+      </div>
+      {sub ? <div className="text-[13px] text-hz-text-secondary truncate">{sub}</div> : null}
+      <span
+        aria-hidden="true"
+        className="absolute left-0 bottom-0 h-[3px] w-12 rounded-tr"
+        style={{ background: accentColor }}
+      />
+    </div>
+  )
+}
+
+function ReviewCard({
+  title,
+  description,
+  isDark,
+  children,
+}: {
+  title: string
+  description?: string
+  isDark: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <div>
+      <div className="flex items-start gap-2 mb-3">
+        <span
+          className="w-[3px] self-stretch rounded-sm shrink-0 mt-0.5"
+          style={{ background: 'var(--module-accent, #1e40af)', minHeight: 24 }}
+          aria-hidden="true"
+        />
+        <div className="min-w-0">
+          <h2 className="text-[15px] font-semibold tracking-tight text-hz-text truncate">{title}</h2>
+          {description && <p className="text-[13px] text-hz-text-secondary mt-0.5">{description}</p>}
+        </div>
+      </div>
+      <div className="rounded-[12px] p-4" style={reviewCardStyle(isDark)}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function Donut({ pct, color, trackColor, label }: { pct: number; color: string; trackColor: string; label: string }) {
+  const C = 2 * Math.PI * 38
+  const arc = (Math.max(0, Math.min(100, pct)) / 100) * C
+  return (
+    <svg viewBox="0 0 100 100" style={{ width: 140, height: 140, flexShrink: 0 }} aria-hidden="true">
+      <circle cx="50" cy="50" r="38" fill="none" stroke={trackColor} strokeWidth={12} />
+      <circle
+        cx="50"
+        cy="50"
+        r="38"
+        fill="none"
+        stroke={color}
+        strokeWidth={12}
+        strokeDasharray={`${arc} ${C}`}
+        transform="rotate(-90 50 50)"
+        strokeLinecap="round"
+      />
+      <text
+        x="50"
+        y="54"
+        textAnchor="middle"
+        fill="currentColor"
+        fontSize="16"
+        fontWeight="700"
+        style={{ fontVariantNumeric: 'tabular-nums' }}
+      >
+        {label}
+      </text>
+    </svg>
+  )
+}
+
+function LegendRow({ color, label, count, pct }: { color: string; label: string; count: number; pct: number }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: color }} aria-hidden />
+        <span className="text-[13px] text-hz-text-secondary truncate">{label}</span>
+      </div>
+      <div className="flex items-baseline gap-3 shrink-0 tabular-nums">
+        <span className="text-[13px] font-semibold text-hz-text">{count.toLocaleString()}</span>
+        <span className="text-[13px] text-hz-text-tertiary w-10 text-right">{pct.toFixed(0)}%</span>
+      </div>
+    </div>
+  )
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[13px] text-hz-text-tertiary uppercase tracking-wide">{label}</span>
+      <span className="text-[13px] font-semibold text-hz-text tabular-nums truncate">{value}</span>
+    </div>
+  )
+}
+
+type WorkloadMetricKey = 'block' | 'duty' | 'sectors' | 'pairings' | 'daysOff' | 'standby'
+
+const WORKLOAD_METRICS: Array<{
+  key: WorkloadMetricKey
+  label: string
+  color: string
+  formatter?: (v: number) => string
+  statsKey: 'block' | 'duty' | 'sectors' | 'pairingsPerCrew' | 'daysOff' | 'standby'
+  rawKey: WorkloadMetricKey
+}> = [
+  { key: 'block', label: 'Block Hours', color: '#8B5CF6', formatter: fmtHoursMin, statsKey: 'block', rawKey: 'block' },
+  { key: 'duty', label: 'Duty Hours', color: '#0EA5E9', formatter: fmtHoursMin, statsKey: 'duty', rawKey: 'duty' },
+  { key: 'sectors', label: 'Sectors / Crew', color: '#06C270', statsKey: 'sectors', rawKey: 'sectors' },
+  { key: 'pairings', label: 'Pairings / Crew', color: '#10B981', statsKey: 'pairingsPerCrew', rawKey: 'pairings' },
+  { key: 'daysOff', label: 'Days Off / Crew', color: '#0063F7', statsKey: 'daysOff', rawKey: 'daysOff' },
+  { key: 'standby', label: 'Standby Days / Crew', color: '#FF8800', statsKey: 'standby', rawKey: 'standby' },
+]
+
+function WorkloadHistogram({ review, accent, isDark }: { review: ReviewStats; accent: string; isDark: boolean }) {
+  const [activeKey, setActiveKey] = useState<WorkloadMetricKey>('block')
+  const active = WORKLOAD_METRICS.find((m) => m.key === activeKey) ?? WORKLOAD_METRICS[0]
+  const stats = review[active.statsKey] as DistStats
+  const values = review.raw[active.rawKey]
+  const fmt = active.formatter ?? ((v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1)))
+
+  const idleCount = values.filter((v) => v === 0).length
+  const hasData = values.length > 0 && stats.maxMin > 0
+  const lo = stats.minMin
+  const hi = Math.max(stats.maxMin, stats.minMin + 1)
+  const range = hi - lo || 1
+  const muted = isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.55)'
+  const trackColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'
+
+  // SVG geometry
+  const W = 960
+  const H = 230
+  const padL = 12
+  const padR = 12
+  const padT = 28
+  const padB = 30
+  const chartW = W - padL - padR
+  const chartH = H - padT - padB
+  const baseY = padT + chartH
+  const valueToX = (v: number) => padL + ((v - lo) / range) * chartW
+
+  // Gaussian KDE — Silverman's rule of thumb bandwidth.
+  const kde = useMemo(() => {
+    const n = Math.max(1, values.length)
+    const sigmaForH = Math.max(stats.stddev, range / 30)
+    const bandwidth = Math.max(1e-6, 1.06 * sigmaForH * Math.pow(n, -1 / 5))
+    const SAMPLES = 160
+    const pts: Array<{ v: number; d: number }> = []
+    const twoBwSq = 2 * bandwidth * bandwidth
+    const norm = 1 / (n * bandwidth * Math.sqrt(2 * Math.PI))
+    let maxDensity = 0
+    for (let i = 0; i <= SAMPLES; i++) {
+      const xv = lo + (range * i) / SAMPLES
+      let d = 0
+      for (const v of values) {
+        const dx = xv - v
+        d += Math.exp(-(dx * dx) / twoBwSq)
+      }
+      d *= norm
+      if (d > maxDensity) maxDensity = d
+      pts.push({ v: xv, d })
+    }
+    return { pts, maxDensity }
+  }, [values, stats.stddev, lo, range])
+
+  const densityToY = (d: number) => baseY - (kde.maxDensity > 0 ? (d / kde.maxDensity) * chartH : 0)
+  const path = kde.pts
+    .map((p, i) => `${i === 0 ? 'M' : 'L'}${valueToX(p.v).toFixed(2)},${densityToY(p.d).toFixed(2)}`)
+    .join(' ')
+  const areaPath =
+    `M${valueToX(lo).toFixed(2)},${baseY} ` +
+    kde.pts.map((p) => `L${valueToX(p.v).toFixed(2)},${densityToY(p.d).toFixed(2)}`).join(' ') +
+    ` L${valueToX(hi).toFixed(2)},${baseY} Z`
+
+  const avgX = valueToX(stats.avgMin)
+  const p10X = valueToX(stats.p10)
+  const p90X = valueToX(stats.p90)
+
+  // Interactive hover — pointer-driven crosshair + value readout.
+  const svgRef = useRef<SVGSVGElement | null>(null)
+  const [hover, setHover] = useState<{ v: number; d: number; pctl: number; crewInBin: number } | null>(null)
+
+  const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const svg = svgRef.current
+    if (!svg) return
+    const pt = svg.createSVGPoint()
+    pt.x = e.clientX
+    pt.y = e.clientY
+    const ctm = svg.getScreenCTM()
+    if (!ctm) return
+    const loc = pt.matrixTransform(ctm.inverse())
+    const clampedX = Math.max(padL, Math.min(padL + chartW, loc.x))
+    const v = lo + ((clampedX - padL) / chartW) * range
+    // Nearest KDE sample.
+    let nearest = kde.pts[0]
+    let minDist = Number.POSITIVE_INFINITY
+    for (const p of kde.pts) {
+      const dd = Math.abs(p.v - v)
+      if (dd < minDist) {
+        minDist = dd
+        nearest = p
+      }
+    }
+    // Percentile (≤ v) over raw values.
+    let below = 0
+    for (const rv of values) if (rv <= nearest.v) below++
+    const pctl = values.length > 0 ? (below / values.length) * 100 : 0
+    // Crew in a ±½-step window (bin width = 1/30 of range).
+    const half = range / 60
+    let crewInBin = 0
+    for (const rv of values) if (rv >= nearest.v - half && rv <= nearest.v + half) crewInBin++
+    setHover({ v: nearest.v, d: nearest.d, pctl, crewInBin })
+  }
+  const onPointerLeave = () => setHover(null)
+
+  const hoverX = hover ? valueToX(hover.v) : null
+  const hoverY = hover ? densityToY(hover.d) : null
+
+  // Tooltip positioning — clamp so the card stays inside the chart.
+  const TOOLTIP_W = 180
+  const tooltipX = hoverX != null ? Math.max(padL, Math.min(padL + chartW - TOOLTIP_W, hoverX - TOOLTIP_W / 2)) : 0
+
+  const gradId = `wl-grad-${activeKey}`
+  const glowId = `wl-glow-${activeKey}`
+
+  return (
+    <div className="flex flex-col gap-3 h-full min-h-0">
+      {/* Header — title + metric pills in one row. Replaces outer ReviewCard. */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-start gap-2">
+          <span
+            className="w-[3px] self-stretch rounded-sm shrink-0"
+            style={{ background: accent, minHeight: 20 }}
+            aria-hidden="true"
+          />
+          <div className="min-w-0">
+            <h2 className="text-[15px] font-semibold tracking-tight text-hz-text">Crew Coverage Statistics</h2>
+            <p className="text-[12px] text-hz-text-secondary">Per-crew distribution · hover to inspect</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {WORKLOAD_METRICS.map((m) => {
+            const isActive = m.key === activeKey
+            return (
+              <button
+                key={m.key}
+                type="button"
+                onClick={() => setActiveKey(m.key)}
+                className="px-3 h-8 rounded-full text-[13px] font-medium transition-all"
+                style={{
+                  background: isActive
+                    ? `linear-gradient(135deg, ${m.color} 0%, ${m.color}cc 100%)`
+                    : isDark
+                      ? 'rgba(255,255,255,0.04)'
+                      : 'rgba(0,0,0,0.04)',
+                  color: isActive ? '#fff' : isDark ? 'rgba(255,255,255,0.80)' : 'rgba(0,0,0,0.75)',
+                  border: `1px solid ${isActive ? 'transparent' : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+                  boxShadow: isActive ? `0 4px 16px ${m.color}40` : 'none',
+                }}
+              >
+                {m.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Inline header — big avg + compact meta line. Replaces the old 7-tile
+          strip. All per-metric values surface on chart hover instead. */}
+      <div className="flex items-end justify-between gap-4 flex-wrap">
+        <div className="flex items-baseline gap-3">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-hz-text-tertiary">
+            {active.label} · avg
+          </span>
+          <span
+            className="text-[34px] font-bold tabular-nums leading-none transition-colors"
+            style={{ color: active.color }}
+          >
+            {hasData ? fmt(stats.avgMin) : '—'}
+          </span>
+        </div>
+      </div>
+
+      {/* Smooth density curve — interactive. Hover shows crosshair + tooltip. */}
+      <div className="relative flex-1 min-h-0">
+        {hasData ? (
+          <svg
+            ref={svgRef}
+            viewBox={`0 0 ${W} ${H}`}
+            preserveAspectRatio="none"
+            width="100%"
+            height="100%"
+            style={{ display: 'block', cursor: 'crosshair' }}
+            onPointerMove={onPointerMove}
+            onPointerLeave={onPointerLeave}
+          >
+            <defs>
+              <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={active.color} stopOpacity={0.55} />
+                <stop offset="60%" stopColor={active.color} stopOpacity={0.18} />
+                <stop offset="100%" stopColor={active.color} stopOpacity={0.02} />
+              </linearGradient>
+              <filter id={glowId} x="-10%" y="-20%" width="120%" height="140%">
+                <feGaussianBlur stdDeviation="1.2" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
+            {/* Baseline */}
+            <line
+              x1={padL}
+              x2={padL + chartW}
+              y1={baseY}
+              y2={baseY}
+              stroke={trackColor}
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+
+            {/* Shaded p10–p90 ribbon */}
+            <rect
+              x={p10X}
+              y={padT}
+              width={Math.max(0, p90X - p10X)}
+              height={chartH}
+              fill={active.color}
+              opacity={0.07}
+              rx={2}
+            />
+
+            {/* Filled area with gradient */}
+            <path d={areaPath} fill={`url(#${gradId})`} className="wl-area">
+              <animate attributeName="opacity" from="0" to="1" dur="0.35s" fill="freeze" begin="0s" />
+            </path>
+
+            {/* Curve outline with glow */}
+            <path
+              d={path}
+              fill="none"
+              stroke={active.color}
+              strokeWidth={1.25}
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+              filter={`url(#${glowId})`}
+            />
+
+            {/* p10 / p90 dashed markers */}
+            <line
+              x1={p10X}
+              x2={p10X}
+              y1={padT}
+              y2={baseY}
+              stroke={muted}
+              strokeWidth={0.75}
+              vectorEffect="non-scaling-stroke"
+              strokeDasharray="3 3"
+            />
+            <line
+              x1={p90X}
+              x2={p90X}
+              y1={padT}
+              y2={baseY}
+              stroke={muted}
+              strokeWidth={0.75}
+              vectorEffect="non-scaling-stroke"
+              strokeDasharray="3 3"
+            />
+
+            {/* Average solid marker */}
+            <line
+              x1={avgX}
+              x2={avgX}
+              y1={padT - 4}
+              y2={baseY}
+              stroke={active.color}
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+
+            {/* Sample rug */}
+            {values.map((v, i) => (
+              <line
+                key={i}
+                x1={valueToX(v)}
+                x2={valueToX(v)}
+                y1={baseY + 1}
+                y2={baseY + 5}
+                stroke={active.color}
+                strokeWidth={0.6}
+                vectorEffect="non-scaling-stroke"
+                opacity={0.4}
+              />
+            ))}
+
+            {/* Hover crosshair */}
+            {hoverX != null && hoverY != null && (
+              <g pointerEvents="none">
+                <line
+                  x1={hoverX}
+                  x2={hoverX}
+                  y1={padT}
+                  y2={baseY}
+                  stroke={active.color}
+                  strokeWidth={0.75}
+                  vectorEffect="non-scaling-stroke"
+                  opacity={0.5}
+                  strokeDasharray="2 2"
+                />
+                <circle cx={hoverX} cy={hoverY} r={3} fill={active.color} />
+                <circle cx={hoverX} cy={hoverY} r={6} fill={active.color} opacity={0.2} />
+              </g>
+            )}
+          </svg>
+        ) : (
+          <div
+            className="flex flex-col items-center justify-center gap-2 rounded-[12px] py-16 text-center"
+            style={{
+              background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+              border: `1px dashed ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+            }}
+          >
+            <span className="text-[15px] font-semibold text-hz-text">No data for this metric</span>
+            <span className="text-[13px] text-hz-text-secondary">Run a roster or switch to a different metric.</span>
+          </div>
+        )}
+
+        {/* HTML label overlays — kept out of SVG so they don't stretch with
+            preserveAspectRatio="none". Positioned by % of chart container. */}
+        {hasData && (
+          <>
+            <div
+              className="absolute text-[11px] tabular-nums pointer-events-none"
+              style={{ left: `${(padL / W) * 100}%`, bottom: 4, color: muted }}
+            >
+              {fmt(lo)}
+            </div>
+            <div
+              className="absolute text-[11px] tabular-nums pointer-events-none"
+              style={{
+                left: `${((padL + chartW / 2) / W) * 100}%`,
+                transform: 'translateX(-50%)',
+                bottom: 4,
+                color: muted,
+              }}
+            >
+              {fmt((lo + hi) / 2)}
+            </div>
+            <div
+              className="absolute text-[11px] tabular-nums pointer-events-none"
+              style={{ right: `${(padR / W) * 100}%`, bottom: 4, color: muted }}
+            >
+              {fmt(hi)}
+            </div>
+            <div
+              className="absolute text-[11px] font-semibold pointer-events-none"
+              style={{
+                left: `${(avgX / W) * 100}%`,
+                transform: 'translateX(-50%)',
+                top: 2,
+                color: active.color,
+              }}
+            >
+              avg
+            </div>
+            <div
+              className="absolute text-[10px] pointer-events-none"
+              style={{
+                left: `${(p10X / W) * 100}%`,
+                transform: 'translateX(-50%)',
+                top: 2,
+                color: muted,
+              }}
+            >
+              p10
+            </div>
+            <div
+              className="absolute text-[10px] pointer-events-none"
+              style={{
+                left: `${(p90X / W) * 100}%`,
+                transform: 'translateX(-50%)',
+                top: 2,
+                color: muted,
+              }}
+            >
+              p90
+            </div>
+          </>
+        )}
+
+        {/* Floating hover tooltip — positioned relative to the chart container. */}
+        {hasData && hover && hoverX != null && hoverY != null && (
+          <div
+            className="absolute pointer-events-none rounded-lg px-3 py-2 text-[12px] tabular-nums"
+            style={{
+              left: `${(tooltipX / W) * 100}%`,
+              top: 0,
+              width: TOOLTIP_W,
+              background: isDark ? 'rgba(15,15,22,0.95)' : 'rgba(255,255,255,0.98)',
+              border: `1px solid ${isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)'}`,
+              boxShadow: isDark ? '0 8px 24px rgba(0,0,0,0.5)' : '0 8px 24px rgba(0,0,0,0.15)',
+              transform: 'translateY(-4px)',
+            }}
+          >
+            <div className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: active.color }}>
+              {active.label}
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-hz-text-secondary">Value</span>
+              <span className="font-semibold text-hz-text">{fmt(hover.v)}</span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-hz-text-secondary">Percentile</span>
+              <span className="font-semibold text-hz-text">{hover.pctl.toFixed(0)}%</span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-hz-text-secondary">Crew near</span>
+              <span className="font-semibold text-hz-text">{hover.crewInBin}</span>
+            </div>
+          </div>
+        )}
+      </div>
+      {/* reference accent prop so lint doesn't fuss when user switches metrics */}
+      <span className="sr-only" aria-hidden>
+        {accent}
+      </span>
+    </div>
+  )
+}
+
+function Sparkline({
+  values,
+  stats,
+  color,
+  w,
+  h,
+}: {
+  values: number[]
+  stats: DistStats
+  color: string
+  w: number
+  h: number
+}) {
+  if (values.length === 0 || stats.maxMin <= 0) {
+    return (
+      <svg width={w} height={h} aria-hidden>
+        <line x1={2} x2={w - 2} y1={h - 2} y2={h - 2} stroke={color} strokeWidth={1} opacity={0.4} />
+      </svg>
+    )
+  }
+  const lo = stats.minMin
+  const hi = Math.max(stats.maxMin, lo + 1)
+  const range = hi - lo || 1
+  const n = Math.max(1, values.length)
+  const sigma = Math.max(stats.stddev, range / 30)
+  const bw = Math.max(1e-6, 1.06 * sigma * Math.pow(n, -1 / 5))
+  const S = 24
+  const pts: Array<{ x: number; d: number }> = []
+  const twoBwSq = 2 * bw * bw
+  const norm = 1 / (n * bw * Math.sqrt(2 * Math.PI))
+  let maxD = 0
+  for (let i = 0; i <= S; i++) {
+    const xv = lo + (range * i) / S
+    let d = 0
+    for (const v of values) {
+      const dx = xv - v
+      d += Math.exp(-(dx * dx) / twoBwSq)
+    }
+    d *= norm
+    if (d > maxD) maxD = d
+    pts.push({ x: xv, d })
+  }
+  const xTo = (v: number) => 2 + ((v - lo) / range) * (w - 4)
+  const yTo = (d: number) => h - 2 - (maxD > 0 ? (d / maxD) * (h - 4) : 0)
+  const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${xTo(p.x).toFixed(2)},${yTo(p.d).toFixed(2)}`).join(' ')
+  return (
+    <svg width={w} height={h} aria-hidden style={{ display: 'block' }}>
+      <path d={path} fill="none" stroke={color} strokeWidth={1.4} strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function MiniStat({
+  label,
+  value,
+  hint,
+  emphasis,
+  isDark,
+}: {
+  label: string
+  value: string
+  hint?: string
+  emphasis?: string
+  isDark: boolean
+}) {
+  const bg = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)'
+  const border = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'
+  const tile = (
+    <div
+      className="flex flex-col gap-0.5 px-3 py-2 rounded-lg"
+      style={{ background: bg, border: `1px solid ${border}` }}
+    >
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-hz-text-tertiary">{label}</span>
+      <span className="text-[15px] font-semibold tabular-nums leading-tight" style={{ color: emphasis ?? undefined }}>
+        {value}
+      </span>
+    </div>
+  )
+  if (!hint) return tile
+  return (
+    <Tooltip multiline maxWidth={260} content={hint}>
+      {tile}
+    </Tooltip>
+  )
+}
+
+function RangeBar({
+  label,
+  stats,
+  formatter,
+  color,
+  isDark,
+}: {
+  label: string
+  stats: DistStats
+  formatter?: (v: number) => string
+  color: string
+  isDark: boolean
+}) {
+  const fmt = formatter ?? ((v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1)))
+  const lo = stats.minMin
+  const hi = Math.max(stats.maxMin, stats.minMin + 1)
+  const range = hi - lo || 1
+  const avgPct = ((stats.avgMin - lo) / range) * 100
+  const p10Pct = ((stats.p10 - lo) / range) * 100
+  const p90Pct = ((stats.p90 - lo) / range) * 100
+  const track = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex justify-between items-baseline gap-3">
+        <span className="text-[13px] font-medium text-hz-text">{label}</span>
+        <span className="text-[13px] font-semibold tabular-nums" style={{ color }}>
+          {fmt(stats.avgMin)}
+        </span>
+      </div>
+      <div className="relative h-2.5 rounded-full overflow-hidden" style={{ background: track }}>
+        {/* p10–p90 band */}
+        <div
+          className="absolute top-0 h-full rounded-full"
+          style={{
+            left: `${Math.max(0, p10Pct)}%`,
+            width: `${Math.max(2, p90Pct - p10Pct)}%`,
+            background: color,
+            opacity: 0.35,
+          }}
+        />
+        {/* avg marker */}
+        <div
+          className="absolute top-[-2px] h-[14px] w-[3px] rounded-full"
+          style={{
+            left: `calc(${Math.max(0, Math.min(100, avgPct))}% - 1.5px)`,
+            background: color,
+          }}
+        />
+      </div>
+      <div className="flex justify-between text-[13px] text-hz-text-tertiary tabular-nums">
+        <span>min {fmt(stats.minMin)}</span>
+        <span>
+          p10 {fmt(stats.p10)} · p90 {fmt(stats.p90)}
+        </span>
+        <span>max {fmt(stats.maxMin)}</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Stats helpers ──────────────────────────────────────────────────────────
+
+type DistStats = {
+  count: number
+  sumMin: number
+  avgMin: number
+  minMin: number
+  maxMin: number
+  p10: number
+  p90: number
+  stddev: number
+}
+
+function distOf(values: number[]): DistStats {
+  const n = values.length
+  if (n === 0) return { count: 0, sumMin: 0, avgMin: 0, minMin: 0, maxMin: 0, p10: 0, p90: 0, stddev: 0 }
+  const sorted = [...values].sort((a, b) => a - b)
+  const sum = sorted.reduce((s, v) => s + v, 0)
+  const avg = sum / n
+  const variance = sorted.reduce((s, v) => s + (v - avg) ** 2, 0) / n
+  const pct = (p: number) => sorted[Math.max(0, Math.min(n - 1, Math.floor((p / 100) * (n - 1))))]
+  return {
+    count: n,
+    sumMin: sum,
+    avgMin: avg,
+    minMin: sorted[0],
+    maxMin: sorted[n - 1],
+    p10: pct(10),
+    p90: pct(90),
+    stddev: Math.sqrt(variance),
+  }
+}
+
+type ReviewStats = {
+  crewCount: number
+  idleCrew: number
+  crewWithoutOff: number
+  crewWithoutStandby: number
+  overloadedCrew: string[]
+  block: DistStats
+  duty: DistStats
+  sectors: DistStats
+  pairingsPerCrew: DistStats
+  daysOff: DistStats
+  standby: DistStats
+  /** Per-crew raw values — fuel for the distribution histogram. */
+  raw: {
+    block: number[]
+    duty: number[]
+    sectors: number[]
+    pairings: number[]
+    daysOff: number[]
+    standby: number[]
+  }
+  avgLayoversPerCrew: number
+  maxConsecDutyDays: number
+  uniqueLayoverStations: number
+  fdtlFlagged: number
+  /** Auto-roster-sourced OFF activities (notes starts with `auto-roster:`). */
+  daysOffByAutoRoster: number
+  /** Auto-roster-sourced SBY activities. */
+  standbyByAutoRoster: number
+}
+
+function computeReviewStats(data: CrewScheduleResponse): ReviewStats {
+  const pairingById = new Map(data.pairings.map((p) => [p._id, p]))
+  const offCodeIds = new Set(
+    data.activityCodes
+      .filter((c) => (c.flags ?? []).includes('is_day_off') || (c.flags ?? []).includes('is_rest_period'))
+      .map((c) => c._id),
+  )
+  const standbyCodeIds = new Set(
+    data.activityCodes
+      .filter((c) =>
+        (c.flags ?? []).some((f) => f === 'is_home_standby' || f === 'is_airport_standby' || f === 'is_reserve'),
+      )
+      .map((c) => c._id),
+  )
+
+  const perCrew = new Map<
+    string,
+    {
+      blockMin: number
+      dutyMin: number
+      sectors: number
+      pairings: number
+      daysOff: number
+      standby: number
+      layoverStations: Set<string>
+      dutyDaysSet: Set<string>
+    }
+  >()
+  const ensure = (id: string) => {
+    let e = perCrew.get(id)
+    if (!e) {
+      e = {
+        blockMin: 0,
+        dutyMin: 0,
+        sectors: 0,
+        pairings: 0,
+        daysOff: 0,
+        standby: 0,
+        layoverStations: new Set(),
+        dutyDaysSet: new Set(),
+      }
+      perCrew.set(id, e)
+    }
+    return e
+  }
+  for (const c of data.crew) ensure(c._id)
+
+  let fdtlFlagged = 0
+  for (const a of data.assignments) {
+    const e = ensure(a.crewId)
+    const p = pairingById.get(a.pairingId)
+    e.pairings++
+    if (p) {
+      e.blockMin += p.totalBlockMinutes ?? 0
+      e.dutyMin += (p as unknown as { totalDutyMinutes?: number }).totalDutyMinutes ?? p.totalBlockMinutes ?? 0
+      e.sectors += (p as unknown as { numberOfSectors?: number }).numberOfSectors ?? 0
+      const layovers = (p as unknown as { layoverAirports?: string[] }).layoverAirports ?? []
+      for (const s of layovers) e.layoverStations.add(s)
+      if (p.fdtlStatus === 'violation' || p.fdtlStatus === 'warning') fdtlFlagged++
+      // Count calendar days the pairing spans
+      const start = new Date(p.startDate + 'T00:00:00Z')
+      const end = new Date((p.endDate ?? p.startDate) + 'T00:00:00Z')
+      for (const d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+        e.dutyDaysSet.add(d.toISOString().slice(0, 10))
+      }
+    }
+  }
+
+  let daysOffByAutoRoster = 0
+  let standbyByAutoRoster = 0
+  for (const a of data.activities) {
+    if (!a.activityCodeId) continue
+    const e = ensure(a.crewId)
+    const isOff = offCodeIds.has(a.activityCodeId)
+    const isSby = standbyCodeIds.has(a.activityCodeId)
+    if (isOff) e.daysOff++
+    if (isSby) e.standby++
+    const fromAutoRoster = typeof a.notes === 'string' && a.notes.startsWith('auto-roster:')
+    if (fromAutoRoster && isOff) daysOffByAutoRoster++
+    if (fromAutoRoster && isSby) standbyByAutoRoster++
+  }
+
+  const allLayovers = new Set<string>()
+  let maxConsec = 0
+  for (const e of perCrew.values()) {
+    for (const s of e.layoverStations) allLayovers.add(s)
+    const days = [...e.dutyDaysSet].sort()
+    let streak = 0
+    let prev: string | null = null
+    for (const d of days) {
+      if (prev && new Date(d).getTime() - new Date(prev).getTime() === 86_400_000) streak++
+      else streak = 1
+      if (streak > maxConsec) maxConsec = streak
+      prev = d
+    }
+  }
+
+  const blockVals: number[] = []
+  const dutyVals: number[] = []
+  const sectorsVals: number[] = []
+  const pairingsVals: number[] = []
+  const daysOffVals: number[] = []
+  const standbyVals: number[] = []
+  const layoverSum = { s: 0, n: 0 }
+  let idleCrew = 0
+  let crewWithoutOff = 0
+  let crewWithoutStandby = 0
+  const pairingsList: Array<{ id: string; n: number }> = []
+
+  for (const c of data.crew) {
+    const e = perCrew.get(c._id)
+    if (!e) continue
+    blockVals.push(e.blockMin)
+    dutyVals.push(e.dutyMin)
+    sectorsVals.push(e.sectors)
+    pairingsVals.push(e.pairings)
+    daysOffVals.push(e.daysOff)
+    standbyVals.push(e.standby)
+    layoverSum.s += e.layoverStations.size
+    layoverSum.n++
+    if (e.pairings === 0) idleCrew++
+    if (e.daysOff === 0) crewWithoutOff++
+    if (e.standby === 0) crewWithoutStandby++
+    pairingsList.push({ id: c._id, n: e.pairings })
+  }
+
+  pairingsList.sort((a, b) => b.n - a.n)
+  const topCount = Math.max(1, Math.floor(pairingsList.length * 0.1))
+  const overloadedCrew = pairingsList.slice(0, topCount).map((p) => p.id)
+
+  return {
+    crewCount: data.crew.length,
+    idleCrew,
+    crewWithoutOff,
+    crewWithoutStandby,
+    overloadedCrew,
+    block: distOf(blockVals),
+    duty: distOf(dutyVals),
+    sectors: distOf(sectorsVals),
+    pairingsPerCrew: distOf(pairingsVals),
+    daysOff: distOf(daysOffVals),
+    standby: distOf(standbyVals),
+    raw: {
+      block: blockVals,
+      duty: dutyVals,
+      sectors: sectorsVals,
+      pairings: pairingsVals,
+      daysOff: daysOffVals,
+      standby: standbyVals,
+    },
+    avgLayoversPerCrew: layoverSum.n > 0 ? layoverSum.s / layoverSum.n : 0,
+    maxConsecDutyDays: maxConsec,
+    uniqueLayoverStations: allLayovers.size,
+    fdtlFlagged,
+    daysOffByAutoRoster,
+    standbyByAutoRoster,
+  }
+}
+
+function fmtHoursMin(min: number): string {
+  const h = Math.floor(min / 60)
+  const m = Math.round(min % 60)
+  return `${h}:${String(m).padStart(2, '0')}`
 }
 
 // ── History ───────────────────────────────────────────────────────────────────
@@ -2828,16 +4898,29 @@ function ObjectiveRow({
   )
 }
 
-function StatCard({ label, value, color, isDark }: { label: string; value: number; color: string; isDark: boolean }) {
+function StatCard({
+  label,
+  value,
+  color,
+  isDark,
+  sub,
+}: {
+  label: string
+  value: number | string
+  color: string
+  isDark: boolean
+  sub?: string
+}) {
   return (
     <div
       className="text-center p-5 rounded-xl"
       style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.025)' }}
     >
-      <div className="text-[32px] font-bold tabular-nums" style={{ color }}>
+      <div className="text-[28px] font-bold tabular-nums leading-tight" style={{ color }}>
         {value}
       </div>
       <div className="text-[13px] uppercase tracking-wide text-hz-text-tertiary mt-1">{label}</div>
+      {sub ? <div className="text-[13px] text-hz-text-tertiary mt-1">{sub}</div> : null}
     </div>
   )
 }

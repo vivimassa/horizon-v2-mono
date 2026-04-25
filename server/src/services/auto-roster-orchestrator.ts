@@ -611,6 +611,13 @@ export async function runAutoRoster(
       const h = hourFromMs(ms)
       return h >= 12 && h < 18 ? 1 : 0
     }
+    // When the planner filters by position (e.g. CP only), no crew in `crew`
+    // can ever cover an FO/CC seat — those virtual seats would just become
+    // slack and bloat the CP-SAT model with O(crew × wasted-seat) variables
+    // and rest/overlap constraints. Restrict virtual-seat expansion to the
+    // matching seat code so the solver gets ~Nx fewer positions to chew on.
+    const filterSeatCode = filters.position ? (positionIdToCode.get(filters.position) ?? null) : null
+
     const virtualPairings: VirtualPairing[] = []
     const virtualByParent = new Map<string, VirtualPairing[]>()
     for (const p of pairings) {
@@ -630,7 +637,16 @@ export async function runAutoRoster(
         },
       )
       const siblings: VirtualPairing[] = []
-      const seatEntries = Object.entries(seatCounts).filter(([, n]) => (n ?? 0) > 0)
+      const allSeatEntries = Object.entries(seatCounts).filter(([, n]) => (n ?? 0) > 0)
+      // When position filter is active, drop pairings that need no seat of the
+      // selected rank — they're not assignable by the filtered crew anyway,
+      // and shipping them as single-slot fallbacks would create unfillable
+      // slack in the model.
+      if (filterSeatCode && allSeatEntries.length > 0 && !allSeatEntries.some(([code]) => code === filterSeatCode)) {
+        virtualByParent.set(parentId, siblings)
+        continue
+      }
+      const seatEntries = filterSeatCode ? allSeatEntries.filter(([code]) => code === filterSeatCode) : allSeatEntries
       if (seatEntries.length === 0) {
         // Fallback: no seat breakdown available — emit single-slot virtual so
         // downstream code stays uniform. Legacy behaviour.

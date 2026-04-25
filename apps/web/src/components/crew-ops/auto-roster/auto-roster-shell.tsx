@@ -52,6 +52,7 @@ import { useCrewScheduleStore } from '@/stores/use-crew-schedule-store'
 import { NumberStepper } from '@/components/admin/_shared/form-primitives'
 import { Tooltip } from '@/components/ui/tooltip'
 import { Dropdown } from '@/components/ui/dropdown'
+import { EmptyPanel } from '@/components/ui/empty-panel'
 import { collapseDock } from '@/lib/dock-store'
 
 const MODULE_ACCENT = MODULE_THEMES.workforce.accent
@@ -304,12 +305,13 @@ export function AutoRosterShell() {
     }
   }, [operator?._id, periodFrom, periodTo, filterBase, filterPosition, filterAcType, filterCrewGroup, allPositions])
 
-  // Go = commit filter state + land on Manpower Check (where user clicks Analyze
-  // to actually fetch the breakdown). Panel collapses via FilterGoButton.
+  // Go = commit filter state + reset the journey to Step 1. Stepper is wiped
+  // back to "only Step 1 active" so prior-run check-marks don't bleed into a
+  // fresh workgroup; the user re-walks 1 → 4 every time they hit Go.
   const handleGo = useCallback(() => {
     commitFilter()
     setActive('manpower')
-    setHighestStep((prev) => Math.max(prev, 1))
+    setHighestStep(1)
   }, [commitFilter])
 
   const navigate = useCallback((to: ActiveKey) => {
@@ -501,57 +503,65 @@ export function AutoRosterShell() {
         />
       </div>
 
-      <div className="flex-1 min-w-0 rounded-2xl overflow-hidden flex flex-col" style={panelStyle}>
-        <Center
-          active={active}
-          config={config}
-          onConfigChange={setConfig}
-          history={history}
-          historyLoading={historyLoading}
-          onRefreshHistory={loadHistory}
-          periodFrom={periodFrom}
-          periodTo={periodTo}
-          committed={committed}
-          breakdown={breakdown}
-          breakdowns={breakdowns}
-          activeBreakdownIdx={activeBreakdownIdx}
-          onSelectBreakdown={setActiveBreakdownIdx}
-          breakdownLoading={breakdownLoading}
-          breakdownError={breakdownError}
-          onAnalyze={handleAnalyze}
-          mode={mode}
-          onModeChange={setMode}
-          longDutiesMinDays={longDutiesMinDays}
-          onLongDutiesMinDaysChange={setLongDutiesMinDays}
-          dayOffCodeId={dayOffCodeId}
-          onDayOffCodeIdChange={setDayOffCodeId}
-          dayOffCodeOptions={dayOffCodeOptions}
-          clearRetainPreAssigned={clearRetainPreAssigned}
-          onClearRetainPreAssignedChange={setClearRetainPreAssigned}
-          clearRetainDayOff={clearRetainDayOff}
-          onClearRetainDayOffChange={setClearRetainDayOff}
-          clearRetainStandby={clearRetainStandby}
-          onClearRetainStandbyChange={setClearRetainStandby}
-          filterBase={filterBase}
-          filterPosition={filterPosition}
-          filterAcType={filterAcType}
-          filterCrewGroup={filterCrewGroup}
-          phase={phase}
-          progress={progress}
-          runStartedAt={runStartedAt}
-          resultRun={resultRun}
-          error={error}
-          onDismissError={() => setError(null)}
-          onRun={handleRun}
-          onCancel={handleCancel}
-          onNavigate={navigate}
-          highestStep={highestStep}
-          lock={lock}
-          isDark={isDark}
-          accent={accent}
-          palette={palette}
-        />
-      </div>
+      {!committed ? (
+        // Pre-Go: blank right panel, matches 4.1.5.1 contract. The hero +
+        // stepper only appear once the user commits a filter scope, so the
+        // initial state isn't a misleading "Step 1 of 4" before any work
+        // has actually been scoped.
+        <EmptyPanel message="Pick a period and filters, then click Go in the left panel." />
+      ) : (
+        <div className="flex-1 min-w-0 rounded-2xl overflow-hidden flex flex-col" style={panelStyle}>
+          <Center
+            active={active}
+            config={config}
+            onConfigChange={setConfig}
+            history={history}
+            historyLoading={historyLoading}
+            onRefreshHistory={loadHistory}
+            periodFrom={periodFrom}
+            periodTo={periodTo}
+            committed={committed}
+            breakdown={breakdown}
+            breakdowns={breakdowns}
+            activeBreakdownIdx={activeBreakdownIdx}
+            onSelectBreakdown={setActiveBreakdownIdx}
+            breakdownLoading={breakdownLoading}
+            breakdownError={breakdownError}
+            onAnalyze={handleAnalyze}
+            mode={mode}
+            onModeChange={setMode}
+            longDutiesMinDays={longDutiesMinDays}
+            onLongDutiesMinDaysChange={setLongDutiesMinDays}
+            dayOffCodeId={dayOffCodeId}
+            onDayOffCodeIdChange={setDayOffCodeId}
+            dayOffCodeOptions={dayOffCodeOptions}
+            clearRetainPreAssigned={clearRetainPreAssigned}
+            onClearRetainPreAssignedChange={setClearRetainPreAssigned}
+            clearRetainDayOff={clearRetainDayOff}
+            onClearRetainDayOffChange={setClearRetainDayOff}
+            clearRetainStandby={clearRetainStandby}
+            onClearRetainStandbyChange={setClearRetainStandby}
+            filterBase={filterBase}
+            filterPosition={filterPosition}
+            filterAcType={filterAcType}
+            filterCrewGroup={filterCrewGroup}
+            phase={phase}
+            progress={progress}
+            runStartedAt={runStartedAt}
+            resultRun={resultRun}
+            error={error}
+            onDismissError={() => setError(null)}
+            onRun={handleRun}
+            onCancel={handleCancel}
+            onNavigate={navigate}
+            highestStep={highestStep}
+            lock={lock}
+            isDark={isDark}
+            accent={accent}
+            palette={palette}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -2699,14 +2709,10 @@ function SolverPhaseList({
   return (
     <div
       ref={listRef}
-      className="rounded-xl overflow-y-auto"
+      className="rounded-xl overflow-y-auto flex-1 min-h-0"
       style={{
         background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
         border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
-        // Hard cap so the page never grows past the viewport. List scrolls
-        // inside this window regardless of how many phases queue up.
-        height: 200,
-        maxHeight: 200,
       }}
     >
       <ul className="divide-y" style={{ borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}>
@@ -2736,43 +2742,70 @@ function SolverPhaseList({
 
               {/* Message + timing */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-[13px] font-medium text-hz-text truncate">{p.message}</span>
-                  {isActive && (
-                    <span className="text-[13px] font-semibold tabular-nums shrink-0" style={{ color: accent }}>
-                      {p.pct}%
-                    </span>
-                  )}
-                </div>
-                <div className="text-[12px] text-hz-text-tertiary tabular-nums mt-0.5">
-                  {fmtTime(p.startAt)}
-                  {p.endAt != null ? ` → ${fmtTime(p.endAt)}` : ' → …'}
-                  {' · '}
-                  {fmtDur(dur)}
-                </div>
+                {(() => {
+                  // The CP-SAT pre-feasible heartbeat ships its message as
+                  // "Searching for first legal roster — Ns / Ms". Replace the
+                  // raw "22s / 1800s" with a deadline progress bar so the
+                  // user can see how much of the time budget is left at a
+                  // glance instead of doing the math.
+                  const m = /^Searching for first legal roster — (\d+)s \/ (\d+)s$/.exec(p.message)
+                  if (m) {
+                    const elapsed = parseInt(m[1], 10)
+                    const limit = Math.max(1, parseInt(m[2], 10))
+                    const pct = Math.min(100, Math.max(0, Math.round((elapsed / limit) * 100)))
+                    return (
+                      <>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-[13px] font-medium text-hz-text truncate">
+                            Searching for first legal roster
+                          </span>
+                          <span className="text-[13px] font-semibold tabular-nums shrink-0" style={{ color: accent }}>
+                            {pct}%
+                          </span>
+                        </div>
+                        <div
+                          className="mt-1 h-1 rounded-full overflow-hidden"
+                          style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }}
+                        >
+                          <div
+                            className="h-full rounded-full transition-[width] duration-500 ease-out"
+                            style={{ width: `${pct}%`, background: accent }}
+                          />
+                        </div>
+                        <div className="text-[12px] text-hz-text-tertiary tabular-nums mt-0.5">
+                          {fmtTime(p.startAt)}
+                          {p.endAt != null ? ` → ${fmtTime(p.endAt)}` : ' → …'}
+                          {' · '}
+                          {fmtDur(dur)}
+                        </div>
+                      </>
+                    )
+                  }
+                  return (
+                    <>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[13px] font-medium text-hz-text truncate">{p.message}</span>
+                        {isActive && (
+                          <span className="text-[13px] font-semibold tabular-nums shrink-0" style={{ color: accent }}>
+                            {p.pct}%
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[12px] text-hz-text-tertiary tabular-nums mt-0.5">
+                        {fmtTime(p.startAt)}
+                        {p.endAt != null ? ` → ${fmtTime(p.endAt)}` : ' → …'}
+                        {' · '}
+                        {fmtDur(dur)}
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
             </li>
           )
         })}
       </ul>
     </div>
-  )
-}
-
-function ElapsedTimer({ startedAt, running }: { startedAt: number; running: boolean }) {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    if (!running) return
-    const id = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(id)
-  }, [running])
-  const sec = Math.max(0, Math.floor((now - startedAt) / 1000))
-  const mm = Math.floor(sec / 60)
-  const ss = sec % 60
-  return (
-    <span className="font-medium text-hz-text-primary tabular-nums">
-      {mm}:{String(ss).padStart(2, '0')} elapsed
-    </span>
   )
 }
 
@@ -2893,7 +2926,7 @@ function GenerateBody({
   }, [phase])
 
   return (
-    <div className="px-6 py-5 space-y-4 w-full h-full overflow-hidden">
+    <div className="px-6 py-5 gap-4 w-full h-full overflow-hidden flex flex-col">
       {isLocked && lock && (
         <div
           className="flex items-start gap-3 rounded-xl px-4 py-3"
@@ -3083,27 +3116,8 @@ function GenerateBody({
       )}
 
       {phase !== 'idle' && (
-        <FormSection title="Solver Progress" icon={Sparkles}>
-          <div className="flex flex-col gap-3">
-            {startedAt && (
-              <div className="flex justify-between items-center text-[13px] text-hz-text-secondary">
-                <span>
-                  Started{' '}
-                  <span className="font-medium text-hz-text-primary tabular-nums">
-                    {new Date(startedAt).toLocaleTimeString(undefined, {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      second: '2-digit',
-                    })}
-                  </span>
-                </span>
-                <div className="flex items-center gap-3">
-                  <PhaseBadge phase={phase} accent={accent} />
-                  <ElapsedTimer startedAt={startedAt} running={phase === 'running'} />
-                </div>
-              </div>
-            )}
-
+        <FormSection title="Solver Progress" icon={Sparkles} className="flex-1 min-h-0 flex flex-col">
+          <div className="flex flex-col gap-3 flex-1 min-h-0">
             <SolverPhaseList phases={solverPhases} running={phase === 'running'} accent={accent} isDark={isDark} />
 
             {phase === 'completed' && (
@@ -4836,14 +4850,16 @@ function FormSection({
   icon: Icon,
   action,
   children,
+  className = '',
 }: {
   title: string
   icon: LucideIcon
   action?: React.ReactNode
   children: React.ReactNode
+  className?: string
 }) {
   return (
-    <div>
+    <div className={className}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Icon size={14} className="text-hz-text-tertiary" strokeWidth={1.8} />
@@ -4922,31 +4938,6 @@ function StatCard({
       <div className="text-[13px] uppercase tracking-wide text-hz-text-tertiary mt-1">{label}</div>
       {sub ? <div className="text-[13px] text-hz-text-tertiary mt-1">{sub}</div> : null}
     </div>
-  )
-}
-
-function PhaseBadge({ phase, accent }: { phase: RunPhase; accent: string }) {
-  const map: Record<RunPhase, { label: string; color: string; bg: string; icon?: React.ReactNode }> = {
-    idle: { label: 'Ready', color: '#8F90A6', bg: 'rgba(143,144,166,0.12)' },
-    running: {
-      label: 'Running',
-      color: accent,
-      bg: accentTint(accent, 0.12),
-      icon: <Loader2 size={12} className="animate-spin" />,
-    },
-    completed: { label: 'Completed', color: '#06C270', bg: 'rgba(6,194,112,0.12)', icon: <CheckCircle size={12} /> },
-    failed: { label: 'Failed', color: '#FF3B3B', bg: 'rgba(255,59,59,0.12)', icon: <AlertTriangle size={12} /> },
-    cancelled: { label: 'Cancelled', color: '#FF8800', bg: 'rgba(255,136,0,0.12)' },
-  }
-  const s = map[phase]
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[13px] font-semibold"
-      style={{ color: s.color, background: s.bg }}
-    >
-      {s.icon}
-      {s.label}
-    </span>
   )
 }
 

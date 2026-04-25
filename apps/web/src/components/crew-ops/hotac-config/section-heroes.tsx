@@ -315,7 +315,67 @@ export function CheckInHero({ accent, isDark }: HeroProps) {
   )
 }
 
-/* ── 5. Email — envelope + queue ── */
+/* ── 5. Transport — van + airport icon ── */
+export function TransportHero({ accent, isDark }: HeroProps) {
+  const dim = isDark ? '#8F90A6' : '#555770'
+  return (
+    <HeroFrame accent={accent} isDark={isDark}>
+      <HeroTitle
+        accent={accent}
+        isDark={isDark}
+        eyebrow="TRANSPORT"
+        title="Crew movement to and from base"
+        caption="Hub-shuttle vs door-to-door, buffer windows, vendor SLA, and flight booking mode."
+      />
+      <svg
+        className="absolute right-6 top-1/2 -translate-y-1/2"
+        width="200"
+        height="150"
+        viewBox="0 0 200 150"
+        aria-hidden
+      >
+        {/* Road */}
+        <line
+          x1="20"
+          y1="118"
+          x2="180"
+          y2="118"
+          stroke={dim}
+          strokeOpacity="0.4"
+          strokeWidth="2"
+          strokeDasharray="6 6"
+        />
+        {/* Van */}
+        <g transform="translate(40 70)">
+          <rect x="0" y="0" width="84" height="40" rx="6" fill={`${accent}28`} stroke={accent} strokeWidth="2" />
+          <rect x="6" y="6" width="22" height="16" rx="2" fill="none" stroke={accent} strokeWidth="1.5" />
+          <rect
+            x="32"
+            y="6"
+            width="22"
+            height="16"
+            rx="2"
+            fill="none"
+            stroke={accent}
+            strokeOpacity="0.5"
+            strokeWidth="1.5"
+          />
+          <circle cx="18" cy="46" r="6" fill={dim} />
+          <circle cx="66" cy="46" r="6" fill={dim} />
+        </g>
+        {/* Airport tower */}
+        <g transform="translate(140 40)">
+          <rect x="6" y="0" width="6" height="70" fill={`${accent}55`} />
+          <polygon points="0,70 18,70 12,82 6,82" fill={accent} />
+          <circle cx="9" cy="-4" r="3" fill={accent} />
+          <line x1="9" y1="-4" x2="9" y2="-12" stroke={accent} strokeWidth="1.5" />
+        </g>
+      </svg>
+    </HeroFrame>
+  )
+}
+
+/* ── 6. Email — envelope + queue ── */
 export function EmailHero({ accent, isDark }: HeroProps) {
   const dim = isDark ? '#8F90A6' : '#555770'
   return (

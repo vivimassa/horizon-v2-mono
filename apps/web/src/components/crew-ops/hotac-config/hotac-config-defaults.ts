@@ -4,6 +4,7 @@ import type {
   HotacEmailConfig,
   HotacLayoverRuleConfig,
   HotacRoomAllocationConfig,
+  HotacTransportConfig,
   OperatorHotacConfig,
 } from '@skyhub/api'
 
@@ -48,11 +49,24 @@ export const DEFAULT_EMAIL: HotacEmailConfig = {
   holdByDefault: true,
 }
 
+export const DEFAULT_TRANSPORT: HotacTransportConfig = {
+  pickupMode: 'hub-shuttle',
+  hubLocation: { name: 'Crew Hub', addressLine: null, lat: null, lng: null },
+  bufferMinutes: 15,
+  batchingWindowMinutes: 30,
+  defaultTravelTimeMinutes: 45,
+  defaultVehicleTier: null,
+  defaultVendorSlaMinutes: 15,
+  taxiVoucherEnabled: false,
+  flightBookingMode: 'ticket-preferred',
+}
+
 export interface HotacConfigDraft {
   layoverRule: HotacLayoverRuleConfig
   roomAllocation: HotacRoomAllocationConfig
   dispatch: HotacDispatchConfig
   checkIn: HotacCheckInConfig
+  transport: HotacTransportConfig
   email: HotacEmailConfig
 }
 
@@ -61,6 +75,7 @@ export const DEFAULT_HOTAC_CONFIG_DRAFT: HotacConfigDraft = {
   roomAllocation: DEFAULT_ROOM_ALLOCATION,
   dispatch: DEFAULT_DISPATCH,
   checkIn: DEFAULT_CHECK_IN,
+  transport: DEFAULT_TRANSPORT,
   email: DEFAULT_EMAIL,
 }
 
@@ -71,6 +86,7 @@ export function configToDraft(cfg: OperatorHotacConfig | null): HotacConfigDraft
     roomAllocation: { ...DEFAULT_ROOM_ALLOCATION, ...(cfg.roomAllocation ?? {}) },
     dispatch: { ...DEFAULT_DISPATCH, ...(cfg.dispatch ?? {}) },
     checkIn: { ...DEFAULT_CHECK_IN, ...(cfg.checkIn ?? {}) },
+    transport: { ...DEFAULT_TRANSPORT, ...(cfg.transport ?? {}) },
     email: { ...DEFAULT_EMAIL, ...(cfg.email ?? {}) },
   }
 }

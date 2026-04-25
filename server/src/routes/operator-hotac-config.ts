@@ -58,12 +58,35 @@ const emailSchema = z
   })
   .optional()
 
+const transportSchema = z
+  .object({
+    pickupMode: z.enum(['door-to-door', 'hub-shuttle']).optional(),
+    hubLocation: z
+      .object({
+        name: z.string().max(120).optional(),
+        addressLine: z.string().max(300).nullable().optional(),
+        lat: z.number().nullable().optional(),
+        lng: z.number().nullable().optional(),
+      })
+      .nullable()
+      .optional(),
+    bufferMinutes: z.number().int().min(0).max(120).optional(),
+    batchingWindowMinutes: z.number().int().min(0).max(120).optional(),
+    defaultTravelTimeMinutes: z.number().int().min(0).max(240).optional(),
+    defaultVehicleTier: z.string().max(60).nullable().optional(),
+    defaultVendorSlaMinutes: z.number().int().min(5).max(60).optional(),
+    taxiVoucherEnabled: z.boolean().optional(),
+    flightBookingMode: z.enum(['ticket-preferred', 'gendec-preferred']).optional(),
+  })
+  .optional()
+
 const upsertSchema = z.object({
   operatorId: z.string().min(1),
   layoverRule: layoverRuleSchema,
   roomAllocation: roomAllocationSchema,
   dispatch: dispatchSchema,
   checkIn: checkInSchema,
+  transport: transportSchema,
   email: emailSchema,
 })
 
@@ -117,6 +140,10 @@ export async function operatorHotacConfigRoutes(app: FastifyInstance) {
       checkIn: {
         ...((existing?.checkIn as Record<string, unknown>) ?? {}),
         ...(parsed.data.checkIn ?? {}),
+      },
+      transport: {
+        ...((existing?.transport as Record<string, unknown>) ?? {}),
+        ...(parsed.data.transport ?? {}),
       },
       email: {
         ...((existing?.email as Record<string, unknown>) ?? {}),

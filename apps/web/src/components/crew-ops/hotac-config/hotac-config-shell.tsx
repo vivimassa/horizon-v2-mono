@@ -15,7 +15,19 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, Loader2, Save, RotateCcw, BedDouble, Layers, Send, DoorOpen, Mail, type LucideIcon } from 'lucide-react'
+import {
+  Check,
+  Loader2,
+  Save,
+  RotateCcw,
+  BedDouble,
+  Layers,
+  Send,
+  DoorOpen,
+  Mail,
+  Bus,
+  type LucideIcon,
+} from 'lucide-react'
 import { api, type OperatorHotacConfig } from '@skyhub/api'
 import { MODULE_THEMES } from '@skyhub/constants'
 import { accentTint, colors, type Palette as PaletteType } from '@skyhub/ui/theme'
@@ -25,11 +37,11 @@ import { useOperatorStore } from '@/stores/use-operator-store'
 import { collapseDock } from '@/lib/dock-store'
 import { HelpBlock, FormRow, Toggle, NumberStepper } from '@/components/admin/_shared/form-primitives'
 import { configToDraft, DEFAULT_HOTAC_CONFIG_DRAFT, type HotacConfigDraft } from './hotac-config-defaults'
-import { LayoverHero, RoomAllocationHero, DispatchHero, CheckInHero, EmailHero } from './section-heroes'
+import { LayoverHero, RoomAllocationHero, DispatchHero, CheckInHero, TransportHero, EmailHero } from './section-heroes'
 
 const MODULE_ACCENT = MODULE_THEMES.workforce.accent
 
-type SectionKey = 'layover' | 'room-allocation' | 'dispatch' | 'check-in' | 'email'
+type SectionKey = 'layover' | 'room-allocation' | 'dispatch' | 'check-in' | 'transport' | 'email'
 
 interface SectionDef {
   key: SectionKey
@@ -43,6 +55,7 @@ const SECTIONS: SectionDef[] = [
   { key: 'room-allocation', label: 'Room Allocation', desc: 'Occupancy + contract-cap behaviour', icon: Layers },
   { key: 'dispatch', label: 'Dispatch', desc: 'Auto-dispatch and SLA thresholds', icon: Send },
   { key: 'check-in', label: 'Check-In', desc: 'Auto check-in and no-show rules', icon: DoorOpen },
+  { key: 'transport', label: 'Transport', desc: 'Hub vs door-to-door, buffers, flight mode', icon: Bus },
   { key: 'email', label: 'Email', desc: 'From address, signature, hold default', icon: Mail },
 ]
 
@@ -53,6 +66,7 @@ function draftToUpsert(operatorId: string, d: HotacConfigDraft) {
     roomAllocation: d.roomAllocation,
     dispatch: d.dispatch,
     checkIn: d.checkIn,
+    transport: d.transport,
     email: d.email,
   }
 }
@@ -131,6 +145,8 @@ export function HotacConfigShell() {
           return { ...prev, dispatch: { ...DEFAULT_HOTAC_CONFIG_DRAFT.dispatch } }
         case 'check-in':
           return { ...prev, checkIn: { ...DEFAULT_HOTAC_CONFIG_DRAFT.checkIn } }
+        case 'transport':
+          return { ...prev, transport: { ...DEFAULT_HOTAC_CONFIG_DRAFT.transport } }
         case 'email':
           return { ...prev, email: { ...DEFAULT_HOTAC_CONFIG_DRAFT.email } }
       }
@@ -359,6 +375,8 @@ function SectionHero({ section, accent, isDark }: { section: SectionKey; accent:
       return <DispatchHero accent={accent} isDark={isDark} />
     case 'check-in':
       return <CheckInHero accent={accent} isDark={isDark} />
+    case 'transport':
+      return <TransportHero accent={accent} isDark={isDark} />
     case 'email':
       return <EmailHero accent={accent} isDark={isDark} />
   }
@@ -387,6 +405,8 @@ function SectionBody({
     setDraft((prev) => ({ ...prev, dispatch: { ...prev.dispatch, ...p } }))
   const patchCheckIn = (p: Partial<HotacConfigDraft['checkIn']>) =>
     setDraft((prev) => ({ ...prev, checkIn: { ...prev.checkIn, ...p } }))
+  const patchTransport = (p: Partial<HotacConfigDraft['transport']>) =>
+    setDraft((prev) => ({ ...prev, transport: { ...prev.transport, ...p } }))
   const patchEmail = (p: Partial<HotacConfigDraft['email']>) =>
     setDraft((prev) => ({ ...prev, email: { ...prev.email, ...p } }))
 
@@ -578,6 +598,144 @@ function SectionBody({
               min={1}
               max={24}
               suffix="h"
+            />
+          </FormRow>
+        </div>
+      )
+
+    case 'transport':
+      return (
+        <div className="max-w-2xl">
+          <HelpBlock>
+            Drives 4.1.8.2 Crew Transport. Pickup mode chooses between a single hub-shuttle per duty-start and per-crew
+            door-to-door pickups (batched within the window). Buffer minutes pad both sides of report/release. Vehicle
+            tier and SLA become defaults on auto-assign.
+          </HelpBlock>
+          <FormRow
+            label="Pickup Mode"
+            description="Hub shuttle = one consolidated trip from a hub location to the airport. Door-to-door = one trip per crew home address, batched."
+          >
+            <SegButtons
+              value={draft.transport.pickupMode}
+              onChange={(v) => patchTransport({ pickupMode: v as 'door-to-door' | 'hub-shuttle' })}
+              options={[
+                { key: 'hub-shuttle', label: 'Hub shuttle' },
+                { key: 'door-to-door', label: 'Door-to-door' },
+              ]}
+              accent={accent}
+              palette={palette}
+              isDark={isDark}
+            />
+          </FormRow>
+          {draft.transport.pickupMode === 'hub-shuttle' && (
+            <>
+              <FormRow label="Hub Name" description="Shown on dispatch sheets and the trip inspector.">
+                <TextInputBasic
+                  value={draft.transport.hubLocation?.name ?? ''}
+                  onChange={(v) =>
+                    patchTransport({
+                      hubLocation: {
+                        ...(draft.transport.hubLocation ?? { addressLine: null, lat: null, lng: null }),
+                        name: v,
+                      },
+                    })
+                  }
+                  placeholder="Crew Hub"
+                />
+              </FormRow>
+              <FormRow label="Hub Address" description="Pickup address printed on dispatch sheets." stacked>
+                <TextInputBasic
+                  value={draft.transport.hubLocation?.addressLine ?? ''}
+                  onChange={(v) =>
+                    patchTransport({
+                      hubLocation: {
+                        ...(draft.transport.hubLocation ?? { name: 'Crew Hub', lat: null, lng: null }),
+                        addressLine: v === '' ? null : v,
+                      },
+                    })
+                  }
+                  placeholder="123 Le Loi, District 1, HCMC"
+                />
+              </FormRow>
+            </>
+          )}
+          <FormRow
+            label="Buffer Minutes"
+            description="Padding on both sides of report/release. Outbound trip leaves report − buffer − travel; inbound trip arrives release + buffer."
+          >
+            <NumberStepper
+              value={draft.transport.bufferMinutes}
+              onChange={(v) => patchTransport({ bufferMinutes: v })}
+              min={0}
+              max={120}
+              step={5}
+              suffix="min"
+            />
+          </FormRow>
+          <FormRow
+            label="Batching Window"
+            description="Door-to-door only. Crew within this many minutes of each other share a vehicle."
+            indent={draft.transport.pickupMode !== 'door-to-door'}
+          >
+            <NumberStepper
+              value={draft.transport.batchingWindowMinutes}
+              onChange={(v) => patchTransport({ batchingWindowMinutes: v })}
+              min={0}
+              max={120}
+              step={5}
+              suffix="min"
+            />
+          </FormRow>
+          <FormRow
+            label="Default Travel Time"
+            description="Used when a crew profile has no travelTimeMinutes set. Fallback only — per-crew values always win."
+          >
+            <NumberStepper
+              value={draft.transport.defaultTravelTimeMinutes}
+              onChange={(v) => patchTransport({ defaultTravelTimeMinutes: v })}
+              min={0}
+              max={240}
+              step={5}
+              suffix="min"
+            />
+          </FormRow>
+          <FormRow
+            label="Default Vendor SLA"
+            description="A trip in 'sent' status this many minutes without confirmation flips to overdue-confirmation."
+          >
+            <NumberStepper
+              value={draft.transport.defaultVendorSlaMinutes}
+              onChange={(v) => patchTransport({ defaultVendorSlaMinutes: v })}
+              min={5}
+              max={60}
+              step={5}
+              suffix="min"
+            />
+          </FormRow>
+          <FormRow
+            label="Taxi Voucher Enabled"
+            description="Allow ad-hoc taxi-voucher trips when no contracted vendor is available."
+          >
+            <Toggle
+              checked={draft.transport.taxiVoucherEnabled}
+              onChange={(v) => patchTransport({ taxiVoucherEnabled: v })}
+              accent={accent}
+            />
+          </FormRow>
+          <FormRow
+            label="Flight Booking Mode"
+            description="Default for deadhead positioning. Ticket = revenue/non-rev ticket on a real flight; GENDEC = supernumerary placement on the operator's own flight."
+          >
+            <SegButtons
+              value={draft.transport.flightBookingMode}
+              onChange={(v) => patchTransport({ flightBookingMode: v as 'ticket-preferred' | 'gendec-preferred' })}
+              options={[
+                { key: 'ticket-preferred', label: 'Ticket preferred' },
+                { key: 'gendec-preferred', label: 'GENDEC preferred' },
+              ]}
+              accent={accent}
+              palette={palette}
+              isDark={isDark}
             />
           </FormRow>
         </div>

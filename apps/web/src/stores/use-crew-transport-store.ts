@@ -1,7 +1,9 @@
 'use client'
 
 import { create } from 'zustand'
+import type { CrewFlightBookingRef, PairingRef } from '@skyhub/api'
 import { EMPTY_TRANSPORT_FILTERS, type CrewTransportFilters } from '@/stores/use-crew-transport-filter-store'
+import type { TransportTrip } from '@/components/crew-ops/transport/types'
 
 export type TransportSegment = 'ground' | 'flight'
 export type GroundTab = 'planning' | 'dayToDay' | 'communication'
@@ -20,13 +22,17 @@ interface CrewTransportStoreState {
   groundTab: GroundTab
   flightTab: FlightTab
 
-  // ── Data (Phase C/D wires real fetches) ──
-  // Server rows are not stored here yet — Phase C will add `trips` and
-  // `flightBookings` arrays. For now the shell only owns period/filter/UI state.
-
-  // ── UI ──
+  // ── Data ──
+  trips: TransportTrip[]
+  /** Cached pairings from the last Go — used by Flight views to find deadhead legs. */
+  pairings: PairingRef[]
+  /** Cached flight bookings keyed by deterministic (pairingId::legId). */
+  flightBookings: CrewFlightBookingRef[]
   loading: boolean
   error: string | null
+  lastFetchedAtUtcMs: number | null
+
+  // ── UI ──
   selectedTripId: string | null
   selectedFlightBookingId: string | null
 
@@ -41,6 +47,12 @@ interface CrewTransportStoreState {
   setSegment: (s: TransportSegment) => void
   setGroundTab: (t: GroundTab) => void
   setFlightTab: (t: FlightTab) => void
+  setTrips: (trips: TransportTrip[]) => void
+  upsertTrip: (trip: TransportTrip) => void
+  setPairings: (p: PairingRef[]) => void
+  setFlightBookings: (b: CrewFlightBookingRef[]) => void
+  upsertFlightBooking: (b: CrewFlightBookingRef) => void
+  removeFlightBooking: (id: string) => void
   setLoading: (l: boolean) => void
   setError: (e: string | null) => void
   setSelectedTripId: (id: string | null) => void
@@ -71,8 +83,13 @@ export const useCrewTransportStore = create<CrewTransportStoreState>((set) => ({
   groundTab: 'planning',
   flightTab: 'open',
 
+  trips: [],
+  pairings: [],
+  flightBookings: [],
   loading: false,
   error: null,
+  lastFetchedAtUtcMs: null,
+
   selectedTripId: null,
   selectedFlightBookingId: null,
 
@@ -85,6 +102,26 @@ export const useCrewTransportStore = create<CrewTransportStoreState>((set) => ({
   setSegment: (segment) => set({ segment }),
   setGroundTab: (groundTab) => set({ groundTab }),
   setFlightTab: (flightTab) => set({ flightTab }),
+  setTrips: (trips) => set({ trips, lastFetchedAtUtcMs: Date.now(), error: null }),
+  upsertTrip: (trip) =>
+    set((s) => {
+      const idx = s.trips.findIndex((t) => t.id === trip.id)
+      if (idx === -1) return { trips: [...s.trips, trip] }
+      const next = s.trips.slice()
+      next[idx] = trip
+      return { trips: next }
+    }),
+  setPairings: (pairings) => set({ pairings }),
+  setFlightBookings: (flightBookings) => set({ flightBookings }),
+  upsertFlightBooking: (b) =>
+    set((s) => {
+      const idx = s.flightBookings.findIndex((x) => x._id === b._id)
+      if (idx === -1) return { flightBookings: [...s.flightBookings, b] }
+      const next = s.flightBookings.slice()
+      next[idx] = b
+      return { flightBookings: next }
+    }),
+  removeFlightBooking: (id) => set((s) => ({ flightBookings: s.flightBookings.filter((b) => b._id !== id) })),
   setLoading: (loading) => set({ loading }),
   setError: (err) => set({ error: err }),
   setSelectedTripId: (id) => set({ selectedTripId: id }),
@@ -101,8 +138,12 @@ export const useCrewTransportStore = create<CrewTransportStoreState>((set) => ({
       segment: 'ground',
       groundTab: 'planning',
       flightTab: 'open',
+      trips: [],
+      pairings: [],
+      flightBookings: [],
       loading: false,
       error: null,
+      lastFetchedAtUtcMs: null,
       selectedTripId: null,
       selectedFlightBookingId: null,
       pollingPaused: false,

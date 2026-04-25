@@ -2783,6 +2783,196 @@ export const api = {
       { method: 'DELETE' },
     ),
 
+  // ── 4.1.8.2 Crew Transport — ground trips ──
+  getCrewTransportTrips: (
+    params: {
+      from?: string
+      to?: string
+      station?: string[]
+      status?: string[]
+      vendor?: string[]
+    } = {},
+  ) => {
+    const qs = new URLSearchParams()
+    if (params.from) qs.set('from', params.from)
+    if (params.to) qs.set('to', params.to)
+    for (const s of params.station ?? []) qs.append('station', s)
+    for (const s of params.status ?? []) qs.append('status', s)
+    for (const v of params.vendor ?? []) qs.append('vendor', v)
+    const url = qs.toString() ? `/crew-transport-trips?${qs.toString()}` : '/crew-transport-trips'
+    return request<CrewTransportTripRef[]>(url)
+  },
+
+  upsertCrewTransportTripsBatch: (body: { rows: CrewTransportTripDerivedRow[]; runId?: string }) =>
+    request<{ upserted: number; preservedManual: number; runId: string }>('/crew-transport-trips/upsert-batch', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  createCrewTransportTrip: (body: CrewTransportTripCreateInput) =>
+    request<CrewTransportTripRef>('/crew-transport-trips', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  patchCrewTransportTrip: (id: string, body: CrewTransportTripPatchInput) =>
+    request<CrewTransportTripRef>(`/crew-transport-trips/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  dispatchCrewTransportTrip: (
+    id: string,
+    body: {
+      driverName?: string | null
+      driverPhone?: string | null
+      vehiclePlate?: string | null
+      vehicleTierId?: string | null
+      at?: number
+    } = {},
+  ) =>
+    request<CrewTransportTripRef>(`/crew-transport-trips/${encodeURIComponent(id)}/dispatch`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  pickupCrewTransportTrip: (id: string, body: { at?: number } = {}) =>
+    request<CrewTransportTripRef>(`/crew-transport-trips/${encodeURIComponent(id)}/picked-up`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  completeCrewTransportTrip: (id: string, body: { at?: number } = {}) =>
+    request<CrewTransportTripRef>(`/crew-transport-trips/${encodeURIComponent(id)}/complete`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  noShowCrewTransportTrip: (id: string) =>
+    request<CrewTransportTripRef>(`/crew-transport-trips/${encodeURIComponent(id)}/no-show`, {
+      method: 'POST',
+    }),
+
+  deleteCrewTransportTrip: (id: string) =>
+    request<{ success: boolean }>(`/crew-transport-trips/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+
+  // ── 4.1.8.2 Transport Email ──
+  getTransportEmails: (
+    params: {
+      direction?: 'outbound' | 'inbound'
+      status?: TransportEmailStatus
+      vendorId?: string
+      threadId?: string
+      from?: string
+      to?: string
+    } = {},
+  ) => {
+    const qs = new URLSearchParams()
+    if (params.direction) qs.set('direction', params.direction)
+    if (params.status) qs.set('status', params.status)
+    if (params.vendorId) qs.set('vendorId', params.vendorId)
+    if (params.threadId) qs.set('threadId', params.threadId)
+    if (params.from) qs.set('from', params.from)
+    if (params.to) qs.set('to', params.to)
+    const url = qs.toString() ? `/transport-emails?${qs.toString()}` : '/transport-emails'
+    return request<TransportEmailRef[]>(url)
+  },
+
+  getHeldTransportEmails: () => request<TransportEmailRef[]>('/transport-emails/held'),
+
+  createTransportEmail: (body: TransportEmailCreateInput) =>
+    request<TransportEmailRef>('/transport-emails', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  patchTransportEmail: (id: string, body: TransportEmailPatchInput) =>
+    request<TransportEmailRef>(`/transport-emails/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  releaseTransportEmails: (ids: string[]) =>
+    request<{ released: number; skipped: number }>('/transport-emails/release', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
+
+  discardTransportEmails: (ids: string[]) =>
+    request<{ discarded: number }>('/transport-emails/discard', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
+
+  // ── 4.1.8.2 Crew Flight Bookings (deadhead) ──
+  getCrewFlightBookings: (
+    params: {
+      from?: string
+      to?: string
+      pairingId?: string
+      status?: string[]
+      method?: string[]
+    } = {},
+  ) => {
+    const qs = new URLSearchParams()
+    if (params.from) qs.set('from', params.from)
+    if (params.to) qs.set('to', params.to)
+    if (params.pairingId) qs.set('pairingId', params.pairingId)
+    for (const s of params.status ?? []) qs.append('status', s)
+    for (const s of params.method ?? []) qs.append('method', s)
+    const url = qs.toString() ? `/crew-flight-bookings?${qs.toString()}` : '/crew-flight-bookings'
+    return request<CrewFlightBookingRef[]>(url)
+  },
+
+  createCrewFlightBooking: (body: CrewFlightBookingCreateInput) =>
+    request<CrewFlightBookingRef>('/crew-flight-bookings', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  patchCrewFlightBooking: (id: string, body: CrewFlightBookingPatchInput) =>
+    request<CrewFlightBookingRef>(`/crew-flight-bookings/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  cancelCrewFlightBooking: (id: string) =>
+    request<CrewFlightBookingRef>(`/crew-flight-bookings/${encodeURIComponent(id)}/cancel`, {
+      method: 'POST',
+    }),
+
+  deleteCrewFlightBooking: (id: string) =>
+    request<{ success: boolean }>(`/crew-flight-bookings/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+
+  /** Multipart upload — image OR PDF, max 20MB. Returns the updated booking. */
+  uploadCrewFlightBookingAttachment: async (id: string, file: File | Blob, filename?: string) => {
+    const fd = new FormData()
+    fd.append('file', file, filename ?? (file instanceof File ? file.name : 'upload'))
+    const headers: Record<string, string> = {}
+    const token = _authCallbacks?.getAccessToken() ?? null
+    if (token) headers.Authorization = `Bearer ${token}`
+    const res = await fetch(`${_baseUrl}/crew-flight-bookings/${encodeURIComponent(id)}/attachments`, {
+      method: 'POST',
+      body: fd,
+      headers,
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(`Upload failed (${res.status}): ${text}`)
+    }
+    return (await res.json()) as CrewFlightBookingRef
+  },
+
+  deleteCrewFlightBookingAttachment: (bookingId: string, attachmentId: string) =>
+    request<CrewFlightBookingRef>(
+      `/crew-flight-bookings/${encodeURIComponent(bookingId)}/attachments/${encodeURIComponent(attachmentId)}`,
+      { method: 'DELETE' },
+    ),
+
   bulkDeleteAssignments: (params: { periodFrom: string; periodTo: string }) => {
     const qs = new URLSearchParams({ periodFrom: params.periodFrom, periodTo: params.periodTo })
     return request<{ success: true; deletedCount: number }>(`/crew-schedule/assignments/bulk?${qs.toString()}`, {
@@ -4079,6 +4269,25 @@ export interface HotacEmailConfig {
   holdByDefault: boolean
 }
 
+export interface HotacTransportHubLocation {
+  name: string
+  addressLine: string | null
+  lat: number | null
+  lng: number | null
+}
+
+export interface HotacTransportConfig {
+  pickupMode: 'door-to-door' | 'hub-shuttle'
+  hubLocation: HotacTransportHubLocation | null
+  bufferMinutes: number
+  batchingWindowMinutes: number
+  defaultTravelTimeMinutes: number
+  defaultVehicleTier: string | null
+  defaultVendorSlaMinutes: number
+  taxiVoucherEnabled: boolean
+  flightBookingMode: 'ticket-preferred' | 'gendec-preferred'
+}
+
 export interface OperatorHotacConfig {
   _id: string
   operatorId: string
@@ -4086,6 +4295,7 @@ export interface OperatorHotacConfig {
   roomAllocation: HotacRoomAllocationConfig
   dispatch: HotacDispatchConfig
   checkIn: HotacCheckInConfig
+  transport: HotacTransportConfig
   email: HotacEmailConfig
   createdAt: string
   updatedAt: string
@@ -4097,6 +4307,7 @@ export interface OperatorHotacConfigUpsert {
   roomAllocation?: Partial<HotacRoomAllocationConfig>
   dispatch?: Partial<HotacDispatchConfig>
   checkIn?: Partial<HotacCheckInConfig>
+  transport?: Partial<HotacTransportConfig>
   email?: Partial<HotacEmailConfig>
 }
 
@@ -4352,6 +4563,348 @@ export interface CrewTransportVendorRef {
   drivers: TransportVendorDriver[]
   createdAt: string | null
   updatedAt: string | null
+}
+
+// ── 4.1.8.2 CrewTransportTrip ──
+
+export type CrewTransportTripType =
+  | 'home-airport'
+  | 'airport-home'
+  | 'hub-airport'
+  | 'airport-hub'
+  | 'hotel-airport'
+  | 'airport-hotel'
+  | 'inter-terminal'
+
+export type CrewTransportTripStatus =
+  | 'demand'
+  | 'forecast'
+  | 'pending'
+  | 'sent'
+  | 'confirmed'
+  | 'dispatched'
+  | 'crew-pickedup'
+  | 'completed'
+  | 'cancelled'
+  | 'no-show'
+
+export type CrewTransportVendorMethod = 'vendor' | 'shuttle' | 'walking' | 'taxi-voucher'
+export type CrewTransportLocationType = 'home' | 'hub' | 'airport' | 'hotel'
+
+export type CrewTransportDisruptionFlag =
+  | 'inbound-delayed'
+  | 'outbound-delayed'
+  | 'extend'
+  | 'overdue-confirmation'
+  | 'cancelled-leg'
+
+export interface CrewTransportPaxStop {
+  crewId: string
+  crewName: string
+  position: string
+  pickupAddress: string | null
+  pickupTimeUtcMs: number | null
+  pickedUpAtUtcMs: number | null
+  dropoffAtUtcMs: number | null
+}
+
+export interface CrewTransportTripRef {
+  _id: string
+  operatorId: string
+  tripType: CrewTransportTripType
+  scheduledTimeUtcMs: number
+  pairingId: string | null
+  hotelBookingId: string | null
+  pairingCode: string
+  legFlightNumber: string | null
+  legStdUtcIso: string | null
+  legStaUtcIso: string | null
+  airportIcao: string
+  fromLocationType: CrewTransportLocationType
+  fromAddress: string | null
+  fromLat: number | null
+  fromLng: number | null
+  fromLabel: string
+  toLocationType: CrewTransportLocationType
+  toAddress: string | null
+  toLat: number | null
+  toLng: number | null
+  toLabel: string
+  paxStops: CrewTransportPaxStop[]
+  paxCount: number
+  vendorId: string | null
+  vendorMethod: CrewTransportVendorMethod
+  vendorContractId: string | null
+  vehicleTierId: string | null
+  vehiclePlate: string | null
+  driverName: string | null
+  driverPhone: string | null
+  costMinor: number
+  costCurrency: string
+  status: CrewTransportTripStatus
+  confirmationNumber: string | null
+  notes: string | null
+  disruptionFlags: CrewTransportDisruptionFlag[]
+  sentAtUtcMs: number | null
+  confirmedAtUtcMs: number | null
+  dispatchedAtUtcMs: number | null
+  pickedUpAtUtcMs: number | null
+  completedAtUtcMs: number | null
+  delayMinutes: number | null
+  crewAppNotifiedAt: number | null
+  createdAtUtcMs: number
+  updatedAtUtcMs: number
+  createdByUserId: string | null
+  sourceRunId: string | null
+}
+
+export interface CrewTransportTripDerivedRow {
+  pairingId: string
+  pairingCode?: string
+  tripType: CrewTransportTripType
+  scheduledTimeUtcMs: number
+  legFlightNumber?: string | null
+  legStdUtcIso?: string | null
+  legStaUtcIso?: string | null
+  airportIcao: string
+  fromLocationType: CrewTransportLocationType
+  fromAddress?: string | null
+  fromLat?: number | null
+  fromLng?: number | null
+  fromLabel?: string
+  toLocationType: CrewTransportLocationType
+  toAddress?: string | null
+  toLat?: number | null
+  toLng?: number | null
+  toLabel?: string
+  paxStops?: CrewTransportPaxStop[]
+  paxCount?: number
+  vendorId?: string | null
+  vendorMethod?: CrewTransportVendorMethod
+  vendorContractId?: string | null
+  vehicleTierId?: string | null
+  costMinor?: number
+  costCurrency?: string
+}
+
+export interface CrewTransportTripCreateInput {
+  pairingId?: string | null
+  pairingCode?: string
+  tripType: CrewTransportTripType
+  scheduledTimeUtcMs: number
+  airportIcao: string
+  fromLocationType: CrewTransportLocationType
+  fromAddress?: string | null
+  fromLabel?: string
+  toLocationType: CrewTransportLocationType
+  toAddress?: string | null
+  toLabel?: string
+  paxStops?: CrewTransportPaxStop[]
+  vendorId?: string | null
+  vendorMethod?: CrewTransportVendorMethod
+  notes?: string | null
+}
+
+export interface CrewTransportTripPatchInput {
+  status?: CrewTransportTripStatus
+  vendorId?: string | null
+  vendorMethod?: CrewTransportVendorMethod
+  vendorContractId?: string | null
+  vehicleTierId?: string | null
+  vehiclePlate?: string | null
+  driverName?: string | null
+  driverPhone?: string | null
+  confirmationNumber?: string | null
+  notes?: string | null
+  costMinor?: number
+  costCurrency?: string
+  paxStops?: CrewTransportPaxStop[]
+  scheduledTimeUtcMs?: number
+  disruptionFlags?: CrewTransportDisruptionFlag[]
+}
+
+// ── 4.1.8.2 CrewFlightBooking (deadhead) ──
+
+export type CrewFlightBookingMethod = 'ticket' | 'gendec'
+export type CrewFlightBookingStatus = 'pending' | 'booked' | 'confirmed' | 'cancelled'
+export type CrewFlightGendecPosition = 'cockpit-jumpseat' | 'cabin-jumpseat' | 'pax-seat'
+export type CrewFlightBookingClass = 'Y' | 'J' | 'F' | 'C' | 'W'
+
+export interface CrewFlightAttachmentRef {
+  _id: string
+  name: string
+  url: string
+  mimeType: string | null
+  sizeBytes: number | null
+  uploadedAtUtcMs: number
+  uploadedByUserId: string | null
+}
+
+export interface CrewFlightBookingRef {
+  _id: string
+  operatorId: string
+  pairingId: string
+  legId: string
+  pairingCode: string
+  crewIds: string[]
+  method: CrewFlightBookingMethod
+  carrierCode: string | null
+  flightNumber: string | null
+  flightDate: string | null
+  depStation: string | null
+  arrStation: string | null
+  bookingClass: CrewFlightBookingClass | null
+  pnr: string | null
+  ticketNumbers: string[]
+  fareCost: number | null
+  fareCurrency: string
+  attachments: CrewFlightAttachmentRef[]
+  gendecPosition: CrewFlightGendecPosition | null
+  status: CrewFlightBookingStatus
+  notes: string | null
+  bookedAtUtcMs: number | null
+  bookedByUserId: string | null
+  cancelledAtUtcMs: number | null
+  sourceRunId: string | null
+  crewAppNotifiedAt: number | null
+  createdAtUtcMs: number
+  updatedAtUtcMs: number
+  createdByUserId: string | null
+}
+
+interface CrewFlightBookingTicketCreate {
+  method: 'ticket'
+  pairingId: string
+  legId: string
+  pairingCode?: string
+  crewIds?: string[]
+  notes?: string | null
+  carrierCode: string
+  flightNumber?: string | null
+  flightDate?: string | null
+  depStation?: string | null
+  arrStation?: string | null
+  bookingClass?: CrewFlightBookingClass | null
+  pnr?: string | null
+  ticketNumbers?: string[]
+  fareCost?: number | null
+  fareCurrency?: string
+}
+
+interface CrewFlightBookingGendecCreate {
+  method: 'gendec'
+  pairingId: string
+  legId: string
+  pairingCode?: string
+  crewIds?: string[]
+  notes?: string | null
+  gendecPosition: CrewFlightGendecPosition
+  carrierCode?: string | null
+  flightNumber?: string | null
+  flightDate?: string | null
+  depStation?: string | null
+  arrStation?: string | null
+}
+
+export type CrewFlightBookingCreateInput = CrewFlightBookingTicketCreate | CrewFlightBookingGendecCreate
+
+export interface CrewFlightBookingPatchInput {
+  method?: CrewFlightBookingMethod
+  carrierCode?: string | null
+  flightNumber?: string | null
+  flightDate?: string | null
+  depStation?: string | null
+  arrStation?: string | null
+  bookingClass?: CrewFlightBookingClass | null
+  pnr?: string | null
+  ticketNumbers?: string[]
+  fareCost?: number | null
+  fareCurrency?: string
+  gendecPosition?: CrewFlightGendecPosition | null
+  crewIds?: string[]
+  status?: CrewFlightBookingStatus
+  notes?: string | null
+}
+
+// ── 4.1.8.2 TransportEmail ──
+
+export type TransportEmailStatus =
+  | 'draft'
+  | 'held'
+  | 'pending'
+  | 'sent'
+  | 'partial'
+  | 'failed'
+  | 'discarded'
+  | 'received'
+
+export type TransportEmailDeliveryStatus = 'pending' | 'delivered' | 'failed' | 'retrying'
+
+export interface TransportEmailAttachmentRef {
+  _id: string
+  name: string
+  url: string
+  mimeType: string | null
+  sizeBytes: number | null
+}
+
+export interface TransportEmailDeliveryRef {
+  recipient: string
+  status: TransportEmailDeliveryStatus
+  attemptCount: number
+  lastAttemptAtUtcMs: number | null
+  deliveredAtUtcMs: number | null
+  errorDetail: string | null
+  externalRef: string | null
+}
+
+export interface TransportEmailRef {
+  _id: string
+  operatorId: string
+  direction: 'outbound' | 'inbound'
+  status: TransportEmailStatus
+  vendorId: string | null
+  vendorName: string
+  tripIds: string[]
+  subject: string
+  body: string
+  attachments: TransportEmailAttachmentRef[]
+  recipients: string[]
+  rawSource: string | null
+  threadId: string | null
+  deliveries: TransportEmailDeliveryRef[]
+  heldAtUtcMs: number | null
+  heldByUserId: string | null
+  releasedAtUtcMs: number | null
+  releasedByUserId: string | null
+  discardedAtUtcMs: number | null
+  discardedByUserId: string | null
+  createdAtUtcMs: number
+  updatedAtUtcMs: number
+  createdByUserId: string | null
+}
+
+export interface TransportEmailCreateInput {
+  direction?: 'outbound'
+  vendorId?: string | null
+  vendorName?: string
+  tripIds?: string[]
+  subject?: string
+  body?: string
+  recipients?: string[]
+  attachments?: Array<{ name: string; url: string; mimeType?: string | null; sizeBytes?: number | null }>
+  threadId?: string | null
+  status?: 'draft' | 'held'
+}
+
+export interface TransportEmailPatchInput {
+  subject?: string
+  body?: string
+  recipients?: string[]
+  attachments?: Array<{ _id?: string; name: string; url: string; mimeType?: string | null; sizeBytes?: number | null }>
+  tripIds?: string[]
+  vendorId?: string | null
+  vendorName?: string
 }
 
 // ── 4.1.6.1 Auto Roster ──

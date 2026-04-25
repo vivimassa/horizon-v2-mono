@@ -56,6 +56,31 @@ const checkInSchema = new Schema(
   { _id: false },
 )
 
+const hubLocationSchema = new Schema(
+  {
+    name: { type: String, default: '' },
+    addressLine: { type: String, default: null },
+    lat: { type: Number, default: null },
+    lng: { type: Number, default: null },
+  },
+  { _id: false },
+)
+
+const transportSchema = new Schema(
+  {
+    pickupMode: { type: String, enum: ['door-to-door', 'hub-shuttle'], default: 'hub-shuttle' },
+    hubLocation: { type: hubLocationSchema, default: null },
+    bufferMinutes: { type: Number, default: 15, min: 0, max: 120 },
+    batchingWindowMinutes: { type: Number, default: 30, min: 0, max: 120 },
+    defaultTravelTimeMinutes: { type: Number, default: 45, min: 0, max: 240 },
+    defaultVehicleTier: { type: String, default: null },
+    defaultVendorSlaMinutes: { type: Number, default: 15, min: 5, max: 60 },
+    taxiVoucherEnabled: { type: Boolean, default: false },
+    flightBookingMode: { type: String, enum: ['ticket-preferred', 'gendec-preferred'], default: 'ticket-preferred' },
+  },
+  { _id: false },
+)
+
 const emailSchema = new Schema(
   {
     fromAddress: { type: String, default: '' },
@@ -76,6 +101,7 @@ const operatorHotacConfigSchema = new Schema(
     roomAllocation: { type: roomAllocationSchema, default: () => ({}) },
     dispatch: { type: dispatchSchema, default: () => ({}) },
     checkIn: { type: checkInSchema, default: () => ({}) },
+    transport: { type: transportSchema, default: () => ({}) },
     email: { type: emailSchema, default: () => ({}) },
 
     createdAt: { type: String, default: () => new Date().toISOString() },

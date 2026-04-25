@@ -57,11 +57,15 @@ import { crewHotelRoutes } from './routes/crew-hotels.js'
 import { hotelBookingRoutes } from './routes/hotel-bookings.js'
 import { hotelEmailRoutes } from './routes/hotel-emails.js'
 import { crewTransportVendorRoutes } from './routes/crew-transport-vendors.js'
+import { crewTransportTripRoutes } from './routes/crew-transport-trips.js'
+import { transportEmailRoutes } from './routes/transport-emails.js'
+import { crewFlightBookingRoutes } from './routes/crew-flight-bookings.js'
 import { ensureManpowerBasePlan } from './services/ensure-manpower-base-plan.js'
 import { startWeatherPoll } from './jobs/weather-poll.js'
 import { startAutoTransmitScheduler } from './jobs/mvt-auto-transmit.js'
 import { startAsmSsmDeliveryScheduler } from './jobs/asm-ssm-deliver.js'
 import { startHotelEmailDeliveryScheduler } from './jobs/hotel-email-deliver.js'
+import { startTransportEmailDeliveryScheduler } from './jobs/transport-email-deliver.js'
 import { loadOurAirportsData, startAutoRefresh } from './data/ourairports-cache.js'
 
 const port = env.PORT
@@ -163,6 +167,9 @@ async function main(): Promise<void> {
   await app.register(hotelBookingRoutes)
   await app.register(hotelEmailRoutes)
   await app.register(crewTransportVendorRoutes)
+  await app.register(crewTransportTripRoutes)
+  await app.register(transportEmailRoutes)
+  await app.register(crewFlightBookingRoutes)
 
   // ── Bootstrap: ensure every active operator has the 4 system document
   // folders (Crew Photos / Passports & Licenses / Medical Certificates /
@@ -207,6 +214,7 @@ async function main(): Promise<void> {
   // Disable with ENABLE_ASM_SSM_DELIVERY=false.
   startAsmSsmDeliveryScheduler()
   startHotelEmailDeliveryScheduler()
+  startTransportEmailDeliveryScheduler()
 
   // ── OOOI Simulation — seed actual times on startup + every 15 minutes ──
   const OOOI_SIM_INTERVAL = 15 * 60_000 // 15 minutes

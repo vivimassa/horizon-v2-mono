@@ -51,7 +51,7 @@ function nightKey(arrUtcIso: string): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
 }
 
-function findLayovers(pairing: PairingRef, cfg: LayoverConfig): LayoverGap[] {
+function findLayovers(pairing: PairingRef, cfg: LayoverConfig, pairingHasHotelAtHomeBase: boolean): LayoverGap[] {
   const legs = (pairing.legs ?? []).slice().sort((a, b) => a.legOrder - b.legOrder)
   if (legs.length === 0) return []
 
@@ -62,8 +62,9 @@ function findLayovers(pairing: PairingRef, cfg: LayoverConfig): LayoverGap[] {
     const arrUtcMs = Date.parse(inbound.staUtcIso)
     if (!Number.isFinite(arrUtcMs)) continue
 
-    // Skip layovers at the home base when configured.
-    if (cfg.excludeHomeBase && inbound.arrStation === pairing.baseAirport) continue
+    // Skip layovers at the home base when configured — UNLESS at least one
+    // crew on this pairing has the hotelAtHomeBase override on their profile.
+    if (cfg.excludeHomeBase && inbound.arrStation === pairing.baseAirport && !pairingHasHotelAtHomeBase) continue
 
     const next = legs[i + 1]
     if (next && next.depStation === inbound.arrStation) {
@@ -232,7 +233,11 @@ export function deriveBookings(input: DeriveInput): HotacBooking[] {
   // from `pairing.crewCounts` when present, falling back to assignments.
   const out: HotacBooking[] = []
   for (const pairing of pairings) {
-    const layovers = findLayovers(pairing, layoverConfig)
+    // Per-crew hotelAtHomeBase override: if ANY crew on the pairing has it
+    // set, home-base layovers are emitted (otherwise excluded by config).
+    const pairingAssignments = assignmentsByPairing.get(pairing._id) ?? []
+    const pairingHasHotelAtHomeBase = pairingAssignments.some((a) => crewById.get(a.crewId)?.hotelAtHomeBase === true)
+    const layovers = findLayovers(pairing, layoverConfig, pairingHasHotelAtHomeBase)
     if (layovers.length === 0) continue
 
     for (const layover of layovers) {

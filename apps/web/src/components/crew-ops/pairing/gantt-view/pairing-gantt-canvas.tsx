@@ -99,6 +99,7 @@ export function PairingGanttCanvas() {
   const pairingFlightPool = usePairingStore((s) => s.flights)
   const positionFilter = usePairingStore((s) => s.filters.positionFilter)
   const baseAirports = usePairingStore((s) => s.filters.baseAirports)
+  const aircraftTypeFilter = usePairingStore((s) => s.filters.aircraftTypes)
   const inspectedPairingId = usePairingStore((s) => s.inspectedPairingId)
   const inspectPairing = usePairingStore((s) => s.inspectPairing)
   const bulkQueue = usePairingStore((s) => s.bulkQueue)
@@ -234,6 +235,16 @@ export function PairingGanttCanvas() {
   const reviewedPairings = useMemo(() => {
     let result = pairings
 
+    if (baseAirports && baseAirports.length > 0) {
+      const baseSet = new Set(baseAirports)
+      result = result.filter((p) => baseSet.has(p.baseAirport))
+    }
+
+    if (aircraftTypeFilter && aircraftTypeFilter.length > 0) {
+      const typeSet = new Set(aircraftTypeFilter)
+      result = result.filter((p) => (p.aircraftTypeIcao ? typeSet.has(p.aircraftTypeIcao) : false))
+    }
+
     const { under, over } = coverageProblemSets
     switch (reviewFilterMode) {
       case 'operating':
@@ -293,7 +304,7 @@ export function PairingGanttCanvas() {
     }
 
     return result
-  }, [pairings, reviewFilterMode, smartFilters, coverageProblemSets])
+  }, [pairings, reviewFilterMode, smartFilters, coverageProblemSets, baseAirports, aircraftTypeFilter])
 
   // Pairing zone layout — depends on reviewedPairings (post-filter) + view params.
   const zoneLayout = useMemo(() => {

@@ -13,7 +13,7 @@ const reportingTimeSchema = new Schema(
 const fdtlSchemeSchema = new Schema(
   {
     _id: { type: String, required: true },
-    operatorId: { type: String, required: true, index: true },
+    operatorId: { type: String, required: true },
     frameworkCode: { type: String, required: true }, // 'CAAV_VAR15', 'EASA_ORO_FTL', 'FAA_P117', etc.
     cabinFrameworkCode: { type: String, default: null }, // null = same as cockpit
     cabinCrewSeparateRules: { type: Boolean, default: false },

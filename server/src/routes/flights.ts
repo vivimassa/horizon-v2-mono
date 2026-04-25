@@ -43,7 +43,9 @@ export async function flightRoutes(app: FastifyInstance): Promise<void> {
 
     if (!from || !to) {
       const filter: Record<string, unknown> = { operatorId }
-      return FlightInstance.find(filter).sort({ 'schedule.stdUtc': 1 }).lean()
+      // allowDiskUse fallback for operators large enough to exceed the 32 MB
+      // in-memory sort limit even with the supporting index.
+      return FlightInstance.find(filter).sort({ 'schedule.stdUtc': 1 }).allowDiskUse(true).lean()
     }
 
     // Build the set of operating dates in the window — extend back 7 days so we

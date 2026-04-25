@@ -79,23 +79,16 @@ export function PairingFilterPanel({ onGo }: PairingFilterPanelProps) {
     [context.acTypes],
   )
 
-  const crewGroupOptions = useMemo<MultiSelectOption[]>(
-    () => context.crewGroups.map((g) => ({ key: g._id, label: g.name })),
-    [context.crewGroups],
-  )
-
   const selectedBases = draft.baseAirports ?? []
   const selectedAircraft = draft.aircraftTypes ?? []
   const selectedPositions = draft.positionFilter ?? []
-  const selectedCrewGroups = draft.crewGroupIds ?? []
 
   const activeCount = mounted
     ? (draftFrom ? 1 : 0) +
       (draftTo ? 1 : 0) +
       (selectedBases.length > 0 ? 1 : 0) +
       (selectedAircraft.length > 0 ? 1 : 0) +
-      (selectedPositions.length > 0 ? 1 : 0) +
-      (selectedCrewGroups.length > 0 ? 1 : 0)
+      (selectedPositions.length > 0 ? 1 : 0)
     : 0
 
   function handleGo() {
@@ -147,18 +140,6 @@ export function PairingFilterPanel({ onGo }: PairingFilterPanelProps) {
           onChange={(keys) => setDraftFilters({ aircraftTypes: keys.length === 0 ? null : keys })}
           allLabel="All Types"
           noneLabel="All Types"
-        />
-      </FilterSection>
-
-      <FilterSection label="Crew Group">
-        <MultiSelectField
-          options={crewGroupOptions}
-          value={selectedCrewGroups}
-          onChange={(keys) => setDraftFilters({ crewGroupIds: keys.length === 0 ? null : keys })}
-          allLabel="All Groups"
-          noneLabel="All Groups"
-          searchable
-          searchPlaceholder="Search groups…"
         />
       </FilterSection>
     </FilterPanel>

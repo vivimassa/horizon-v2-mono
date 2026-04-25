@@ -4,6 +4,7 @@
 
 export * from './database'
 export * from './schedule-messaging'
+export * from './gantt'
 
 // Re-export GCS types under a namespace to avoid collisions
 export * as GCS from './gcs'

@@ -121,7 +121,15 @@ export function PairingGanttShell() {
           const familyMap: Record<string, string | null> = {}
           for (const t of acTypesRaw) familyMap[t.icaoType] = t.family ?? null
           setAircraftTypeFamilies(familyMap)
-          setGanttAircraft(acRegs.map((r) => toGanttAircraft(r, typeLookup)))
+          const selectedTypeIcaos = filters.aircraftTypes
+          const filteredRegs =
+            selectedTypeIcaos && selectedTypeIcaos.length > 0
+              ? acRegs.filter((r) => {
+                  const icao = typeLookup.get(r.aircraftTypeId)?.icaoType
+                  return icao ? selectedTypeIcaos.includes(icao) : false
+                })
+              : acRegs
+          setGanttAircraft(filteredRegs.map((r) => toGanttAircraft(r, typeLookup)))
           setGanttFlights((flightRows as PairingFlight[]).map(toGanttFlight))
         } catch (err) {
           // Dev fallback so the UI is usable without the real backend.

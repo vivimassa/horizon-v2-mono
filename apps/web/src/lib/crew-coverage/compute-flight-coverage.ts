@@ -46,12 +46,22 @@ export function computeFlightCoverage({
     return false
   }
   const isDeadhead = (p: Pairing): boolean => p.deadheadFlightIds.includes(flightId)
+  const icaoEarly = aircraftTypeIcao ?? ''
+  const findTemplateEarly = (key: string): Record<string, number> | null => {
+    const doc = complementMaster.find(
+      (c) => c.aircraftTypeIcao === icaoEarly && c.templateKey === key && c.isActive !== false,
+    )
+    return doc ? (doc.counts as Record<string, number>) : null
+  }
   const covering = pairings.filter((p) => {
     if (!matchesFlight(p) || isDeadhead(p)) return false
     if (!filterSetPre) return true
     // When filtering by position(s), only pairings that carry ≥1 selected
     // position count as covering this flight for that planner's view.
-    const counts = p.crewCounts ?? {}
+    // Pairings often omit `crewCounts` and rely on their complement template
+    // (e.g. Standard 2-cockpit) — fall back to that template so a CP filter
+    // doesn't drop pairings that would carry CP via the template.
+    const counts = p.crewCounts ?? findTemplateEarly(p.complementKey) ?? {}
     return [...filterSetPre].some((code) => (counts[code] ?? 0) > 0)
   })
   if (covering.length === 0) return { state: 'uncovered', augmented: false, deltas: [] }

@@ -28,14 +28,11 @@ export interface ActivityCategorization {
   countsFdp: boolean
 }
 
-const REST_FLAGS = new Set([
-  'is_day_off',
-  'is_annual_leave',
-  'is_sick_leave',
-  'is_rest_period',
-  'is_home_standby',
-  'is_reserve',
-])
+// True rest — clears the duty chain AND counts as zero duty time.
+// Standby/reserve are NOT here: they require min-rest before & after like any
+// duty endpoint. Treating them as rest hides legality violations when standby
+// is placed adjacent to a pairing without sufficient gap.
+const REST_FLAGS = new Set(['is_day_off', 'is_annual_leave', 'is_sick_leave', 'is_rest_period'])
 
 export function categorizeActivityFlags(flags: readonly string[] | null | undefined): ActivityCategorization {
   const f = new Set(flags ?? [])

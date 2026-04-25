@@ -197,6 +197,9 @@ const flightInstanceSchema = new Schema(
 
 flightInstanceSchema.index({ operatorId: 1, operatingDate: 1 })
 flightInstanceSchema.index({ operatorId: 1, scheduledFlightId: 1, operatingDate: 1 })
+// Backs unfiltered GET /flights sort. Without it Mongo loads everything into
+// memory and a large operator hits the 32 MB sort limit.
+flightInstanceSchema.index({ operatorId: 1, 'schedule.stdUtc': 1 })
 
 export type FlightInstanceDoc = InferSchemaType<typeof flightInstanceSchema>
 export const FlightInstance = mongoose.model('FlightInstance', flightInstanceSchema)

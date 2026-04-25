@@ -18,7 +18,9 @@ const destinationRuleSchema = new Schema(
   {
     _id: { type: String, required: true },
     scope: { type: String, enum: ['airport', 'country'], required: true },
-    code: { type: String, required: true },
+    codes: { type: [String], default: [] },
+    /** @deprecated retained for legacy doc reads — migrated to codes[] in app code. */
+    code: { type: String, default: null },
     maxLayoversPerPeriod: { type: Number, default: null },
     minSeparationDays: { type: Number, default: null },
     enabled: { type: Boolean, default: true },
@@ -71,6 +73,40 @@ const standbySchema = new Schema(
   { _id: false },
 )
 
+// Quality-of-Life rule. Soft preferences that shape duty placement around
+// designated activities (typically vacation / leave codes) so crew can wind
+// down before, and ease back into work after, those blocks.
+//
+//   direction='before_activity' + timeHHMM='12:00'
+//     → duty ENDING the day before the activity must end before 12:00 local
+//   direction='after_activity'  + timeHHMM='12:00'
+//     → duty STARTING the day after the activity must start after 12:00 local
+//
+// Per-rule weight 1-10 (same scale as soft duty rules). Solver penalises
+// violations but never blocks coverage.
+const qolRuleSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    enabled: { type: Boolean, default: true },
+    direction: { type: String, enum: ['before_activity', 'after_activity'], required: true },
+    activityCodeIds: { type: [String], default: [] },
+    timeHHMM: { type: String, required: true },
+    weight: { type: Number, default: 5, min: 1, max: 10 },
+    notes: { type: String, default: null },
+  },
+  { _id: false },
+)
+
+// Birthday-off rule. Standalone soft preference: on a crew's birthday, place
+// OFF (or rest) instead of any duty. Honoured by the solver when it can
+// satisfy coverage without breaking it. Weight 1-10.
+const qolBirthdaySchema = new Schema(
+  {
+    enabled: { type: Boolean, default: false },
+  },
+  { _id: false },
+)
+
 const objectivesSchema = new Schema(
   {
     genderBalanceOnLayovers: { type: Boolean, default: true },
@@ -92,6 +128,8 @@ const operatorSchedulingConfigSchema = new Schema(
     daysOff: { type: daysOffSchema, default: () => ({}) },
     standby: { type: standbySchema, default: () => ({}) },
     destinationRules: { type: [destinationRuleSchema], default: [] },
+    qolRules: { type: [qolRuleSchema], default: [] },
+    qolBirthday: { type: qolBirthdaySchema, default: () => ({}) },
     objectives: { type: objectivesSchema, default: () => ({}) },
 
     createdAt: { type: String, default: () => new Date().toISOString() },

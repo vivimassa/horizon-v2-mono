@@ -41,7 +41,7 @@ export interface SoftRulesConfig {
   }
   destinationRules: Array<{
     scope: 'airport' | 'country'
-    code: string
+    codes: string[]
     maxLayoversPerPeriod: number | null
     minSeparationDays: number | null
     enabled: boolean
@@ -147,16 +147,19 @@ export function checkSoftRules(
     }
 
     for (const rule of enabledDestRules) {
-      const matchingAssignments = assignmentLayovers.filter((al) =>
-        rule.scope === 'airport' ? al.stations.includes(rule.code) : al.countries.includes(rule.code),
-      )
+      const codeSet = new Set(rule.codes)
+      const matchingAssignments = assignmentLayovers.filter((al) => {
+        const haystack = rule.scope === 'airport' ? al.stations : al.countries
+        return haystack.some((c) => codeSet.has(c))
+      })
+      const codeLabel = rule.codes.join(', ')
 
       // Max layovers per period
       if (rule.maxLayoversPerPeriod !== null && matchingAssignments.length > rule.maxLayoversPerPeriod) {
         violations.push({
           rule: 'destinationLayover',
           severity: 'warning',
-          message: `${matchingAssignments.length} layovers at ${rule.code} exceeds max of ${rule.maxLayoversPerPeriod}`,
+          message: `${matchingAssignments.length} layovers at ${codeLabel} exceeds max of ${rule.maxLayoversPerPeriod}`,
           affectedDates: matchingAssignments.slice(rule.maxLayoversPerPeriod).map((a) => a.startDate),
         })
       }
@@ -170,7 +173,7 @@ export function checkSoftRules(
             violations.push({
               rule: 'destinationSeparation',
               severity: 'warning',
-              message: `Only ${gap}d gap between ${rule.code} duties (min ${rule.minSeparationDays}d)`,
+              message: `Only ${gap}d gap between ${codeLabel} duties (min ${rule.minSeparationDays}d)`,
               affectedDates: [visitDates[i]],
             })
           }

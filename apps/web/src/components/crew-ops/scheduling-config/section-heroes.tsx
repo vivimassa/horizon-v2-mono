@@ -703,7 +703,7 @@ export function DestinationHero({ accent, isDark }: HeroProps) {
       <HeroTitle
         accent={accent}
         isDark={isDark}
-        eyebrow="Destination rules · Soft constraint"
+        eyebrow="Destination rules · Soft rule"
         title="Limit layovers and protect crew rest"
         caption="Cap layovers per airport or country per period. Enforce minimum separation days between visits."
       />
@@ -833,6 +833,106 @@ export function OptimizationHero({ accent, isDark }: HeroProps) {
         eyebrow="Optimization · Objective weights"
         title="Balance gender on layover flights"
         caption="Crew of the same gender in shared accommodation reduces HOTAC cost. Tune how hard the solver tries."
+      />
+    </HeroFrame>
+  )
+}
+
+export function QolHero({ accent, isDark }: HeroProps) {
+  // Visualises a 3-day strip: Day -1 (early off), Day 0 (vacation block),
+  // Day +1 (late report). Soft amber highlights the wind-down + late return
+  // windows; the green block in the middle is the activity (e.g. AL).
+  const dim = isDark ? '#8F90A6' : '#555770'
+  return (
+    <HeroFrame accent={accent} isDark={isDark}>
+      <svg
+        className="absolute right-6 top-1/2 -translate-y-1/2"
+        width="280"
+        height="150"
+        viewBox="0 0 280 150"
+        aria-hidden
+      >
+        {/* Day labels */}
+        {['Day −1', 'Vacation', 'Day +1'].map((lbl, i) => (
+          <text
+            key={lbl}
+            x={28 + i * 92}
+            y="22"
+            fontSize="9"
+            fontWeight="700"
+            textAnchor="middle"
+            fontFamily="system-ui"
+            fill={dim}
+            letterSpacing="0.08em"
+          >
+            {lbl.toUpperCase()}
+          </text>
+        ))}
+
+        {/* Day -1 lane: full duty bar with wind-down highlight on the right */}
+        <rect x="0" y="34" width="84" height="22" rx="6" fill={`${accent}55`} stroke={accent} strokeWidth="0.8" />
+        <rect x="58" y="34" width="26" height="22" rx="6" fill={`${accent}cc`} />
+        <text
+          x="42"
+          y="49"
+          fontSize="9"
+          fontWeight="700"
+          textAnchor="middle"
+          fontFamily="ui-monospace, monospace"
+          fill="#fff"
+        >
+          DUTY
+        </text>
+        {/* arrow showing early end */}
+        <line x1="84" y1="68" x2="84" y2="78" stroke={accent} strokeWidth="1" />
+        <text x="84" y="90" fontSize="8" fontWeight="600" textAnchor="middle" fontFamily="system-ui" fill={accent}>
+          end ≤ 12:00
+        </text>
+
+        {/* Vacation block (green) */}
+        <rect x="92" y="34" width="84" height="22" rx="6" fill="#06C27033" stroke="#06C270" strokeWidth="0.8" />
+        <text
+          x="134"
+          y="49"
+          fontSize="9"
+          fontWeight="700"
+          textAnchor="middle"
+          fontFamily="ui-monospace, monospace"
+          fill="#06C270"
+        >
+          AL
+        </text>
+
+        {/* Day +1 lane: late start bar */}
+        <rect x="184" y="34" width="84" height="22" rx="6" fill={`${accent}55`} stroke={accent} strokeWidth="0.8" />
+        <rect x="184" y="34" width="26" height="22" rx="6" fill={`${accent}cc`} />
+        <text
+          x="226"
+          y="49"
+          fontSize="9"
+          fontWeight="700"
+          textAnchor="middle"
+          fontFamily="ui-monospace, monospace"
+          fill="#fff"
+        >
+          DUTY
+        </text>
+        <line x1="210" y1="68" x2="210" y2="78" stroke={accent} strokeWidth="1" />
+        <text x="210" y="90" fontSize="8" fontWeight="600" textAnchor="middle" fontFamily="system-ui" fill={accent}>
+          start ≥ 12:00
+        </text>
+
+        {/* Heart glyph footer */}
+        <text x="140" y="128" fontSize="9" fontWeight="600" textAnchor="middle" fontFamily="system-ui" fill={dim}>
+          Soft preference · coverage still wins
+        </text>
+      </svg>
+      <HeroTitle
+        accent={accent}
+        isDark={isDark}
+        eyebrow="Quality of life · Soft rule"
+        title="Wind down before, ease back after"
+        caption="Per-activity windows that nudge the solver toward early relief and late return around vacations and leave."
       />
     </HeroFrame>
   )

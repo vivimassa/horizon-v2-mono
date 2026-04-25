@@ -12,14 +12,30 @@ import { OperatorSchedulingConfig } from '../models/OperatorSchedulingConfig.js'
  * PUT gated by requireOpsRole. Reads open to any authenticated tenant user.
  */
 
-const destinationRuleSchema = z.object({
-  _id: z.string().min(1),
-  scope: z.enum(['airport', 'country']),
-  code: z.string().min(1).max(10),
-  maxLayoversPerPeriod: z.number().int().min(0).max(99).nullable().optional(),
-  minSeparationDays: z.number().int().min(0).max(90).nullable().optional(),
-  enabled: z.boolean().optional(),
-})
+const destinationRuleSchema = z
+  .object({
+    _id: z.string().min(1),
+    scope: z.enum(['airport', 'country']),
+    /** New shape — array of codes. */
+    codes: z.array(z.string().min(1).max(10)).min(1).max(50).optional(),
+    /** Legacy single-code shape; auto-migrated to codes[]. */
+    code: z.string().min(1).max(10).optional(),
+    maxLayoversPerPeriod: z.number().int().min(0).max(99).nullable().optional(),
+    minSeparationDays: z.number().int().min(0).max(90).nullable().optional(),
+    enabled: z.boolean().optional(),
+  })
+  .transform((r) => {
+    const codes = r.codes && r.codes.length > 0 ? r.codes : r.code ? [r.code] : []
+    return {
+      _id: r._id,
+      scope: r.scope,
+      codes,
+      maxLayoversPerPeriod: r.maxLayoversPerPeriod,
+      minSeparationDays: r.minSeparationDays,
+      enabled: r.enabled,
+    }
+  })
+  .refine((r) => r.codes.length > 0, { message: 'At least one code required' })
 
 const softRuleSchema = z
   .object({
@@ -58,6 +74,22 @@ const standbySchema = z
   })
   .optional()
 
+const qolRuleSchema = z.object({
+  _id: z.string().min(1),
+  enabled: z.boolean().optional(),
+  direction: z.enum(['before_activity', 'after_activity']),
+  activityCodeIds: z.array(z.string().min(1)).min(1).max(20),
+  timeHHMM: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Expected HH:MM (00:00–23:59)'),
+  weight: z.number().int().min(1).max(10).optional(),
+  notes: z.string().max(200).nullable().optional(),
+})
+
+const qolBirthdaySchema = z
+  .object({
+    enabled: z.boolean().optional(),
+  })
+  .optional()
+
 const objectivesSchema = z
   .object({
     genderBalanceOnLayovers: z.boolean().optional(),
@@ -72,6 +104,8 @@ const upsertSchema = z.object({
   daysOff: daysOffSchema,
   standby: standbySchema,
   destinationRules: z.array(destinationRuleSchema).optional(),
+  qolRules: z.array(qolRuleSchema).max(40).optional(),
+  qolBirthday: qolBirthdaySchema,
   objectives: objectivesSchema,
 })
 
@@ -136,6 +170,10 @@ export async function operatorSchedulingConfigRoutes(app: FastifyInstance) {
       ...((existing?.objectives as Record<string, unknown>) ?? {}),
       ...(parsed.data.objectives ?? {}),
     }
+    const mergedQolBirthday = {
+      ...((existing?.qolBirthday as Record<string, unknown>) ?? {}),
+      ...(parsed.data.qolBirthday ?? {}),
+    }
 
     const set: Record<string, unknown> = {
       operatorId,
@@ -143,6 +181,7 @@ export async function operatorSchedulingConfigRoutes(app: FastifyInstance) {
       daysOff: mergedDaysOff,
       standby: mergedStandby,
       objectives: mergedObjectives,
+      qolBirthday: mergedQolBirthday,
       updatedAt: now,
     }
 
@@ -155,6 +194,11 @@ export async function operatorSchedulingConfigRoutes(app: FastifyInstance) {
       set.destinationRules = parsed.data.destinationRules
     } else if (existing?.destinationRules !== undefined) {
       set.destinationRules = existing.destinationRules
+    }
+    if (parsed.data.qolRules !== undefined) {
+      set.qolRules = parsed.data.qolRules
+    } else if (existing?.qolRules !== undefined) {
+      set.qolRules = existing.qolRules
     }
 
     await OperatorSchedulingConfig.updateOne(

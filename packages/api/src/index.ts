@@ -213,6 +213,8 @@ export type {
   SchedulingDaysOffConfig,
   SchedulingStandbyConfig,
   SchedulingDestinationRule,
+  SchedulingQolRule,
+  SchedulingQolBirthdayConfig,
   SchedulingObjectivesConfig,
   OperatorSchedulingConfig,
   OperatorSchedulingConfigUpsert,

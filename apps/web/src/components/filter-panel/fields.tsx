@@ -204,7 +204,23 @@ export function MultiSelectField({
   const isDark = theme === 'dark'
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [flipUp, setFlipUp] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+
+  // When opening, decide whether the panel renders below (default) or above
+  // the trigger. Cheap viewport math — avoids a portal and keeps it inside
+  // existing scroll containers.
+  useEffect(() => {
+    if (!open) return
+    const el = triggerRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - rect.bottom
+    const spaceAbove = rect.top
+    const desired = 280 // search input + ~6 rows
+    setFlipUp(spaceBelow < desired && spaceAbove > spaceBelow)
+  }, [open])
 
   // Close on outside click / Escape.
   useEffect(() => {
@@ -254,6 +270,7 @@ export function MultiSelectField({
   return (
     <div ref={rootRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="w-full h-9 flex items-center justify-between px-3 rounded-xl text-[13px] font-medium transition-colors"
@@ -267,7 +284,7 @@ export function MultiSelectField({
       </button>
       {open && (
         <div
-          className="absolute z-50 mt-1 w-full rounded-xl overflow-hidden"
+          className={`absolute z-50 w-full rounded-xl overflow-hidden ${flipUp ? 'mb-1 bottom-full' : 'mt-1 top-full'}`}
           style={{
             background: menuBg,
             border: `1px solid ${inputBorder}`,

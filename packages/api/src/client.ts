@@ -1053,6 +1053,40 @@ export const api = {
   getFlight: (id: string) => request<Flight>(`/flights/${id}`),
 
   // Reference data
+  // ── Gantt (module 1.1.2) ──
+  getGanttFlights: (params: {
+    operatorId: string
+    from: string
+    to: string
+    scenarioId?: string
+    acTypeFilter?: string[]
+    statusFilter?: string[]
+    includeOcc?: boolean
+  }) => {
+    const qs = new URLSearchParams({
+      operatorId: params.operatorId,
+      from: params.from,
+      to: params.to,
+    })
+    if (params.scenarioId) qs.set('scenarioId', params.scenarioId)
+    if (params.acTypeFilter?.length) qs.set('acTypeFilter', params.acTypeFilter.join(','))
+    if (params.statusFilter?.length) qs.set('statusFilter', params.statusFilter.join(','))
+    if (params.includeOcc) qs.set('includeOcc', '1')
+    return request<import('@skyhub/types').GanttApiResponse>(`/gantt/flights?${qs}`)
+  },
+
+  ganttAssignFlights: (operatorId: string, flightIds: string[], registration: string) =>
+    request<{ updated: number }>('/gantt/assign', {
+      method: 'PATCH',
+      body: JSON.stringify({ operatorId, flightIds, registration }),
+    }),
+
+  ganttUnassignFlights: (operatorId: string, flightIds: string[]) =>
+    request<{ updated: number }>('/gantt/unassign', {
+      method: 'PATCH',
+      body: JSON.stringify({ operatorId, flightIds }),
+    }),
+
   getAirports: (params?: { search?: string; crewBase?: boolean; country?: string }) => {
     let path = '/airports?active=true'
     if (params?.search) path += `&search=${encodeURIComponent(params.search)}`
@@ -4188,9 +4222,37 @@ export interface SchedulingStandbyConfig {
 export interface SchedulingDestinationRule {
   _id: string
   scope: 'airport' | 'country'
-  code: string
+  /** ICAO codes (airport scope) or ISO-2 codes (country scope). One rule may
+   *  cover many destinations to avoid bloat. Legacy `code: string` is migrated
+   *  to a single-element `codes` on read. */
+  codes: string[]
   maxLayoversPerPeriod: number | null
   minSeparationDays: number | null
+  enabled: boolean
+}
+
+/**
+ * Quality-of-Life soft rule. Applied around designated activity codes
+ * (typically AL / vacation / leave) to give crew gentle on-ramp and off-ramp:
+ *   - direction='before_activity' + timeHHMM='12:00' → duty ending the day
+ *     before the activity should end before 12:00 local (early relief).
+ *   - direction='after_activity'  + timeHHMM='12:00' → duty starting the day
+ *     after the activity should start after 12:00 local (late return).
+ * Weight 1-10. Solver penalises violations, never blocks coverage.
+ */
+export interface SchedulingQolRule {
+  _id: string
+  enabled: boolean
+  direction: 'before_activity' | 'after_activity'
+  activityCodeIds: string[]
+  timeHHMM: string
+  weight: number
+  notes?: string | null
+}
+
+/** Birthday-off soft preference. Solver places OFF on a crew's birthday
+ *  when it can satisfy coverage without breaking it. */
+export interface SchedulingQolBirthdayConfig {
   enabled: boolean
 }
 
@@ -4211,6 +4273,8 @@ export interface OperatorSchedulingConfig {
   daysOff: SchedulingDaysOffConfig
   standby: SchedulingStandbyConfig
   destinationRules: SchedulingDestinationRule[]
+  qolRules: SchedulingQolRule[]
+  qolBirthday: SchedulingQolBirthdayConfig
   objectives: SchedulingObjectivesConfig
   createdAt: string
   updatedAt: string
@@ -4222,6 +4286,8 @@ export interface OperatorSchedulingConfigUpsert {
   daysOff?: Partial<SchedulingDaysOffConfig>
   standby?: Partial<SchedulingStandbyConfig>
   destinationRules?: SchedulingDestinationRule[]
+  qolRules?: SchedulingQolRule[]
+  qolBirthday?: Partial<SchedulingQolBirthdayConfig>
   objectives?: Partial<SchedulingObjectivesConfig>
 }
 

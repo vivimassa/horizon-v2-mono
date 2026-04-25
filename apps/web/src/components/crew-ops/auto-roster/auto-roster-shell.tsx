@@ -357,16 +357,36 @@ export function AutoRosterShell() {
       })
     })
     es.addEventListener('error', (e) => {
-      let msg = 'Solver error'
-      try {
-        msg = (JSON.parse((e as MessageEvent).data) as { message: string }).message
-      } catch {
-        /* ignore */
+      // EventSource fires the native `error` event for two very different
+      // things:
+      //   1. Server explicitly emitted `event: error\ndata: {...}` — a real
+      //      solver failure. The MessageEvent has a `data` payload.
+      //   2. The TCP connection dropped (server restart, network blip,
+      //      tsx watch reload after a commit-time prettier rewrite). The
+      //      event has NO `data` and EventSource will auto-retry.
+      // Treating both the same makes a routine `tsx watch` restart kill a
+      // 9-minute solver run in the UI even though the orchestrator may
+      // recover on the other side. So distinguish them.
+      const data = (e as MessageEvent).data
+      if (typeof data === 'string' && data.length > 0) {
+        let msg = 'Solver error'
+        try {
+          msg = (JSON.parse(data) as { message: string }).message
+        } catch {
+          /* ignore */
+        }
+        setPhase('failed')
+        setError(msg)
+        es.close()
+        void loadHistory()
+        return
       }
-      setPhase('failed')
-      setError(msg)
-      es.close()
-      void loadHistory()
+      // Native drop — don't fail the run. Surface a transient banner via
+      // the progress message and let EventSource auto-retry. If the
+      // server-side run is actually dead, the stale-lock sweep flips it
+      // to failed within ~5 min and the next reconnect (or a refresh)
+      // will pick that up via the rehydrate path on mount.
+      setProgress((prev) => ({ pct: prev.pct, message: 'Connection lost — reconnecting…' }))
     })
   }
 

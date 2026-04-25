@@ -50,15 +50,25 @@ export function biometricLabel(types: LocalAuthentication.AuthenticationType[]):
  * the password login screen).
  */
 export async function promptBiometric(promptMessage = 'Sign in to SkyHub'): Promise<boolean> {
+  const result = await promptBiometricVerbose(promptMessage)
+  return result.success
+}
+
+/** Verbose variant — returns Expo's full result so callers can surface why a prompt failed. */
+export async function promptBiometricVerbose(
+  promptMessage = 'Sign in to SkyHub',
+): Promise<LocalAuthentication.LocalAuthenticationResult> {
   try {
-    const result = await LocalAuthentication.authenticateAsync({
+    return await LocalAuthentication.authenticateAsync({
       promptMessage,
-      cancelLabel: 'Use password',
-      fallbackLabel: 'Use password',
-      disableDeviceFallback: true,
+      cancelLabel: 'Cancel',
+      fallbackLabel: 'Use device passcode',
+      // Allow device-passcode fallback. iOS without NSFaceIDUsageDescription in
+      // the native binary refuses to run Face ID and falls back to the device
+      // passcode UI — until the dev build ships, that's the working path.
+      disableDeviceFallback: false,
     })
-    return result.success
-  } catch {
-    return false
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'unknown', warning: undefined } as never
   }
 }

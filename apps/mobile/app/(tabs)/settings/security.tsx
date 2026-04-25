@@ -25,6 +25,7 @@ import { useAppTheme } from '../../../providers/ThemeProvider'
 import { useUser } from '../../../providers/UserProvider'
 import { tokenStorage } from '../../../src/lib/token-storage'
 import { biometricLabel, checkBiometricAvailable, promptBiometric } from '../../../src/lib/biometric-gate'
+import { biometricProfile } from '../../../src/lib/biometric-profile'
 import type { AuthenticationType } from 'expo-local-authentication'
 
 const ACCENT = '#1e40af'
@@ -93,6 +94,7 @@ export default function SecurityScreen() {
         // the next boot doesn't block behind a prompt that can never succeed.
         if (tokenStorage.isBiometricEnabled()) {
           tokenStorage.setBiometricEnabled(false)
+          biometricProfile.clear()
           setBiometric(false)
         }
       }
@@ -117,6 +119,11 @@ export default function SecurityScreen() {
       const ok = await promptBiometric(`Enable ${biometricName} for SkyHub`)
       if (!ok) return // user cancelled — no state change
       tokenStorage.setBiometricEnabled(true)
+      // Persist current session into biometric profile so login screen can
+      // offer Face ID quick sign-in after explicit logout.
+      const rt = tokenStorage.getRefreshToken()
+      const em = user?.profile?.email
+      if (rt && em) biometricProfile.set({ email: em, refreshToken: rt })
       setBiometric(true)
       try {
         await api.updateSecurity({ biometricEnabled: true })
@@ -125,6 +132,7 @@ export default function SecurityScreen() {
       }
     } else {
       tokenStorage.setBiometricEnabled(false)
+      biometricProfile.clear()
       setBiometric(false)
       try {
         await api.updateSecurity({ biometricEnabled: false })

@@ -16,13 +16,24 @@ function resolveApiBaseUrl(): string {
     return env.API_URL
   }
 
-  // Dev: extract LAN IP from Expo's debugger host (e.g. "192.168.1.4:8081")
+  // Dev: extract LAN IP from Expo's debugger host (e.g. "192.168.1.4:8081").
+  // Works across laptops because each `expo start` bakes the bundler's own
+  // LAN IP into hostUri at session start.
   const debuggerHost = Constants.expoConfig?.hostUri ?? Constants.experienceUrl ?? ''
-  const lanIp = debuggerHost.split(':')[0]
+  const host = debuggerHost.split(':')[0]
 
-  if (lanIp) return `http://${lanIp}:${API_PORT}`
+  // Reject tunnel hosts (e.g. *.exp.direct) — those resolve from the phone
+  // but the API at :3002 isn't proxied through them.
+  const isLanIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(host)
+  if (isLanIp) {
+    const url = `http://${host}:${API_PORT}`
+    console.log('[api-url] auto-detected LAN API:', url)
+    return url
+  }
 
-  // Fallback
+  if (host) {
+    console.warn('[api-url] non-LAN host detected:', host, '— set EXPO_PUBLIC_API_URL in apps/mobile/.env')
+  }
   return `http://localhost:${API_PORT}`
 }
 

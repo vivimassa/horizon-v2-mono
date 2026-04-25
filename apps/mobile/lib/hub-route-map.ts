@@ -49,6 +49,9 @@ export const HUB_ROUTE_MAP: Record<string, string> = {
   '/admin/fdt-rules': '/(tabs)/settings/fdt-rules',
   '/admin/duty-patterns': '/(tabs)/settings/duty-patterns',
   '/admin/mpp-lead-times': '/(tabs)/settings/mpp-lead-times',
+  '/admin/crew-hotels': '/(tabs)/settings/crew-hotels',
+  '/network/control/schedule-gantt': '/(tabs)/network/gantt',
+  '/network/schedule/gantt': '/(tabs)/network/gantt',
 
   // ── System Administration (7.1.*) ──
   '/settings/admin/operator-config': '/(tabs)/settings/operator-config',

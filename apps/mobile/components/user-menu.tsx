@@ -1,11 +1,15 @@
-import { useState } from 'react'
-import { View, Text, Pressable, Modal } from 'react-native'
+import { useEffect, useState } from 'react'
+import { View, Text, Pressable, Modal, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
-import { ChevronDown, HelpCircle, LogOut, Moon, Sun, UserCircle } from 'lucide-react-native'
+import { ChevronDown, Fingerprint, HelpCircle, LogOut, Moon, ScanFace, Sun, UserCircle } from 'lucide-react-native'
 import type { LucideIcon } from 'lucide-react-native'
+import type { AuthenticationType } from 'expo-local-authentication'
 import { useAuthStore } from '@skyhub/ui'
 import { useAppTheme } from '../providers/ThemeProvider'
 import { useUser } from '../providers/UserProvider'
+import { tokenStorage } from '../src/lib/token-storage'
+import { biometricProfile } from '../src/lib/biometric-profile'
+import { biometricLabel, checkBiometricAvailable } from '../src/lib/biometric-gate'
 
 interface Props {
   /** Overlay tone (true = glassy trigger for use over imagery). */
@@ -22,10 +26,54 @@ interface Props {
  */
 export function UserMenu({ overlay = true, compact = false }: Props) {
   const router = useRouter()
-  const { isDark, palette, toggleDark } = useAppTheme()
+  const { isDark, palette, toggleDark, accent } = useAppTheme()
   const { user } = useUser()
   const logout = useAuthStore((s) => s.logout)
   const [open, setOpen] = useState(false)
+
+  const [bioAvailable, setBioAvailable] = useState(false)
+  const [bioName, setBioName] = useState('Face ID')
+  const [bioEnabled, setBioEnabled] = useState(() => tokenStorage.isBiometricEnabled())
+
+  useEffect(() => {
+    let cancelled = false
+    checkBiometricAvailable().then((cap) => {
+      if (cancelled || !cap.available) return
+      setBioAvailable(true)
+      setBioName(biometricLabel(cap.types as AuthenticationType[]))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const toggleBio = () => {
+    if (bioEnabled) {
+      tokenStorage.setBiometricEnabled(false)
+      biometricProfile.clear()
+      setBioEnabled(false)
+      return
+    }
+    if (!bioAvailable) {
+      Alert.alert(
+        `${bioName} unavailable`,
+        'No biometric hardware enrolled. Enroll a face or fingerprint in your device settings, then try again.',
+      )
+      return
+    }
+    const rt = tokenStorage.getRefreshToken()
+    const em = user?.profile?.email
+    if (!rt || !em) {
+      Alert.alert('Cannot enable', 'Session info missing. Sign in again, then enable.')
+      return
+    }
+    // Flip immediately — the biometric prompt happens at login time when the
+    // user actually taps "Sign in with Face ID". Avoids a confusing pre-flight
+    // prompt that may silently fail in Expo Go / unenrolled emulators.
+    tokenStorage.setBiometricEnabled(true)
+    biometricProfile.set({ email: em, refreshToken: rt })
+    setBioEnabled(true)
+  }
 
   const firstName = user?.profile?.firstName ?? ''
   const lastName = user?.profile?.lastName ?? ''
@@ -196,12 +244,79 @@ export function UserMenu({ overlay = true, compact = false }: Props) {
               isDark={isDark}
               onPress={() => setOpen(false)}
             />
+            {bioAvailable && (
+              <MenuItemToggle
+                icon={bioName === 'Face ID' ? ScanFace : Fingerprint}
+                label={`Login with ${bioName}`}
+                value={bioEnabled}
+                onPress={toggleBio}
+                color={menuTextColor}
+                accent={accent}
+                isDark={isDark}
+              />
+            )}
             <View style={{ height: 1, backgroundColor: dividerColor, marginHorizontal: 4 }} />
             <MenuItem icon={LogOut} label="Log out" color="#dc2626" isDark={isDark} onPress={handleLogout} />
           </View>
         </Pressable>
       </Modal>
     </>
+  )
+}
+
+function MenuItemToggle({
+  icon: Icon,
+  label,
+  value,
+  onPress,
+  color,
+  accent,
+  isDark,
+}: {
+  icon: LucideIcon
+  label: string
+  value: boolean
+  onPress: () => void
+  color: string
+  accent: string
+  isDark: boolean
+}) {
+  const pressBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'
+  const trackOff = isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.14)'
+  return (
+    <Pressable onPress={onPress} android_ripple={{ color: pressBg }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+        }}
+      >
+        <Icon size={17} color={color} strokeWidth={1.9} />
+        <Text style={{ fontSize: 14, fontWeight: '500', color, flex: 1 }}>{label}</Text>
+        <View
+          style={{
+            width: 38,
+            height: 22,
+            borderRadius: 999,
+            padding: 2,
+            backgroundColor: value ? accent : trackOff,
+          }}
+        >
+          <View
+            style={{
+              width: 18,
+              height: 18,
+              borderRadius: 9,
+              backgroundColor: '#fff',
+              marginLeft: value ? 16 : 0,
+            }}
+          />
+        </View>
+      </View>
+    </Pressable>
   )
 }
 

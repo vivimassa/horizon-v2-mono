@@ -24,6 +24,12 @@ const WALLPAPERS_LIGHT = [
 
 const INTERVAL_MS = 8000
 const FADE_MS = 1800
+// Ken Burns zoom range — matches web's wallpaper-kb keyframes (scale 1 → 1.15
+// over the slide's lifetime). Slightly less aggressive than web's 1.4 because
+// mobile has less screen real estate to absorb the crop.
+const ZOOM_FROM = 1
+const ZOOM_TO = 1.15
+const ZOOM_DURATION = INTERVAL_MS + FADE_MS
 
 interface Props {
   isDark: boolean
@@ -45,8 +51,34 @@ export function WallpaperBg({ isDark, overlayOpacity = 0.55 }: Props) {
   const idxRef = useRef(0)
   // Two layers: the "back" holds the previous image, "front" animates the next in.
   const frontOpacity = useRef(new Animated.Value(1)).current
+  // Ken Burns scale per layer. Front zooms while displayed; back freezes at the
+  // scale it reached when handed off so the crossfade reads as continuous.
+  const frontScale = useRef(new Animated.Value(ZOOM_FROM)).current
+  const backScale = useRef(new Animated.Value(ZOOM_FROM)).current
+  const frontScaleValueRef = useRef(ZOOM_FROM)
   const [frontUrl, setFrontUrl] = useState(set[0])
   const [backUrl, setBackUrl] = useState<string | null>(null)
+
+  // Track the live scale value so we can hand it off to the back layer on swap.
+  useEffect(() => {
+    const id = frontScale.addListener(({ value }) => {
+      frontScaleValueRef.current = value
+    })
+    return () => frontScale.removeListener(id)
+  }, [frontScale])
+
+  // Kick off the first slide's zoom on mount.
+  useEffect(() => {
+    if (!ready) return
+    frontScale.setValue(ZOOM_FROM)
+    Animated.timing(frontScale, {
+      toValue: ZOOM_TO,
+      duration: ZOOM_DURATION,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready])
 
   // Prefetch every URL in the active set into the expo-image memory+disk cache
   // so the crossfade never waits on the network — that wait is what reads as a
@@ -74,6 +106,8 @@ export function WallpaperBg({ isDark, overlayOpacity = 0.55 }: Props) {
     setFrontUrl(set[0])
     setBackUrl(null)
     frontOpacity.setValue(1)
+    frontScale.setValue(ZOOM_FROM)
+    backScale.setValue(ZOOM_FROM)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDark])
 
@@ -87,29 +121,46 @@ export function WallpaperBg({ isDark, overlayOpacity = 0.55 }: Props) {
       // another state's updater, so React won't complain.
       setBackUrl(set[prev])
       setFrontUrl(set[next])
+      // Hand off the front layer's current zoom to the back so the outgoing
+      // image keeps drifting instead of snapping back to scale 1.
+      backScale.setValue(frontScaleValueRef.current)
       frontOpacity.setValue(0)
-      Animated.timing(frontOpacity, {
-        toValue: 1,
-        duration: FADE_MS,
-        // Quad-in-out reads smoother than linear for cross-dissolves —
-        // matches the CSS `ease-in-out` default the web wallpaper uses.
-        easing: Easing.inOut(Easing.quad),
-        useNativeDriver: true,
-      }).start()
+      frontScale.setValue(ZOOM_FROM)
+      Animated.parallel([
+        Animated.timing(frontOpacity, {
+          toValue: 1,
+          duration: FADE_MS,
+          // Quad-in-out reads smoother than linear for cross-dissolves —
+          // matches the CSS `ease-in-out` default the web wallpaper uses.
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(frontScale, {
+          toValue: ZOOM_TO,
+          duration: ZOOM_DURATION,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start()
     }, INTERVAL_MS)
     return () => clearInterval(id)
-  }, [set, frontOpacity, ready])
+  }, [set, frontOpacity, frontScale, backScale, ready])
 
   const overlayColor = isDark ? `rgba(0,0,0,${overlayOpacity})` : `rgba(255,255,255,${overlayOpacity})`
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {backUrl && (
-        <Image source={{ uri: backUrl }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" />
+        <AnimatedExpoImage
+          source={{ uri: backUrl }}
+          style={[StyleSheet.absoluteFill, { transform: [{ scale: backScale }] }]}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+        />
       )}
       <AnimatedExpoImage
         source={{ uri: frontUrl }}
-        style={[StyleSheet.absoluteFill, { opacity: frontOpacity }]}
+        style={[StyleSheet.absoluteFill, { opacity: frontOpacity, transform: [{ scale: frontScale }] }]}
         contentFit="cover"
         cachePolicy="memory-disk"
       />

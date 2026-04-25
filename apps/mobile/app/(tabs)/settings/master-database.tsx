@@ -25,6 +25,7 @@ import {
   ChevronRight,
   Database,
   Contact,
+  BedDouble,
 } from 'lucide-react-native'
 import type { LucideIcon } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
@@ -213,6 +214,13 @@ const SECTIONS: SectionDef[] = [
         desc: 'Training & recruitment lead times for manpower planning',
         icon: Timer,
         route: '/(tabs)/settings/mpp-lead-times',
+      },
+      {
+        code: '5.4.10',
+        label: 'Crew Hotels',
+        desc: 'Layover hotels per airport — contracts, rates, shuttle bus',
+        icon: BedDouble,
+        route: '/(tabs)/settings/crew-hotels',
       },
     ],
   },

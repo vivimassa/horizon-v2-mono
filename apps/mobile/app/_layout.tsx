@@ -8,6 +8,7 @@ import { useAuthStore, useTheme, QueryProvider } from '@skyhub/ui'
 import { ThemeProvider, useAppTheme } from '../providers/ThemeProvider'
 import { UserProvider } from '../providers/UserProvider'
 import { tokenStorage, hydrateTokenStorage } from '../src/lib/token-storage'
+import { hydrateBiometricProfile, biometricProfile } from '../src/lib/biometric-profile'
 import { promptBiometric } from '../src/lib/biometric-gate'
 import { useOperatorStore } from '../src/stores/use-operator-store'
 import LoginScreen from './login'
@@ -46,13 +47,14 @@ function AuthGate() {
       onAuthFailure: () => {
         tokenStorage.clearTokens()
         tokenStorage.setBiometricEnabled(false)
+        biometricProfile.clear()
         useAuthStore.getState().logout()
       },
     })
 
     // Hydrate token cache from AsyncStorage, then try auto-login.
     const bootstrap = async () => {
-      await hydrateTokenStorage()
+      await Promise.all([hydrateTokenStorage(), hydrateBiometricProfile()])
       const stored = tokenStorage.getRefreshToken()
       if (!stored) {
         useAuthStore.getState().setLoading(false)
@@ -79,6 +81,7 @@ function AuthGate() {
       } catch {
         tokenStorage.clearTokens()
         tokenStorage.setBiometricEnabled(false)
+        biometricProfile.clear()
         useAuthStore.getState().logout()
       } finally {
         useAuthStore.getState().setLoading(false)

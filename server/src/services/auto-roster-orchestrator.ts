@@ -1,4 +1,5 @@
 import crypto from 'node:crypto'
+import { Agent } from 'undici'
 import { validateCrewAssignment } from '@skyhub/logic/src/fdtl/crew-schedule-validator'
 import { buildScheduleDuties, buildCandidateDuty, type PairingLike } from '@skyhub/logic/src/fdtl/schedule-duty-builder'
 import type { SerializedRuleSet } from '@skyhub/logic/src/fdtl/engine-types'
@@ -48,6 +49,8 @@ async function resolveCrewIdsForFilters(operatorId: string, filters: AutoRosterF
 }
 
 const AUTO_ROSTER_SOLVER_URL = process.env.AUTO_ROSTER_SOLVER_URL ?? 'http://localhost:8082'
+// Disable undici's default 300s bodyTimeout — solver streams can run 30+ minutes.
+const solverAgent = new Agent({ bodyTimeout: 0, headersTimeout: 300_000 })
 
 function resolveMinRestMinutes(ruleSet: SerializedRuleSet | null): number {
   // Prefer MIN_REST_HOME_BASE; fall back to MIN_REST_AWAY, then any min-rest
@@ -751,6 +754,8 @@ export async function runAutoRoster(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(solverPayload),
         signal,
+        // @ts-expect-error -- undici dispatcher accepted by Node's fetch
+        dispatcher: solverAgent,
       })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)

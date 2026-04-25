@@ -2583,6 +2583,206 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  // ── 4.1.8.3 HOTAC Configurations ──
+  getOperatorHotacConfig: (operatorId: string) =>
+    request<OperatorHotacConfig | null>(`/operator-hotac-config?operatorId=${encodeURIComponent(operatorId)}`).catch(
+      (err) => {
+        if (err instanceof Error && /^API 404/.test(err.message)) return null
+        throw err
+      },
+    ),
+
+  upsertOperatorHotacConfig: (body: OperatorHotacConfigUpsert) =>
+    request<OperatorHotacConfig>('/operator-hotac-config', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  // ── 4.1.8.1 Crew Hotel Management — bookings ──
+  getHotelBookings: (
+    params: {
+      from?: string
+      to?: string
+      station?: string[]
+      status?: string[]
+    } = {},
+  ) => {
+    const qs = new URLSearchParams()
+    if (params.from) qs.set('from', params.from)
+    if (params.to) qs.set('to', params.to)
+    for (const s of params.station ?? []) qs.append('station', s)
+    for (const s of params.status ?? []) qs.append('status', s)
+    const url = qs.toString() ? `/hotel-bookings?${qs.toString()}` : '/hotel-bookings'
+    return request<HotelBookingRef[]>(url)
+  },
+
+  upsertHotelBookingsBatch: (body: { rows: HotelBookingDerivedRow[]; runId?: string }) =>
+    request<{ upserted: number; preservedManual: number; runId: string }>('/hotel-bookings/upsert-batch', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  createHotelBooking: (body: HotelBookingCreateInput) =>
+    request<HotelBookingRef>('/hotel-bookings', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  patchHotelBooking: (id: string, body: HotelBookingPatchInput) =>
+    request<HotelBookingRef>(`/hotel-bookings/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  checkInHotelBooking: (id: string, body: { at?: number; by?: 'crew' | 'hotac' | 'hotel' } = {}) =>
+    request<HotelBookingRef>(`/hotel-bookings/${encodeURIComponent(id)}/check-in`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  checkOutHotelBooking: (id: string, body: { at?: number } = {}) =>
+    request<HotelBookingRef>(`/hotel-bookings/${encodeURIComponent(id)}/check-out`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  noShowHotelBooking: (id: string) =>
+    request<HotelBookingRef>(`/hotel-bookings/${encodeURIComponent(id)}/no-show`, {
+      method: 'POST',
+    }),
+
+  deleteHotelBooking: (id: string) =>
+    request<{ success: boolean }>(`/hotel-bookings/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+
+  // ── 4.1.8.1 Hotel Email — held / released / sent ──
+  getHotelEmails: (
+    params: {
+      direction?: 'outbound' | 'inbound'
+      status?: HotelEmailStatus
+      hotelId?: string
+      threadId?: string
+      from?: string
+      to?: string
+    } = {},
+  ) => {
+    const qs = new URLSearchParams()
+    if (params.direction) qs.set('direction', params.direction)
+    if (params.status) qs.set('status', params.status)
+    if (params.hotelId) qs.set('hotelId', params.hotelId)
+    if (params.threadId) qs.set('threadId', params.threadId)
+    if (params.from) qs.set('from', params.from)
+    if (params.to) qs.set('to', params.to)
+    const url = qs.toString() ? `/hotel-emails?${qs.toString()}` : '/hotel-emails'
+    return request<HotelEmailRef[]>(url)
+  },
+
+  getHeldHotelEmails: () => request<HotelEmailRef[]>('/hotel-emails/held'),
+
+  createHotelEmail: (body: HotelEmailCreateInput) =>
+    request<HotelEmailRef>('/hotel-emails', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  patchHotelEmail: (id: string, body: HotelEmailPatchInput) =>
+    request<HotelEmailRef>(`/hotel-emails/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  releaseHotelEmails: (ids: string[]) =>
+    request<{ released: number; skipped: number }>('/hotel-emails/release', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
+
+  discardHotelEmails: (ids: string[]) =>
+    request<{ discarded: number }>('/hotel-emails/discard', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
+
+  ingestInboundHotelEmail: (body: {
+    hotelId?: string | null
+    fromAddress: string
+    subject?: string
+    body?: string
+    rawSource?: string
+    threadId?: string | null
+  }) =>
+    request<HotelEmailRef>('/hotel-emails/inbound', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  // ── 4.1.8.2 Crew Transport — vendor master data ──
+  getCrewTransportVendors: (params: { airportIcao?: string; active?: boolean; search?: string } = {}) => {
+    const qs = new URLSearchParams()
+    if (params.airportIcao) qs.set('airportIcao', params.airportIcao)
+    if (params.active === true) qs.set('active', 'true')
+    if (params.search) qs.set('search', params.search)
+    const url = qs.toString() ? `/crew-transport-vendors?${qs.toString()}` : '/crew-transport-vendors'
+    return request<CrewTransportVendorRef[]>(url)
+  },
+
+  getCrewTransportVendor: (id: string) =>
+    request<CrewTransportVendorRef>(`/crew-transport-vendors/${encodeURIComponent(id)}`),
+
+  createCrewTransportVendor: (body: Partial<CrewTransportVendorRef>) =>
+    request<CrewTransportVendorRef>('/crew-transport-vendors', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateCrewTransportVendor: (id: string, body: Partial<CrewTransportVendorRef>) =>
+    request<CrewTransportVendorRef>(`/crew-transport-vendors/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteCrewTransportVendor: (id: string) =>
+    request<{ success: boolean }>(`/crew-transport-vendors/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+
+  addTransportVendorContract: (vendorId: string, data: Partial<TransportVendorContract>) =>
+    request<CrewTransportVendorRef>(`/crew-transport-vendors/${encodeURIComponent(vendorId)}/contracts`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateTransportVendorContract: (vendorId: string, contractId: string, data: Partial<TransportVendorContract>) =>
+    request<CrewTransportVendorRef>(
+      `/crew-transport-vendors/${encodeURIComponent(vendorId)}/contracts/${encodeURIComponent(contractId)}`,
+      { method: 'PATCH', body: JSON.stringify(data) },
+    ),
+
+  deleteTransportVendorContract: (vendorId: string, contractId: string) =>
+    request<CrewTransportVendorRef>(
+      `/crew-transport-vendors/${encodeURIComponent(vendorId)}/contracts/${encodeURIComponent(contractId)}`,
+      { method: 'DELETE' },
+    ),
+
+  addTransportVendorDriver: (vendorId: string, data: Partial<TransportVendorDriver>) =>
+    request<CrewTransportVendorRef>(`/crew-transport-vendors/${encodeURIComponent(vendorId)}/drivers`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateTransportVendorDriver: (vendorId: string, driverId: string, data: Partial<TransportVendorDriver>) =>
+    request<CrewTransportVendorRef>(
+      `/crew-transport-vendors/${encodeURIComponent(vendorId)}/drivers/${encodeURIComponent(driverId)}`,
+      { method: 'PATCH', body: JSON.stringify(data) },
+    ),
+
+  deleteTransportVendorDriver: (vendorId: string, driverId: string) =>
+    request<CrewTransportVendorRef>(
+      `/crew-transport-vendors/${encodeURIComponent(vendorId)}/drivers/${encodeURIComponent(driverId)}`,
+      { method: 'DELETE' },
+    ),
+
   bulkDeleteAssignments: (params: { periodFrom: string; periodTo: string }) => {
     const qs = new URLSearchParams({ periodFrom: params.periodFrom, periodTo: params.periodTo })
     return request<{ success: true; deletedCount: number }>(`/crew-schedule/assignments/bulk?${qs.toString()}`, {
@@ -3833,6 +4033,325 @@ export interface OperatorSchedulingConfigUpsert {
   standby?: Partial<SchedulingStandbyConfig>
   destinationRules?: SchedulingDestinationRule[]
   objectives?: Partial<SchedulingObjectivesConfig>
+}
+
+// ── 4.1.8.3 HOTAC Configurations ──
+
+export interface HotacLayoverRuleConfig {
+  /** Minimum block-to-block layover hours that qualify for a hotel. */
+  layoverMinHours: number
+  /** When true, layovers at the crew's home base are skipped. */
+  excludeHomeBase: boolean
+  /** Additional gate: require the layover to span N hours across local midnight. 0 = disabled. */
+  minSpanMidnightHours: number
+}
+
+export interface HotacRoomAllocationConfig {
+  defaultOccupancy: 'single' | 'double'
+  /** Position codes allowed to share a room (e.g. ['CCM']). */
+  doubleOccupancyPositions: string[]
+  /** Behaviour when crew count exceeds the active contract's per-night cap. */
+  contractCapBehaviour: 'reject' | 'supplement'
+}
+
+export interface HotacDispatchConfig {
+  autoDispatchEnabled: boolean
+  /** Local "HH:MM" daily run time; null = manual only. */
+  autoDispatchTime: string | null
+  /** Send rooming list this many hours before crew arrival. */
+  sendBeforeHours: number
+  /** Flag a sent email overdue-confirmation if no reply within this many hours. */
+  confirmationSlaHours: number
+}
+
+export interface HotacCheckInConfig {
+  /** Auto-mark check-in if not done by ARR + N min after STA. 0 = disabled. */
+  autoCheckInOnArrivalDelayMinutes: number
+  /** Mark no-show if no check-in this many hours after STA. */
+  noShowAfterHours: number
+}
+
+export interface HotacEmailConfig {
+  fromAddress: string
+  replyTo: string | null
+  signature: string
+  /** When true, new outbound emails start as 'held' (require explicit Release). */
+  holdByDefault: boolean
+}
+
+export interface OperatorHotacConfig {
+  _id: string
+  operatorId: string
+  layoverRule: HotacLayoverRuleConfig
+  roomAllocation: HotacRoomAllocationConfig
+  dispatch: HotacDispatchConfig
+  checkIn: HotacCheckInConfig
+  email: HotacEmailConfig
+  createdAt: string
+  updatedAt: string
+}
+
+export interface OperatorHotacConfigUpsert {
+  operatorId: string
+  layoverRule?: Partial<HotacLayoverRuleConfig>
+  roomAllocation?: Partial<HotacRoomAllocationConfig>
+  dispatch?: Partial<HotacDispatchConfig>
+  checkIn?: Partial<HotacCheckInConfig>
+  email?: Partial<HotacEmailConfig>
+}
+
+// ── 4.1.8.1 HotelBooking ──
+
+export type HotelBookingStatus =
+  | 'demand'
+  | 'forecast'
+  | 'pending'
+  | 'sent'
+  | 'confirmed'
+  | 'in-house'
+  | 'departed'
+  | 'cancelled'
+  | 'no-show'
+
+export type HotelBookingDisruptionFlag =
+  | 'inbound-cancelled'
+  | 'outbound-cancelled'
+  | 'inbound-delayed'
+  | 'outbound-delayed'
+  | 'extend-night'
+  | 'overdue-confirmation'
+
+export interface HotelBookingRef {
+  _id: string
+  operatorId: string
+  pairingId: string
+  pairingCode: string
+  airportIcao: string
+  layoverNightUtcMs: number
+  arrFlight: string | null
+  arrStaUtcIso: string | null
+  depFlight: string | null
+  depStdUtcIso: string | null
+  layoverHours: number
+  hotelId: string | null
+  hotelName: string
+  hotelPriority: number | null
+  hotelDistance: number | null
+  contractId: string | null
+  rooms: number
+  occupancy: 'single' | 'double'
+  pax: number
+  crewByPosition: Record<string, number>
+  crewIds: string[]
+  costMinor: number
+  costCurrency: string
+  status: HotelBookingStatus
+  confirmationNumber: string | null
+  shuttle: 'Y' | 'N' | 'walking' | null
+  notes: string | null
+  disruptionFlags: HotelBookingDisruptionFlag[]
+  checkedInAtUtcMs: number | null
+  checkedInBy: 'crew' | 'hotac' | 'hotel' | null
+  checkedOutAtUtcMs: number | null
+  createdAtUtcMs: number
+  updatedAtUtcMs: number
+  createdByUserId: string | null
+  sourceRunId: string | null
+}
+
+/** Subset of fields the client sends to /hotel-bookings/upsert-batch.
+ *  Manual-edit fields (status, confirmationNumber, etc.) are omitted —
+ *  the server preserves whatever the planner already saved. */
+export interface HotelBookingDerivedRow {
+  pairingId: string
+  pairingCode?: string
+  airportIcao: string
+  layoverNightUtcMs: number
+  arrFlight?: string | null
+  arrStaUtcIso?: string | null
+  depFlight?: string | null
+  depStdUtcIso?: string | null
+  layoverHours?: number
+  hotelId?: string | null
+  hotelName?: string
+  hotelPriority?: number | null
+  hotelDistance?: number | null
+  rooms?: number
+  occupancy?: 'single' | 'double'
+  pax?: number
+  crewByPosition?: Record<string, number>
+  crewIds?: string[]
+  costMinor?: number
+  costCurrency?: string
+  shuttle?: 'Y' | 'N' | 'walking' | null
+}
+
+export interface HotelBookingCreateInput {
+  pairingId: string
+  pairingCode?: string
+  airportIcao: string
+  layoverNightUtcMs: number
+  hotelId?: string | null
+  hotelName?: string
+  rooms?: number
+  occupancy?: 'single' | 'double'
+  notes?: string | null
+}
+
+export interface HotelBookingPatchInput {
+  rooms?: number
+  occupancy?: 'single' | 'double'
+  status?: HotelBookingStatus
+  confirmationNumber?: string | null
+  hotelId?: string | null
+  hotelName?: string
+  contractId?: string | null
+  notes?: string | null
+  costMinor?: number
+  costCurrency?: string
+  shuttle?: 'Y' | 'N' | 'walking' | null
+  disruptionFlags?: HotelBookingDisruptionFlag[]
+}
+
+// ── 4.1.8.1 HotelEmail ──
+
+export type HotelEmailStatus = 'draft' | 'held' | 'pending' | 'sent' | 'partial' | 'failed' | 'discarded' | 'received'
+
+export type HotelEmailDeliveryStatus = 'pending' | 'delivered' | 'failed' | 'retrying'
+
+export interface HotelEmailAttachmentRef {
+  _id: string
+  name: string
+  url: string
+  mimeType: string | null
+  sizeBytes: number | null
+}
+
+export interface HotelEmailDeliveryRef {
+  recipient: string
+  status: HotelEmailDeliveryStatus
+  attemptCount: number
+  lastAttemptAtUtcMs: number | null
+  deliveredAtUtcMs: number | null
+  errorDetail: string | null
+  externalRef: string | null
+}
+
+export interface HotelEmailRef {
+  _id: string
+  operatorId: string
+  direction: 'outbound' | 'inbound'
+  status: HotelEmailStatus
+  hotelId: string | null
+  hotelName: string
+  bookingIds: string[]
+  subject: string
+  body: string
+  attachments: HotelEmailAttachmentRef[]
+  recipients: string[]
+  rawSource: string | null
+  threadId: string | null
+  deliveries: HotelEmailDeliveryRef[]
+  heldAtUtcMs: number | null
+  heldByUserId: string | null
+  releasedAtUtcMs: number | null
+  releasedByUserId: string | null
+  discardedAtUtcMs: number | null
+  discardedByUserId: string | null
+  createdAtUtcMs: number
+  updatedAtUtcMs: number
+  createdByUserId: string | null
+}
+
+export interface HotelEmailCreateInput {
+  direction?: 'outbound'
+  hotelId?: string | null
+  hotelName?: string
+  bookingIds?: string[]
+  subject?: string
+  body?: string
+  recipients?: string[]
+  attachments?: Array<{ name: string; url: string; mimeType?: string | null; sizeBytes?: number | null }>
+  threadId?: string | null
+  /** 'draft' or 'held'. Defaults to operator config's holdByDefault. */
+  status?: 'draft' | 'held'
+}
+
+export interface HotelEmailPatchInput {
+  subject?: string
+  body?: string
+  recipients?: string[]
+  attachments?: Array<{ _id?: string; name: string; url: string; mimeType?: string | null; sizeBytes?: number | null }>
+  bookingIds?: string[]
+  hotelId?: string | null
+  hotelName?: string
+}
+
+// ── 4.1.8.2 CrewTransportVendor ──
+
+export interface TransportVendorContact {
+  _id: string
+  name: string | null
+  telephone: string | null
+  email: string | null
+}
+
+export interface TransportVendorEmail {
+  _id: string
+  address: string
+  isDefault: boolean
+}
+
+export interface TransportVendorVehicleTier {
+  _id: string
+  tierName: string
+  paxCapacity: number
+  ratePerTrip: number
+  ratePerHour: number
+}
+
+export interface TransportVendorContract {
+  _id: string
+  contractNo: string | null
+  priority: number
+  startDateUtcMs: number | null
+  endDateUtcMs: number | null
+  weekdayMask: boolean[]
+  currency: string
+  /** Operator must dispatch at least this many minutes ahead. */
+  minLeadTimeMin: number
+  /** Vendor confirmation SLA in minutes. */
+  slaMin: number
+  vehicleTiers: TransportVendorVehicleTier[]
+}
+
+export interface TransportVendorDriver {
+  _id: string
+  name: string
+  phone: string | null
+  vehiclePlate: string | null
+  status: 'active' | 'inactive'
+}
+
+export interface CrewTransportVendorRef {
+  _id: string
+  operatorId: string
+  vendorName: string
+  baseAirportIcao: string
+  priority: number
+  isActive: boolean
+  addressLine1: string | null
+  addressLine2: string | null
+  addressLine3: string | null
+  latitude: number | null
+  longitude: number | null
+  serviceAreaIcaos: string[]
+  contacts: TransportVendorContact[]
+  emails: TransportVendorEmail[]
+  contracts: TransportVendorContract[]
+  drivers: TransportVendorDriver[]
+  createdAt: string | null
+  updatedAt: string | null
 }
 
 // ── 4.1.6.1 Auto Roster ──

@@ -683,6 +683,48 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
     module: 'workforce',
     level: 2,
   },
+  {
+    code: '4.1.8',
+    name: 'Crew HOTAC',
+    description: 'Crew accommodation, transport, and HOTAC configuration',
+    icon: 'BedDouble',
+    // Parent route lands on the primary child (Hotel Management).
+    // Mirrors the 4.1.5 / 4.1.6 pattern.
+    route: '/crew-ops/control/hotac/hotel-management',
+    parent_code: '4.1',
+    module: 'workforce',
+    level: 2,
+  },
+  {
+    code: '4.1.8.1',
+    name: 'Crew Hotel Management',
+    description: 'Layover bookings, IROP recovery & invoice reconciliation',
+    icon: 'Hotel',
+    route: '/crew-ops/control/hotac/hotel-management',
+    parent_code: '4.1.8',
+    module: 'workforce',
+    level: 3,
+  },
+  {
+    code: '4.1.8.2',
+    name: 'Crew Transport Management',
+    description: 'Ground transport vendors, routes, and bookings',
+    icon: 'Bus',
+    route: '/crew-ops/control/hotac/transport-management',
+    parent_code: '4.1.8',
+    module: 'workforce',
+    level: 3,
+  },
+  {
+    code: '4.1.8.3',
+    name: 'HOTAC Configurations',
+    description: 'Dispatch rules, allowances, rate cards',
+    icon: 'Settings2',
+    route: '/crew-ops/control/hotac/configurations',
+    parent_code: '4.1.8',
+    module: 'workforce',
+    level: 3,
+  },
 
   // 4.3 Reports
   {
@@ -979,8 +1021,8 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
   },
   {
     code: '5.4.10',
-    name: 'Crew Hotels',
-    description: 'Layover hotels per airport — contracts, rates, shuttle bus',
+    name: 'Crew Hotels & Transport',
+    description: 'Layover hotels and ground transport vendors — contracts, rates, drivers',
     icon: 'BedDouble',
     route: '/admin/crew-hotels',
     parent_code: '5.4',

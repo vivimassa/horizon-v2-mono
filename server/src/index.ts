@@ -39,6 +39,7 @@ import { operatorDisruptionConfigRoutes } from './routes/operator-disruption-con
 import { operatorMessagingConfigRoutes } from './routes/operator-messaging-config.js'
 import { operatorPairingConfigRoutes } from './routes/operator-pairing-config.js'
 import { operatorSchedulingConfigRoutes } from './routes/operator-scheduling-config.js'
+import { operatorHotacConfigRoutes } from './routes/operator-hotac-config.js'
 import { asmSsmConsumerRoutes } from './routes/asm-ssm-consumers.js'
 import { integrationPullRoutes } from './routes/integration-pull.js'
 import { mlRoutes } from './routes/ml.js'
@@ -53,10 +54,14 @@ import { pairingRoutes } from './routes/pairings.js'
 import { crewScheduleRoutes } from './routes/crew-schedule.js'
 import { autoRosterRoutes } from './routes/auto-roster.js'
 import { crewHotelRoutes } from './routes/crew-hotels.js'
+import { hotelBookingRoutes } from './routes/hotel-bookings.js'
+import { hotelEmailRoutes } from './routes/hotel-emails.js'
+import { crewTransportVendorRoutes } from './routes/crew-transport-vendors.js'
 import { ensureManpowerBasePlan } from './services/ensure-manpower-base-plan.js'
 import { startWeatherPoll } from './jobs/weather-poll.js'
 import { startAutoTransmitScheduler } from './jobs/mvt-auto-transmit.js'
 import { startAsmSsmDeliveryScheduler } from './jobs/asm-ssm-deliver.js'
+import { startHotelEmailDeliveryScheduler } from './jobs/hotel-email-deliver.js'
 import { loadOurAirportsData, startAutoRefresh } from './data/ourairports-cache.js'
 
 const port = env.PORT
@@ -141,6 +146,7 @@ async function main(): Promise<void> {
   await app.register(operatorMessagingConfigRoutes)
   await app.register(operatorPairingConfigRoutes)
   await app.register(operatorSchedulingConfigRoutes)
+  await app.register(operatorHotacConfigRoutes)
   await app.register(asmSsmConsumerRoutes)
   await app.register(integrationPullRoutes)
   await app.register(mlRoutes)
@@ -154,6 +160,9 @@ async function main(): Promise<void> {
   await app.register(crewScheduleRoutes)
   await app.register(autoRosterRoutes)
   await app.register(crewHotelRoutes)
+  await app.register(hotelBookingRoutes)
+  await app.register(hotelEmailRoutes)
+  await app.register(crewTransportVendorRoutes)
 
   // ── Bootstrap: ensure every active operator has the 4 system document
   // folders (Crew Photos / Passports & Licenses / Medical Certificates /
@@ -197,6 +206,7 @@ async function main(): Promise<void> {
   // pull_api deliveries are drained synchronously by the consumer's HTTP pull.
   // Disable with ENABLE_ASM_SSM_DELIVERY=false.
   startAsmSsmDeliveryScheduler()
+  startHotelEmailDeliveryScheduler()
 
   // ── OOOI Simulation — seed actual times on startup + every 15 minutes ──
   const OOOI_SIM_INTERVAL = 15 * 60_000 // 15 minutes

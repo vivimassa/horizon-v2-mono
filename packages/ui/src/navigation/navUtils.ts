@@ -8,6 +8,8 @@ export interface NavPath {
   module: NavModuleData
   section?: NavSectionData
   page?: NavPageData
+  /** Leaf sub-page when 4-level nav is in use (e.g. 4.1.8.1 under 4.1.8) */
+  subPage?: NavPageData
 }
 
 export interface BreadcrumbSegment {
@@ -54,6 +56,22 @@ function firstSectionRoute(section: NavSectionData): string {
 }
 
 export function resolveNavPath(pathname: string): NavPath | null {
+  // Exact sub-page match (4-level nav, e.g. 4.1.8.x). Check before page-level
+  // so that a parent page sharing its route with a sub-page (landing child)
+  // still resolves with the correct subPage leaf.
+  for (const mod of NAV_TREE) {
+    for (const section of mod.sections) {
+      for (const page of section.pages) {
+        if (!page.subPages) continue
+        for (const subPage of page.subPages) {
+          if (subPage.route === pathname) {
+            return { module: mod, section, page, subPage }
+          }
+        }
+      }
+    }
+  }
+
   // Exact page match
   for (const mod of NAV_TREE) {
     for (const section of mod.sections) {
@@ -69,6 +87,13 @@ export function resolveNavPath(pathname: string): NavPath | null {
   for (const mod of NAV_TREE) {
     for (const section of mod.sections) {
       for (const page of section.pages) {
+        if (page.subPages) {
+          for (const subPage of page.subPages) {
+            if (subPage.route !== '/' && pathname.startsWith(subPage.route + '/')) {
+              return { module: mod, section, page, subPage }
+            }
+          }
+        }
         if (page.route !== '/' && pathname.startsWith(page.route + '/')) {
           return { module: mod, section, page }
         }
@@ -218,12 +243,42 @@ export function buildBreadcrumbs(path: NavPath): BreadcrumbSegment[] {
     })
   }
 
+  if (path.subPage && path.page?.subPages) {
+    segs.push({
+      level: 'page',
+      num: path.subPage.num,
+      label: path.subPage.label,
+      route: path.subPage.route,
+      iconName: path.subPage.iconName,
+      hideNum,
+      parentLabel: path.page.label,
+      siblings: path.page.subPages.map((sp) => ({
+        key: sp.key,
+        label: sp.label,
+        num: sp.num,
+        route: sp.route,
+        iconName: sp.iconName,
+        desc: sp.desc,
+      })),
+      showDescriptions: true,
+    })
+  }
+
   return segs
 }
 
 export function getSiblings(
   path: NavPath,
 ): Array<{ key: string; label: string; num: string; route: string; iconName: string }> {
+  if (path.subPage && path.page?.subPages) {
+    return path.page.subPages.map((sp) => ({
+      key: sp.key,
+      label: sp.label,
+      num: sp.num,
+      route: sp.route,
+      iconName: sp.iconName,
+    }))
+  }
   if (path.page && path.section) {
     return path.section.pages.map((p) => ({
       key: p.key,

@@ -11,6 +11,8 @@ export interface NavPageData {
   /** Optional group header for dropdown rendering (e.g. "Network", "Flight Ops") */
   group?: string
   groupIconName?: string
+  /** Optional sub-pages for 4-level nav (e.g. 4.1.8 → 4.1.8.1/.2/.3) */
+  subPages?: NavPageData[]
 }
 
 export interface NavSectionData {
@@ -586,6 +588,40 @@ export const NAV_TREE: NavModuleData[] = [
             route: '/crew-ops/planning/roster-view',
             iconName: 'CalendarDays',
             desc: 'Crew schedule view',
+          },
+          {
+            key: 'crew-hotac',
+            label: 'Crew HOTAC',
+            num: '4.1.8',
+            route: '/crew-ops/control/hotac/hotel-management',
+            iconName: 'BedDouble',
+            desc: 'Crew accommodation, transport, and HOTAC configuration',
+            subPages: [
+              {
+                key: 'crew-hotel-mgmt',
+                label: 'Crew Hotel Management',
+                num: '4.1.8.1',
+                route: '/crew-ops/control/hotac/hotel-management',
+                iconName: 'Hotel',
+                desc: 'Layover bookings, IROP recovery & invoice reconciliation',
+              },
+              {
+                key: 'crew-transport-mgmt',
+                label: 'Crew Transport Management',
+                num: '4.1.8.2',
+                route: '/crew-ops/control/hotac/transport-management',
+                iconName: 'Bus',
+                desc: 'Ground transport vendors, routes, and bookings',
+              },
+              {
+                key: 'hotac-config',
+                label: 'HOTAC Configurations',
+                num: '4.1.8.3',
+                route: '/crew-ops/control/hotac/configurations',
+                iconName: 'Settings2',
+                desc: 'Dispatch rules, allowances, rate cards',
+              },
+            ],
           },
         ],
       },

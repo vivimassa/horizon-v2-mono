@@ -2,6 +2,9 @@ import type { ComponentType } from 'react'
 import { MODULE_REGISTRY } from '@skyhub/constants'
 import SchedulingXL from '../../../content/help/scheduling-xl.mdx'
 import GanttChart from '../../../content/help/gantt-chart.mdx'
+import CrewHotelManagement from '../../../content/help/crew-hotel-management.mdx'
+import CrewTransportManagement from '../../../content/help/crew-transport-management.mdx'
+import HotacConfigurations from '../../../content/help/hotac-configurations.mdx'
 
 export interface HelpMeta {
   code: string
@@ -34,6 +37,30 @@ export const HELP_REGISTRY: HelpEntry[] = [
       subtitle: 'Aircraft rotation timeline and tail assignment',
     },
     Content: GanttChart,
+  },
+  {
+    meta: {
+      code: '4.1.8.1',
+      title: 'Crew Hotel Management',
+      subtitle: 'Layover bookings, rooming lists, and hotel email queue',
+    },
+    Content: CrewHotelManagement,
+  },
+  {
+    meta: {
+      code: '4.1.8.2',
+      title: 'Crew Transport Management',
+      subtitle: 'Ground trips and deadhead flight bookings',
+    },
+    Content: CrewTransportManagement,
+  },
+  {
+    meta: {
+      code: '4.1.8.3',
+      title: 'HOTAC Configurations',
+      subtitle: 'Operator policy for layover, room allocation, dispatch, and transport',
+    },
+    Content: HotacConfigurations,
   },
 ]
 

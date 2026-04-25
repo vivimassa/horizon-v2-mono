@@ -1,0 +1,118 @@
+import { Term, Kbd, Step, Callout, Shortcut, ShortcutList } from '@/components/help'
+
+HOTAC Configurations is the operator-level policy page that governs how 4.1.8.1 **Crew Hotel** and 4.1.8.2 **Crew Transport** behave. One configuration document per operator — every booking and trip those two pages derive reads its rules from here.
+
+<Callout tone="tip" title="If you're new to this page">
+The page has six sidebar sections — **Layover Rule**, **Room Allocation**, **Dispatch**, **Check-In**, **Transport**, **Email**. Every change is held as an unsaved draft until you press **Save Changes** at the top right; persistence is per-operator and there is exactly one config doc per tenant.
+</Callout>
+
+## Who uses this page
+
+Operations admin and the <Term definition="Hotel and accommodation policy owner — sets layover rules, occupancy defaults, dispatch SLAs, and the hotel email template for an operator." full="HOTAC supervisor">HOTAC</Term> supervisor. Typically configured once per operator at onboarding and revisited only when policy changes — a new home-base, a new vendor SLA, switching from <Term definition="One consolidated vehicle from a fixed pickup point to the airport." full="Hub shuttle">Hub shuttle</Term> to <Term definition="One vehicle per crew home address, batched within a configurable window." full="Door-to-door">Door-to-door</Term> transport, etc. The form is permission-gated to `administrator`, `manager`, or `operator` roles.
+
+## Save, Reset, and the Saved tick
+
+The top bar has two buttons:
+
+- **Save Changes** — disabled until you have an unsaved draft. Persists the entire draft in one PUT to `OperatorHotacConfig`. The server applies a partial-merge per section, so any section you didn't touch keeps its existing value (you cannot accidentally blank out a section by saving).
+- **Reset** — reverts **only the active section** to compiled defaults. It does not revert other sections, and it does not save — you still have to press **Save Changes** for the reset to persist.
+
+After a successful save the button briefly turns green with a checkmark and the label **Saved** for ~3 seconds, then returns to **Save Changes**.
+
+<Callout tone="info" title="First save creates the document">
+An operator with no config yet returns 404 from `GET /operator-hotac-config` and the UI shows the compiled defaults from `hotac-config-defaults.ts`. Your first **Save** upserts the document. Until then, 4.1.8.1 and 4.1.8.2 fall back to those same defaults at derivation time.
+</Callout>
+
+## The six sections
+
+The sidebar order matches the order policy is consumed downstream. Work top-to-bottom on first setup.
+
+### 1. Layover Rule
+
+Drives 4.1.8.1 **Crew Hotel** → derive-bookings. A <Term definition="Block-to-block rest period between an inbound flight's STA and the next outbound's STD on the same crew pairing." full="Layover">Layover</Term> qualifies for a hotel only when these gates pass.
+
+- **Min Layover Hours** — block-to-block rest from inbound <Term>STA</Term> to outbound <Term>STD</Term>. Range `1`–`24`, default `6`. Aligns with typical short-haul night-stop policy.
+- **Exclude Home Base** — toggle, default `true`. When on, layovers ending at the <Term definition="Crew rotation segment — sequence of legs flown by the same crew before they go off-duty." full="Pairing">Pairing</Term>'s home base are skipped (no hotel needed). Per-crew override: if any crew on the pairing has `hotelAtHomeBase = true` on their profile, the home-base layover is emitted anyway.
+- **Min Span Across Local Midnight** — additional gate. Range `0`–`12` hours, default `0` (disabled). When `> 0`, the layover must also span this many hours across the layover station's local midnight to qualify.
+
+### 2. Room Allocation
+
+Drives 4.1.8.1 → Enlist. Counts rooms when crew are enlisted onto a hotel night.
+
+- **Default Occupancy** — `single` or `double`. Default `single` (one room per crew).
+- **Double-Occupancy Positions** — comma-separated list of position codes (e.g. `CCM, CSM`) allowed to share a room when default is `single`. Codes are uppercased and clamped to ≤10 chars; the array is capped at 20 entries.
+- **Contract Cap Behaviour** — `reject` or `supplement`. Default `supplement`. When demand exceeds the active contract's per-night room cap, `reject` makes HOTAC manually find another hotel; `supplement` books the extras at the contract's supplement rate.
+
+### 3. Dispatch
+
+Drives 4.1.8.1 → rooming-list send schedule.
+
+- **Auto-Dispatch Enabled** — toggle, default `false`. When on, an unattended daily run sweeps pending bookings and emails their rooming lists.
+- **Auto-Dispatch Time** — local 24h `HH:MM`. Default `null` (manual only). Only meaningful when **Auto-Dispatch Enabled** is on; the field is disabled otherwise.
+- **Send Before Hours** — lead window. Range `0`–`96`, default `24`. Bookings whose check-in is within this window become eligible for the next dispatch run.
+- **Confirmation SLA** — range `1`–`24` hours, default `2`. A sent email with no hotel reply within this window is flagged **overdue-confirmation** in Day to Day.
+
+### 4. Check-In
+
+Drives 4.1.8.1 → auto-status transitions. HOTAC tracks check-in events from the future Crew app, hotel replies/webhooks, and manual marks.
+
+- **Auto Check-In on Arrival Delay** — range `0`–`240` minutes, step 15, default `60`. If no check-in event arrives within this many minutes after the inbound STA, the booking is auto-marked checked-in. `0` disables auto check-in (HOTAC must mark manually).
+- **No-Show After** — range `1`–`24` hours, default `4`. Bookings still un-checked-in this many hours after STA flip to **no-show** and raise an exception.
+
+### 5. Transport
+
+Drives 4.1.8.2 **Crew Transport** → derive-trips.
+
+- **Pickup Mode** — `hub-shuttle` (default) or `door-to-door`. Hub shuttle = one consolidated trip from a hub location to the airport. Door-to-door = one trip per crew home address, batched within the window below.
+- **Hub Name** — only shown when **Pickup Mode** is `hub-shuttle`. Free text up to 120 chars. Printed on dispatch sheets and the trip inspector. Default `Crew Hub`.
+- **Hub Address** — only shown when **Pickup Mode** is `hub-shuttle`. Free text up to 300 chars (e.g. `123 Le Loi, District 1, HCMC`). Default `null`.
+- **Buffer Minutes** — range `0`–`120`, step 5, default `15`. Padding on both sides of report/release. Outbound trip leaves at `report − buffer − travel`; inbound trip arrives at `release + buffer`.
+- **Batching Window** — range `0`–`120` minutes, step 5, default `30`. Door-to-door only — crew within this many minutes of each other share a vehicle. Field is dimmed when **Pickup Mode** is `hub-shuttle`.
+- **Default Travel Time** — range `0`–`240` minutes, step 5, default `45`. Fallback when a crew profile has no `travelTimeMinutes` set. Per-crew values always win.
+- **Default Vendor SLA** — range `5`–`60` minutes, step 5, default `15`. A trip in `sent` status this many minutes without confirmation flips to **overdue-confirmation**.
+- **Taxi Voucher Enabled** — toggle, default `false`. Allow ad-hoc taxi-voucher trips when no contracted vendor is available.
+- **Flight Booking Mode** — `ticket-preferred` (default) or `gendec-preferred`. Default for deadhead positioning. `ticket-preferred` books a revenue or non-rev <Term definition="Passenger Name Record — the booking record on a flight, identifying a ticketed passenger." full="PNR">PNR</Term> on a real flight; `gendec-preferred` places the crew supernumerary on the operator's own flight via the <Term definition="General Declaration — the manifest filed for an aircraft's crew and supernumeraries on a flight." full="GENDEC">GENDEC</Term>.
+
+### 6. Email
+
+Drives both 4.1.8.1 hotel correspondence and 4.1.8.2 transport vendor correspondence — the SMTP block is shared.
+
+- **From Address** — string up to 200 chars, default empty. The Reply-To and message envelope sender for outbound rooming lists and trip emails. Empty is permitted by the schema, but Save will succeed with a blank From and outbound delivery will fail at the SMTP layer — fill it before going live.
+- **Reply-To** — string up to 200 chars, default `null`. Optional override if replies should go to a different mailbox than From.
+- **Signature** — plain text up to 2000 chars, default empty. Appended to every outbound email body.
+- **Hold by Default** — toggle, default `true`. When on, new outbound emails (both HotelEmail in 4.1.8.1 and TransportEmail in 4.1.8.2) start as **held** and require an explicit Release before they leave SkyHub. Off = emails go straight to the SMTP queue.
+
+## Where each section is read
+
+| Section          | Consumed by                             | Page    |
+| ---------------- | --------------------------------------- | ------- |
+| Layover Rule     | derive-bookings layover gate            | 4.1.8.1 |
+| Room Allocation  | Enlist room counter                     | 4.1.8.1 |
+| Dispatch         | Auto-dispatch scheduler + SLA flagger   | 4.1.8.1 |
+| Check-In         | Auto-status transitions                 | 4.1.8.1 |
+| Transport        | derive-trips + vendor SLA flagger       | 4.1.8.2 |
+| Email            | HotelEmail + TransportEmail SMTP send   | 4.1.8.1 + 4.1.8.2 |
+
+## Common gotchas
+
+### Hub-shuttle saved with a blank hub
+
+When **Pickup Mode** is `hub-shuttle` the **Hub Name** and **Hub Address** fields appear, but the schema permits empty strings — the form will Save without complaining. A trip dispatch sheet with a blank hub looks unprofessional; fill the name (and ideally the address) before the first Save.
+
+### Changing Layover Rule mid-period
+
+Editing **Min Layover Hours**, **Exclude Home Base**, or **Min Span Across Local Midnight** does not retroactively rewrite bookings that already exist on 4.1.8.1. Existing bookings keep their derived state until the next derivation cycle on that period — sticky-status protects rows that have been manually progressed (Confirmed, Checked-In, etc.). To pick up a new layover policy on an already-loaded period, go back to 4.1.8.1 and re-Fetch the period.
+
+### Hold by Default = off
+
+Turning **Hold by Default** off makes Release-by-default — new outbound emails skip the held queue and go straight to SMTP. That's fine for mature operators, but on a fresh install it can mean accidental sends while you're still tuning the signature or the From address. Leave it on until the email block is finalized.
+
+<Callout tone="warning" title="Per-crew overrides win">
+**Exclude Home Base** is global, but a per-crew `hotelAtHomeBase = true` on the crew profile flips it for that crew. Similarly, **Default Travel Time** is a fallback — any crew with `travelTimeMinutes` set on their profile uses their own value. If a single crew's bookings or trips look wrong, check the crew profile before assuming the operator config is at fault.
+</Callout>
+
+## Keyboard shortcuts
+
+<ShortcutList>
+  <Shortcut combo="F1">Toggle this help</Shortcut>
+</ShortcutList>

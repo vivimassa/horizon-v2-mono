@@ -1,0 +1,142 @@
+import { Term, Kbd, Step, Callout, Shortcut, ShortcutList } from '@/components/help'
+
+Crew Hotel Management is the workspace the <Term full="Hotel Accommodation" definition="Industry shorthand for crew layover hotel coordination — the desk that books rooms for crew night-stops.">HOTAC</Term> desk uses to turn pairings into confirmed hotel rooms — projecting demand from the schedule, allocating rooms, sending rooming lists to hotels, and tracking each booking through check-out.
+
+<Callout tone="tip" title="If you're new to this page">
+Pick a period in the filter rail, click **Go**. Start in **Planning** to see demand counts, switch to **Day to Day** when you need real crew names, and use **Communication** to send and track hotel emails. The Fetch / Enlist / Send flow on the ribbon is the spine of every workday.
+</Callout>
+
+## Who uses this page
+
+The HOTAC dispatchers and the crew accommodation team. Planners use it weeks ahead to forecast room demand and lock contract rates; the day-of desk uses it to confirm rooms, watch for disruption, and chase no-shows. Both roles share the same underlying booking rows — the tabs swap the lens, not the data.
+
+## The three tabs
+
+The same set of bookings, three views. The active tab also changes which derivation runs on Fetch and which ribbon you see.
+
+### Planning
+
+Long-horizon demand. Fetch runs in `planning` mode — pairings are loaded with **counts only** (e.g. `2× PIC · 2× FO · 4× CCM`), no full crew names. The grid groups by station-night and shows the suggested hotel, its priority, and the projected cost. Use it for room blocks, contract reviews, and seasonal capacity planning.
+
+### Day to Day
+
+Short-horizon ops. Fetch runs in `dayToDay` mode and the grid filters to `now − 1 day` through `now + 7 days`. Crew names are populated from assignments. Rows with disruption flags get an orange tint and a **disruption badge** in the Status column (`inbound-cancelled`, `outbound-delayed`, `extend-night`, `overdue-confirmation`, etc.) so the desk can act on IROPS before the night arrives.
+
+### Communication
+
+Three folders — **Held**, **Outgoing**, **Incoming** — over the same `HotelEmail` collection. Held is the staging queue (outbound, status = `held`); Outgoing is everything outbound that has left held (`pending`, `sent`, `failed`); Incoming is hotel replies received via the inbound webhook. Master-detail layout: folder list on the left, message list in the middle, full message + thread on the right.
+
+## The booking status ladder
+
+Every booking walks one direction through the status enum. The grid shows a chip per row; the inspector footer changes which action button is offered based on the current status.
+
+- `demand` — freshly derived from a pairing layover, no allocation yet
+- `forecast` — **Enlist** ran and applied the room-allocation policy
+- `pending` — held in queue, waiting to send
+- `sent` — rooming list dispatched, awaiting hotel reply
+- `confirmed` — hotel acknowledged, room secured
+- `in-house` — crew checked in
+- `departed` — crew checked out
+
+Two terminal off-paths: `cancelled` (e.g. flight cancelled) and `no-show` (crew never showed). Once a booking moves past `forecast`, the server treats its status as **sticky** — re-running Fetch will not knock it back down. See "Fetch and Enlist" below.
+
+## Fetch and Enlist
+
+Both buttons live in the **Pairings** section of the Planning ribbon (Fetch alone in **Sync** on Day to Day). They are not interchangeable.
+
+<Step n={1}>
+Press **Go** in the filter rail. The runway-loading panel runs once (3-second floor) and the workspace appears. Polling kicks off on a tick and re-fetches canonical bookings every 60 seconds without re-running derivation.
+</Step>
+
+<Step n={2}>
+Click **Fetch** to re-derive. The client calls `getCrewSchedule` for the period, runs `deriveBookings` over the pairings + crew + assignments + positions to find layovers, matches each station to a hotel via `hotelsByIcao` (priority-1 first), and POSTs the result to `upsert-batch`. The server upserts each row keyed by `(operatorId, pairingId, airportIcao, layoverNightUtcMs)`, then the client GETs canonical rows back and merges them into the store. <Term>UTC</Term> milliseconds throughout.
+</Step>
+
+<Step n={3}>
+Click **Enlist** to flip every row currently in `demand` to `forecast`. The room-allocation policy runs (Phase 1 is single-occupancy across the board; per-position double occupancy comes from `OperatorHotacConfig`). The client patches each row optimistically, then PATCHes the server.
+</Step>
+
+<Callout tone="info" title="Sticky status — Enlist won't undo your work">
+The server's upsert-batch handler treats anything past `forecast` as **sticky**: a re-Fetch will not overwrite the status, the chosen hotel, the contract ID, the confirmation number, or any manual cost override. `demand` and `forecast` are the only refreshable states. This is what lets multiple HOTAC users share the workspace without stomping on each other.
+</Callout>
+
+## The booking inspector
+
+Click any row to open the inspector on the right. Click again — or press <Kbd>Esc</Kbd> via the close button — to dismiss it. Three tabs:
+
+- **Overview** — the layover triplet (inbound flight + STA → stay duration → outbound flight + STD), the matched hotel with its priority badge `P1`/`P2`/`P3`, distance from terminal in minutes, amenity chips, free-text notes, and a disruption-flags panel when any are set.
+- **Crew (n)** — full crew list with avatars, position, and home base. In Planning mode this falls back to the per-position counts and prompts you to switch to **Day to Day** to load names.
+- **Cost** — `rooms × 1 night × rate` in the contract currency, plus a 10% tax-and-service line and a total. If no hotel matched, the tab says so.
+
+The action footer changes per status:
+
+- `forecast` / `pending` → **Mark sent** (primary)
+- `sent` → **Mark confirmed** (green, `#06C270`)
+- `confirmed` → **Check in** (primary)
+- `in-house` → **Check out** (primary)
+- `sent` and `confirmed` also expose **No-show** (outlined red, `#FF3B3B`)
+
+## Composing rooming lists
+
+There are three ways to compose:
+
+- **Right-click any row** in Planning or Day to Day. The selected booking is treated as the seed, the matched hotel's `emails[]` are pre-filled as recipients, and `buildRoomingListTemplate` generates the subject and body from the pairing context. The compose drawer opens on top of the Communication tab.
+- **Click Hold in the Compose ribbon** while on the Communication tab to start a blank rooming list.
+- **Click any held email in the Held folder** to edit it before release.
+
+The drawer has four fields — Hotel, To (comma-separated recipients), Subject, Body — plus a chip strip showing linked booking IDs. Two save actions:
+
+- **Save as held** — persists with `status='held'`. The email stays in the Held folder until you release it.
+- **Save & Release** — saves then immediately POSTs to `/hotel-emails/release`, flipping the email to `pending` and fanning the recipients out into a `deliveries[]` array for SMTP transport. Disabled until at least one recipient is set.
+
+## Communication folders
+
+- **Held** — outbound, `status='held'`. Each row gets a checkbox so you can multi-select for bulk release/discard from the ribbon's **Bulk** section. PATCH is allowed while held; once status > held the server returns 409 and the message is read-only.
+- **Outgoing** — outbound, anything that's not `held` or `discarded` (typically `pending`, `sent`, `failed`). Sorted by most recent update.
+- **Incoming** — inbound replies, captured by the `/hotel-emails/inbound` webhook from the SMTP receiver. Each carries its `threadId` so replies thread back to the original outbound rooming list.
+
+<Callout tone="warning" title="Release semantics">
+**Release** transitions `held` → `pending` and populates `deliveries[]` from `recipients[]`. If the email has no recipients AND its hotel has no `emails[]` in master data, the server marks it `failed` and skips the send — no SMTP attempt is made. Add at least one address to the **To** field, or fix the hotel's contact list in **4.1.8.2 Hotels Database**, before releasing.
+</Callout>
+
+## Layover detection
+
+The derivation considers a gap between two legs at the same station a layover when:
+
+- the inbound and outbound stations match (`legs[i].arrStation === legs[i+1].depStation`), and
+- the gap from inbound STA to outbound STD is **at least 6 hours** block-to-block (the `layoverMinHours` default), and
+- the station is **not the pairing's home base** — unless a crew member on the pairing has the `hotelAtHomeBase` override on their profile
+
+The final leg of a pairing also emits a layover row when it ends away from base, with `depUtcMs = null`. Defaults live in `DEFAULT_LAYOVER_CONFIG` and are overridable per operator via `OperatorHotacConfig.layoverRule` — tune them in **4.1.8.3 Operator Hotac Config**. The optional `minSpanMidnightHours` rule (gap must cross UTC midnight) is off by default.
+
+## Export
+
+**Export** in the View ribbon writes a CSV of the currently loaded bookings: Station, Night, Pairing, Pax, Hotel, Rooms, Status, Cost, Currency. Filename pattern: `hotac-{YYYY-MM-DD}.csv`. Respects the active filter set.
+
+## Keyboard shortcuts
+
+<ShortcutList>
+  <Shortcut combo="F1">Toggle this help</Shortcut>
+  <Shortcut combo="Esc">Close inspector / compose drawer</Shortcut>
+  <Shortcut combo="Right-click">Compose rooming list from selected booking</Shortcut>
+  <Shortcut combo="Click row">Open inspector</Shortcut>
+  <Shortcut combo="Click row again">Close inspector</Shortcut>
+</ShortcutList>
+
+## Common gotchas
+
+### Crew names are blank in Planning
+
+Expected. Planning runs `deriveBookings` in `planning` mode, which uses `pairing.crewCounts` (or a count of overlapping assignments) and intentionally skips the per-leg crew lookup for speed. The Crew tab in the inspector tells you to switch to **Day to Day** — that's where full names get loaded.
+
+### Enlist did nothing visible
+
+Enlist only acts on rows currently in `demand`. Anything already at `forecast`, `pending`, `sent`, or beyond is left alone. If the grid is full of `forecast` chips and you press Enlist again, no PATCH will fire — that's correct behaviour, not a bug. To rebuild the room counts under a different policy, escalate the row to `cancelled` first or edit it manually.
+
+### Released a held email but nothing arrived
+
+If `recipients[]` is empty at release time, the server falls back to the hotel's master-data `emails[]`. If that's also empty, the email is marked `failed` and never reaches SMTP. Open the row in Outgoing — the `failed` chip is the giveaway. Fix it by patching the hotel's contact list and re-creating the email, or by editing recipients manually before release.
+
+### Disruption badges only appear on Day to Day rows
+
+`detectDisruptions` runs on every poll tick and Fetch, but the orange-tinted row + badge only renders in the Day to Day grid. The flags are still set on Planning rows and surface in the inspector's Overview tab when one is selected.

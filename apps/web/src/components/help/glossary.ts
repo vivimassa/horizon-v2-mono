@@ -64,6 +64,42 @@ export const GLOSSARY: Record<string, GlossaryEntry> = {
     definition:
       'Duration between off-blocks (STD) and on-blocks (STA). In Sky Hub it is computed automatically from STA − STD, handling midnight wraparound via the OFFSET column.',
   },
+  HOTAC: {
+    term: 'HOTAC',
+    full: 'Hotel Accommodation',
+    definition:
+      'Industry shorthand for the desk that books crew layover hotels and ground transport. In Sky Hub the HOTAC module covers 4.1.8.1 Crew Hotel Management, 4.1.8.2 Crew Transport, and the 4.1.8.3 policy page that drives them both.',
+  },
+  Layover: {
+    term: 'Layover',
+    full: 'Layover',
+    definition:
+      'Block-to-block rest period between an inbound STA and the next outbound STD on the same pairing. Qualifies for a hotel only when the gap meets the operator-configured minimum (default ≥6h) and is not at the crew home base.',
+  },
+  Pairing: {
+    term: 'Pairing',
+    full: 'Crew Pairing',
+    definition:
+      'A multi-day rotation a crew member flies — first leg of duty (report) through last leg (release). The unit of work for crew schedule, HOTAC layover detection, and crew-transport derivation.',
+  },
+  Deadhead: {
+    term: 'Deadhead',
+    full: 'Deadhead Positioning',
+    definition:
+      'A leg flown by a crew member as a passenger to position for an upcoming duty rather than to operate the flight. Captured in 4.1.8.2 Flight as either a ticket booking or a GENDEC supernumerary placement.',
+  },
+  GENDEC: {
+    term: 'GENDEC',
+    full: 'General Declaration',
+    definition:
+      'Supernumerary placement of crew on the operator’s own flight without a passenger ticket — typically a cockpit jumpseat, cabin jumpseat, or pax seat declared on the GENDEC manifest. The non-ticketed alternative to a deadhead booking.',
+  },
+  PNR: {
+    term: 'PNR',
+    full: 'Passenger Name Record',
+    definition:
+      'GDS booking reference for a ticketed flight. Stored on a CrewFlightBooking when method=ticket, alongside the carrier code, ticket numbers, fare, and any e-ticket attachments.',
+  },
 }
 
 export function lookupTerm(term: string): GlossaryEntry | undefined {

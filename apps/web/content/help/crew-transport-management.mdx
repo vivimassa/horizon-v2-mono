@@ -1,0 +1,199 @@
+import { Term, Kbd, Step, Callout, Shortcut, ShortcutList } from '@/components/help'
+
+Crew Transport is where the <Term definition="Hotel-Allowance / Crew-Accommodation. The dispatch team that books crew rest, ground transport, and positioning flights." full="HOTAC team">HOTAC</Term> / dispatch team turns the published roster into actual ground trips and positioning flights — every pickup that gets a crew member from home (or hotel, or the crew hub) to the aircraft, and every <Term definition="A leg a crew member travels as a passenger to position for an upcoming duty, instead of operating it." full="Deadhead">deadhead</Term> ticket that flies them somewhere they need to start a duty.
+
+<Callout tone="tip" title="If you're new to this page">
+Start with the **Ground** segment, **Planning** tab. Click **Go** in the filter panel to derive trips from the roster. Then read the segments section below — Ground and Flight are completely separate workflows on the same page.
+</Callout>
+
+## Who uses this page
+
+Dispatch / HOTAC controllers. Upstream, the roster is already published — pairings exist, crew are assigned to them. Downstream, vendors need a dispatch sheet, drivers need a plate and a phone number, deadheading crew need a PNR. This page is the bridge: it derives the demand, lets you assign and confirm vendors, tracks each trip through pickup and completion, and keeps the email trail with the vendor in one place.
+
+## The two segments
+
+The page splits horizontally by the **kind of transport**:
+
+- **Ground** — every road trip on the day of duty: home-to-airport, hub shuttles, hotel-to-airport, return legs. Derived from pairings, dispatched to road vendors.
+- **Flight** — deadhead positioning on a flight (revenue ticket on another carrier, non-rev jumpseat on your own metal). One booking per deadhead leg in a pairing.
+
+Each segment has its own tab set. Switching segment changes both the tabs and the ribbon actions.
+
+## Ground
+
+Three tabs: **Planning**, **Day to Day**, **Communication**.
+
+### How trips are derived
+
+When you click **Go**, the shell pulls the crew schedule for your period and runs derivation locally before persisting. The unit of work is one trip per <Term definition="A multi-day rotation a crew member flies — first leg of duty (report) through last leg (release)." full="Pairing">pairing</Term> edge:
+
+- One **outbound** trip — pickup from home / hub, dropoff at the airport — anchored to the first leg's <Term>STD</Term>.
+- One **inbound** trip — pickup at the airport, dropoff at home / hub — anchored to the last leg's <Term>STA</Term>.
+
+Only crew with `transportRequired = true` on their profile **and** whose `base` matches the pairing's `baseAirport` get trips. Anyone else is assumed to handle their own positioning.
+
+### Pickup mode — Hub shuttle vs Door-to-door
+
+The shape of each trip depends on `pickupMode` in your operator config:
+
+- <Term definition="One consolidated van per duty-start: every crew shows up at a single staging location (the 'crew hub') and rides together to the aircraft." full="Hub shuttle">**Hub shuttle**</Term> (`hub-shuttle`) — one trip per pairing edge. All eligible crew share the vehicle. Pickup time is anchored so the slowest crew member can still make it from home to hub, plus your buffer.
+- <Term definition="One trip per crew member, picking each up at their home address. The grid batches consecutive pickups within a configurable window." full="Door-to-door">**Door-to-door**</Term> (`door-to-door`) — one trip per crew, but the grid batches crew whose pickups fall within `batchingWindowMinutes` into a shared vehicle. Pickup time per crew = report − buffer − their `travelTimeMinutes` (or the operator default if unset).
+
+Vendor and vehicle tier are picked automatically: vendors filtered to the pairing's base airport, sorted by `priority`, then the smallest tier that fits `paxCount` (largest tier as fallback).
+
+### Status ladder
+
+Every trip flows through:
+
+`demand` → `forecast` → `pending` → `sent` → `confirmed` → `dispatched` → `crew-pickedup` → `completed`
+
+Plus two terminals: `cancelled` and `no-show`.
+
+- **demand / forecast** — newly derived. No vendor commitment yet.
+- **pending / sent / confirmed** — the dispatch-sheet exchange with the vendor. `sent` flips when an outbound email leaves Held, `confirmed` when the vendor replies.
+- **dispatched** — driver and plate are now on the trip; crew can be picked up.
+- **crew-pickedup** — driver reports the crew on board.
+- **completed** — dropoff confirmed, audit closed.
+
+The **Picked up**, **Dispatch**, **Done**, **No-show** buttons in the inspector footer drive these transitions. Status moves forward only — there is no "back" button, by design.
+
+### Planning tab
+
+Long-horizon demand projection. One row per derived trip across the whole loaded period. Columns:
+
+- **Time** — scheduled pickup time + ISO date.
+- **Direction** — `Hub → Airport`, `Home → Airport`, etc. (computed from `tripType`).
+- **Pickup → Dropoff** — `fromLabel` → `toLabel`, plus the gating leg's flight number underneath.
+- **Pax** — count of crew on the trip.
+- **Vendor / Vehicle** — matched vendor, vehicle tier, priority badge (`P1`, `P2`...).
+- **Status** — chip in the lifecycle ladder.
+- **Cost** — vendor's `ratePerTrip` for the matched tier, in the contract currency.
+
+Click any row to open the inspector. **Right-click** any row to compose a dispatch-sheet email pre-filled with that trip's vendor, pax list, and pickup details.
+
+### Day to Day tab
+
+Today-only operational view. The header shows a **24h timeline strip per station** — pills sit on the strip at their scheduled time, count badge inside the pill = pax count. Click a pill to select the trip; the active trip turns solid accent.
+
+Below the strip is the same trip list as Planning, with two extra columns visible:
+
+- **Driver / Plate** — populated by Dispatch action.
+
+Use this tab as the day-of-ops console.
+
+### Communication tab
+
+Three folders down the left rail: **Held**, **Outgoing**, **Incoming**.
+
+- **Held** — outbound dispatch sheets staged for review. Multi-select with the checkbox column, then **Release** from the ribbon to send the batch (or **Discard** to throw them away). Each released email flips its trips to `sent`.
+- **Outgoing** — already-sent outbound mail. Read-only audit.
+- **Incoming** — vendor replies. Open one to confirm the booking and flip the trip to `confirmed`.
+
+**Composing**: right-click any trip in Planning or Day to Day → the compose drawer opens pre-filled. The body uses the dispatch-sheet template — outbound/inbound, time, route, pax stops with pickup addresses, and a confirmation request. **Recipients resolve from the vendor's `emails[]` array** — if you leave the recipient field empty when sending, the server fills it from the matched vendor's contact emails.
+
+### Trip inspector
+
+Opens when you click a row in Planning or Day to Day. Four tabs:
+
+- **Overview** — status chip, scheduled time, from/to labels + addresses, vendor, vehicle tier, driver, plate, confirmation #, notes, disruption flags (`inbound-delayed`, `extend`, `overdue-confirmation`...).
+- **Pax** — ordered list of crew on this trip. Each entry has the crew's pickup time and address.
+- **Cost** — trip cost, currency, vendor priority, contracted tier rate.
+- **Audit** — the five lifecycle timestamps (`Sent`, `Confirmed`, `Dispatched`, `Picked up`, `Completed`) in UTC.
+
+The footer holds four **lifecycle action buttons**:
+
+- **Dispatch** — disabled if status is already `dispatched` or beyond. Locks driver + plate on the trip.
+- **Picked up** — sets `pickedUpAtUtcMs`, status → `crew-pickedup`.
+- **Done** — sets `completedAtUtcMs`, status → `completed`. Terminal.
+- **No-show** — destructive (red). Status → `no-show`. Terminal.
+
+## Flight
+
+Three tabs: **Open**, **Booked**, **History**.
+
+### Open tab
+
+Lists every leg in the loaded pairings where `isDeadhead = true` and there is no `CrewFlightBooking` yet. Columns: **Date**, **Pairing**, **Leg** (flight number), **Route**, **Pax** (sum of `crewCounts`), and a **Book** button on the right. Click **Book** to open the booking drawer pre-filled with the leg context.
+
+### Booked tab
+
+Active bookings — anything not cancelled and not in the past. **Edit** opens the same drawer for amendments (re-book class, attach a fresh PDF, update the PNR, cancel).
+
+### History tab
+
+Cancelled bookings + bookings whose `flightDate` is before today. Read-only.
+
+### Booking drawer — Ticket vs GENDEC
+
+Two methods, picked at the top of the drawer:
+
+#### Ticket
+
+Revenue or non-revenue ticket on a real flight (yours or another carrier's).
+
+- **Carrier (IATA / ICAO)** — **REQUIRED**. FK to `/admin/carrier-codes`. The field shows a datalist of active carriers; if the code you type isn't in the list, the input goes red and **Save** is disabled. Server-side the route also rejects unknown codes.
+- **Flight #**, **Date**, **Dep**, **Arr** — the flight you're booking onto.
+- **Class** — segmented buttons: `Y`, `J`, `F`, `C`, `W`. Click again to clear.
+- **PNR** — uppercased on entry.
+- **Ticket numbers** — comma- or whitespace-separated, parsed into an array on save.
+- **Fare cost / Currency** — `USD`, `VND`, `EUR`, `GBP`, `AUD`, `SGD`.
+- **Attachments** — image or PDF e-tickets. See the rules below.
+
+#### GENDEC
+
+Supernumerary placement on the operator's own flight (no ticket, just a name on the <Term definition="General Declaration. The form-list of crew and supernumeraries on a flight, used for immigration and aviation authority filings." full="GENDEC (General Declaration)">GENDEC</Term>).
+
+- **GENDEC position** — `Cockpit jumpseat`, `Cabin jumpseat`, `Pax seat`. Required.
+- **Carrier** — optional. Defaults to the operator's IATA code if you leave it blank.
+- **Flight #**, **Date** — the operator flight you're piggy-backing on.
+
+No PNR, no class, no fare, no attachments — by design.
+
+### Attachments
+
+Ticket bookings only.
+
+- **Allowed types** — `image/*` or `application/pdf`. Anything else is rejected by the server.
+- **Max size** — 20 MB per file.
+- **Upload requires save** — the drawer disables the Upload button until the booking has been saved (it needs the booking `_id` to scope the upload). The label warns "save first to enable upload" when `bookingId` is null.
+
+Each uploaded file shows up in the booking row as a clickable icon — image vs paper depending on `mimeType`.
+
+## Vendor and config setup — where things live
+
+This page **consumes** vendor and config; it doesn't define them.
+
+- **Vendor master data** — `/admin/crew-hotels`, **Transport Vendors** segment toggle. Set up vendors, contracts, vehicle tiers, service-area <Term>ICAO</Term> codes, priority, and the `emails[]` used as default dispatch recipients.
+- **Pickup mode**, **buffer minutes**, **batching window**, **default travel time**, **hub location** — **4.1.8.3 HOTAC Configurations → Transport** section. The shell falls back to compiled defaults (`hub-shuttle`, 15-min buffer, 30-min batching, 45-min default travel) if no config doc exists yet.
+- **Carrier codes** for ticket bookings — `/admin/carrier-codes`. Only active carriers appear in the booking drawer's datalist.
+
+## Common gotchas
+
+### No trips appear after Go
+
+The grid says "No ground trips for the selected period & filters" even though crew are clearly flying. Check, in order:
+
+1. **`transportRequired` is false** on the affected crew profiles. Derivation drops anyone whose flag isn't explicitly `true`.
+2. **Crew base mismatch** — their `base` doesn't match the pairing's `baseAirport`. Phase C only emits trips for crew based at the pairing's home station; positioning crew working out of a different base get nothing.
+3. **No assignments** — pairings with no crew assigned (still in draft) produce zero trips, by definition.
+
+### "Carrier not in /admin/carrier-codes"
+
+The booking drawer rejects ticket bookings whose carrier code isn't an active row in `/admin/carrier-codes`. Either:
+
+- The code you typed has a typo (the field auto-uppercases but doesn't auto-correct), or
+- The carrier exists but has been deactivated, or
+- The code only exists in ICAO form and you typed the IATA code (or vice versa) — the validator accepts either, but the row must exist.
+
+Add or reactivate the carrier in `/admin/carrier-codes`, then come back. **GENDEC** bookings have no such requirement — carrier is optional.
+
+### "Save the booking first, then attach files"
+
+You hit **Upload file** before saving. The attachment route needs the booking `_id`, so the drawer disables upload until the first save round-trips. Click **Save booking** at the bottom right, wait for the green tick, then upload.
+
+## Keyboard shortcuts
+
+<ShortcutList>
+  <Shortcut combo="F1">Toggle this help</Shortcut>
+  <Shortcut combo="Esc">Close inspector / drawer</Shortcut>
+</ShortcutList>

@@ -4286,6 +4286,11 @@ export interface HotacTransportConfig {
   defaultVendorSlaMinutes: number
   taxiVoucherEnabled: boolean
   flightBookingMode: 'ticket-preferred' | 'gendec-preferred'
+  /** Who runs airport↔hotel transport at layover stations.
+   *  - 'hotel'  → hotel shuttle handles it; no trips emitted by 4.1.8.2.
+   *  - 'vendor' → ground vendor handles it; 4.1.8.2 derives airport-hotel /
+   *               hotel-airport trips per HotelBooking and dispatches to vendors. */
+  layoverTransportProvider: 'hotel' | 'vendor'
 }
 
 export interface OperatorHotacConfig {

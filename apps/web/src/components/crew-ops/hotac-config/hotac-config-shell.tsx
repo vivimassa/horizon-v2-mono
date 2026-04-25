@@ -614,8 +614,24 @@ function SectionBody({
             tier and SLA become defaults on auto-assign.
           </HelpBlock>
           <FormRow
+            label="Layover Transport Provider"
+            description="Who handles airport↔hotel transport at outstation layovers. 'Hotel' = the hotel runs its own shuttle and 4.1.8.2 emits no trips for layovers. 'Vendor' = HOTAC dispatches a contracted ground vendor; 4.1.8.2 derives one trip per direction per booking."
+          >
+            <SegButtons
+              value={draft.transport.layoverTransportProvider}
+              onChange={(v) => patchTransport({ layoverTransportProvider: v as 'hotel' | 'vendor' })}
+              options={[
+                { key: 'vendor', label: 'Vendor' },
+                { key: 'hotel', label: 'Hotel' },
+              ]}
+              accent={accent}
+              palette={palette}
+              isDark={isDark}
+            />
+          </FormRow>
+          <FormRow
             label="Pickup Mode"
-            description="Hub shuttle = one consolidated trip from a hub location to the airport. Door-to-door = one trip per crew home address, batched."
+            description="Home/Hub-airport behavior. Hub shuttle = one consolidated trip from a hub location to the airport. Door-to-door = one trip per crew home address, batched."
           >
             <SegButtons
               value={draft.transport.pickupMode}

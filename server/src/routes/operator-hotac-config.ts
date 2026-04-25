@@ -77,6 +77,7 @@ const transportSchema = z
     defaultVendorSlaMinutes: z.number().int().min(5).max(60).optional(),
     taxiVoucherEnabled: z.boolean().optional(),
     flightBookingMode: z.enum(['ticket-preferred', 'gendec-preferred']).optional(),
+    layoverTransportProvider: z.enum(['hotel', 'vendor']).optional(),
   })
   .optional()
 

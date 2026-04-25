@@ -86,6 +86,11 @@ export interface TransportConfig {
   batchingWindowMinutes: number
   /** Default crew→airport drive time when CrewMember.travelTimeMinutes is null. */
   defaultTravelTimeMinutes: number
+  /** Who runs airport↔hotel transport at outstation layovers.
+   *  - 'hotel'  → hotel shuttle handles it; layover-trip derivation is skipped.
+   *  - 'vendor' → ground vendor handles it; 4.1.8.2 derives airport-hotel /
+   *               hotel-airport trips per HotelBooking. */
+  layoverTransportProvider: 'hotel' | 'vendor'
 }
 
 export const DEFAULT_TRANSPORT_CONFIG: TransportConfig = {
@@ -94,6 +99,7 @@ export const DEFAULT_TRANSPORT_CONFIG: TransportConfig = {
   bufferMinutes: 15,
   batchingWindowMinutes: 30,
   defaultTravelTimeMinutes: 45,
+  layoverTransportProvider: 'vendor',
 }
 
 export const NON_TERMINAL_STATUSES: TripStatus[] = ['demand', 'forecast', 'pending', 'sent', 'confirmed', 'dispatched']

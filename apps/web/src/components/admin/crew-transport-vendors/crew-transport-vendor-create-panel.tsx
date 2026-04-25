@@ -8,10 +8,12 @@ interface Props {
   airports: AirportRef[]
   onCreate: (data: Partial<CrewTransportVendorRef>) => Promise<void>
   onCancel: () => void
+  /** When provided, the airport selector is pre-filled and locked. */
+  lockedAirportIcao?: string
 }
 
-export function CrewTransportVendorCreatePanel({ airports, onCreate, onCancel }: Props) {
-  const [icao, setIcao] = useState('')
+export function CrewTransportVendorCreatePanel({ airports, onCreate, onCancel, lockedAirportIcao }: Props) {
+  const [icao, setIcao] = useState(lockedAirportIcao ?? '')
   const [vendorName, setVendorName] = useState('')
   const [priority, setPriority] = useState('1')
   const [busy, setBusy] = useState(false)
@@ -67,7 +69,8 @@ export function CrewTransportVendorCreatePanel({ airports, onCreate, onCancel }:
           <select
             value={icao}
             onChange={(e) => setIcao(e.target.value)}
-            className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-card text-hz-text focus:ring-2 focus:ring-module-accent/30 outline-none"
+            disabled={!!lockedAirportIcao}
+            className="w-full mt-1 px-3 py-2.5 rounded-lg text-[13px] border border-hz-border bg-hz-card text-hz-text focus:ring-2 focus:ring-module-accent/30 outline-none disabled:opacity-70 disabled:cursor-not-allowed"
           >
             <option value="">Select airport…</option>
             {airports.map((a) => (
@@ -76,6 +79,9 @@ export function CrewTransportVendorCreatePanel({ airports, onCreate, onCancel }:
               </option>
             ))}
           </select>
+          {lockedAirportIcao && (
+            <div className="text-[13px] text-hz-text-secondary mt-1">Airport is fixed by the parent hotel.</div>
+          )}
         </div>
 
         <div>

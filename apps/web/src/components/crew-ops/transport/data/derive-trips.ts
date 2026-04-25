@@ -7,10 +7,12 @@
 
 import type {
   CrewAssignmentRef,
+  CrewHotelRef,
   CrewMemberListItemRef,
   CrewTransportPaxStop,
   CrewTransportTripType,
   CrewTransportVendorRef,
+  HotelBookingRef,
   PairingLegRef,
   PairingRef,
 } from '@skyhub/api'
@@ -350,5 +352,178 @@ export function indexVendorsByIcao(vendors: CrewTransportVendorRef[]): Map<strin
     push(v.baseAirportIcao, v)
     for (const a of v.serviceAreaIcaos) if (a !== v.baseAirportIcao) push(a, v)
   }
+  return m
+}
+
+interface DeriveLayoverInput {
+  bookings: HotelBookingRef[]
+  hotelsById: Map<string, CrewHotelRef>
+  crew: CrewMemberListItemRef[]
+  vendorsByIcao: Map<string, CrewTransportVendorRef[]>
+  config: TransportConfig
+  filters: CrewTransportFilters
+}
+
+/**
+ * Layover transport derivation — emits one inbound (airport→hotel) and one
+ * outbound (hotel→airport) trip per HotelBooking when the operator has chosen
+ * `layoverTransportProvider = 'vendor'`. Returns an empty array when the
+ * provider is `'hotel'` (the hotel runs its own shuttle and 4.1.8.2 stays
+ * out of the picture).
+ *
+ * Times:
+ *   - airport→hotel: booking.arrStaUtcIso + bufferMinutes (crew has just landed)
+ *   - hotel→airport: booking.depStdUtcIso − bufferMinutes − distanceFromAirportMinutes
+ *
+ * When `depStdUtcIso` is missing (open-ended layover at end of pairing), the
+ * outbound leg is skipped — the next pairing will pick the crew up.
+ */
+export function deriveLayoverTrips(input: DeriveLayoverInput): TransportTrip[] {
+  const { bookings, hotelsById, crew, vendorsByIcao, config, filters } = input
+
+  if (config.layoverTransportProvider === 'hotel') return []
+
+  const crewById = new Map<string, CrewMemberListItemRef>()
+  for (const c of crew) crewById.set(c._id, c)
+
+  const out: TransportTrip[] = []
+  const bufferMs = config.bufferMinutes * 60_000
+
+  for (const b of bookings) {
+    if (b.status === 'cancelled') continue
+    const hotel = b.hotelId ? hotelsById.get(b.hotelId) : null
+    const distanceMinutes = hotel?.distanceFromAirportMinutes ?? config.defaultTravelTimeMinutes
+    const hotelLabel = hotel?.hotelName || b.hotelName || 'Hotel'
+    const hotelAddress = hotel ? [hotel.addressLine1, hotel.addressLine2].filter(Boolean).join(', ') || null : null
+
+    // Pax stops — one per crew member assigned to the booking.
+    const paxStops: CrewTransportPaxStop[] = b.crewIds.map((cid) => {
+      const c = crewById.get(cid)
+      const fullName = c ? `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim() || c.shortCode || cid : cid
+      return {
+        crewId: cid,
+        crewName: fullName,
+        position: c?.position ?? '',
+        pickupAddress: null,
+        pickupTimeUtcMs: null,
+        pickedUpAtUtcMs: null,
+        dropoffAtUtcMs: null,
+      }
+    })
+
+    const inboundStaMs = b.arrStaUtcIso ? Date.parse(b.arrStaUtcIso) : NaN
+    if (Number.isFinite(inboundStaMs)) {
+      const scheduledIn = inboundStaMs + bufferMs
+      const stops: CrewTransportPaxStop[] = paxStops.map((p) => ({ ...p, pickupTimeUtcMs: scheduledIn }))
+      const vendorIn = selectVendor(vendorsByIcao, b.airportIcao, stops.length, scheduledIn)
+      out.push(
+        buildLayoverTrip({
+          booking: b,
+          tripType: 'airport-hotel',
+          scheduledTimeUtcMs: scheduledIn,
+          fromLabel: b.airportIcao,
+          fromAddress: null,
+          toLabel: hotelLabel,
+          toAddress: hotelAddress,
+          paxStops: stops,
+          vendor: vendorIn,
+          legFlightNumber: b.arrFlight,
+          legStdUtcIso: null,
+          legStaUtcIso: b.arrStaUtcIso,
+        }),
+      )
+    }
+
+    const outboundStdMs = b.depStdUtcIso ? Date.parse(b.depStdUtcIso) : NaN
+    if (Number.isFinite(outboundStdMs)) {
+      const scheduledOut = outboundStdMs - bufferMs - distanceMinutes * 60_000
+      const stops: CrewTransportPaxStop[] = paxStops.map((p) => ({
+        ...p,
+        pickupAddress: hotelAddress,
+        pickupTimeUtcMs: scheduledOut,
+      }))
+      const vendorOut = selectVendor(vendorsByIcao, b.airportIcao, stops.length, scheduledOut)
+      out.push(
+        buildLayoverTrip({
+          booking: b,
+          tripType: 'hotel-airport',
+          scheduledTimeUtcMs: scheduledOut,
+          fromLabel: hotelLabel,
+          fromAddress: hotelAddress,
+          toLabel: b.airportIcao,
+          toAddress: null,
+          paxStops: stops,
+          vendor: vendorOut,
+          legFlightNumber: b.depFlight,
+          legStdUtcIso: b.depStdUtcIso,
+          legStaUtcIso: null,
+        }),
+      )
+    }
+  }
+
+  return applyFilters(out, filters)
+}
+
+interface BuildLayoverArgs {
+  booking: HotelBookingRef
+  tripType: 'airport-hotel' | 'hotel-airport'
+  scheduledTimeUtcMs: number
+  fromLabel: string
+  fromAddress: string | null
+  toLabel: string
+  toAddress: string | null
+  paxStops: CrewTransportPaxStop[]
+  vendor: TripVendorLite | null
+  legFlightNumber: string | null
+  legStdUtcIso: string | null
+  legStaUtcIso: string | null
+}
+
+function buildLayoverTrip(args: BuildLayoverArgs): TransportTrip {
+  const isOutbound = args.tripType === 'hotel-airport'
+  const cost = args.vendor?.ratePerTrip ?? 0
+  const currency = args.vendor?.currency ?? 'USD'
+
+  return {
+    id: `${args.booking.pairingId}::${args.tripType}::${args.scheduledTimeUtcMs}`,
+    pairingId: args.booking.pairingId,
+    pairingCode: args.booking.pairingCode,
+    tripType: args.tripType,
+    scheduledTimeUtcMs: args.scheduledTimeUtcMs,
+    legFlightNumber: args.legFlightNumber,
+    legStdUtcIso: args.legStdUtcIso,
+    legStaUtcIso: args.legStaUtcIso,
+    airportIcao: args.booking.airportIcao,
+    fromLocationType: isOutbound ? 'hotel' : 'airport',
+    fromAddress: args.fromAddress,
+    fromLabel: args.fromLabel,
+    toLocationType: isOutbound ? 'airport' : 'hotel',
+    toAddress: args.toAddress,
+    toLabel: args.toLabel,
+    paxStops: args.paxStops,
+    paxCount: args.paxStops.length,
+    vendor: args.vendor,
+    vendorMethod: 'vendor',
+    vehiclePlate: null,
+    driverName: null,
+    driverPhone: null,
+    cost,
+    costCurrency: currency,
+    status: 'demand',
+    confirmationNumber: null,
+    notes: null,
+    disruptionFlags: [],
+    sentAtUtcMs: null,
+    confirmedAtUtcMs: null,
+    dispatchedAtUtcMs: null,
+    pickedUpAtUtcMs: null,
+    completedAtUtcMs: null,
+  }
+}
+
+export function indexHotelsById(hotels: CrewHotelRef[]): Map<string, CrewHotelRef> {
+  const m = new Map<string, CrewHotelRef>()
+  for (const h of hotels) m.set(h._id, h)
   return m
 }

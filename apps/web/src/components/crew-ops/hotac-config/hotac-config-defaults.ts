@@ -59,6 +59,7 @@ export const DEFAULT_TRANSPORT: HotacTransportConfig = {
   defaultVendorSlaMinutes: 15,
   taxiVoucherEnabled: false,
   flightBookingMode: 'ticket-preferred',
+  layoverTransportProvider: 'vendor',
 }
 
 export interface HotacConfigDraft {

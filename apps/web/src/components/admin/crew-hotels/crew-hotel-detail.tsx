@@ -7,7 +7,8 @@ import { CrewHotelDetailsTab } from './crew-hotel-details-tab'
 import { CrewHotelContactsTab } from './crew-hotel-contacts-tab'
 import { CrewHotelContractsTab } from './crew-hotel-contracts-tab'
 import { CrewHotelShuttleTab } from './crew-hotel-shuttle-tab'
-import { BedDouble, Info, Phone, FileText, Bus, Plus, X } from 'lucide-react'
+import { CrewHotelTransportVendorsTab } from './crew-hotel-transport-vendors-tab'
+import { BedDouble, Info, Phone, FileText, Bus, Truck, Plus, X } from 'lucide-react'
 import { DetailScreenHeader, TabBar, Text, type TabBarItem } from '@/components/ui'
 
 const TABS: TabBarItem[] = [
@@ -15,9 +16,10 @@ const TABS: TabBarItem[] = [
   { key: 'contacts', label: 'Contact Details', icon: Phone },
   { key: 'contracts', label: 'Contracts', icon: FileText },
   { key: 'shuttle', label: 'Shuttle Bus Info', icon: Bus },
+  { key: 'transport', label: 'Transport Vendors', icon: Truck },
 ]
 
-type TabKey = 'details' | 'contacts' | 'contracts' | 'shuttle'
+type TabKey = 'details' | 'contacts' | 'contracts' | 'shuttle' | 'transport'
 
 interface Props {
   hotel: CrewHotelRef
@@ -307,6 +309,7 @@ export function CrewHotelDetail({ hotel, airports, onSave, onDelete, onCreate, o
         )}
         {activeTab === 'contracts' && <CrewHotelContractsTab hotel={hotel} onRefresh={onRefresh} />}
         {activeTab === 'shuttle' && <CrewHotelShuttleTab hotel={hotel} onRefresh={onRefresh} />}
+        {activeTab === 'transport' && <CrewHotelTransportVendorsTab hotel={hotel} airports={airports} />}
       </div>
     </div>
   )

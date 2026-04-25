@@ -77,6 +77,10 @@ const transportSchema = new Schema(
     defaultVendorSlaMinutes: { type: Number, default: 15, min: 5, max: 60 },
     taxiVoucherEnabled: { type: Boolean, default: false },
     flightBookingMode: { type: String, enum: ['ticket-preferred', 'gendec-preferred'], default: 'ticket-preferred' },
+    /** Who runs airport↔hotel transport at layover stations.
+     *  - 'hotel'  → hotel's own shuttle handles it; 4.1.8.2 emits no trips for layovers.
+     *  - 'vendor' → contracted ground vendor handles it; 4.1.8.2 derives trips per HotelBooking. */
+    layoverTransportProvider: { type: String, enum: ['hotel', 'vendor'], default: 'vendor' },
   },
   { _id: false },
 )

@@ -19,7 +19,7 @@ import { GroundCommunicationView } from '../views/ground-communication-view'
 import { FlightOpenView } from '../views/flight-open-view'
 import { FlightBookedView } from '../views/flight-booked-view'
 import { TripInspector } from '../views/trip-inspector'
-import { deriveTrips, indexVendorsByIcao } from '../data/derive-trips'
+import { deriveLayoverTrips, deriveTrips, indexHotelsById, indexVendorsByIcao } from '../data/derive-trips'
 import { fromServerRow, indexTripsByDetKey, indexVendorsById, toDerivedRow } from '../data/trip-converters'
 import { DEFAULT_TRANSPORT_CONFIG, type DerivationMode, type TransportConfig, type TransportTrip } from '../types'
 import { useCrewTransportPolling } from './use-crew-transport-polling'
@@ -126,7 +126,7 @@ export function CrewTransportShell() {
           crewGroup: filters.crewGroupIds && filters.crewGroupIds.length === 1 ? filters.crewGroupIds[0] : undefined,
         })
 
-        const derived = deriveTrips({
+        const homeHubTrips = deriveTrips({
           pairings: sched.pairings,
           crew: sched.crew,
           assignments: sched.assignments,
@@ -135,6 +135,33 @@ export function CrewTransportShell() {
           filters,
           mode,
         })
+
+        // Layover transport: pull HotelBookings + CrewHotels for the period
+        // and derive airport↔hotel trips when the operator's transport
+        // provider is 'vendor'. (When 'hotel' is configured, the helper
+        // returns [] and we skip the persistence + read entirely.)
+        let layoverTrips: TransportTrip[] = []
+        if (transportConfig.layoverTransportProvider === 'vendor') {
+          try {
+            const [hotelBookings, hotels] = await Promise.all([
+              api.getHotelBookings({ from: periodFrom, to: periodTo }),
+              api.getCrewHotels({ active: true }),
+            ])
+            const hotelsById = indexHotelsById(hotels)
+            layoverTrips = deriveLayoverTrips({
+              bookings: hotelBookings,
+              hotelsById,
+              crew: sched.crew,
+              vendorsByIcao,
+              config: transportConfig,
+              filters,
+            })
+          } catch (e) {
+            console.warn('[crew-transport] layover-trip derivation failed', e)
+          }
+        }
+
+        const derived = [...homeHubTrips, ...layoverTrips]
 
         // Persist derived rows so multiple HOTAC users see the same view, then
         // pull canonical rows back with manual edits merged in.

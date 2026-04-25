@@ -428,9 +428,12 @@ export async function runAutoRoster(
       endUtcIso: { $gte: historyFromIso },
     }).lean()
 
-    const activityCodes = await ActivityCode.find({ operatorId }, { _id: 1, flags: 1 }).lean()
+    const activityCodes = await ActivityCode.find({ operatorId }, { _id: 1, code: 1, flags: 1 }).lean()
     const activityCodesById = new Map<string, { flags: string[] }>(
       activityCodes.map((c) => [c._id as string, { flags: (c.flags ?? []) as string[] }]),
+    )
+    const activityCodeStringById = new Map<string, string>(
+      activityCodes.map((c) => [c._id as string, ((c as { code?: string }).code ?? '').toUpperCase()]),
     )
 
     const adaptActivities = (
@@ -718,6 +721,95 @@ export async function runAutoRoster(
       }
       if (virtuals.length > 0) allowedVirtual[crewId] = virtuals
     }
+    // ── Quality of Life: birthday HARD ────────────────────────────────────
+    // Strip pairings overlapping the crew member's birthday (MM-DD match) from
+    // the per-crew allowed list before solver sees them. Hard rule = no
+    // penalty negotiation, the slot is simply not assignable.
+    const birthdayEnabled = Boolean(schedulingConfig?.qolBirthday?.enabled)
+    if (birthdayEnabled) {
+      const virtualById = new Map(virtualPairings.map((v) => [v.id, v]))
+      const enumerateBirthdays = (mmdd: string): Set<string> => {
+        // All ISO dates in [periodFrom, periodTo] whose MM-DD matches.
+        const out = new Set<string>()
+        const start = new Date(`${periodFrom}T00:00:00Z`)
+        const end = new Date(`${periodTo}T00:00:00Z`)
+        for (let t = start.getTime(); t <= end.getTime(); t += 86_400_000) {
+          const iso = new Date(t).toISOString().slice(0, 10)
+          if (iso.slice(5) === mmdd) out.add(iso)
+        }
+        return out
+      }
+      let stripped = 0
+      for (const c of crew) {
+        const dob = (c as { dateOfBirth?: string | null }).dateOfBirth ?? null
+        if (!dob || dob.length < 10) continue
+        const birthdays = enumerateBirthdays(dob.slice(5, 10))
+        if (birthdays.size === 0) continue
+        const cid = c._id as string
+        const list = allowedVirtual[cid]
+        if (!list) continue
+        const filtered = list.filter((vid) => {
+          const v = virtualById.get(vid)
+          if (!v) return true
+          return !v.days.some((d) => birthdays.has(d))
+        })
+        stripped += list.length - filtered.length
+        if (filtered.length === 0) delete allowedVirtual[cid]
+        else allowedVirtual[cid] = filtered
+      }
+      if (stripped > 0) {
+        console.log(`[auto-roster] ${runId} QoL birthday hard rule stripped ${stripped} pairing×crew pairs`)
+      }
+    }
+
+    // ── Quality of Life: wind-down / late-return SOFT ─────────────────────
+    // For each enabled qolRule, find every crew × activity-date matching the
+    // rule's activity codes, and emit a per-crew per-date cutoff sent to the
+    // solver as a soft penalty.
+    type QolSoftRulePayload = {
+      crew_id: string
+      kind: 'wind_down' | 'late_return'
+      date: string
+      cutoff_min: number
+      weight: number
+    }
+    const qolSoftRules: QolSoftRulePayload[] = []
+    const enabledQolRules = (schedulingConfig?.qolRules ?? []).filter((r) => r.enabled)
+    if (enabledQolRules.length > 0) {
+      const activitiesByCrew = new Map<string, Array<{ codeStr: string; startUtcIso: string }>>()
+      for (const a of activities) {
+        const codeStr = a.activityCodeId ? activityCodeStringById.get(a.activityCodeId) : null
+        if (!codeStr) continue
+        const entry = activitiesByCrew.get(a.crewId) ?? []
+        entry.push({ codeStr, startUtcIso: a.startUtcIso })
+        activitiesByCrew.set(a.crewId, entry)
+      }
+      const parseHHMM = (s: string): number => {
+        const [h, m] = s.split(':').map((x) => parseInt(x, 10))
+        return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0)
+      }
+      const shiftDate = (iso: string, deltaDays: number): string => {
+        const t = new Date(`${iso.slice(0, 10)}T00:00:00Z`).getTime() + deltaDays * 86_400_000
+        return new Date(t).toISOString().slice(0, 10)
+      }
+      for (const rule of enabledQolRules) {
+        const codes = new Set((rule.activityCodeIds ?? []).map((c) => c.toUpperCase()))
+        if (codes.size === 0) continue
+        const cutoff = parseHHMM(rule.timeHHMM ?? '12:00')
+        const weight = Math.max(1, Math.min(10, Math.floor(rule.weight ?? 5)))
+        const kind: 'wind_down' | 'late_return' = rule.direction === 'before_activity' ? 'wind_down' : 'late_return'
+        const offset = kind === 'wind_down' ? -1 : 1
+        for (const [crewId, list] of activitiesByCrew.entries()) {
+          for (const a of list) {
+            if (!codes.has(a.codeStr)) continue
+            const targetDate = shiftDate(a.startUtcIso, offset)
+            if (targetDate < periodFrom || targetDate > periodTo) continue
+            qolSoftRules.push({ crew_id: crewId, kind, date: targetDate, cutoff_min: cutoff, weight })
+          }
+        }
+      }
+    }
+
     const totalVirtualLegalPairs = Object.values(allowedVirtual).reduce((s, arr) => s + arr.length, 0)
 
     onEvent({
@@ -749,6 +841,7 @@ export async function runAutoRoster(
             daysOff?: Record<string, unknown> | null
           } | null,
         ),
+        qol_soft_rules: qolSoftRules,
       },
       time_limit_sec: timeLimitSec,
     }
@@ -2183,7 +2276,10 @@ async function runStandbyAssignment(
       const reqEnd = endMs + minRestMs
       // Simple linear scan — crewIntervals rarely exceed ~60 entries per run.
       for (const itv of arr) {
-        // Reject if interval overlaps the required rest buffer window.
+        // 1) Hard overlap with the standby window itself — always reject,
+        //    even when minRestMs is 0 (missing FDTL ruleset).
+        if (itv.startMs < endMs && itv.endMs > startMs) return false
+        // 2) Reject if interval falls inside the rest-buffer window.
         if (itv.startMs < reqEnd && itv.endMs > reqStart) return false
       }
       return true
@@ -2231,27 +2327,36 @@ async function runStandbyAssignment(
       operatingByDay[d] = new Set()
     }
 
+    // Walk every UTC calendar day touched by [s, e]. Normalize to 00:00Z so
+    // pairings crossing midnight (e.g. 22:00→05:00 UTC) tag BOTH days, not
+    // just the start day. Without this, standby placed on day 2 wouldn't see
+    // the crew as busy and could overlap the pairing tail.
+    const walkUtcDays = (s: Date, e: Date, fn: (day: string) => void) => {
+      const cursor = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate()))
+      while (cursor <= e) {
+        fn(cursor.toISOString().slice(0, 10))
+        cursor.setUTCDate(cursor.getUTCDate() + 1)
+      }
+    }
     for (const a of assignments) {
-      const s = new Date(a.startUtcIso),
-        e = new Date(a.endUtcIso)
-      for (const d = new Date(s); d <= e; d.setUTCDate(d.getUTCDate() + 1)) {
-        const day = d.toISOString().slice(0, 10)
+      const s = new Date(a.startUtcIso)
+      const e = new Date(a.endUtcIso)
+      walkUtcDays(s, e, (day) => {
         if (day in busyByDay) {
           busyByDay[day].add(a.crewId)
           operatingByDay[day].add(a.crewId)
         }
-      }
+      })
     }
     for (const a of activities) {
-      const s = new Date(a.startUtcIso),
-        e = new Date(a.endUtcIso)
+      const s = new Date(a.startUtcIso)
+      const e = new Date(a.endUtcIso)
       const isStandby = a.activityCodeId && standbyCodeIds.has(a.activityCodeId as string)
-      for (const d = new Date(s); d <= e; d.setUTCDate(d.getUTCDate() + 1)) {
-        const day = d.toISOString().slice(0, 10)
-        if (!(day in busyByDay)) continue
+      walkUtcDays(s, e, (day) => {
+        if (!(day in busyByDay)) return
         busyByDay[day].add(a.crewId)
         if (isStandby) standbyByDay[day].add(a.crewId)
-      }
+      })
     }
 
     let inserted = 0

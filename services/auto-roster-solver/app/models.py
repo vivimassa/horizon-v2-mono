@@ -70,13 +70,29 @@ class WeeklyRestRule(BaseModel):
     window_hours: int = 168   # rolling window size
 
 
+class QolSoftRule(BaseModel):
+    """Per-crew, per-date Quality-of-Life cutoff. Penalises pairings on
+    `date` that violate the cutoff:
+      - kind='wind_down'  → pairing end_utc must be on/before `date`@cutoff_min
+      - kind='late_return' → pairing start_utc must be on/after `date`@cutoff_min
+    cutoff_min is minutes-from-midnight UTC (orchestrator-assumed; per-crew
+    timezone conversion not yet wired). weight is 1-10.
+    """
+    crew_id: str
+    kind: str             # 'wind_down' | 'late_return'
+    date: str             # ISO YYYY-MM-DD
+    cutoff_min: int       # 0..1440
+    weight: int = 5
+
+
 class SolverConfig(BaseModel):
     gender_balance_weight: int = 80   # 0-100, from OperatorSchedulingConfig.objectives
-    destination_rules: list[dict] = []  # {code, max_layovers_per_period, scope}
+    destination_rules: list[dict] = []  # {scope, codes, max_layovers_per_period, ...}
     min_rest_min: int = 720           # FDTL min rest between pairings — buffers used by pair-mutex
     fdtl_limits: list[FdtlCumulativeLimit] = []  # rolling-window cumulative caps
     weekly_rest: WeeklyRestRule | None = None    # CAAV §15.037(d) / FAA 117.25
     soft_consec_duty: list[SoftConsecDutyRule] = []  # planner-tunable soft caps
+    qol_soft_rules: list[QolSoftRule] = []  # wind-down / late-return per-crew cutoffs
 
 
 class SolveRequest(BaseModel):

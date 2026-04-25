@@ -153,6 +153,7 @@ export function AutoRosterShell() {
   const [activeRunId, setActiveRunId] = useState<string | null>(null)
   const [resultRun, setResultRun] = useState<AutoRosterRun | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [multiBaseBlocked, setMultiBaseBlocked] = useState(false)
   // Lock state — populated when another planner owns the currently running
   // auto-roster for this operator. Drives the "locked" banner + disabled Run
   // button on Step 3.
@@ -393,6 +394,13 @@ export function AutoRosterShell() {
   const handleRun = useCallback(async () => {
     if (!operator?._id || !periodFrom || !periodTo) return
     if (mode === 'training') return // scaffolded — not implemented
+    // Auto-roster runs are scoped to one base at a time. Multi-base selection
+    // is fine for projection views, but the solver / day-off / standby /
+    // long-duty passes all assume a single home base.
+    if (mode !== 'clear' && filterBase.length > 1) {
+      setMultiBaseBlocked(true)
+      return
+    }
     setError(null)
     setResultRun(null)
     setPhase('running')
@@ -582,6 +590,99 @@ export function AutoRosterShell() {
           />
         </div>
       )}
+      {multiBaseBlocked && (
+        <MultiBaseBlockDialog
+          selectedCount={filterBase.length}
+          onClose={() => setMultiBaseBlocked(false)}
+          isDark={isDark}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Multi-base block dialog ─────────────────────────────────────────────────
+// Auto-roster pipelines (general / standby / days-off / long-duty) are
+// scoped to one base. Multi-base manpower projection is fine, but actually
+// running the solver across bases produces nonsense rosters (cross-base
+// repositioning, mixed FDTL schemes, conflicting standby pools).
+
+function MultiBaseBlockDialog({
+  selectedCount,
+  onClose,
+  isDark,
+}: {
+  selectedCount: number
+  onClose: () => void
+  isDark: boolean
+}) {
+  const panelBg = isDark ? '#191921' : '#FFFFFF'
+  const borderCol = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-9999 flex items-center justify-center p-6"
+      style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="rounded-2xl overflow-hidden flex flex-col"
+        style={{
+          background: panelBg,
+          border: `1px solid ${borderCol}`,
+          width: 'min(92vw, 520px)',
+          boxShadow: isDark ? '0 24px 60px rgba(0,0,0,0.55)' : '0 24px 60px rgba(96,97,112,0.35)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="flex items-center justify-between px-5 py-3 shrink-0"
+          style={{ borderBottom: `1px solid ${borderCol}` }}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertTriangle size={16} style={{ color: '#FF8800' }} />
+            <div className="text-[14px] font-bold text-hz-text">Single base required</div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-hz-border/30 transition-colors shrink-0"
+            aria-label="Close"
+          >
+            <X size={15} />
+          </button>
+        </div>
+        <div className="px-5 py-4 flex flex-col gap-3">
+          <p className="text-[13px] text-hz-text">
+            Auto-roster runs one base at a time. You currently have{' '}
+            <span className="font-semibold">{selectedCount} bases</span> selected.
+          </p>
+          <p className="text-[13px] text-hz-text-secondary">
+            Multi-base is supported for manpower projection only. Narrow the Base filter to a single base, click Go,
+            then run the auto-roster again.
+          </p>
+        </div>
+        <div className="px-5 py-3 flex justify-end" style={{ borderTop: `1px solid ${borderCol}` }}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-8 px-4 rounded-lg text-[13px] font-medium text-white"
+            style={{ background: '#FF8800' }}
+          >
+            Got it
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -2565,20 +2666,35 @@ function InlineRow({
 }
 
 function Toggle({ on, onChange, accent }: { on: boolean; onChange: (v: boolean) => void; accent: string }) {
+  // Inline pixel dimensions — Tailwind size utilities were getting overridden
+  // by a parent rule, letting the thumb spill past the track on the "on" state.
+  const TRACK_W = 40
+  const TRACK_H = 24
+  const THUMB = 20
+  const PAD = 2
+  const TRAVEL = TRACK_W - THUMB - PAD * 2 // 16
   return (
     <button
       type="button"
       onClick={() => onChange(!on)}
       role="switch"
       aria-checked={on}
-      className="relative w-10 h-6 rounded-full transition-colors"
+      className="relative shrink-0 rounded-full transition-colors"
       style={{
+        width: TRACK_W,
+        height: TRACK_H,
         background: on ? accent : 'rgba(125,125,140,0.35)',
       }}
     >
       <span
-        className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
-        style={{ transform: on ? 'translateX(16px)' : 'translateX(0)' }}
+        className="absolute bg-white rounded-full shadow transition-transform"
+        style={{
+          top: PAD,
+          left: PAD,
+          width: THUMB,
+          height: THUMB,
+          transform: on ? `translateX(${TRAVEL}px)` : 'translateX(0)',
+        }}
       />
     </button>
   )

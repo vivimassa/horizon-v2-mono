@@ -16,6 +16,7 @@ Hard constraints:
 from __future__ import annotations
 
 import asyncio
+import calendar
 import time
 from typing import AsyncIterator
 
@@ -322,6 +323,48 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
     # Planner-defined soft consecutive-duty penalties.
     for excess_var, w in soft_excess_terms:
         obj_terms.append(excess_var * w)
+
+    # ── Quality of Life: wind-down / late-return soft penalties ──────────
+    # For each (crew, date, kind, cutoff) rule, penalise any assignment of a
+    # pairing on that date that breaches the cutoff. cutoff_min is interpreted
+    # as minutes-from-midnight UTC (per orchestrator convention).
+    QOL_WEIGHT_SCALE = 200  # weight 5 → 1000 obj points per breaching pairing
+    qol_rules = request.config.qol_soft_rules or []
+    if qol_rules and crew_ids and pairing_ids:
+        DAY_MS = 86_400_000
+        crew_idx = {cid: ci for ci, cid in enumerate(crew_ids)}
+        for rule in qol_rules:
+            ci = crew_idx.get(rule.crew_id)
+            if ci is None:
+                continue
+            try:
+                day_start_ms = (
+                    calendar.timegm(time.strptime(rule.date, "%Y-%m-%d")) * 1000
+                )
+            except Exception:
+                continue
+            day_end_ms = day_start_ms + DAY_MS
+            cutoff_ms = day_start_ms + max(0, min(1440, int(rule.cutoff_min))) * 60_000
+            weight = max(0, int(rule.weight)) * QOL_WEIGHT_SCALE
+            if weight <= 0:
+                continue
+            for pi, pid in enumerate(pairing_ids):
+                if (ci, pi) not in x:
+                    continue
+                p = pairing_by_id[pid]
+                if p.start_utc_ms <= 0 or p.end_utc_ms <= 0:
+                    continue
+                # Pairing must overlap the target date to count.
+                if p.end_utc_ms <= day_start_ms or p.start_utc_ms >= day_end_ms:
+                    continue
+                if rule.kind == "wind_down":
+                    breaches = p.end_utc_ms > cutoff_ms
+                elif rule.kind == "late_return":
+                    breaches = p.start_utc_ms < cutoff_ms
+                else:
+                    breaches = False
+                if breaches:
+                    obj_terms.append(x[(ci, pi)] * weight)
 
     # Idle-crew soft penalty: a qualified crew with at least one legal pairing
     # but zero assignments is penalised — strong enough to beat BH fairness

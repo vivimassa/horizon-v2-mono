@@ -16,8 +16,10 @@ import {
   Send,
   Pause,
   X,
+  HelpCircle,
 } from 'lucide-react'
 import { useHotacStore } from '@/stores/use-hotac-store'
+import { useHelp } from '@/components/help'
 
 interface HotacRibbonToolbarProps {
   onFetch: () => void
@@ -46,6 +48,7 @@ export function HotacRibbonToolbar(props: HotacRibbonToolbarProps) {
   const setPollingPaused = useHotacStore((s) => s.setPollingPaused)
   const periodCommitted = useHotacStore((s) => s.periodCommitted)
   const disabled = !periodCommitted
+  const { openHelp } = useHelp()
 
   return (
     <div className="flex items-stretch gap-0 overflow-x-auto" style={{ minHeight: 120 }}>
@@ -273,6 +276,20 @@ export function HotacRibbonToolbar(props: HotacRibbonToolbarProps) {
           </RibbonSection>
         </>
       )}
+
+      {/* ── Help — always rightmost, regardless of active tab ── */}
+      <RibbonDivider isDark={isDark} />
+      <RibbonSection label="Help">
+        <RibbonBtn
+          icon={HelpCircle}
+          label="Help"
+          onClick={() => openHelp()}
+          isDark={isDark}
+          hoverBg={hoverBg}
+          activeBg={activeBg}
+          tooltip="Open help for this page (F1)"
+        />
+      </RibbonSection>
     </div>
   )
 }

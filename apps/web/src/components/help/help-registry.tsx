@@ -70,12 +70,15 @@ for (const entry of HELP_REGISTRY) BY_CODE.set(entry.meta.code, entry)
 /**
  * Resolve pathname to a module code using the module registry.
  * Uses longest-prefix match so `/network/control/schedule-grid` resolves to the
- * deepest module that still matches (`1.1.2`), not the root (`1`).
+ * deepest module that still matches (`1.1.2`), not the root (`1`). When two
+ * entries share the same route (e.g. a parent `4.1.8` whose landing page is
+ * its first child `4.1.8.1`), we prefer the deeper `level` so help registered
+ * on the leaf is found instead of the parent.
  */
 export function pathnameToCode(pathname: string): string | undefined {
   if (!pathname) return undefined
   const match = MODULE_REGISTRY.filter((m) => pathname === m.route || pathname.startsWith(m.route + '/')).sort(
-    (a, b) => b.route.length - a.route.length,
+    (a, b) => b.route.length - a.route.length || (b.level ?? 0) - (a.level ?? 0),
   )[0]
   return match?.code
 }

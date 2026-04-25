@@ -20,8 +20,10 @@ import {
   X,
   PlusCircle,
   ImagePlus,
+  HelpCircle,
 } from 'lucide-react'
 import { useCrewTransportStore } from '@/stores/use-crew-transport-store'
+import { useHelp } from '@/components/help'
 
 interface CrewTransportRibbonToolbarProps {
   // Ground — Planning
@@ -64,6 +66,25 @@ export function CrewTransportRibbonToolbar(props: CrewTransportRibbonToolbarProp
   const setPollingPaused = useCrewTransportStore((s) => s.setPollingPaused)
   const periodCommitted = useCrewTransportStore((s) => s.periodCommitted)
   const disabled = !periodCommitted
+  const { openHelp } = useHelp()
+
+  /** Help section rendered at the rightmost edge of every ribbon variant. */
+  const helpSection = (
+    <>
+      <RibbonDivider isDark={isDark} />
+      <RibbonSection label="Help">
+        <RibbonBtn
+          icon={HelpCircle}
+          label="Help"
+          onClick={() => openHelp()}
+          isDark={isDark}
+          hoverBg={hoverBg}
+          activeBg={activeBg}
+          tooltip="Open help for this page (F1)"
+        />
+      </RibbonSection>
+    </>
+  )
 
   // ── Ground / Planning ──
   if (segment === 'ground' && groundTab === 'planning') {
@@ -156,6 +177,7 @@ export function CrewTransportRibbonToolbar(props: CrewTransportRibbonToolbarProp
             activeBg={activeBg}
           />
         </RibbonSection>
+        {helpSection}
       </Bar>
     )
   }
@@ -273,6 +295,7 @@ export function CrewTransportRibbonToolbar(props: CrewTransportRibbonToolbarProp
             activeBg={activeBg}
           />
         </RibbonSection>
+        {helpSection}
       </Bar>
     )
   }
@@ -335,6 +358,7 @@ export function CrewTransportRibbonToolbar(props: CrewTransportRibbonToolbarProp
             activeBg={activeBg}
           />
         </RibbonSection>
+        {helpSection}
       </Bar>
     )
   }
@@ -390,6 +414,7 @@ export function CrewTransportRibbonToolbar(props: CrewTransportRibbonToolbarProp
             activeBg={activeBg}
           />
         </RibbonSection>
+        {helpSection}
       </Bar>
     )
   }

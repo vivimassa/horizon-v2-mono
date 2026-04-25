@@ -36,6 +36,7 @@ import { useTheme } from '@/components/theme-provider'
 import { useOperatorStore } from '@/stores/use-operator-store'
 import { collapseDock } from '@/lib/dock-store'
 import { HelpBlock, FormRow, Toggle, NumberStepper } from '@/components/admin/_shared/form-primitives'
+import { HelpButton } from '@/components/help'
 import { configToDraft, DEFAULT_HOTAC_CONFIG_DRAFT, type HotacConfigDraft } from './hotac-config-defaults'
 import { LayoverHero, RoomAllocationHero, DispatchHero, CheckInHero, TransportHero, EmailHero } from './section-heroes'
 
@@ -308,6 +309,7 @@ function Center({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <HelpButton size="sm" />
           <button
             type="button"
             onClick={() => onResetSection(section.key)}

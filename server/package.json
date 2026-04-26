@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "predev": "kill-port 3002 || exit 0",
     "dev": "cross-env NODE_OPTIONS=--max-old-space-size=8192 tsx watch --clear-screen=false --ignore=uploads --ignore=dist --ignore=**/*.log src/index.ts",
     "start:prod": "cross-env NODE_OPTIONS=--max-old-space-size=8192 node dist/index.js",
     "build": "tsc",
@@ -28,6 +29,7 @@
     "@fastify/jwt": "^9.0.0",
     "@fastify/multipart": "^9.4.0",
     "@fastify/static": "^9.0.0",
+    "@mongodb-js/zstd": "^2.0.1",
     "@skyhub/env": "*",
     "@supabase/supabase-js": "^2.101.0",
     "bcryptjs": "^3.0.3",
@@ -42,6 +44,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.10.0",
     "cross-env": "^7.0.3",
+    "kill-port": "^2.0.1",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }

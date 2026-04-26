@@ -3619,6 +3619,41 @@ export const api = {
     return request<CrewScheduleResponse>(`/crew-schedule?${qs.toString()}`)
   },
 
+  /** 4.1.6 Uncrewed Duties tray — lazy companion to /crew-schedule.
+   *  The main aggregator scopes pairings to those with assignments
+   *  (faster initial load); this endpoint returns the uncrewed-shortfall
+   *  list (and the uncrewed pairings themselves so the tray can render
+   *  legs/route). Called when the user opens the tray. */
+  getCrewScheduleUncrewed: (params: {
+    from: string
+    to: string
+    base?: string | string[]
+    position?: string | string[]
+    acType?: string | string[]
+    crewGroup?: string | string[]
+    baseAirport?: string
+  }) => {
+    const qs = new URLSearchParams({ from: params.from, to: params.to })
+    const join = (v: string | string[] | undefined): string | null => {
+      if (!v) return null
+      if (Array.isArray(v)) return v.length > 0 ? v.join(',') : null
+      return v || null
+    }
+    const b = join(params.base)
+    const p = join(params.position)
+    const a = join(params.acType)
+    const g = join(params.crewGroup)
+    if (b) qs.set('base', b)
+    if (p) qs.set('position', p)
+    if (a) qs.set('acType', a)
+    if (g) qs.set('crewGroup', g)
+    if (params.baseAirport) qs.set('baseAirport', params.baseAirport)
+    return request<{
+      uncrewed: CrewScheduleResponse['uncrewed']
+      pairings: CrewScheduleResponse['pairings']
+    }>(`/crew-schedule/uncrewed?${qs.toString()}`)
+  },
+
   /** Fetch the cached aggregator payload pre-built by the auto-roster
    *  orchestrator at solve completion. Returns a 404 (which `request`
    *  surfaces as a thrown error) when the cache is cold — callers MUST

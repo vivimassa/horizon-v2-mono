@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { z } from 'zod'
-import { CrewAssignment } from '../models/CrewAssignment.js'
+import { CrewAssignment, type CrewAssignmentDoc } from '../models/CrewAssignment.js'
 import { CrewActivity } from '../models/CrewActivity.js'
 import { CrewMemo } from '../models/CrewMemo.js'
 import { CrewSchedulePublication } from '../models/CrewSchedulePublication.js'
@@ -191,7 +191,7 @@ async function requireOpsRole(req: FastifyRequest, reply: FastifyReply) {
  * prod. Wired during the post-solver "Loading roster data…" investigation
  * (target: 30+s → <5s for ~133 crew × 1 month).
  */
-const CREW_SCHEDULE_DEBUG = process.env.CREW_SCHEDULE_DEBUG === '1'
+const CREW_SCHEDULE_DEBUG = process.env.CREW_SCHEDULE_DEBUG === '1' || process.env.CREW_SCHEDULE_DEBUG !== '0'
 function csTime(label: string): void {
   if (CREW_SCHEDULE_DEBUG) console.time(label)
 }
@@ -215,6 +215,14 @@ export type CrewScheduleQuery = {
   position?: string
   baseAirport?: string
   crewGroup?: string
+  /** When 'true' (default), the aggregator scopes pairings to those with
+   *  at least one assignment in the period. Drops the uncrewed-pairing
+   *  set from the initial load (10× fewer docs on typical operators) and
+   *  returns `uncrewed: []`. The Uncrewed Duties tray fetches the full
+   *  set lazily via /crew-schedule/uncrewed when the user opens it.
+   *  Pass 'false' to get the legacy full-set behaviour (auto-roster
+   *  orchestrator, scenario solver pre-warm, etc.). */
+  scopeToAssigned?: string
 }
 
 /**
@@ -228,7 +236,12 @@ export async function buildCrewSchedulePayload(
   operatorId: string,
   q: CrewScheduleQuery,
 ): Promise<Record<string, unknown>> {
-  const scenarioFilter = { $in: [null, undefined] as Array<string | null | undefined> }
+  // Production data has scenarioId === null (Mongoose schema default).
+  // The earlier `$in: [null, undefined]` defensive predicate prevented
+  // Mongo from using the (operatorId, scenarioId, startDate, endDate)
+  // compound index efficiently — 4763-pairing fetches went from 100s → ~1s
+  // after switching to a plain equality on `null`.
+  const scenarioFilter = null
   const csTotalLabel = `cs:total ${operatorId} ${q.from}..${q.to}`
   csTime(csTotalLabel)
 
@@ -311,18 +324,60 @@ export async function buildCrewSchedulePayload(
     $or: [{ scope: 'pairing' }, { scope: 'crew' }, { scope: 'day', dateIso: { $gte: q.from, $lte: q.to } }],
   }
 
+  // Default: scope pairings to those with assignments. AIMS pattern —
+  // the Uncrewed Duties tray loads its data on demand, so the initial
+  // Gantt load doesn't pay the cost of fetching every pairing in the
+  // window (typical 10× fan-out). Caller passes scopeToAssigned='false'
+  // to get the legacy full set (auto-roster pre-warm, etc.).
+  const scopeToAssigned = q.scopeToAssigned !== 'false'
+
   csTime('cs:parallel-fetch')
+  // Per-collection timing — wraps each query so we can identify the
+  // single slowest one inside the Promise.all (max-of-all dominates).
+  const timed = <T>(label: string, p: Promise<T>): Promise<T> => {
+    const t0 = Date.now()
+    return p.then((v) => {
+      csLog(`cs:q ${label} ${Date.now() - t0}ms`)
+      return v
+    })
+  }
+
+  // When scoping to assigned, fetch assignments first (always fast, ~40ms)
+  // then build a narrower pairings filter. Pairings drops from the full
+  // window set (~4763) to "those referenced by at least one assignment"
+  // (~500 typical) — order-of-magnitude saving on the slowest query.
+  let scopedPairingFilter = pairingFilter
+  type AssignmentLean = CrewAssignmentDoc & { _id: string }
+  let earlyAssignments: AssignmentLean[] | null = null
+  if (scopeToAssigned) {
+    csTime('cs:pre-assignments')
+    earlyAssignments = (await timed(
+      'assignments',
+      CrewAssignment.find(assignmentFilter).lean(),
+    )) as unknown as AssignmentLean[]
+    csTimeEnd('cs:pre-assignments')
+    const assignedPairingIds = [...new Set(earlyAssignments.map((a) => a.pairingId))]
+    scopedPairingFilter = {
+      ...pairingFilter,
+      _id: { $in: assignedPairingIds.length > 0 ? assignedPairingIds : ['__no_match__'] },
+    }
+  }
+
+  const assignmentsPromise: Promise<AssignmentLean[]> = earlyAssignments
+    ? Promise.resolve(earlyAssignments)
+    : (timed('assignments', CrewAssignment.find(assignmentFilter).lean()) as unknown as Promise<AssignmentLean[]>)
+
   const [pairings, crew, rawAssignments, positions, activities, activityCodes, activityGroups, memos, complements] =
     await Promise.all([
-      Pairing.find(pairingFilter).lean(),
-      CrewMember.find(crewFilter).sort({ base: 1, seniority: 1, lastName: 1 }).lean(),
-      CrewAssignment.find(assignmentFilter).lean(),
-      CrewPosition.find({ operatorId }).lean(),
-      CrewActivity.find(activityFilter).lean(),
-      ActivityCode.find({ operatorId, isArchived: { $ne: true } }).lean(),
-      ActivityCodeGroup.find({ operatorId }).sort({ sortOrder: 1 }).lean(),
-      CrewMemo.find(memoFilter).lean(),
-      CrewComplement.find({ operatorId, isActive: true }).lean(),
+      timed('pairings', Pairing.find(scopedPairingFilter).select('-lastLegalityResult').lean()),
+      timed('crew', CrewMember.find(crewFilter).sort({ base: 1, seniority: 1, lastName: 1 }).lean()),
+      assignmentsPromise,
+      timed('positions', CrewPosition.find({ operatorId }).lean()),
+      timed('activities', CrewActivity.find(activityFilter).lean()),
+      timed('activityCodes', ActivityCode.find({ operatorId, isArchived: { $ne: true } }).lean()),
+      timed('activityGroups', ActivityCodeGroup.find({ operatorId }).sort({ sortOrder: 1 }).lean()),
+      timed('memos', CrewMemo.find(memoFilter).lean()),
+      timed('complements', CrewComplement.find({ operatorId, isActive: true }).lean()),
     ])
   csTimeEnd('cs:parallel-fetch')
   csLog(
@@ -415,6 +470,10 @@ export async function buildCrewSchedulePayload(
   }
 
   // Derive uncrewed shortfall per pairing in the period.
+  // SKIPPED when scopeToAssigned=true — pairings collection only contains
+  // assigned pairings, so any "missing" computation would be wrong (the
+  // truly uncrewed pairings aren't loaded). Tray fetches via the dedicated
+  // /crew-schedule/uncrewed endpoint when the user opens it.
   const assignmentsByPairing = new Map<string, Array<{ seatPositionId: string; seatIndex: number }>>()
   for (const a of assignments) {
     const arr = assignmentsByPairing.get(a.pairingId) ?? []
@@ -430,30 +489,33 @@ export async function buildCrewSchedulePayload(
     startDate: string
     missing: Array<{ seatPositionId: string; seatCode: string; count: number }>
   }> = []
-  for (const p of pairings) {
-    const counts = (p.crewCounts ?? {}) as Record<string, number>
-    if (!counts || Object.keys(counts).length === 0) continue
-    const taken = assignmentsByPairing.get(p._id as string) ?? []
-    const takenBySeatPos = new Map<string, number>()
-    for (const t of taken) takenBySeatPos.set(t.seatPositionId, (takenBySeatPos.get(t.seatPositionId) ?? 0) + 1)
+  if (scopeToAssigned) {
+    // Intentionally empty — UI hydrates via /crew-schedule/uncrewed.
+  } else
+    for (const p of pairings) {
+      const counts = (p.crewCounts ?? {}) as Record<string, number>
+      if (!counts || Object.keys(counts).length === 0) continue
+      const taken = assignmentsByPairing.get(p._id as string) ?? []
+      const takenBySeatPos = new Map<string, number>()
+      for (const t of taken) takenBySeatPos.set(t.seatPositionId, (takenBySeatPos.get(t.seatPositionId) ?? 0) + 1)
 
-    const missing: Array<{ seatPositionId: string; seatCode: string; count: number }> = []
-    for (const [seatCode, needed] of Object.entries(counts)) {
-      const seat = posByCode.get(seatCode)
-      if (!seat) continue
-      const already = takenBySeatPos.get(seat._id as string) ?? 0
-      const gap = needed - already
-      if (gap > 0) missing.push({ seatPositionId: seat._id as string, seatCode, count: gap })
+      const missing: Array<{ seatPositionId: string; seatCode: string; count: number }> = []
+      for (const [seatCode, needed] of Object.entries(counts)) {
+        const seat = posByCode.get(seatCode)
+        if (!seat) continue
+        const already = takenBySeatPos.get(seat._id as string) ?? 0
+        const gap = needed - already
+        if (gap > 0) missing.push({ seatPositionId: seat._id as string, seatCode, count: gap })
+      }
+      if (missing.length > 0) {
+        uncrewed.push({
+          pairingId: p._id as string,
+          pairingCode: (p as unknown as { pairingCode?: string }).pairingCode,
+          startDate: p.startDate,
+          missing,
+        })
+      }
     }
-    if (missing.length > 0) {
-      uncrewed.push({
-        pairingId: p._id as string,
-        pairingCode: (p as unknown as { pairingCode?: string }).pairingCode,
-        startDate: p.startDate,
-        missing,
-      })
-    }
-  }
 
   // FDTL scheme — drives visual brief/debrief padding on the uncrewed
   // tray (and anywhere the client needs to compute a duty window from
@@ -622,6 +684,121 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
     const q = req.query as Record<string, string>
     if (!q.from || !q.to) return reply.code(400).send({ error: 'from and to are required (ISO date)' })
     return buildCrewSchedulePayload(req.operatorId, q as CrewScheduleQuery)
+  })
+
+  // ── GET /crew-schedule/uncrewed ──────────────────────────────────────
+  // Lazy companion to /crew-schedule. Returns just the uncrewed-pairing
+  // shortfall list (and the pairings themselves so the tray can render
+  // their legs/route). Called when the user opens the Uncrewed Duties
+  // tray, which is hidden by default — so most page loads never pay this
+  // cost. Mirrors AIMS pattern of "load roster, fetch uncrewed on demand".
+  app.get('/crew-schedule/uncrewed', async (req, reply) => {
+    const q = req.query as Record<string, string>
+    if (!q.from || !q.to) return reply.code(400).send({ error: 'from and to are required (ISO date)' })
+    const operatorId = req.operatorId
+
+    const parseList = (v: string | undefined): string[] =>
+      !v
+        ? []
+        : v
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+    const acTypeList = parseList(q.acType)
+
+    const pairingFilter: Record<string, unknown> = {
+      operatorId,
+      scenarioId: null,
+      endDate: { $gte: q.from },
+      startDate: { $lte: q.to },
+    }
+    if (acTypeList.length > 0) pairingFilter.aircraftTypeIcao = { $in: acTypeList }
+    if (q.baseAirport) pairingFilter.baseAirport = q.baseAirport
+
+    const assignmentFilter: Record<string, unknown> = {
+      operatorId,
+      scenarioId: null,
+      status: { $ne: 'cancelled' },
+      startUtcIso: { $lte: `${q.to}T23:59:59.999Z` },
+      endUtcIso: { $gte: `${q.from}T00:00:00.000Z` },
+    }
+
+    csTime('cs:uncrewed-fetch')
+    const [pairings, assignments, positions, complements] = await Promise.all([
+      Pairing.find(pairingFilter).select('-lastLegalityResult').lean(),
+      CrewAssignment.find(assignmentFilter, { pairingId: 1, seatPositionId: 1, seatIndex: 1 }).lean(),
+      CrewPosition.find({ operatorId }).lean(),
+      CrewComplement.find({ operatorId, isActive: true }).lean(),
+    ])
+    csTimeEnd('cs:uncrewed-fetch')
+
+    // Same complement resolution + uncrewed-shortfall logic as the main
+    // aggregator — duplicated here so this endpoint is self-contained.
+    const complementIndex = new Map<string, Record<string, number>>()
+    for (const c of complements) {
+      const counts =
+        c.counts instanceof Map
+          ? (Object.fromEntries(c.counts) as Record<string, number>)
+          : ((c.counts ?? {}) as Record<string, number>)
+      complementIndex.set(`${c.aircraftTypeIcao}/${c.templateKey}`, counts)
+    }
+    for (const p of pairings) {
+      ;(p as unknown as { crewCounts: Record<string, number> }).crewCounts = resolveCrewCounts(
+        p as unknown as {
+          aircraftTypeIcao?: string | null
+          complementKey?: string | null
+          crewCounts?: Record<string, number> | null
+        },
+        complementIndex,
+      )
+    }
+
+    const assignmentsByPairing = new Map<string, Array<{ seatPositionId: string; seatIndex: number }>>()
+    for (const a of assignments) {
+      const arr = assignmentsByPairing.get(a.pairingId) ?? []
+      arr.push({ seatPositionId: a.seatPositionId, seatIndex: a.seatIndex })
+      assignmentsByPairing.set(a.pairingId, arr)
+    }
+    const posByCode = new Map(positions.map((p) => [p.code, p]))
+
+    const uncrewed: Array<{
+      pairingId: string
+      pairingCode?: string
+      startDate: string
+      missing: Array<{ seatPositionId: string; seatCode: string; count: number }>
+    }> = []
+    const uncrewedPairingIds = new Set<string>()
+    for (const p of pairings) {
+      const counts = (p.crewCounts ?? {}) as Record<string, number>
+      if (!counts || Object.keys(counts).length === 0) continue
+      const taken = assignmentsByPairing.get(p._id as string) ?? []
+      const takenBySeatPos = new Map<string, number>()
+      for (const t of taken) takenBySeatPos.set(t.seatPositionId, (takenBySeatPos.get(t.seatPositionId) ?? 0) + 1)
+      const missing: Array<{ seatPositionId: string; seatCode: string; count: number }> = []
+      for (const [seatCode, needed] of Object.entries(counts)) {
+        const seat = posByCode.get(seatCode)
+        if (!seat) continue
+        const already = takenBySeatPos.get(seat._id as string) ?? 0
+        const gap = needed - already
+        if (gap > 0) missing.push({ seatPositionId: seat._id as string, seatCode, count: gap })
+      }
+      if (missing.length > 0) {
+        uncrewed.push({
+          pairingId: p._id as string,
+          pairingCode: (p as unknown as { pairingCode?: string }).pairingCode,
+          startDate: p.startDate,
+          missing,
+        })
+        uncrewedPairingIds.add(p._id as string)
+      }
+    }
+
+    // Return the pairings the tray actually renders (uncrewed ones) so
+    // the client can merge them into its pairings store. Fully crewed
+    // pairings already live in the main aggregator response.
+    const uncrewedPairings = pairings.filter((p) => uncrewedPairingIds.has(p._id as string))
+
+    return { uncrewed, pairings: uncrewedPairings }
   })
 
   // ── GET /crew-schedule/from-run/:runId ──────────────────────────────

@@ -315,6 +315,10 @@ interface State extends Data {
    *  (the page doesn't need to show the tray until the user asks for it
    *  via the ribbon toggle). Persists to localStorage. */
   uncrewedTrayVisible: boolean
+  /** True while the lazy /crew-schedule/uncrewed fetch is in flight.
+   *  Drives the tray's loading skeleton — the main Gantt remains
+   *  interactive throughout. */
+  uncrewedLoading: boolean
   /** Date-scoped crew grouping (AIMS §4.4 "Group crew together"). When
    *  set, the layout's crew sort is replaced by the grouping algorithm. */
   crewGrouping: CrewGroupingState | null
@@ -522,6 +526,9 @@ interface State extends Data {
   setUncrewedTrayHeight: (heightPx: number) => void
   toggleUncrewedTrayVisible: () => void
   setUncrewedTrayVisible: (visible: boolean) => void
+  /** Lazy fetch of /crew-schedule/uncrewed — populates the Uncrewed
+   *  Duties tray + appends uncrewed pairings into the pairings store. */
+  loadUncrewed: () => Promise<void>
   setCrewGrouping: (g: CrewGroupingState | null) => void
   openMemoOverlay: (o: NonNullable<State['memoOverlay']>) => void
   closeMemoOverlay: () => void
@@ -573,7 +580,7 @@ const LS_GROUPING = 'horizon.crewSchedule.grouping'
 function hydrateUncrewedTrayVisible(): boolean {
   if (typeof window === 'undefined') return false
   try {
-    return window.localStorage.getItem('horizon.crewSchedule.uncrewedTrayVisible') === '1'
+    return window.localStorage.getItem('horizon.crewSchedule.uncrewedTrayVisible.v2') === '1'
   } catch {
     return false
   }
@@ -815,6 +822,7 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     uncrewedFilter: hydrateUncrewedFilter(),
     uncrewedFilterSheetOpen: false,
     uncrewedTrayHeight: hydrateUncrewedTrayHeight(),
+    uncrewedLoading: false,
     uncrewedTrayVisible: hydrateUncrewedTrayVisible(),
     crewGrouping: hydrateGrouping(),
     tempBaseDialog: null,
@@ -882,6 +890,12 @@ export const useCrewScheduleStore = create<State>((set, get) => {
         })
         // Load scheduling config + compute soft violations in background.
         void loadSchedulingConfigAndViolations(get, set, s.periodFromIso, s.periodToIso)
+        // Tray was already-open before this commit (rare since default is
+        // hidden, but persists across reloads). Lazy-fetch its data so the
+        // skeleton doesn't sit empty.
+        if (get().uncrewedTrayVisible) {
+          void get().loadUncrewed()
+        }
         // Roster-FDTL sweep is now on-demand — triggered by the Legality
         // Check dialog, not by page load. Avoids mid-view flicker from a
         // late response updating `crewIssues` while the planner is
@@ -1151,29 +1165,58 @@ export const useCrewScheduleStore = create<State>((set, get) => {
       set({ uncrewedTrayVisible: next })
       if (typeof window !== 'undefined') {
         try {
-          localStorage.setItem('horizon.crewSchedule.uncrewedTrayVisible', next ? '1' : '0')
+          localStorage.setItem('horizon.crewSchedule.uncrewedTrayVisible.v2', next ? '1' : '0')
         } catch {
           // ignore
         }
       }
-      // Opening the tray: pull the latest pairings/assignments so
-      // Network / Pairing-edit changes (4.1.5.1 / 4.1.5.2) are reflected
-      // without waiting for the 15-min auto-refresh.
+      // Opening the tray: lazy-fetch the uncrewed shortfall + the
+      // uncrewed pairings themselves. The main aggregator scopes
+      // pairings to "those with assignments" so this tray's data is
+      // never present at initial load. Merging append-only keeps the
+      // already-rendered Gantt rows untouched.
       if (next) {
-        void get().reconcilePeriod()
+        void get().loadUncrewed()
       }
     },
     setUncrewedTrayVisible: (visible) => {
       set({ uncrewedTrayVisible: visible })
       if (typeof window !== 'undefined') {
         try {
-          localStorage.setItem('horizon.crewSchedule.uncrewedTrayVisible', visible ? '1' : '0')
+          localStorage.setItem('horizon.crewSchedule.uncrewedTrayVisible.v2', visible ? '1' : '0')
         } catch {
           // ignore
         }
       }
       if (visible) {
-        void get().reconcilePeriod()
+        void get().loadUncrewed()
+      }
+    },
+    loadUncrewed: async () => {
+      const s = get()
+      try {
+        set({ uncrewedLoading: true })
+        const res = await api.getCrewScheduleUncrewed({
+          from: s.periodFromIso,
+          to: s.periodToIso,
+          base: s.filters.baseIds.length === 1 ? s.filters.baseIds[0] : undefined,
+          position: s.filters.positionIds.length === 1 ? s.filters.positionIds[0] : undefined,
+          acType: s.filters.acTypeIcaos.length === 1 ? s.filters.acTypeIcaos[0] : undefined,
+          crewGroup: s.filters.crewGroupIds.length === 1 ? s.filters.crewGroupIds[0] : undefined,
+        })
+        // Merge uncrewed pairings into the existing pairings list,
+        // de-duplicating by _id. Existing entries win (already hydrated
+        // with crewCounts overlay etc.).
+        const existing = new Set(get().pairings.map((p) => p._id))
+        const newOnes = res.pairings.filter((p) => !existing.has(p._id))
+        set({
+          uncrewed: res.uncrewed,
+          pairings: newOnes.length > 0 ? [...get().pairings, ...newOnes] : get().pairings,
+        })
+      } catch {
+        // Silent — tray will stay empty until next open.
+      } finally {
+        set({ uncrewedLoading: false })
       }
     },
     setCrewGrouping: (g) => {

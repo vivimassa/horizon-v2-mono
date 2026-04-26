@@ -35,6 +35,13 @@ export async function connectDB(uri: string): Promise<void> {
         serverSelectionTimeoutMS: 30_000,
         socketTimeoutMS: 60_000,
         maxPoolSize: 50,
+        // Wire compression — Atlas supports zstd (best ratio) and snappy
+        // (lower CPU). Driver picks the first one the server also speaks.
+        // Critical when the cluster is far from the app server (WAN
+        // throughput dominates aggregator queries — see 4.1.6 Crew
+        // Schedule diagnosis: 12MB payload over 100s ≈ 100 KB/s ceiling).
+        compressors: ['zstd', 'snappy', 'zlib'],
+        zlibCompressionLevel: 6,
       })
       return
     } catch (err) {

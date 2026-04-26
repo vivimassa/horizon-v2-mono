@@ -7,7 +7,21 @@
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "env": [
+        "CREW_SCHEDULE_DEBUG",
+        "NODE_OPTIONS",
+        "OOOI_SIM",
+        "ENABLE_AUTO_TRANSMIT",
+        "ENABLE_ASM_SSM_DELIVERY",
+        "ENABLE_WEATHER_POLL",
+        "WEATHER_POLL_INTERVAL_MINUTES",
+        "PORT",
+        "MONGODB_URI",
+        "JWT_SECRET",
+        "CORS_ORIGIN",
+        "ML_API_URL"
+      ]
     },
     "lint": {},
     "typecheck": {

@@ -15,6 +15,8 @@ import type {
   FleetSortOrder,
   LayoutResult,
 } from '@skyhub/types'
+import { readCachedPeriod, writeCachedPeriod, listPending } from '../lib/gantt/cache'
+import { readCachedPeriodFromWmdb, writeCachedPeriodToWmdb, listPendingFromWmdb } from '../lib/gantt/wmdb-bridge'
 
 const DEFAULT_PERIOD_DAYS = 3
 
@@ -31,6 +33,21 @@ export type DetailSheetTarget =
   | { kind: 'flight'; flightId: string }
   | { kind: 'aircraft'; registration: string }
   | { kind: 'day'; date: string }
+  | null
+
+export type MutationSheetTarget =
+  | { kind: 'cancel'; flightIds: string[] }
+  | { kind: 'reschedule'; flightId: string }
+  | { kind: 'swap'; aFlightIds: string[]; bFlightIds: string[] }
+  | { kind: 'divert'; flightId: string }
+  | { kind: 'addFlight' }
+  | { kind: 'editFlight'; flightId: string }
+  | { kind: 'assign'; flightIds: string[]; aircraftTypeIcao: string | null }
+  | { kind: 'aircraftContext'; registration: string }
+  | { kind: 'dayContext'; date: string }
+  | { kind: 'scenario' }
+  | { kind: 'compare' }
+  | { kind: 'optimizer' }
   | null
 
 interface GanttState {
@@ -60,6 +77,14 @@ interface GanttState {
   containerHeight: number
   isDark: boolean
 
+  // ── Overlay toggles ──
+  showTat: boolean
+  showSlots: boolean
+  showMissingTimes: boolean
+  showDelays: boolean
+  oooiGraceMins: number
+  considerableDelayMins: number
+
   // ── Layout (derived) ──
   layout: LayoutResult | null
 
@@ -71,6 +96,19 @@ interface GanttState {
   // ── Sheets ──
   detailSheet: DetailSheetTarget
   filterSheetOpen: boolean
+  searchSheetOpen: boolean
+  mutationSheet: MutationSheetTarget
+
+  // ── Optimistic state ──
+  /** Optimistic forced placements applied to layout. Reverted on API failure. */
+  forcedPlacements: Map<string, string>
+  toastMessage: { kind: 'success' | 'error' | 'info'; text: string } | null
+
+  // ── Sync state ──
+  /** True when last loaded data came from local cache, not server. */
+  isStale: boolean
+  /** Pending mutations awaiting server sync (read from MMKV queue). */
+  pendingMutationsCount: number
 
   // ── Actions ──
   setPeriod: (from: string, to: string) => void
@@ -92,6 +130,29 @@ interface GanttState {
   openDetailSheet: (target: DetailSheetTarget) => void
   closeDetailSheet: () => void
   setFilterSheetOpen: (open: boolean) => void
+  setSearchSheetOpen: (open: boolean) => void
+  openMutationSheet: (target: MutationSheetTarget) => void
+  closeMutationSheet: () => void
+
+  toggleTat: () => void
+  toggleSlots: () => void
+  toggleMissingTimes: () => void
+  toggleDelays: () => void
+  setOooiGraceMins: (n: number) => void
+
+  /** Apply optimistic placement and recompute layout. */
+  applyOptimisticPlacement: (flightIds: string[], registration: string) => void
+  /** Roll back specific flightIds from forcedPlacements. */
+  revertOptimisticPlacement: (flightIds: string[]) => void
+  /** Clear forcedPlacements after a successful refetch. */
+  clearForcedPlacements: () => void
+  /** Apply optimistic STD shift to a flight (mutates etdUtc/etaUtc). */
+  applyOptimisticReschedule: (flightId: string, newEtdUtc: number, newEtaUtc: number | null) => void
+  showToast: (kind: 'success' | 'error' | 'info', text: string) => void
+  dismissToast: () => void
+
+  setScenarioId: (id: string | null) => void
+  refreshPendingCount: () => Promise<void>
 
   selectionDayDate: string | null
   enterSelection: (rotationId: string | null, flightIds: string[], dayDate: string | null) => void
@@ -132,6 +193,13 @@ export const useMobileGanttStore = create<GanttState>((set, get) => ({
   containerHeight: 0,
   isDark: true,
 
+  showTat: true,
+  showSlots: true,
+  showMissingTimes: true,
+  showDelays: true,
+  oooiGraceMins: 15,
+  considerableDelayMins: 60,
+
   layout: null,
 
   selectionMode: false,
@@ -142,6 +210,12 @@ export const useMobileGanttStore = create<GanttState>((set, get) => ({
 
   detailSheet: null,
   filterSheetOpen: false,
+  searchSheetOpen: false,
+  mutationSheet: null,
+  forcedPlacements: new Map(),
+  toastMessage: null,
+  isStale: false,
+  pendingMutationsCount: 0,
 
   setPeriod: (from, to) => set({ periodFrom: from, periodTo: to }),
   setAcTypeFilter: (types) => set({ acTypeFilter: types }),
@@ -199,6 +273,7 @@ export const useMobileGanttStore = create<GanttState>((set, get) => ({
   commitPeriod: async (operatorId) => {
     const { periodFrom, periodTo, scenarioId, acTypeFilter, statusFilter } = get()
     set({ loading: true, error: null, periodCommitted: true })
+    const cacheKey = { operatorId, from: periodFrom, to: periodTo, scenarioId }
     try {
       const res = await api.getGanttFlights({
         operatorId,
@@ -208,15 +283,55 @@ export const useMobileGanttStore = create<GanttState>((set, get) => ({
         acTypeFilter: acTypeFilter ?? undefined,
         statusFilter: statusFilter ?? undefined,
       })
+      // Persist to both WMDB (preferred, durable) and AsyncStorage cache.
+      void writeCachedPeriod(cacheKey, {
+        flights: res.flights,
+        aircraft: res.aircraft,
+        aircraftTypes: res.aircraftTypes,
+      })
+      void writeCachedPeriodToWmdb(cacheKey, {
+        flights: res.flights,
+        aircraft: res.aircraft,
+        aircraftTypes: res.aircraftTypes,
+      })
+      const wmdbPending = await listPendingFromWmdb(operatorId)
+      const asPending = wmdbPending || (await listPending()).length
       set({
         flights: res.flights,
         aircraft: res.aircraft,
         aircraftTypes: res.aircraftTypes,
         loading: false,
+        forcedPlacements: new Map(),
+        isStale: false,
+        pendingMutationsCount: asPending,
       })
       get().recomputeLayout()
     } catch (e) {
-      set({ loading: false, error: e instanceof Error ? e.message : 'Failed to load' })
+      // Prefer WMDB on offline read; AsyncStorage cache as last resort.
+      const wmdbCached = await readCachedPeriodFromWmdb(cacheKey)
+      const cached = wmdbCached
+        ? { data: wmdbCached, fetchedAt: wmdbCached.fetchedAt }
+        : await readCachedPeriod(cacheKey)
+      if (cached) {
+        const wmdbPending = await listPendingFromWmdb(operatorId)
+        const asPending = wmdbPending || (await listPending()).length
+        set({
+          flights: cached.data.flights,
+          aircraft: cached.data.aircraft,
+          aircraftTypes: cached.data.aircraftTypes,
+          loading: false,
+          isStale: true,
+          error: null,
+          pendingMutationsCount: asPending,
+        })
+        get().recomputeLayout()
+      } else {
+        set({
+          loading: false,
+          error: e instanceof Error ? e.message : 'Failed to load',
+          isStale: false,
+        })
+      }
     }
   },
 
@@ -228,6 +343,63 @@ export const useMobileGanttStore = create<GanttState>((set, get) => ({
   openDetailSheet: (target) => set({ detailSheet: target }),
   closeDetailSheet: () => set({ detailSheet: null }),
   setFilterSheetOpen: (open) => set({ filterSheetOpen: open }),
+  setSearchSheetOpen: (open) => set({ searchSheetOpen: open }),
+  openMutationSheet: (target) => set({ mutationSheet: target }),
+  closeMutationSheet: () => set({ mutationSheet: null }),
+
+  toggleTat: () => set((s) => ({ showTat: !s.showTat })),
+  toggleSlots: () => set((s) => ({ showSlots: !s.showSlots })),
+  toggleMissingTimes: () => set((s) => ({ showMissingTimes: !s.showMissingTimes })),
+  toggleDelays: () => set((s) => ({ showDelays: !s.showDelays })),
+  setOooiGraceMins: (n) => set({ oooiGraceMins: Math.max(1, Math.min(60, n)) }),
+
+  applyOptimisticPlacement: (flightIds, registration) => {
+    set((s) => {
+      const next = new Map(s.forcedPlacements)
+      for (const id of flightIds) next.set(id, registration)
+      // Mirror the placement onto the in-memory flights array so layout picks
+      // up the change for both unassigned virtual placement and assigned reg.
+      const flights = s.flights.map((f) => (flightIds.includes(f.id) ? { ...f, aircraftReg: registration } : f))
+      return { forcedPlacements: next, flights }
+    })
+    get().recomputeLayout()
+  },
+  revertOptimisticPlacement: (flightIds) => {
+    set((s) => {
+      const next = new Map(s.forcedPlacements)
+      const wasReg = new Map<string, string>()
+      for (const id of flightIds) {
+        const r = next.get(id)
+        if (r) wasReg.set(id, r)
+        next.delete(id)
+      }
+      // Best effort: drop the optimistic aircraftReg back to null for IDs we'd patched.
+      const flights = s.flights.map((f) => (wasReg.has(f.id) ? { ...f, aircraftReg: null } : f))
+      return { forcedPlacements: next, flights }
+    })
+    get().recomputeLayout()
+  },
+  clearForcedPlacements: () => {
+    set({ forcedPlacements: new Map() })
+  },
+  applyOptimisticReschedule: (flightId, newEtdUtc, newEtaUtc) => {
+    set((s) => ({
+      flights: s.flights.map((f) =>
+        f.id === flightId ? { ...f, etdUtc: newEtdUtc, etaUtc: newEtaUtc ?? f.etaUtc } : f,
+      ),
+    }))
+    get().recomputeLayout()
+  },
+  showToast: (kind, text) => set({ toastMessage: { kind, text } }),
+  dismissToast: () => set({ toastMessage: null }),
+
+  setScenarioId: (id) => {
+    set({ scenarioId: id })
+  },
+  refreshPendingCount: async () => {
+    const list = await listPending()
+    set({ pendingMutationsCount: list.length })
+  },
 
   enterSelection: (rotationId, flightIds, dayDate) =>
     set({
@@ -286,6 +458,7 @@ export const useMobileGanttStore = create<GanttState>((set, get) => ({
       isDark: s.isDark,
       containerWidth: s.containerWidth,
       previousVirtualPlacements: s.layout?.virtualPlacements,
+      forcedPlacements: s.forcedPlacements.size > 0 ? s.forcedPlacements : undefined,
     }
     set({ layout: computeLayout(input) })
   },

@@ -76,7 +76,7 @@ export function CycleTab({ rotationId, rotationLabel, allFlights }: Props) {
                       borderBottomColor: palette.border,
                     }}
                   >
-                    <Text style={{ fontSize: 11, color: palette.textTertiary, fontFamily: 'monospace' }}>
+                    <Text style={{ fontSize: 13, color: palette.textTertiary, fontFamily: 'monospace' }}>
                       ─ TAT {fmtDuration(tatMs)} ─
                     </Text>
                   </View>
@@ -94,7 +94,7 @@ export function CycleTab({ rotationId, rotationLabel, allFlights }: Props) {
                 >
                   <Text
                     style={{
-                      fontSize: 11,
+                      fontSize: 13,
                       fontWeight: '700',
                       fontFamily: 'monospace',
                       color: accent,
@@ -112,7 +112,7 @@ export function CycleTab({ rotationId, rotationLabel, allFlights }: Props) {
                     <Text style={{ fontSize: 14, fontWeight: '500', color: palette.text }}>
                       {f.depStation} → {f.arrStation}
                     </Text>
-                    <Text style={{ fontSize: 12, color: palette.textSecondary, fontFamily: 'monospace', marginTop: 2 }}>
+                    <Text style={{ fontSize: 13, color: palette.textSecondary, fontFamily: 'monospace', marginTop: 2 }}>
                       {fmtUtcTime(f.stdUtc)}–{fmtUtcTime(f.staUtc)}Z · {fmtBlock(f.blockMinutes)}
                     </Text>
                   </View>

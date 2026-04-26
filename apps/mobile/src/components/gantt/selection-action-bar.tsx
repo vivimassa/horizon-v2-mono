@@ -2,9 +2,10 @@
 // Slides down via Reanimated when selectionMode flips on. Two-step:
 //   Step A: rotation label + Select All / Done
 //   Step B: scope picker — Selected Day / Entire Period
+//   Step C (confirmed): mutation actions — Assign / Swap / Cancel / Reschedule
 
-import { useEffect, useState } from 'react'
-import { View, Text, Pressable } from 'react-native'
+import { useEffect, useMemo, useState } from 'react'
+import { ScrollView, View, Text, Pressable } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
 import { useMobileGanttStore } from '../../stores/use-mobile-gantt-store'
 import { useAppTheme } from '../../../providers/ThemeProvider'
@@ -21,6 +22,7 @@ export function SelectionActionBar() {
   const selectRotationScope = useMobileGanttStore((s) => s.selectRotationScope)
   const clearSelection = useMobileGanttStore((s) => s.clearSelection)
   const openDetailSheet = useMobileGanttStore((s) => s.openDetailSheet)
+  const openMutationSheet = useMobileGanttStore((s) => s.openMutationSheet)
   const confirmed = useMobileGanttStore((s) => s.selectionConfirmed)
 
   const offsetY = useSharedValue(-HEIGHT)
@@ -43,6 +45,35 @@ export function SelectionActionBar() {
     rotationId && !rotationId.startsWith('__solo_')
       ? (flights.find((f) => f.rotationId === rotationId)?.rotationLabel ?? rotationId)
       : 'Single flight'
+
+  const selectedAcType = useMemo(() => {
+    const ids = [...selected]
+    if (ids.length === 0) return null
+    const types = new Set(
+      ids.map((id) => flights.find((f) => f.id === id)?.aircraftTypeIcao).filter(Boolean) as string[],
+    )
+    return types.size === 1 ? [...types][0] : null
+  }, [selected, flights])
+
+  const handleAssign = () =>
+    openMutationSheet({ kind: 'assign', flightIds: [...selected], aircraftTypeIcao: selectedAcType })
+  const handleCancel = () => openMutationSheet({ kind: 'cancel', flightIds: [...selected] })
+  const handleReschedule = () => {
+    const first = [...selected][0]
+    if (!first) return
+    openMutationSheet({ kind: 'reschedule', flightId: first })
+  }
+  const handleSwap = () => {
+    const ids = [...selected]
+    if (ids.length < 2) return
+    const half = Math.floor(ids.length / 2)
+    openMutationSheet({ kind: 'swap', aFlightIds: ids.slice(0, half), bFlightIds: ids.slice(half) })
+  }
+  const handleDivert = () => {
+    const first = [...selected][0]
+    if (!first) return
+    openMutationSheet({ kind: 'divert', flightId: first })
+  }
 
   const handleSelectAll = () => setScopeStep(true)
 
@@ -80,7 +111,7 @@ export function SelectionActionBar() {
         <Text style={{ fontSize: 13, color: palette.textSecondary, fontWeight: '600' }} numberOfLines={1}>
           {rotationLabel}
         </Text>
-        <Text style={{ fontSize: 11, color: palette.textTertiary, marginTop: 1 }}>{selected.size} selected</Text>
+        <Text style={{ fontSize: 13, color: palette.textTertiary, marginTop: 1 }}>{selected.size} selected</Text>
       </View>
 
       {!confirmed && !scopeStep && (
@@ -96,7 +127,20 @@ export function SelectionActionBar() {
           <Pill label="Cancel" onPress={() => setScopeStep(false)} palette={palette} />
         </>
       )}
-      {confirmed && <Pill label="Done" onPress={clearSelection} primary accent={accent} />}
+      {confirmed && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}
+        >
+          <Pill label="Assign" onPress={handleAssign} primary accent={accent} />
+          {selected.size >= 2 && <Pill label="Swap" onPress={handleSwap} primary accent={accent} />}
+          {selected.size === 1 && <Pill label="Reschedule" onPress={handleReschedule} primary accent={accent} />}
+          {selected.size === 1 && <Pill label="Divert" onPress={handleDivert} primary accent={accent} />}
+          <Pill label="Cancel" onPress={handleCancel} palette={palette} />
+          <Pill label="Done" onPress={clearSelection} palette={palette} />
+        </ScrollView>
+      )}
     </Animated.View>
   )
 }
@@ -119,7 +163,7 @@ function Pill({
       onPress={onPress}
       style={{
         paddingHorizontal: 12,
-        paddingVertical: 7,
+        paddingVertical: 9,
         borderRadius: 999,
         backgroundColor: primary ? accent : palette?.card,
         borderWidth: primary ? 0 : 1,

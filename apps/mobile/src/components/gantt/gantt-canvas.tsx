@@ -2,17 +2,32 @@
 // Renders the timeline body. Time header + row labels are separate canvases
 // pinned to the edges; they read the same scroll shared values for sync.
 
-import { useEffect, useMemo } from 'react'
-import { View } from 'react-native'
+import { useEffect, useMemo, useState } from 'react'
+import { View, useWindowDimensions } from 'react-native'
 import * as Haptics from 'expo-haptics'
-import { Canvas, Group, Rect, RoundedRect, matchFont, type SkFont } from '@shopify/react-native-skia'
+import { Canvas, Group, Rect, RoundedRect } from '@shopify/react-native-skia'
+import { useCanvasFont } from '../../lib/gantt/use-canvas-font'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { useSharedValue, useDerivedValue, useFrameCallback, runOnJS } from 'react-native-reanimated'
 import { useGanttScroll } from './gantt-scroll-context'
 import { useMobileGanttStore } from '../../stores/use-mobile-gantt-store'
+import { api } from '@skyhub/api'
 import { hitTestBars, computeNowLineX, dateToMs, computePixelsPerHour, utcToX } from '@skyhub/logic'
+import { useAuthStore } from '@skyhub/ui'
+import { enqueuePending } from '../../lib/gantt/cache'
+import { enqueuePendingToWmdb } from '../../lib/gantt/wmdb-bridge'
 import { ROW_HEIGHT_LEVELS } from '@skyhub/types'
-import { BarsLayer, GridLayer, GroupHeadersLayer, NowLineLayer } from '../../lib/gantt/draw'
+import {
+  BarsLayer,
+  GridLayer,
+  GroupHeadersLayer,
+  NowLineLayer,
+  TatLabelsLayer,
+  SlotRiskLayer,
+  MissingTimesLayer,
+  DelaysLayer,
+  DragGhostLayer,
+} from '../../lib/gantt/draw'
 
 interface Props {
   width: number
@@ -37,12 +52,30 @@ export function GanttCanvas({ width, height, accent }: Props) {
   const selectionConfirmed = useMobileGanttStore((s) => s.selectionConfirmed)
   const enterSelection = useMobileGanttStore((s) => s.enterSelection)
   const toggleSelection = useMobileGanttStore((s) => s.toggleSelection)
+  const showTat = useMobileGanttStore((s) => s.showTat)
+  const showSlots = useMobileGanttStore((s) => s.showSlots)
+  const showMissingTimes = useMobileGanttStore((s) => s.showMissingTimes)
+  const showDelays = useMobileGanttStore((s) => s.showDelays)
+  const oooiGraceMins = useMobileGanttStore((s) => s.oooiGraceMins)
+  const considerableDelayMins = useMobileGanttStore((s) => s.considerableDelayMins)
+  const applyOptimisticPlacement = useMobileGanttStore((s) => s.applyOptimisticPlacement)
+  const revertOptimisticPlacement = useMobileGanttStore((s) => s.revertOptimisticPlacement)
+  const showToast = useMobileGanttStore((s) => s.showToast)
+  const refreshPendingCount = useMobileGanttStore((s) => s.refreshPendingCount)
+  const operatorId = useAuthStore((s) => s.user?.operatorId ?? null)
+  const win = useWindowDimensions()
+  const isTablet = win.width >= 768
 
   // Scroll shared values come from context — header + row labels read them too.
   const { scrollX, scrollY } = useGanttScroll()
   const startScrollX = useSharedValue(0)
   const startScrollY = useSharedValue(0)
   const pinchAccum = useSharedValue(0)
+
+  // Drag-to-assign state — set in panGesture.onStart when starting on a selected bar.
+  const dragActive = useSharedValue(false)
+  const dragDeltaX = useSharedValue(0)
+  const dragDeltaY = useSharedValue(0)
 
   // Push container width to the store so layout recomputes at the right pph.
   useEffect(() => {
@@ -51,6 +84,14 @@ export function GanttCanvas({ width, height, accent }: Props) {
 
   const rowConfig = ROW_HEIGHT_LEVELS[rowHeightLevel] ?? ROW_HEIGHT_LEVELS[1]
   const font = useGanttFont(rowConfig.fontSize)
+  const smallFont = useGanttFont(Math.max(9, rowConfig.fontSize - 2))
+
+  // 60s tick — drives now-line + missing-time recompute.
+  const [nowTick, setNowTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setNowTick((t) => t + 1), 60_000)
+    return () => clearInterval(id)
+  }, [])
 
   const totalWidth = layout?.totalWidth ?? width
   const totalHeight = layout?.totalHeight ?? height
@@ -61,21 +102,100 @@ export function GanttCanvas({ width, height, accent }: Props) {
     return Math.round((dateToMs(periodTo) + 86_400_000 - startMs) / 86_400_000)
   }, [periodTo, startMs])
   const pph = useMemo(() => computePixelsPerHour(width, zoom), [width, zoom])
-  const nowX = useMemo(() => computeNowLineX(startMs, periodDays, pph), [startMs, periodDays, pph])
+  const nowX = useMemo(
+    () => computeNowLineX(startMs, periodDays, pph),
+    // nowTick forces recompute every minute; eslint disabled because that's intentional
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [startMs, periodDays, pph, nowTick],
+  )
 
   // ── Gestures ──
 
   const panGesture = Gesture.Pan()
-    .onStart(() => {
+    .runOnJS(true)
+    .onStart((e) => {
       startScrollX.value = scrollX.value
       startScrollY.value = scrollY.value
+      const tx = e.x + scrollX.value
+      const ty = e.y + scrollY.value
+      const state = useMobileGanttStore.getState()
+      if (state.selectionMode && state.selectionConfirmed) {
+        const bars = state.layout?.bars ?? []
+        const flightId = hitTestBars(tx, ty, bars)
+        if (flightId && state.selectedFlightIds.has(flightId)) {
+          dragActive.value = true
+          dragDeltaX.value = 0
+          dragDeltaY.value = 0
+        }
+      }
     })
     .onUpdate((e) => {
+      if (dragActive.value) {
+        dragDeltaX.value = e.translationX
+        dragDeltaY.value = e.translationY
+        return
+      }
       const maxX = Math.max(0, totalWidth - width)
       const maxY = Math.max(0, totalHeight - height)
       scrollX.value = clamp(startScrollX.value - e.translationX, 0, maxX)
       scrollY.value = clamp(startScrollY.value - e.translationY, 0, maxY)
     })
+    .onEnd(() => {
+      if (dragActive.value) {
+        const dx = dragDeltaX.value
+        const dy = dragDeltaY.value
+        dragActive.value = false
+        dragDeltaX.value = 0
+        dragDeltaY.value = 0
+        handleDragEnd(dx, dy)
+      }
+    })
+
+  function handleDragEnd(deltaX: number, deltaY: number) {
+    const state = useMobileGanttStore.getState()
+    const layoutState = state.layout
+    if (!layoutState || !operatorId) return
+    const selected = [...state.selectedFlightIds]
+    if (selected.length === 0) return
+    // Use the first selected bar as the anchor for hit-testing the drop row.
+    const firstBar = layoutState.bars.find((b) => b.flightId === selected[0])
+    if (!firstBar) return
+    const dropY = firstBar.y + firstBar.height / 2 + deltaY
+    const targetRow = layoutState.rows.find((r) => r.type === 'aircraft' && dropY >= r.y && dropY < r.y + r.height)
+    if (!targetRow || !targetRow.registration) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {})
+      return
+    }
+    const targetReg = targetRow.registration
+    const sourceFlight = state.flights.find((f) => f.id === selected[0])
+    // Type compatibility: target row's icaoType must match the dragged flights' AC type.
+    if (
+      sourceFlight?.aircraftTypeIcao &&
+      targetRow.aircraftTypeIcao &&
+      sourceFlight.aircraftTypeIcao !== targetRow.aircraftTypeIcao
+    ) {
+      showToast('error', `Type mismatch: ${sourceFlight.aircraftTypeIcao} cannot be assigned to ${targetReg}.`)
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {})
+      return
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {})
+    applyOptimisticPlacement(selected, targetReg)
+    api
+      .ganttAssignFlights(operatorId, selected, targetReg)
+      .then(() => {
+        showToast('success', `Assigned ${selected.length} flight${selected.length > 1 ? 's' : ''} to ${targetReg}.`)
+      })
+      .catch((err: unknown) => {
+        // Keep the optimistic placement and queue the mutation so the user
+        // doesn't lose their work. Will reconcile on next refresh.
+        const payload = { operatorId, flightIds: selected, registration: targetReg }
+        void enqueuePending({ kind: 'assign', payload })
+        void enqueuePendingToWmdb(operatorId, 'assign', payload)
+        void refreshPendingCount()
+        showToast('info', err instanceof Error ? `Queued: ${err.message}` : 'Queued for sync.')
+        void revertOptimisticPlacement // keep import live without action
+      })
+  }
 
   const pinchGesture = Gesture.Pinch()
     .onStart(() => {
@@ -123,8 +243,11 @@ export function GanttCanvas({ width, height, accent }: Props) {
     const flight = state.flights.find((f) => f.id === flightId)
     if (!flight) return
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {})
-    // Enter selection mode keyed on rotationId. If the flight has no
-    // rotation, treat just this single flight as the "rotation" of one.
+    // Phone variant: long-press → detail sheet only (no selection mode).
+    if (!isTablet) {
+      openDetailSheet({ kind: 'flight', flightId })
+      return
+    }
     const rotationId = flight.rotationId ?? `__solo_${flight.id}`
     const siblings = state.flights.filter((f) => (f.rotationId ?? `__solo_${f.id}`) === rotationId).map((f) => f.id)
     enterSelection(rotationId, siblings, flight.operatingDate)
@@ -204,6 +327,32 @@ export function GanttCanvas({ width, height, accent }: Props) {
                   jiggleRotationId={jiggleActive ? selectionRotationId : null}
                   selectionConfirmed={selectionConfirmed}
                 />
+                {showSlots && <SlotRiskLayer bars={layout.bars} viewport={viewport} />}
+                {showMissingTimes && (
+                  <MissingTimesLayer
+                    bars={layout.bars}
+                    graceMins={oooiGraceMins}
+                    nowTick={nowTick}
+                    viewport={viewport}
+                  />
+                )}
+                {showTat && <TatLabelsLayer bars={layout.bars} font={smallFont} isDark={isDark} viewport={viewport} />}
+                {showDelays && (
+                  <DelaysLayer
+                    bars={layout.bars}
+                    considerableMins={considerableDelayMins}
+                    font={smallFont}
+                    viewport={viewport}
+                  />
+                )}
+                <DragGhostLayer
+                  bars={layout.bars}
+                  draggedIds={selectedIds}
+                  deltaX={dragDeltaX}
+                  deltaY={dragDeltaY}
+                  active={dragActive}
+                  accent={accent}
+                />
                 <NowLineLayer x={nowX} totalHeight={totalHeight} />
 
                 {/* Focus overlays — driven by detail sheet target */}
@@ -239,15 +388,4 @@ function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v))
 }
 
-function useGanttFont(size: number): SkFont | null {
-  return useMemo(
-    () =>
-      matchFont({
-        fontFamily: 'System',
-        fontSize: size,
-        fontStyle: 'normal',
-        fontWeight: 'normal',
-      }),
-    [size],
-  )
-}
+const useGanttFont = useCanvasFont

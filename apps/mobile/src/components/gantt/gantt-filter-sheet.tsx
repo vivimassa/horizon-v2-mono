@@ -1,9 +1,11 @@
-// Filter sheet for the mobile Gantt — period + AC type + status + Go.
+// Filter sheet for the mobile Gantt — period + AC type + status + view tweaks
+// + overlay toggles + Go.
 
 import { useMemo, useRef, useEffect, useCallback } from 'react'
-import { View, Text, Pressable, ScrollView, TextInput } from 'react-native'
+import { View, Text, Pressable, ScrollView, TextInput, Switch } from 'react-native'
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet'
 import { LinearGradient } from 'expo-linear-gradient'
+import type { ColorMode, BarLabelMode } from '@skyhub/types'
 import { useMobileGanttStore } from '../../stores/use-mobile-gantt-store'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 
@@ -12,6 +14,16 @@ interface Props {
 }
 
 const STATUS_OPTIONS = ['draft', 'active', 'suspended', 'cancelled']
+const COLOR_OPTIONS: { value: ColorMode; label: string }[] = [
+  { value: 'status', label: 'Status' },
+  { value: 'ac_type', label: 'AC Type' },
+  { value: 'service_type', label: 'Service' },
+  { value: 'route_type', label: 'Route' },
+]
+const LABEL_OPTIONS: { value: BarLabelMode; label: string }[] = [
+  { value: 'flightNo', label: 'Flight #' },
+  { value: 'sector', label: 'Sector' },
+]
 
 export function GanttFilterSheet({ operatorId }: Props) {
   const { palette, isDark, accent } = useAppTheme()
@@ -27,6 +39,18 @@ export function GanttFilterSheet({ operatorId }: Props) {
   const setStatusFilter = useMobileGanttStore((s) => s.setStatusFilter)
   const aircraftTypes = useMobileGanttStore((s) => s.aircraftTypes)
   const commitPeriod = useMobileGanttStore((s) => s.commitPeriod)
+  const colorMode = useMobileGanttStore((s) => s.colorMode)
+  const setColorMode = useMobileGanttStore((s) => s.setColorMode)
+  const barLabelMode = useMobileGanttStore((s) => s.barLabelMode)
+  const setBarLabelMode = useMobileGanttStore((s) => s.setBarLabelMode)
+  const showTat = useMobileGanttStore((s) => s.showTat)
+  const toggleTat = useMobileGanttStore((s) => s.toggleTat)
+  const showSlots = useMobileGanttStore((s) => s.showSlots)
+  const toggleSlots = useMobileGanttStore((s) => s.toggleSlots)
+  const showMissingTimes = useMobileGanttStore((s) => s.showMissingTimes)
+  const toggleMissingTimes = useMobileGanttStore((s) => s.toggleMissingTimes)
+  const showDelays = useMobileGanttStore((s) => s.showDelays)
+  const toggleDelays = useMobileGanttStore((s) => s.toggleDelays)
 
   useEffect(() => {
     if (open) ref.current?.snapToIndex(0)
@@ -119,6 +143,41 @@ export function GanttFilterSheet({ operatorId }: Props) {
             </View>
           </Section>
 
+          <Section label="COLOR BY" palette={palette}>
+            <Segmented
+              options={COLOR_OPTIONS}
+              value={colorMode}
+              onChange={(v) => setColorMode(v as ColorMode)}
+              palette={palette}
+              accent={accent}
+              isDark={isDark}
+            />
+          </Section>
+
+          <Section label="BAR LABEL" palette={palette}>
+            <Segmented
+              options={LABEL_OPTIONS}
+              value={barLabelMode}
+              onChange={(v) => setBarLabelMode(v as BarLabelMode)}
+              palette={palette}
+              accent={accent}
+              isDark={isDark}
+            />
+          </Section>
+
+          <Section label="OVERLAYS" palette={palette}>
+            <ToggleRow label="TAT minutes" value={showTat} onChange={toggleTat} palette={palette} accent={accent} />
+            <ToggleRow label="Slot risk" value={showSlots} onChange={toggleSlots} palette={palette} accent={accent} />
+            <ToggleRow
+              label="Missing OOOI flags"
+              value={showMissingTimes}
+              onChange={toggleMissingTimes}
+              palette={palette}
+              accent={accent}
+            />
+            <ToggleRow label="Delays" value={showDelays} onChange={toggleDelays} palette={palette} accent={accent} />
+          </Section>
+
           <Pressable
             onPress={handleGo}
             disabled={!operatorId}
@@ -130,7 +189,7 @@ export function GanttFilterSheet({ operatorId }: Props) {
             }}
           >
             <LinearGradient
-              colors={['#1e40af', '#3b6cf5']}
+              colors={[accent, accent]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={{ height: 48, alignItems: 'center', justifyContent: 'center' }}
@@ -157,7 +216,7 @@ function Section({
     <View style={{ marginBottom: 16 }}>
       <Text
         style={{
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: '700',
           color: palette.textSecondary,
           letterSpacing: 0.6,
@@ -184,7 +243,7 @@ function DateField({
 }) {
   return (
     <View style={{ flex: 1 }}>
-      <Text style={{ fontSize: 11, color: palette.textSecondary, marginBottom: 4 }}>{label}</Text>
+      <Text style={{ fontSize: 13, color: palette.textSecondary, marginBottom: 4 }}>{label}</Text>
       <TextInput
         value={value}
         onChangeText={onChange}
@@ -202,6 +261,89 @@ function DateField({
           fontSize: 14,
           color: palette.text,
         }}
+      />
+    </View>
+  )
+}
+
+function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  palette,
+  accent,
+  isDark,
+}: {
+  options: { value: T; label: string }[]
+  value: T
+  onChange: (v: T) => void
+  palette: { text: string; cardBorder: string }
+  accent: string
+  isDark: boolean
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: palette.cardBorder,
+        overflow: 'hidden',
+      }}
+    >
+      {options.map((opt, i) => {
+        const active = opt.value === value
+        return (
+          <Pressable
+            key={opt.value}
+            onPress={() => onChange(opt.value)}
+            style={{
+              flex: 1,
+              paddingVertical: 8,
+              alignItems: 'center',
+              backgroundColor: active ? (isDark ? 'rgba(62,123,250,0.18)' : 'rgba(62,123,250,0.10)') : 'transparent',
+              borderLeftWidth: i === 0 ? 0 : 1,
+              borderLeftColor: palette.cardBorder,
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: '600', color: active ? accent : palette.text }}>{opt.label}</Text>
+          </Pressable>
+        )
+      })}
+    </View>
+  )
+}
+
+function ToggleRow({
+  label,
+  value,
+  onChange,
+  palette,
+  accent,
+}: {
+  label: string
+  value: boolean
+  onChange: () => void
+  palette: { text: string; border: string }
+  accent: string
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: palette.border,
+      }}
+    >
+      <Text style={{ fontSize: 14, color: palette.text }}>{label}</Text>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ false: '#8F90A6', true: accent }}
+        thumbColor={value ? '#fff' : '#eee'}
       />
     </View>
   )

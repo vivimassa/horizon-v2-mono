@@ -22,6 +22,7 @@ import { CrewTempBase } from '../models/CrewTempBase.js'
 import { loadSerializedRuleSet } from '../services/fdtl-rule-set.js'
 import { evaluateCrewRoster } from '../services/evaluate-crew-roster.js'
 import { CrewLegalityIssue } from '../models/CrewLegalityIssue.js'
+import { getRosterRunPayload } from '../services/roster-run-cache.js'
 
 /** Parse an FDTL rule value like "12:00" / "10:30" / raw-number minutes
  *  into total minutes. Returns 0 on parse failure so the UI falls back
@@ -183,367 +184,467 @@ async function requireOpsRole(req: FastifyRequest, reply: FastifyReply) {
   }
 }
 
+/**
+ * Opt-in perf logging. Set CREW_SCHEDULE_DEBUG=1 to emit per-block
+ * console.time / console.timeEnd labels + collection counts + payload size
+ * for every /crew-schedule request. Off by default to avoid log noise in
+ * prod. Wired during the post-solver "Loading roster data…" investigation
+ * (target: 30+s → <5s for ~133 crew × 1 month).
+ */
+const CREW_SCHEDULE_DEBUG = process.env.CREW_SCHEDULE_DEBUG === '1'
+function csTime(label: string): void {
+  if (CREW_SCHEDULE_DEBUG) console.time(label)
+}
+function csTimeEnd(label: string): void {
+  if (CREW_SCHEDULE_DEBUG) console.timeEnd(label)
+}
+function csLog(...args: unknown[]): void {
+  if (CREW_SCHEDULE_DEBUG) console.log('[crew-schedule]', ...args)
+}
+
+/**
+ * Filter shape accepted by the crew-schedule aggregator. Same params the
+ * GET /crew-schedule route reads from the query string. Multi-value
+ * fields are comma-separated strings ("A320,A321") to mirror the route.
+ */
+export type CrewScheduleQuery = {
+  from: string
+  to: string
+  acType?: string
+  base?: string
+  position?: string
+  baseAirport?: string
+  crewGroup?: string
+}
+
+/**
+ * Build the full /crew-schedule aggregator payload for an operator +
+ * window. Extracted so the auto-roster orchestrator can pre-warm the
+ * roster-run cache (services/roster-run-cache.ts) at solve completion,
+ * letting the post-solve UI fetch hit a warm payload instead of paying
+ * the full aggregator cost again.
+ */
+export async function buildCrewSchedulePayload(
+  operatorId: string,
+  q: CrewScheduleQuery,
+): Promise<Record<string, unknown>> {
+  const scenarioFilter = { $in: [null, undefined] as Array<string | null | undefined> }
+  const csTotalLabel = `cs:total ${operatorId} ${q.from}..${q.to}`
+  csTime(csTotalLabel)
+
+  // Query filters accept comma-separated arrays. Single value still works
+  // (treated as 1-element array). Empty/missing → no filter on that axis.
+  const parseList = (v: string | undefined): string[] =>
+    !v
+      ? []
+      : v
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+  const acTypeList = parseList(q.acType)
+  const baseList = parseList(q.base)
+  const positionList = parseList(q.position)
+  const crewGroupList = parseList(q.crewGroup)
+
+  const pairingFilter: Record<string, unknown> = {
+    operatorId,
+    scenarioId: scenarioFilter,
+    endDate: { $gte: q.from },
+    startDate: { $lte: q.to },
+  }
+  if (acTypeList.length > 0) pairingFilter.aircraftTypeIcao = { $in: acTypeList }
+  if (q.baseAirport) pairingFilter.baseAirport = q.baseAirport
+
+  const crewFilter: Record<string, unknown> = { operatorId, status: { $ne: 'inactive' } }
+  if (baseList.length === 1) crewFilter.base = baseList[0]
+  else if (baseList.length > 1) crewFilter.base = { $in: baseList }
+  if (positionList.length === 1) crewFilter.position = positionList[0]
+  else if (positionList.length > 1) crewFilter.position = { $in: positionList }
+
+  // Intersect crew id set across group membership + aircraft qualification.
+  const crewIdSets: string[][] = []
+  if (crewGroupList.length > 0) {
+    const groupCrewIds = (await CrewGroupAssignment.distinct('crewId', {
+      operatorId,
+      groupId: { $in: crewGroupList },
+    })) as string[]
+    crewIdSets.push(groupCrewIds)
+  }
+  if (acTypeList.length > 0) {
+    const qualCrewIds = (await CrewQualification.distinct('crewId', {
+      operatorId,
+      aircraftType: { $in: acTypeList },
+    })) as string[]
+    crewIdSets.push(qualCrewIds)
+  }
+  if (crewIdSets.length > 0) {
+    const intersected = crewIdSets.reduce((acc, arr) => {
+      const s = new Set(arr)
+      return acc.filter((id) => s.has(id))
+    })
+    crewFilter._id = { $in: intersected.length > 0 ? intersected : ['__no_match__'] }
+  }
+
+  const assignmentFilter: Record<string, unknown> = {
+    operatorId,
+    scenarioId: scenarioFilter,
+    status: { $ne: 'cancelled' },
+    startUtcIso: { $lte: `${q.to}T23:59:59.999Z` },
+    endUtcIso: { $gte: `${q.from}T00:00:00.000Z` },
+  }
+
+  const activityFilter: Record<string, unknown> = {
+    operatorId,
+    scenarioId: scenarioFilter,
+    startUtcIso: { $lte: `${q.to}T23:59:59.999Z` },
+    endUtcIso: { $gte: `${q.from}T00:00:00.000Z` },
+  }
+
+  // Memo filter — pull every memo the period could touch:
+  //   - pairing-scope memos whose pairing is in the loaded list (filtered post-fetch)
+  //   - day-scope memos for dates inside [from, to]
+  //   - crew-scope memos (no date constraint)
+  // Keep it broad; client trims to what it renders.
+  const memoFilter: Record<string, unknown> = {
+    operatorId,
+    scenarioId: { $in: [null, undefined] as Array<string | null | undefined> },
+    $or: [{ scope: 'pairing' }, { scope: 'crew' }, { scope: 'day', dateIso: { $gte: q.from, $lte: q.to } }],
+  }
+
+  csTime('cs:parallel-fetch')
+  const [pairings, crew, rawAssignments, positions, activities, activityCodes, activityGroups, memos, complements] =
+    await Promise.all([
+      Pairing.find(pairingFilter).lean(),
+      CrewMember.find(crewFilter).sort({ base: 1, seniority: 1, lastName: 1 }).lean(),
+      CrewAssignment.find(assignmentFilter).lean(),
+      CrewPosition.find({ operatorId }).lean(),
+      CrewActivity.find(activityFilter).lean(),
+      ActivityCode.find({ operatorId, isArchived: { $ne: true } }).lean(),
+      ActivityCodeGroup.find({ operatorId }).sort({ sortOrder: 1 }).lean(),
+      CrewMemo.find(memoFilter).lean(),
+      CrewComplement.find({ operatorId, isActive: true }).lean(),
+    ])
+  csTimeEnd('cs:parallel-fetch')
+  csLog(
+    `cs:counts pairings=${pairings.length} crew=${crew.length} assignments=${rawAssignments.length} positions=${positions.length} activities=${activities.length} activityCodes=${activityCodes.length} activityGroups=${activityGroups.length} memos=${memos.length} complements=${complements.length}`,
+  )
+
+  // Overlay current tail (registration) onto each pairing leg by joining
+  // legs[].flightId → FlightInstance._id. Pairings cache `tailNumber` at
+  // creation time; pool-side aircraft assignments made AFTER pairing save
+  // never propagate back. Re-resolving here means the planner always sees
+  // the live tail, no migration required. Falls back to the cached value
+  // when no instance is found.
+  csTime('cs:tail-overlay')
+  const allFlightIds = new Set<string>()
+  for (const p of pairings) {
+    for (const l of (p.legs ?? []) as Array<{ flightId?: string | null }>) {
+      if (l.flightId) allFlightIds.add(l.flightId)
+    }
+  }
+  if (allFlightIds.size > 0) {
+    const instances = await FlightInstance.find(
+      { operatorId, _id: { $in: Array.from(allFlightIds) } },
+      { _id: 1, tail: 1 },
+    ).lean()
+    const tailById = new Map<string, string | null>()
+    for (const inst of instances) {
+      const reg = (inst as { tail?: { registration?: string | null } | null }).tail?.registration ?? null
+      tailById.set(inst._id as string, reg)
+    }
+    for (const p of pairings) {
+      for (const l of (p.legs ?? []) as Array<{ flightId?: string | null; tailNumber?: string | null }>) {
+        if (!l.flightId) continue
+        const live = tailById.get(l.flightId)
+        if (live) l.tailNumber = live
+      }
+    }
+  }
+  csTimeEnd('cs:tail-overlay')
+
+  // Recompute assignment windows from fresh pairing data. Older writes
+  // that used the legs[0].staUtcIso-90 fallback stored bogus startUtcIso
+  // values; rebuilding here means the client always sees corrected
+  // windows without a data migration.
+  const pairingWindowById = new Map<string, { startUtcIso: string; endUtcIso: string }>()
+  for (const p of pairings) {
+    pairingWindowById.set(p._id as string, computeAssignmentWindow(p as unknown as PairingLean))
+  }
+  const assignments = rawAssignments.map((a) => {
+    const w = pairingWindowById.get(a.pairingId)
+    if (!w) return a
+    return { ...a, startUtcIso: w.startUtcIso, endUtcIso: w.endUtcIso }
+  })
+
+  // Build (aircraftType/templateKey) → counts lookup so we can fall back
+  // when a pairing's denormalised crewCounts cache wasn't populated.
+  const complementIndex = new Map<string, Record<string, number>>()
+  for (const c of complements) {
+    const counts =
+      c.counts instanceof Map
+        ? (Object.fromEntries(c.counts) as Record<string, number>)
+        : ((c.counts ?? {}) as Record<string, number>)
+    complementIndex.set(`${c.aircraftTypeIcao}/${c.templateKey}`, counts)
+  }
+
+  // Resolve each crew's base UUID to an airport IATA code so the client
+  // renders "SGN" instead of the raw _id. Required by the left panel,
+  // the Pairing Details dialog's Crew Assigned list, and any other
+  // surface that reads `crew.baseLabel`.
+  csTime('cs:base-label')
+  const crewBaseIds = [...new Set(crew.map((c) => c.base).filter((v): v is string => !!v))]
+  const crewBaseDocs =
+    crewBaseIds.length > 0 ? await Airport.find({ _id: { $in: crewBaseIds } }, { _id: 1, iataCode: 1 }).lean() : []
+  const crewBaseLabel = new Map(crewBaseDocs.map((a) => [a._id as string, a.iataCode ?? null]))
+  for (const c of crew) {
+    ;(c as unknown as { baseLabel: string | null }).baseLabel = c.base ? (crewBaseLabel.get(c.base) ?? null) : null
+  }
+  csTimeEnd('cs:base-label')
+
+  // Hydrate pairings so downstream (uncrewed tray + client layout) sees
+  // the resolved counts regardless of cache state.
+  for (const p of pairings) {
+    ;(p as unknown as { crewCounts: Record<string, number> }).crewCounts = resolveCrewCounts(
+      p as unknown as {
+        aircraftTypeIcao?: string | null
+        complementKey?: string | null
+        crewCounts?: Record<string, number> | null
+      },
+      complementIndex,
+    )
+  }
+
+  // Derive uncrewed shortfall per pairing in the period.
+  const assignmentsByPairing = new Map<string, Array<{ seatPositionId: string; seatIndex: number }>>()
+  for (const a of assignments) {
+    const arr = assignmentsByPairing.get(a.pairingId) ?? []
+    arr.push({ seatPositionId: a.seatPositionId, seatIndex: a.seatIndex })
+    assignmentsByPairing.set(a.pairingId, arr)
+  }
+
+  const posByCode = new Map(positions.map((p) => [p.code, p]))
+
+  const uncrewed: Array<{
+    pairingId: string
+    pairingCode?: string
+    startDate: string
+    missing: Array<{ seatPositionId: string; seatCode: string; count: number }>
+  }> = []
+  for (const p of pairings) {
+    const counts = (p.crewCounts ?? {}) as Record<string, number>
+    if (!counts || Object.keys(counts).length === 0) continue
+    const taken = assignmentsByPairing.get(p._id as string) ?? []
+    const takenBySeatPos = new Map<string, number>()
+    for (const t of taken) takenBySeatPos.set(t.seatPositionId, (takenBySeatPos.get(t.seatPositionId) ?? 0) + 1)
+
+    const missing: Array<{ seatPositionId: string; seatCode: string; count: number }> = []
+    for (const [seatCode, needed] of Object.entries(counts)) {
+      const seat = posByCode.get(seatCode)
+      if (!seat) continue
+      const already = takenBySeatPos.get(seat._id as string) ?? 0
+      const gap = needed - already
+      if (gap > 0) missing.push({ seatPositionId: seat._id as string, seatCode, count: gap })
+    }
+    if (missing.length > 0) {
+      uncrewed.push({
+        pairingId: p._id as string,
+        pairingCode: (p as unknown as { pairingCode?: string }).pairingCode,
+        startDate: p.startDate,
+        missing,
+      })
+    }
+  }
+
+  // FDTL scheme — drives visual brief/debrief padding on the uncrewed
+  // tray (and anywhere the client needs to compute a duty window from
+  // legs when reportTime/releaseTime is null). Default 45/45 mirrors
+  // the FdtlScheme schema defaults.
+  csTime('cs:fdtl')
+  const scheme = await FdtlScheme.findOne({ operatorId }).lean()
+  // Fallbacks are 0/0 (not schema defaults). If a user ever sees duty
+  // windows collapse to STD/STA exactly, they immediately know the FDTL
+  // scheme for this operator hasn't been seeded. Single failure mode.
+  // Pull the two rest rules needed for client-side "mandatory rest
+  // after duty" zebra strips. For CAAV VAR 15 these are MIN_REST_HOME_BASE
+  // (12:00) and MIN_REST_AWAY (10:00). If the operator's framework uses
+  // different codes, they fall back to 0 — the UI then renders no rest
+  // strip, which is the least-surprising behaviour.
+  const restRuleDocs = scheme
+    ? await FdtlRule.find({
+        operatorId,
+        frameworkCode: scheme.frameworkCode,
+        ruleCode: { $in: ['MIN_REST_HOME_BASE', 'MIN_REST_AWAY'] },
+        isActive: { $ne: false },
+      }).lean()
+    : []
+  const byCode: Record<string, string> = {}
+  for (const r of restRuleDocs) byCode[r.ruleCode] = r.value
+  const fdtl = {
+    briefMinutes: scheme?.reportTimeMinutes ?? 0,
+    // Debrief window on a pill = postFlight + debrief (total time the
+    // crew is still on duty after the last STA).
+    debriefMinutes: scheme ? (scheme.postFlightMinutes ?? 0) + (scheme.debriefMinutes ?? 0) : 0,
+    restRules: {
+      homeBaseMinMinutes: parseDurationToMinutes(byCode.MIN_REST_HOME_BASE),
+      awayMinMinutes: parseDurationToMinutes(byCode.MIN_REST_AWAY),
+    },
+  }
+  csTimeEnd('cs:fdtl')
+
+  // Qualifications + aircraft types feed the client-side AC-type
+  // hard-block check (crew not rated for the pairing's aircraft type,
+  // with AC FAMILY fallback). Each qualification carries the
+  // `acFamilyQualified` toggle from the crew profile; `aircraftTypes`
+  // supplies the family each ICAO belongs to.
+  csTime('cs:quals')
+  const crewIdsForQuals = crew.map((c) => c._id as string)
+  const [quals, acTypes] = await Promise.all([
+    crewIdsForQuals.length > 0
+      ? CrewQualification.find(
+          { operatorId, crewId: { $in: crewIdsForQuals } },
+          { crewId: 1, aircraftType: 1, acFamilyQualified: 1 },
+        ).lean()
+      : Promise.resolve([] as Array<{ crewId: string; aircraftType: string; acFamilyQualified?: boolean }>),
+    AircraftType.find({ operatorId }, { icaoType: 1, family: 1, color: 1 }).lean(),
+  ])
+  csTimeEnd('cs:quals')
+  const qualsByCrew = new Map<string, Array<{ aircraftType: string; acFamilyQualified: boolean }>>()
+  for (const q of quals) {
+    if (!q.aircraftType) continue
+    const arr = qualsByCrew.get(q.crewId) ?? []
+    arr.push({ aircraftType: q.aircraftType, acFamilyQualified: !!q.acFamilyQualified })
+    qualsByCrew.set(q.crewId, arr)
+  }
+  for (const c of crew) {
+    ;(c as unknown as { qualifications: Array<{ aircraftType: string; acFamilyQualified: boolean }> }).qualifications =
+      qualsByCrew.get(c._id as string) ?? []
+  }
+  const aircraftTypes = acTypes.map((t) => ({
+    icaoType: t.icaoType,
+    family: t.family ?? null,
+    color: (t as unknown as { color?: string | null }).color ?? null,
+  }))
+
+  // Crew temp-base assignments that overlap the visible window. Kept
+  // simple (overlap check in JS) since the table is small per operator.
+  csTime('cs:temp-bases')
+  const tempBaseDocs = await CrewTempBase.find({
+    operatorId,
+    fromIso: { $lte: q.to },
+    toIso: { $gte: q.from },
+  }).lean()
+  csTimeEnd('cs:temp-bases')
+  const tempBases = tempBaseDocs.map((t) => ({
+    _id: t._id as string,
+    crewId: t.crewId,
+    fromIso: t.fromIso,
+    toIso: t.toIso,
+    airportCode: t.airportCode,
+  }))
+
+  // Full SerializedRuleSet — powers the 4.1.6 FDTL-aware validator.
+  // Same assembly path that /fdtl/rule-set returns, so every tweak in
+  // /admin/fdt-rules flows here without a code change.
+  csTime('cs:rule-set')
+  const ruleSet = await loadSerializedRuleSet(operatorId)
+  csTimeEnd('cs:rule-set')
+
+  // Roster-level issues for the visible window. Cheap to read since
+  // indexed by (operatorId, periodFromIso, periodToIso). Re-evaluation
+  // is triggered separately (mutation-driven or nightly job), but we
+  // also do a best-effort inline run when the cache is empty.
+  csTime('cs:legality-cache')
+  let crewIssues = await CrewLegalityIssue.find({
+    operatorId,
+    periodFromIso: q.from,
+    periodToIso: q.to,
+  }).lean()
+
+  // Self-heal stale cache: if the cache references pairing/assignment
+  // IDs that no longer exist (e.g. after Clear Schedule), purge and
+  // re-evaluate. Without this, red shields linger on an empty roster
+  // until the nightly sweep runs.
+  if (crewIssues.length > 0) {
+    const liveAssignIds = new Set(assignments.map((a) => a._id as string))
+    const anyStale = crewIssues.some((iss) => {
+      const refs = (iss as unknown as { assignmentIds?: string[] }).assignmentIds ?? []
+      if (refs.length === 0) return false
+      return refs.some((id) => !liveAssignIds.has(id))
+    })
+    if (anyStale) {
+      await CrewLegalityIssue.deleteMany({ operatorId, periodFromIso: q.from, periodToIso: q.to })
+      crewIssues = []
+    }
+  }
+  csTimeEnd('cs:legality-cache')
+
+  // Roster-FDTL sweep is now fully on-demand — no auto-kickoff on page
+  // load. Clients that need fresh findings (Legality Check dialog,
+  // Publish preflight) call `POST /crew-schedule/reevaluate-roster`
+  // explicitly. Mutation paths (assign/swap/delete) still trigger a
+  // server-side eval so individual edits stay accurate.
+  const rosterEvaluating = false
+
+  csTime('cs:serialize')
+  const payload = {
+    pairings,
+    crew,
+    assignments,
+    uncrewed,
+    positions,
+    activities,
+    activityCodes,
+    activityGroups,
+    memos,
+    fdtl,
+    ruleSet,
+    crewIssues,
+    rosterEvaluating,
+    aircraftTypes,
+    tempBases,
+  }
+  if (CREW_SCHEDULE_DEBUG) {
+    // Heavy: only stringify when debugging. Run BEFORE timeEnd so the
+    // serialize label captures the cost the framework will pay anyway.
+    const bytes = JSON.stringify(payload).length
+    csLog(`cs:size bytes=${bytes} (${(bytes / 1024 / 1024).toFixed(2)}MB)`)
+  }
+  csTimeEnd('cs:serialize')
+  csTimeEnd(csTotalLabel)
+  return payload
+}
+
 export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
   // ── GET /crew-schedule — aggregator for a period ─────────────────────
+  // Thin wrapper around buildCrewSchedulePayload so the orchestrator can
+  // reuse the same assembly path to pre-warm the roster-run cache.
   app.get('/crew-schedule', async (req, reply) => {
     const q = req.query as Record<string, string>
     if (!q.from || !q.to) return reply.code(400).send({ error: 'from and to are required (ISO date)' })
+    return buildCrewSchedulePayload(req.operatorId, q as CrewScheduleQuery)
+  })
 
-    const operatorId = req.operatorId
-    const scenarioFilter = { $in: [null, undefined] as Array<string | null | undefined> }
-
-    // Query filters accept comma-separated arrays. Single value still works
-    // (treated as 1-element array). Empty/missing → no filter on that axis.
-    const parseList = (v: string | undefined): string[] =>
-      !v
-        ? []
-        : v
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean)
-    const acTypeList = parseList(q.acType)
-    const baseList = parseList(q.base)
-    const positionList = parseList(q.position)
-    const crewGroupList = parseList(q.crewGroup)
-
-    const pairingFilter: Record<string, unknown> = {
-      operatorId,
-      scenarioId: scenarioFilter,
-      endDate: { $gte: q.from },
-      startDate: { $lte: q.to },
-    }
-    if (acTypeList.length > 0) pairingFilter.aircraftTypeIcao = { $in: acTypeList }
-    if (q.baseAirport) pairingFilter.baseAirport = q.baseAirport
-
-    const crewFilter: Record<string, unknown> = { operatorId, status: { $ne: 'inactive' } }
-    if (baseList.length === 1) crewFilter.base = baseList[0]
-    else if (baseList.length > 1) crewFilter.base = { $in: baseList }
-    if (positionList.length === 1) crewFilter.position = positionList[0]
-    else if (positionList.length > 1) crewFilter.position = { $in: positionList }
-
-    // Intersect crew id set across group membership + aircraft qualification.
-    const crewIdSets: string[][] = []
-    if (crewGroupList.length > 0) {
-      const groupCrewIds = (await CrewGroupAssignment.distinct('crewId', {
-        operatorId,
-        groupId: { $in: crewGroupList },
-      })) as string[]
-      crewIdSets.push(groupCrewIds)
-    }
-    if (acTypeList.length > 0) {
-      const qualCrewIds = (await CrewQualification.distinct('crewId', {
-        operatorId,
-        aircraftType: { $in: acTypeList },
-      })) as string[]
-      crewIdSets.push(qualCrewIds)
-    }
-    if (crewIdSets.length > 0) {
-      const intersected = crewIdSets.reduce((acc, arr) => {
-        const s = new Set(arr)
-        return acc.filter((id) => s.has(id))
-      })
-      crewFilter._id = { $in: intersected.length > 0 ? intersected : ['__no_match__'] }
-    }
-
-    const assignmentFilter: Record<string, unknown> = {
-      operatorId,
-      scenarioId: scenarioFilter,
-      status: { $ne: 'cancelled' },
-      startUtcIso: { $lte: `${q.to}T23:59:59.999Z` },
-      endUtcIso: { $gte: `${q.from}T00:00:00.000Z` },
-    }
-
-    const activityFilter: Record<string, unknown> = {
-      operatorId,
-      scenarioId: scenarioFilter,
-      startUtcIso: { $lte: `${q.to}T23:59:59.999Z` },
-      endUtcIso: { $gte: `${q.from}T00:00:00.000Z` },
-    }
-
-    // Memo filter — pull every memo the period could touch:
-    //   - pairing-scope memos whose pairing is in the loaded list (filtered post-fetch)
-    //   - day-scope memos for dates inside [from, to]
-    //   - crew-scope memos (no date constraint)
-    // Keep it broad; client trims to what it renders.
-    const memoFilter: Record<string, unknown> = {
-      operatorId,
-      scenarioId: { $in: [null, undefined] as Array<string | null | undefined> },
-      $or: [{ scope: 'pairing' }, { scope: 'crew' }, { scope: 'day', dateIso: { $gte: q.from, $lte: q.to } }],
-    }
-
-    const [pairings, crew, rawAssignments, positions, activities, activityCodes, activityGroups, memos, complements] =
-      await Promise.all([
-        Pairing.find(pairingFilter).lean(),
-        CrewMember.find(crewFilter).sort({ base: 1, seniority: 1, lastName: 1 }).lean(),
-        CrewAssignment.find(assignmentFilter).lean(),
-        CrewPosition.find({ operatorId }).lean(),
-        CrewActivity.find(activityFilter).lean(),
-        ActivityCode.find({ operatorId, isArchived: { $ne: true } }).lean(),
-        ActivityCodeGroup.find({ operatorId }).sort({ sortOrder: 1 }).lean(),
-        CrewMemo.find(memoFilter).lean(),
-        CrewComplement.find({ operatorId, isActive: true }).lean(),
-      ])
-
-    // Overlay current tail (registration) onto each pairing leg by joining
-    // legs[].flightId → FlightInstance._id. Pairings cache `tailNumber` at
-    // creation time; pool-side aircraft assignments made AFTER pairing save
-    // never propagate back. Re-resolving here means the planner always sees
-    // the live tail, no migration required. Falls back to the cached value
-    // when no instance is found.
-    const allFlightIds = new Set<string>()
-    for (const p of pairings) {
-      for (const l of (p.legs ?? []) as Array<{ flightId?: string | null }>) {
-        if (l.flightId) allFlightIds.add(l.flightId)
-      }
-    }
-    if (allFlightIds.size > 0) {
-      const instances = await FlightInstance.find(
-        { operatorId, _id: { $in: Array.from(allFlightIds) } },
-        { _id: 1, tail: 1 },
-      ).lean()
-      const tailById = new Map<string, string | null>()
-      for (const inst of instances) {
-        const reg = (inst as { tail?: { registration?: string | null } | null }).tail?.registration ?? null
-        tailById.set(inst._id as string, reg)
-      }
-      for (const p of pairings) {
-        for (const l of (p.legs ?? []) as Array<{ flightId?: string | null; tailNumber?: string | null }>) {
-          if (!l.flightId) continue
-          const live = tailById.get(l.flightId)
-          if (live) l.tailNumber = live
-        }
-      }
-    }
-
-    // Recompute assignment windows from fresh pairing data. Older writes
-    // that used the legs[0].staUtcIso-90 fallback stored bogus startUtcIso
-    // values; rebuilding here means the client always sees corrected
-    // windows without a data migration.
-    const pairingWindowById = new Map<string, { startUtcIso: string; endUtcIso: string }>()
-    for (const p of pairings) {
-      pairingWindowById.set(p._id as string, computeAssignmentWindow(p as unknown as PairingLean))
-    }
-    const assignments = rawAssignments.map((a) => {
-      const w = pairingWindowById.get(a.pairingId)
-      if (!w) return a
-      return { ...a, startUtcIso: w.startUtcIso, endUtcIso: w.endUtcIso }
-    })
-
-    // Build (aircraftType/templateKey) → counts lookup so we can fall back
-    // when a pairing's denormalised crewCounts cache wasn't populated.
-    const complementIndex = new Map<string, Record<string, number>>()
-    for (const c of complements) {
-      const counts =
-        c.counts instanceof Map
-          ? (Object.fromEntries(c.counts) as Record<string, number>)
-          : ((c.counts ?? {}) as Record<string, number>)
-      complementIndex.set(`${c.aircraftTypeIcao}/${c.templateKey}`, counts)
-    }
-
-    // Resolve each crew's base UUID to an airport IATA code so the client
-    // renders "SGN" instead of the raw _id. Required by the left panel,
-    // the Pairing Details dialog's Crew Assigned list, and any other
-    // surface that reads `crew.baseLabel`.
-    const crewBaseIds = [...new Set(crew.map((c) => c.base).filter((v): v is string => !!v))]
-    const crewBaseDocs =
-      crewBaseIds.length > 0 ? await Airport.find({ _id: { $in: crewBaseIds } }, { _id: 1, iataCode: 1 }).lean() : []
-    const crewBaseLabel = new Map(crewBaseDocs.map((a) => [a._id as string, a.iataCode ?? null]))
-    for (const c of crew) {
-      ;(c as unknown as { baseLabel: string | null }).baseLabel = c.base ? (crewBaseLabel.get(c.base) ?? null) : null
-    }
-
-    // Hydrate pairings so downstream (uncrewed tray + client layout) sees
-    // the resolved counts regardless of cache state.
-    for (const p of pairings) {
-      ;(p as unknown as { crewCounts: Record<string, number> }).crewCounts = resolveCrewCounts(
-        p as unknown as {
-          aircraftTypeIcao?: string | null
-          complementKey?: string | null
-          crewCounts?: Record<string, number> | null
-        },
-        complementIndex,
-      )
-    }
-
-    // Derive uncrewed shortfall per pairing in the period.
-    const assignmentsByPairing = new Map<string, Array<{ seatPositionId: string; seatIndex: number }>>()
-    for (const a of assignments) {
-      const arr = assignmentsByPairing.get(a.pairingId) ?? []
-      arr.push({ seatPositionId: a.seatPositionId, seatIndex: a.seatIndex })
-      assignmentsByPairing.set(a.pairingId, arr)
-    }
-
-    const posByCode = new Map(positions.map((p) => [p.code, p]))
-
-    const uncrewed: Array<{
-      pairingId: string
-      pairingCode?: string
-      startDate: string
-      missing: Array<{ seatPositionId: string; seatCode: string; count: number }>
-    }> = []
-    for (const p of pairings) {
-      const counts = (p.crewCounts ?? {}) as Record<string, number>
-      if (!counts || Object.keys(counts).length === 0) continue
-      const taken = assignmentsByPairing.get(p._id as string) ?? []
-      const takenBySeatPos = new Map<string, number>()
-      for (const t of taken) takenBySeatPos.set(t.seatPositionId, (takenBySeatPos.get(t.seatPositionId) ?? 0) + 1)
-
-      const missing: Array<{ seatPositionId: string; seatCode: string; count: number }> = []
-      for (const [seatCode, needed] of Object.entries(counts)) {
-        const seat = posByCode.get(seatCode)
-        if (!seat) continue
-        const already = takenBySeatPos.get(seat._id as string) ?? 0
-        const gap = needed - already
-        if (gap > 0) missing.push({ seatPositionId: seat._id as string, seatCode, count: gap })
-      }
-      if (missing.length > 0) {
-        uncrewed.push({
-          pairingId: p._id as string,
-          pairingCode: (p as unknown as { pairingCode?: string }).pairingCode,
-          startDate: p.startDate,
-          missing,
-        })
-      }
-    }
-
-    // FDTL scheme — drives visual brief/debrief padding on the uncrewed
-    // tray (and anywhere the client needs to compute a duty window from
-    // legs when reportTime/releaseTime is null). Default 45/45 mirrors
-    // the FdtlScheme schema defaults.
-    const scheme = await FdtlScheme.findOne({ operatorId }).lean()
-    // Fallbacks are 0/0 (not schema defaults). If a user ever sees duty
-    // windows collapse to STD/STA exactly, they immediately know the FDTL
-    // scheme for this operator hasn't been seeded. Single failure mode.
-    // Pull the two rest rules needed for client-side "mandatory rest
-    // after duty" zebra strips. For CAAV VAR 15 these are MIN_REST_HOME_BASE
-    // (12:00) and MIN_REST_AWAY (10:00). If the operator's framework uses
-    // different codes, they fall back to 0 — the UI then renders no rest
-    // strip, which is the least-surprising behaviour.
-    const restRuleDocs = scheme
-      ? await FdtlRule.find({
-          operatorId,
-          frameworkCode: scheme.frameworkCode,
-          ruleCode: { $in: ['MIN_REST_HOME_BASE', 'MIN_REST_AWAY'] },
-          isActive: { $ne: false },
-        }).lean()
-      : []
-    const byCode: Record<string, string> = {}
-    for (const r of restRuleDocs) byCode[r.ruleCode] = r.value
-    const fdtl = {
-      briefMinutes: scheme?.reportTimeMinutes ?? 0,
-      // Debrief window on a pill = postFlight + debrief (total time the
-      // crew is still on duty after the last STA).
-      debriefMinutes: scheme ? (scheme.postFlightMinutes ?? 0) + (scheme.debriefMinutes ?? 0) : 0,
-      restRules: {
-        homeBaseMinMinutes: parseDurationToMinutes(byCode.MIN_REST_HOME_BASE),
-        awayMinMinutes: parseDurationToMinutes(byCode.MIN_REST_AWAY),
-      },
-    }
-
-    // Qualifications + aircraft types feed the client-side AC-type
-    // hard-block check (crew not rated for the pairing's aircraft type,
-    // with AC FAMILY fallback). Each qualification carries the
-    // `acFamilyQualified` toggle from the crew profile; `aircraftTypes`
-    // supplies the family each ICAO belongs to.
-    const crewIdsForQuals = crew.map((c) => c._id as string)
-    const [quals, acTypes] = await Promise.all([
-      crewIdsForQuals.length > 0
-        ? CrewQualification.find(
-            { operatorId, crewId: { $in: crewIdsForQuals } },
-            { crewId: 1, aircraftType: 1, acFamilyQualified: 1 },
-          ).lean()
-        : Promise.resolve([] as Array<{ crewId: string; aircraftType: string; acFamilyQualified?: boolean }>),
-      AircraftType.find({ operatorId }, { icaoType: 1, family: 1, color: 1 }).lean(),
-    ])
-    const qualsByCrew = new Map<string, Array<{ aircraftType: string; acFamilyQualified: boolean }>>()
-    for (const q of quals) {
-      if (!q.aircraftType) continue
-      const arr = qualsByCrew.get(q.crewId) ?? []
-      arr.push({ aircraftType: q.aircraftType, acFamilyQualified: !!q.acFamilyQualified })
-      qualsByCrew.set(q.crewId, arr)
-    }
-    for (const c of crew) {
-      ;(
-        c as unknown as { qualifications: Array<{ aircraftType: string; acFamilyQualified: boolean }> }
-      ).qualifications = qualsByCrew.get(c._id as string) ?? []
-    }
-    const aircraftTypes = acTypes.map((t) => ({
-      icaoType: t.icaoType,
-      family: t.family ?? null,
-      color: (t as unknown as { color?: string | null }).color ?? null,
-    }))
-
-    // Crew temp-base assignments that overlap the visible window. Kept
-    // simple (overlap check in JS) since the table is small per operator.
-    const tempBaseDocs = await CrewTempBase.find({
-      operatorId,
-      fromIso: { $lte: q.to },
-      toIso: { $gte: q.from },
-    }).lean()
-    const tempBases = tempBaseDocs.map((t) => ({
-      _id: t._id as string,
-      crewId: t.crewId,
-      fromIso: t.fromIso,
-      toIso: t.toIso,
-      airportCode: t.airportCode,
-    }))
-
-    // Full SerializedRuleSet — powers the 4.1.6 FDTL-aware validator.
-    // Same assembly path that /fdtl/rule-set returns, so every tweak in
-    // /admin/fdt-rules flows here without a code change.
-    const ruleSet = await loadSerializedRuleSet(operatorId)
-
-    // Roster-level issues for the visible window. Cheap to read since
-    // indexed by (operatorId, periodFromIso, periodToIso). Re-evaluation
-    // is triggered separately (mutation-driven or nightly job), but we
-    // also do a best-effort inline run when the cache is empty.
-    let crewIssues = await CrewLegalityIssue.find({
-      operatorId,
-      periodFromIso: q.from,
-      periodToIso: q.to,
-    }).lean()
-
-    // Self-heal stale cache: if the cache references pairing/assignment
-    // IDs that no longer exist (e.g. after Clear Schedule), purge and
-    // re-evaluate. Without this, red shields linger on an empty roster
-    // until the nightly sweep runs.
-    if (crewIssues.length > 0) {
-      const liveAssignIds = new Set(assignments.map((a) => a._id as string))
-      const anyStale = crewIssues.some((iss) => {
-        const refs = (iss as unknown as { assignmentIds?: string[] }).assignmentIds ?? []
-        if (refs.length === 0) return false
-        return refs.some((id) => !liveAssignIds.has(id))
-      })
-      if (anyStale) {
-        await CrewLegalityIssue.deleteMany({ operatorId, periodFromIso: q.from, periodToIso: q.to })
-        crewIssues = []
-      }
-    }
-
-    // Roster-FDTL sweep is now fully on-demand — no auto-kickoff on page
-    // load. Clients that need fresh findings (Legality Check dialog,
-    // Publish preflight) call `POST /crew-schedule/reevaluate-roster`
-    // explicitly. Mutation paths (assign/swap/delete) still trigger a
-    // server-side eval so individual edits stay accurate.
-    const rosterEvaluating = false
-
-    return {
-      pairings,
-      crew,
-      assignments,
-      uncrewed,
-      positions,
-      activities,
-      activityCodes,
-      activityGroups,
-      memos,
-      fdtl,
-      ruleSet,
-      crewIssues,
-      rosterEvaluating,
-      aircraftTypes,
-      tempBases,
-    }
+  // ── GET /crew-schedule/from-run/:runId ──────────────────────────────
+  // Returns the cached aggregator payload that the auto-roster
+  // orchestrator pre-built at solve completion. 404 if the cache is
+  // empty (TTL expired, server restarted, or run wasn't completed
+  // through the orchestrator). Frontend MUST fall back to the regular
+  // /crew-schedule on 404.
+  //
+  // Known limitation: cache is NOT invalidated on roster mutations.
+  // Once the user assigns/swaps/deletes anything, this cache is stale.
+  // Mutations naturally route the next read through the regular
+  // aggregator, which fixes the data without us having to wire
+  // invalidation through every mutation path.
+  app.get('/crew-schedule/from-run/:runId', async (req, reply) => {
+    const { runId } = req.params as { runId: string }
+    if (!runId) return reply.code(400).send({ error: 'runId required' })
+    // Cache lookup is operatorId-scoped — a mismatch returns null and
+    // we surface 404 just like an empty cache. NEVER serve a cached
+    // payload across tenants, even on runId collision.
+    const cached = getRosterRunPayload(runId, req.operatorId)
+    if (!cached) return reply.code(404).send({ error: 'cache miss' })
+    return cached
   })
 
   // GET /crew-schedule/roster-issues — lightweight poll endpoint. Client

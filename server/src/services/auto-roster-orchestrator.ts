@@ -16,6 +16,37 @@ import { Airport } from '../models/Airport.js'
 import { CrewPosition } from '../models/CrewPosition.js'
 import { CrewComplement } from '../models/CrewComplement.js'
 import { loadSerializedRuleSet } from './fdtl-rule-set.js'
+import { setRosterRunPayload } from './roster-run-cache.js'
+import { buildCrewSchedulePayload, type CrewScheduleQuery } from '../routes/crew-schedule.js'
+
+/**
+ * Pre-build the /crew-schedule aggregator payload and cache it under the
+ * runId. Called fire-and-forget after a roster run completes so the
+ * post-solve "Loading roster data…" UI fetch hits a warm payload via
+ * GET /crew-schedule/from-run/:runId instead of paying the full
+ * aggregator cost (was 30+s for 133 crew × 1 month).
+ *
+ * Errors are swallowed — the regular /crew-schedule endpoint remains the
+ * source of truth, and the frontend falls back to it on cache miss.
+ */
+function prewarmRosterRunCache(
+  runId: string,
+  operatorId: string,
+  periodFrom: string,
+  periodTo: string,
+  filters: AutoRosterFilters,
+): void {
+  const q: CrewScheduleQuery = { from: periodFrom, to: periodTo }
+  if (filters.acTypes && filters.acTypes.length > 0) q.acType = filters.acTypes.join(',')
+  if (filters.base) q.base = filters.base
+  if (filters.position) q.position = filters.position
+  if (filters.crewGroupIds && filters.crewGroupIds.length > 0) q.crewGroup = filters.crewGroupIds.join(',')
+  void buildCrewSchedulePayload(operatorId, q)
+    .then((payload) => setRosterRunPayload(runId, operatorId, payload))
+    .catch((err) => {
+      console.warn(`[auto-roster] ${runId} cache prewarm failed: ${(err as Error).message}`)
+    })
+}
 
 export type AutoRosterFilters = {
   base?: string | null
@@ -1122,6 +1153,8 @@ export async function runAutoRoster(
       },
     )
 
+    prewarmRosterRunCache(runId, operatorId, periodFrom, periodTo, filters)
+
     onEvent({ event: 'committed', data: { assignedCount, rejectedCount, rejectionReasons } })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -2098,6 +2131,8 @@ async function runDaysOffAssignment(
 
     await AutoRosterRun.updateOne({ _id: runId }, { status: 'completed', completedAt: now(), stats, updatedAt: now() })
 
+    if (!chained) prewarmRosterRunCache(runId, operatorId, periodFrom, periodTo, filters)
+
     onEvent({ event: 'committed', data: { assignedCount: inserted, rejectedCount: 0 } })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -2541,6 +2576,8 @@ async function runStandbyAssignment(
     }
 
     await AutoRosterRun.updateOne({ _id: runId }, { status: 'completed', completedAt: now(), stats, updatedAt: now() })
+
+    if (!chained) prewarmRosterRunCache(runId, operatorId, periodFrom, periodTo, filters)
 
     onEvent({ event: 'committed', data: { assignedCount: inserted, rejectedCount: 0 } })
   } catch (err) {

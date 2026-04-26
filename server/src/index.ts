@@ -72,6 +72,18 @@ import { loadOurAirportsData, startAutoRefresh } from './data/ourairports-cache.
 
 const port = env.PORT
 
+// Survive stray promise rejections + sync throws from background jobs.
+// Logging only — Fastify's own error handler still owns the request path.
+// Without these, any unhandled rejection (Atlas blip, fire-and-forget,
+// EventSource cleanup) crashes the whole process.
+process.on('unhandledRejection', (reason) => {
+  const msg = reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)
+  console.error('[unhandledRejection]', msg)
+})
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err.stack ?? err.message)
+})
+
 async function main(): Promise<void> {
   const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 /* 10MB */ })
 

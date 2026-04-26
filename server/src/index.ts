@@ -223,9 +223,45 @@ async function main(): Promise<void> {
     console.error('  SBY color backfill error:', (e as Error).message)
   }
 
-  // Start
-  await app.listen({ port, host: '0.0.0.0' })
+  // Start — retry on EADDRINUSE because tsx watch / turbo restarts can
+  // race with the previous child releasing the socket on Windows (where
+  // SO_REUSEADDR doesn't behave like Linux). Without this, half of all
+  // hot-reloads die with "Fatal: listen EADDRINUSE :3002".
+  const maxListenAttempts = 8
+  let listenDelay = 500
+  for (let attempt = 1; attempt <= maxListenAttempts; attempt++) {
+    try {
+      await app.listen({ port, host: '0.0.0.0' })
+      break
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (code !== 'EADDRINUSE' || attempt === maxListenAttempts) throw err
+      console.warn(`[listen] port ${port} busy, retry ${attempt}/${maxListenAttempts} in ${listenDelay}ms`)
+      await new Promise((r) => setTimeout(r, listenDelay))
+      listenDelay = Math.min(listenDelay * 2, 5_000)
+    }
+  }
   console.log(`✓ Server listening on port ${port}`)
+
+  // Graceful shutdown — drain in-flight requests + close socket BEFORE the
+  // process exits so the next tsx-watch child can bind cleanly. tsx
+  // forwards SIGTERM on file change; without this handler the socket stays
+  // in TIME_WAIT and the new child gets EADDRINUSE.
+  let shuttingDown = false
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) return
+    shuttingDown = true
+    console.log(`[shutdown] ${signal} received — closing server`)
+    try {
+      await app.close()
+    } catch (e) {
+      console.error('[shutdown] app.close error:', (e as Error).message)
+    }
+    process.exit(0)
+  }
+  process.on('SIGINT', () => void shutdown('SIGINT'))
+  process.on('SIGTERM', () => void shutdown('SIGTERM'))
+  process.on('SIGHUP', () => void shutdown('SIGHUP'))
 
   // Live weather polling — fetches METAR observations for monitored airports every ~15 min.
   startWeatherPoll()

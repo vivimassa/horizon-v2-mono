@@ -225,10 +225,27 @@ export function CrewScheduleShell() {
             s.selectActivity(null)
             return
           }
+          let serverGone = true
           try {
             await api.deleteCrewActivity(id)
           } catch (err) {
-            console.error('Failed to delete activity:', err)
+            const status = (err as { status?: number })?.status
+            // 404 = already deleted on server (e.g. previous click succeeded
+            // but the reconcile that follows it silently failed). Treat as
+            // success and let the optimistic strip below clear the bar.
+            if (status !== 404) {
+              serverGone = false
+              console.error('Failed to delete activity:', err)
+            }
+          }
+          if (serverGone) {
+            // Optimistic local strip — guarantees the bar disappears even
+            // when the follow-up reconcile fails (server bouncing / network
+            // blip). Reconcile still fires to catch any cascading changes
+            // (FDTL re-eval, pairing crewCounts, etc.).
+            useCrewScheduleStore.setState((st) => ({
+              activities: st.activities.filter((a) => a._id !== id),
+            }))
           }
           s.selectActivity(null)
           safeReconcile()
@@ -239,10 +256,20 @@ export function CrewScheduleShell() {
             s.selectAssignment(null)
             return
           }
+          let serverGone = true
           try {
             await api.deleteCrewAssignment(id)
           } catch (err) {
-            console.error('Failed to delete assignment:', err)
+            const status = (err as { status?: number })?.status
+            if (status !== 404) {
+              serverGone = false
+              console.error('Failed to delete assignment:', err)
+            }
+          }
+          if (serverGone) {
+            useCrewScheduleStore.setState((st) => ({
+              assignments: st.assignments.filter((a) => a._id !== id),
+            }))
           }
           s.selectAssignment(null)
           safeReconcile()

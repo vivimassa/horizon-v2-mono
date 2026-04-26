@@ -292,16 +292,27 @@ export function CrewScheduleContextMenu({ onAfterMutate }: Props) {
                   return
                 }
                 setBusy(true)
+                let serverGone = true
                 try {
                   await api.deleteCrewAssignment(menu.targetId)
-                  selectAssignment(null)
-                  onAfterMutate()
                 } catch (err) {
-                  console.error('Failed to unassign crew:', err)
-                } finally {
-                  setBusy(false)
-                  closeContextMenu()
+                  const status = (err as { status?: number })?.status
+                  if (status !== 404) {
+                    serverGone = false
+                    console.error('Failed to unassign crew:', err)
+                  }
                 }
+                if (serverGone) {
+                  // Optimistic local strip — see crew-schedule-shell.tsx
+                  // delete handler for full rationale.
+                  useCrewScheduleStore.setState((st) => ({
+                    assignments: st.assignments.filter((a) => a._id !== menu.targetId),
+                  }))
+                }
+                selectAssignment(null)
+                onAfterMutate()
+                setBusy(false)
+                closeContextMenu()
               },
             },
           ],

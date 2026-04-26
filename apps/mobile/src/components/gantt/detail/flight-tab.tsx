@@ -1,6 +1,9 @@
-import { View, Text } from 'react-native'
+import { View, Text, Pressable } from 'react-native'
+import { Pencil } from 'lucide-react-native'
+import { Icon } from '@skyhub/ui'
 import type { GanttFlight } from '@skyhub/types'
 import { useAppTheme } from '../../../../providers/ThemeProvider'
+import { useMobileGanttStore } from '../../../stores/use-mobile-gantt-store'
 import { Row, StatusPill, StatRow, StatTile, SectionLabel } from './detail-ui'
 import { aircraftDailyUtil, fmtBlock, fmtUtcDateTime, fmtUtcTime } from './detail-helpers'
 
@@ -11,6 +14,12 @@ interface Props {
 
 export function FlightTab({ flight, allFlights }: Props) {
   const { palette, isDark, accent } = useAppTheme()
+  const openMutationSheet = useMobileGanttStore((s) => s.openMutationSheet)
+  const closeDetailSheet = useMobileGanttStore((s) => s.closeDetailSheet)
+  const handleEdit = () => {
+    closeDetailSheet()
+    openMutationSheet({ kind: 'editFlight', flightId: flight.id })
+  }
 
   const blockMs = flight.staUtc - flight.stdUtc
   const util = flight.aircraftReg ? aircraftDailyUtil(allFlights, flight.aircraftReg, flight.operatingDate) : null
@@ -31,6 +40,23 @@ export function FlightTab({ flight, allFlights }: Props) {
           {flight.flightNumber}
         </Text>
         <StatusPill flight={flight} isDark={isDark} />
+        <View style={{ flex: 1 }} />
+        <Pressable
+          onPress={handleEdit}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            paddingHorizontal: 10,
+            paddingVertical: 7,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: accent,
+          }}
+        >
+          <Icon icon={Pencil} size="sm" color={accent} />
+          <Text style={{ fontSize: 13, fontWeight: '700', color: accent }}>Edit details</Text>
+        </Pressable>
       </View>
 
       {/* Route */}
@@ -50,7 +76,7 @@ export function FlightTab({ flight, allFlights }: Props) {
         <View style={{ flex: 1, alignItems: 'center', gap: 4 }}>
           <Text style={{ fontSize: 13, color: palette.textSecondary }}>{fmtBlock(flight.blockMinutes)}</Text>
           <View style={{ height: 1, width: '100%', backgroundColor: palette.border }} />
-          <Text style={{ fontSize: 11, color: palette.textTertiary }}>BLOCK</Text>
+          <Text style={{ fontSize: 13, color: palette.textTertiary }}>BLOCK</Text>
         </View>
         <Endpoint code={flight.arrStation} time={fmtUtcTime(flight.staUtc)} palette={palette} align="right" />
       </View>

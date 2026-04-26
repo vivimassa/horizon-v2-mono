@@ -678,10 +678,21 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
     name: 'Crew Tracking',
     description: 'Real-time crew tracking with list, Gantt, and map views',
     icon: 'Activity',
-    route: '/crew-ops/control/tracking',
+    // Parent route lands on the primary child (Check-In/Out).
+    route: '/crew-ops/control/tracking/check-in',
     parent_code: '4.1',
     module: 'workforce',
     level: 2,
+  },
+  {
+    code: '4.1.7.1',
+    name: 'Crew Check-In/Out',
+    description: 'Real-time crew check-in monitor with late / no-show tracking',
+    icon: 'UserCheck',
+    route: '/crew-ops/control/tracking/check-in',
+    parent_code: '4.1.7',
+    module: 'workforce',
+    level: 3,
   },
   {
     code: '4.1.8',

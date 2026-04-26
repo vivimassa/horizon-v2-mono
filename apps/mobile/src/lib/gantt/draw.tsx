@@ -6,13 +6,15 @@
 // shared layout (computed by @skyhub/logic) plus viewport bounds for culling.
 
 import { memo } from 'react'
-import { Group, Rect, RoundedRect, Text, Line, vec, type SkFont } from '@shopify/react-native-skia'
+import { Circle, Group, Path, Rect, RoundedRect, Text, Line, vec, type SkFont } from '@shopify/react-native-skia'
 import type { SharedValue } from 'react-native-reanimated'
 import { useDerivedValue } from 'react-native-reanimated'
 import type { BarLayout, RowLayout, TickMark, ROW_HEIGHT_LEVELS } from '@skyhub/types'
+import { SLOT_RISK_COLORS, MISSING_TIMES_FLAG_COLOR, getDisplayTimes } from '@skyhub/logic'
 
 const ROW_LABELS_WIDTH = 0 // labels live on a separate canvas; canvas content x=0 is timeline-relative
-const NOW_LINE_COLOR = '#ef4444'
+// XD danger red for the now-line (matches colors.status.danger).
+const NOW_LINE_COLOR = '#FF3B3B'
 
 interface ViewportBounds {
   scrollX: number
@@ -236,6 +238,250 @@ interface NowLineProps {
 export const NowLineLayer = memo(function NowLineLayer({ x, totalHeight }: NowLineProps) {
   if (x == null) return null
   return <Line p1={vec(x, 0)} p2={vec(x, totalHeight)} color={NOW_LINE_COLOR} strokeWidth={2} />
+})
+
+// ── TAT labels: minutes between consecutive bars on same row ──
+
+interface TatProps {
+  bars: BarLayout[]
+  font: SkFont | null
+  isDark: boolean
+  viewport: ViewportBounds
+}
+
+export const TatLabelsLayer = memo(function TatLabelsLayer({ bars, font, isDark, viewport }: TatProps) {
+  if (!font) return null
+  const color = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)'
+  // Group bars by row, sort by x within row
+  const byRow = new Map<number, BarLayout[]>()
+  for (const b of bars) {
+    const list = byRow.get(b.row) ?? []
+    list.push(b)
+    byRow.set(b.row, list)
+  }
+  const out: React.ReactElement[] = []
+  for (const rowBars of byRow.values()) {
+    if (rowBars.length < 2) continue
+    rowBars.sort((a, b) => a.x - b.x)
+    const firstY = rowBars[0].y
+    if (!inViewportY(firstY, rowBars[0].height, viewport)) continue
+    for (let i = 0; i < rowBars.length - 1; i++) {
+      const curr = rowBars[i]
+      const next = rowBars[i + 1]
+      const gap = next.x - (curr.x + curr.width)
+      if (gap < 25) continue
+      if (!inViewportX(curr.x + curr.width, gap, viewport)) continue
+      const tatMs = getDisplayTimes(next.flight).depMs - getDisplayTimes(curr.flight).arrMs
+      if (tatMs <= 0) continue
+      const tatMin = Math.round(tatMs / 60_000)
+      if (tatMin >= 180) continue
+      const label = `${String(Math.floor(tatMin / 60)).padStart(2, '0')}:${String(tatMin % 60).padStart(2, '0')}`
+      const labelW = font.measureText(label).width
+      const cx = curr.x + curr.width + gap / 2 - labelW / 2
+      const cy = curr.y + curr.height / 2 + 3
+      out.push(<Text key={`tat-${curr.flightId}`} x={cx} y={cy} text={label} font={font} color={color} />)
+    }
+  }
+  return <Group>{out}</Group>
+})
+
+// ── Slot risk lines: thin colored bar under flight bars ──
+
+interface SlotRiskProps {
+  bars: BarLayout[]
+  viewport: ViewportBounds
+}
+
+export const SlotRiskLayer = memo(function SlotRiskLayer({ bars, viewport }: SlotRiskProps) {
+  const LINE_H = 3
+  const LINE_GAP = 2
+  return (
+    <Group>
+      {bars.map((b) => {
+        const risk = b.flight.slotRiskLevel
+        if (!risk || risk === 'safe') return null
+        const color = SLOT_RISK_COLORS[risk]
+        if (!color) return null
+        if (!inViewportX(b.x, b.width, viewport)) return null
+        const lineY = b.y + b.height + LINE_GAP
+        if (!inViewportY(lineY, LINE_H, viewport)) return null
+        return (
+          <RoundedRect
+            key={`sr-${b.flightId}`}
+            x={b.x}
+            y={lineY}
+            width={b.width}
+            height={LINE_H}
+            r={LINE_H / 2}
+            color={color}
+          />
+        )
+      })}
+    </Group>
+  )
+})
+
+// ── Missing-times flags: orange triangular flags at top corners of bars missing OOOI ──
+
+interface MissingTimesProps {
+  bars: BarLayout[]
+  graceMins: number
+  /** Tick — pass a value that changes every 60s so the layer recomputes against current time. */
+  nowTick: number
+  viewport: ViewportBounds
+}
+
+export const MissingTimesLayer = memo(function MissingTimesLayer({
+  bars,
+  graceMins,
+  nowTick,
+  viewport,
+}: MissingTimesProps) {
+  // nowTick referenced so memoization invalidates each minute
+  void nowTick
+  const now = Date.now()
+  const graceMs = graceMins * 60_000
+  const FLAG_SIZE = 10
+  return (
+    <Group>
+      {bars.map((b) => {
+        if (!inViewportX(b.x, b.width, viewport)) return null
+        if (!inViewportY(b.y, b.height, viewport)) return null
+        const f = b.flight
+        const etdVal = f.etdUtc ?? Number.POSITIVE_INFINITY
+        const depThreshold = Math.min(f.stdUtc, etdVal) + graceMs
+        const depMissing = now >= depThreshold && (!f.atdUtc || !f.offUtc)
+        const etaVal = f.etaUtc ?? Number.POSITIVE_INFINITY
+        const arrThreshold = Math.min(f.staUtc, etaVal) + graceMs
+        const arrMissing = now >= arrThreshold && (!f.ataUtc || !f.onUtc)
+        if (!depMissing && !arrMissing) return null
+        const fs = Math.max(4, Math.min(FLAG_SIZE, b.width / 2, b.height))
+        const items: React.ReactElement[] = []
+        if (depMissing) {
+          const path = `M ${b.x} ${b.y} L ${b.x + fs} ${b.y} L ${b.x} ${b.y + fs} Z`
+          items.push(<Path key={`mtL-${b.flightId}`} path={path} color={MISSING_TIMES_FLAG_COLOR} />)
+        }
+        if (arrMissing) {
+          const rx = b.x + b.width
+          const path = `M ${rx} ${b.y} L ${rx - fs} ${b.y} L ${rx} ${b.y + fs} Z`
+          items.push(<Path key={`mtR-${b.flightId}`} path={path} color={MISSING_TIMES_FLAG_COLOR} />)
+        }
+        return <Group key={`mt-${b.flightId}`}>{items}</Group>
+      })}
+    </Group>
+  )
+})
+
+// ── Drag ghost layer: floating translucent copies of dragged bars ──
+
+interface DragGhostProps {
+  bars: BarLayout[]
+  draggedIds: Set<string>
+  deltaX: SharedValue<number>
+  deltaY: SharedValue<number>
+  active: SharedValue<boolean>
+  accent: string
+}
+
+export const DragGhostLayer = memo(function DragGhostLayer({
+  bars,
+  draggedIds,
+  deltaX,
+  deltaY,
+  active,
+  accent,
+}: DragGhostProps) {
+  if (draggedIds.size === 0) return null
+  return (
+    <Group>
+      {bars.map((b) => {
+        if (!draggedIds.has(b.flightId)) return null
+        return (
+          <DragGhostBar
+            key={`gh-${b.flightId}`}
+            bar={b}
+            deltaX={deltaX}
+            deltaY={deltaY}
+            active={active}
+            accent={accent}
+          />
+        )
+      })}
+    </Group>
+  )
+})
+
+function DragGhostBar({
+  bar,
+  deltaX,
+  deltaY,
+  active,
+  accent,
+}: {
+  bar: BarLayout
+  deltaX: SharedValue<number>
+  deltaY: SharedValue<number>
+  active: SharedValue<boolean>
+  accent: string
+}) {
+  const transform = useDerivedValue(() => {
+    'worklet'
+    return [{ translateX: active.value ? deltaX.value : 0 }, { translateY: active.value ? deltaY.value : 0 }]
+  })
+  const opacity = useDerivedValue(() => {
+    'worklet'
+    return active.value ? 0.55 : 0
+  })
+  return (
+    <Group transform={transform} opacity={opacity}>
+      <RoundedRect x={bar.x} y={bar.y} width={bar.width} height={bar.height} r={4} color={bar.color} />
+      <RoundedRect
+        x={bar.x - 1.5}
+        y={bar.y - 1.5}
+        width={bar.width + 3}
+        height={bar.height + 3}
+        r={5}
+        color={accent}
+        style="stroke"
+        strokeWidth={2}
+      />
+    </Group>
+  )
+}
+
+// ── Delay markers: red dot + minutes text above bars with considerable delay ──
+
+interface DelaysProps {
+  bars: BarLayout[]
+  considerableMins: number
+  font: SkFont | null
+  viewport: ViewportBounds
+}
+
+export const DelaysLayer = memo(function DelaysLayer({ bars, considerableMins, font, viewport }: DelaysProps) {
+  const DOT = 4
+  const color = '#FF3B3B'
+  return (
+    <Group>
+      {bars.map((b) => {
+        const delays = b.flight.delays
+        if (!delays || delays.length === 0) return null
+        const total = delays.reduce((s, d) => s + (d.minutes ?? 0), 0)
+        if (total < considerableMins) return null
+        if (!inViewportX(b.x, b.width, viewport)) return null
+        if (!inViewportY(b.y - DOT, b.height + DOT, viewport)) return null
+        const cx = b.x + DOT + 1
+        const cy = b.y - DOT - 1
+        const label = `+${total}`
+        return (
+          <Group key={`dl-${b.flightId}`}>
+            <Circle cx={cx} cy={cy} r={DOT} color={color} />
+            {font && <Text x={cx + DOT + 3} y={cy + 4} text={label} font={font} color={color} />}
+          </Group>
+        )
+      })}
+    </Group>
+  )
 })
 
 export { ROW_LABELS_WIDTH }

@@ -1,5 +1,5 @@
-import { ComingSoon } from '@/components/coming-soon'
+import { redirect } from 'next/navigation'
 
 export default function Page() {
-  return <ComingSoon />
+  redirect('/crew-ops/control/tracking/check-in')
 }

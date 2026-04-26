@@ -6,6 +6,7 @@ import { CrewActivity } from '../models/CrewActivity.js'
 import { CrewMemo } from '../models/CrewMemo.js'
 import { CrewSchedulePublication } from '../models/CrewSchedulePublication.js'
 import { Pairing } from '../models/Pairing.js'
+import { FlightInstance } from '../models/FlightInstance.js'
 import { CrewMember } from '../models/CrewMember.js'
 import { CrewPosition } from '../models/CrewPosition.js'
 import { ActivityCode, ActivityCodeGroup } from '../models/ActivityCode.js'
@@ -282,6 +283,37 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
         CrewMemo.find(memoFilter).lean(),
         CrewComplement.find({ operatorId, isActive: true }).lean(),
       ])
+
+    // Overlay current tail (registration) onto each pairing leg by joining
+    // legs[].flightId → FlightInstance._id. Pairings cache `tailNumber` at
+    // creation time; pool-side aircraft assignments made AFTER pairing save
+    // never propagate back. Re-resolving here means the planner always sees
+    // the live tail, no migration required. Falls back to the cached value
+    // when no instance is found.
+    const allFlightIds = new Set<string>()
+    for (const p of pairings) {
+      for (const l of (p.legs ?? []) as Array<{ flightId?: string | null }>) {
+        if (l.flightId) allFlightIds.add(l.flightId)
+      }
+    }
+    if (allFlightIds.size > 0) {
+      const instances = await FlightInstance.find(
+        { operatorId, _id: { $in: Array.from(allFlightIds) } },
+        { _id: 1, tail: 1 },
+      ).lean()
+      const tailById = new Map<string, string | null>()
+      for (const inst of instances) {
+        const reg = (inst as { tail?: { registration?: string | null } | null }).tail?.registration ?? null
+        tailById.set(inst._id as string, reg)
+      }
+      for (const p of pairings) {
+        for (const l of (p.legs ?? []) as Array<{ flightId?: string | null; tailNumber?: string | null }>) {
+          if (!l.flightId) continue
+          const live = tailById.get(l.flightId)
+          if (live) l.tailNumber = live
+        }
+      }
+    }
 
     // Recompute assignment windows from fresh pairing data. Older writes
     // that used the legs[0].staUtcIso-90 fallback stored bogus startUtcIso
@@ -1183,6 +1215,73 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       }
       throw err
     }
+  })
+
+  // ── 4.1.7.1 Crew Check-In/Out ─────────────────────────────────────
+  //   POST /crew-schedule/assignments/:id/check-in   { at?: number }
+  //   POST /crew-schedule/assignments/:id/check-out  { at?: number }
+  //   POST /crew-schedule/assignments/:id/undo-check-in
+  // Toggle the check-in/out timestamps on a single assignment. `at`
+  // defaults to server now() in UTC ms. Multi-tenant guarded via
+  // operatorId from the auth middleware. ───────────────────────────
+  const checkInSchema = z.object({ at: z.number().int().nonnegative().optional() }).strict()
+
+  app.post('/crew-schedule/assignments/:id/check-in', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const parsed = checkInSchema.safeParse(req.body ?? {})
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues })
+    const at = parsed.data.at ?? Date.now()
+    const operatorId = req.operatorId
+    const userId = req.userId ?? null
+
+    const updated = await CrewAssignment.findOneAndUpdate(
+      { _id: id, operatorId },
+      {
+        $set: {
+          checkInUtcMs: at,
+          checkedInByUserId: userId,
+          updatedAt: new Date().toISOString(),
+        },
+      },
+      { new: true },
+    ).lean()
+    if (!updated) return reply.code(404).send({ error: 'Assignment not found' })
+    return updated
+  })
+
+  app.post('/crew-schedule/assignments/:id/check-out', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const parsed = checkInSchema.safeParse(req.body ?? {})
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues })
+    const at = parsed.data.at ?? Date.now()
+    const operatorId = req.operatorId
+
+    const updated = await CrewAssignment.findOneAndUpdate(
+      { _id: id, operatorId },
+      { $set: { checkOutUtcMs: at, updatedAt: new Date().toISOString() } },
+      { new: true },
+    ).lean()
+    if (!updated) return reply.code(404).send({ error: 'Assignment not found' })
+    return updated
+  })
+
+  app.post('/crew-schedule/assignments/:id/undo-check-in', async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const operatorId = req.operatorId
+    const updated = await CrewAssignment.findOneAndUpdate(
+      { _id: id, operatorId },
+      {
+        $set: {
+          checkInUtcMs: null,
+          checkOutUtcMs: null,
+          checkedInByUserId: null,
+          updatedAt: new Date().toISOString(),
+        },
+      },
+      { new: true },
+    ).lean()
+    if (!updated) return reply.code(404).send({ error: 'Assignment not found' })
+    return updated
   })
 
   // ── POST /crew-schedule/assignments/swap — atomic swap of crew on

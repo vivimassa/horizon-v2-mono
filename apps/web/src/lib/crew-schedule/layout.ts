@@ -37,6 +37,9 @@ export interface AssignmentBarLayout {
   status: CrewAssignmentRef['status']
   fdtlStatus: PairingRef['fdtlStatus']
   hasDeadhead: boolean
+  /** 4.1.7.1 — actual check-in timestamp (UTC ms) when crew has reported.
+   *  Drives a small green tick badge in the canvas. */
+  checkInUtcMs?: number | null
   /** True when the pairing has at least one 'pairing'-scope memo. */
   hasMemo?: boolean
   /** Diff vs published snapshot (AIMS F10). Unset when overlay is off. */
@@ -395,6 +398,7 @@ export function buildCrewScheduleLayout(input: BuildLayoutInput): CrewScheduleLa
       status: a.status,
       fdtlStatus: pairing.fdtlStatus,
       hasDeadhead: pairing.legs.some((l) => l.isDeadhead),
+      checkInUtcMs: a.checkInUtcMs ?? null,
       hasMemo: pairingsWithMemo.has(a.pairingId),
       diff,
       color: pairing.aircraftTypeIcao ? acTypeColorMap.get(pairing.aircraftTypeIcao) : undefined,

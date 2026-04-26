@@ -66,6 +66,17 @@ export * from './utils/gantt-time'
 export * from './utils/gantt-colors'
 export * from './utils/gantt-hit-testing'
 export * from './utils/gantt-layout'
+export * as TailOptimizer from './utils/tail-optimizer'
+export { runOptimizer, serializeResult, generateRunName } from './utils/tail-optimizer'
+export type {
+  OptimizerPreset,
+  OptimizerMethod,
+  OptimizerConfig,
+  OptimizerProgress,
+  OptimizerStats,
+  TypeBreakdown,
+  OptimizerResult,
+} from './utils/tail-optimizer'
 export * from './utils/solver-stream'
 export * from './utils/advisor-summary-builder'
 

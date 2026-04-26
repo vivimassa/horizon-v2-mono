@@ -49,6 +49,14 @@ const crewAssignmentSchema = new Schema(
 
     notes: { type: String, default: null },
 
+    /** 4.1.7.1 Crew Check-In/Out — actual report timestamp (UTC ms).
+     *  Null = crew has not yet reported. Set via POST /assignments/:id/check-in. */
+    checkInUtcMs: { type: Number, default: null },
+    /** Optional check-out timestamp for ground duties / standby release. */
+    checkOutUtcMs: { type: Number, default: null },
+    /** User _id of the crew controller who performed the check-in. */
+    checkedInByUserId: { type: String, default: null },
+
     createdAt: { type: String, default: () => new Date().toISOString() },
     updatedAt: { type: String, default: () => new Date().toISOString() },
   },

@@ -1087,6 +1087,67 @@ export const api = {
       body: JSON.stringify({ operatorId, flightIds }),
     }),
 
+  ganttCancelFlights: (operatorId: string, flightIds: string[]) =>
+    request<{ removed: number }>('/gantt/remove-from-date', {
+      method: 'PATCH',
+      body: JSON.stringify({ operatorId, flightIds }),
+    }),
+
+  ganttFetchCancelImpact: (operatorId: string, flightIds: string[]) =>
+    request<{
+      impacts: Array<{
+        seriesId: string
+        airportIata: string
+        seasonCode: string
+        currentUtilizationPct: number
+        projectedUtilizationPct: number
+        cancelledCount: number
+      }>
+    }>('/gantt/cancel-impact', {
+      method: 'POST',
+      body: JSON.stringify({ operatorId, flightIds }),
+    }),
+
+  ganttSwapFlights: (
+    operatorId: string,
+    aFlightIds: string[],
+    aRegistration: string | null,
+    bFlightIds: string[],
+    bRegistration: string | null,
+  ) =>
+    request<{ updated: number }>('/gantt/swap', {
+      method: 'PATCH',
+      body: JSON.stringify({ operatorId, aFlightIds, aRegistration, bFlightIds, bRegistration }),
+    }),
+
+  ganttRescheduleFlight: (
+    flightInstanceId: string,
+    body: { newEtdUtc: number; newEtaUtc?: number | null; reason?: string },
+  ) =>
+    request<{ success: boolean }>(`/gantt/flight-instance/${encodeURIComponent(flightInstanceId)}/reschedule`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  ganttDivertFlight: (
+    flightInstanceId: string,
+    body: {
+      kind: 'divert' | 'airReturn' | 'rampReturn' | 'none'
+      divertAirportIcao?: string | null
+      ataUtc?: number | null
+      etaUtc?: number | null
+      reasonCode?: string | null
+      reasonText?: string | null
+      nextFlightNumber?: string | null
+      nextEtdUtc?: number | null
+      doNotGenerateNextFlight?: boolean
+    },
+  ) =>
+    request<{ success: boolean }>(`/gantt/flight-instance/${encodeURIComponent(flightInstanceId)}/disruption`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
   getAirports: (params?: { search?: string; crewBase?: boolean; country?: string }) => {
     let path = '/airports?active=true'
     if (params?.search) path += `&search=${encodeURIComponent(params.search)}`
@@ -2632,6 +2693,42 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  // ── 4.1.7.1 Crew Check-In/Out Configuration ──
+  getOperatorCheckInConfig: (operatorId: string) =>
+    request<OperatorCheckInConfig | null>(
+      `/operator-check-in-config?operatorId=${encodeURIComponent(operatorId)}`,
+    ).catch((err) => {
+      if (err instanceof Error && /^API 404/.test(err.message)) return null
+      throw err
+    }),
+
+  upsertOperatorCheckInConfig: (body: OperatorCheckInConfigUpsert) =>
+    request<OperatorCheckInConfig>('/operator-check-in-config', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  // ── 4.1.7.1 Crew Messages ──
+  createCrewMessage: (body: CrewMessageCreateInput) =>
+    request<CrewMessageRef>('/crew-messages', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  getCrewMessages: (params: { pairingId?: string; crewId?: string; limit?: number }) => {
+    const qs = new URLSearchParams()
+    if (params.pairingId) qs.set('pairingId', params.pairingId)
+    if (params.crewId) qs.set('crewId', params.crewId)
+    if (params.limit) qs.set('limit', String(params.limit))
+    return request<CrewMessageRef[]>(`/crew-messages?${qs.toString()}`)
+  },
+
+  ackCrewMessage: (id: string, body: CrewMessageAckInput) =>
+    request<CrewMessageRef>(`/crew-messages/${encodeURIComponent(id)}/ack`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
   // ── 4.1.8.1 Crew Hotel Management — bookings ──
   getHotelBookings: (
     params: {
@@ -3572,6 +3669,27 @@ export const api = {
       method: 'DELETE',
     }),
 
+  /** 4.1.7.1 Crew Check-In — stamp the assignment with the report time
+   *  (defaults to server now). Returns the updated assignment row. */
+  checkInCrewAssignment: (id: string, body: { at?: number } = {}) =>
+    request<CrewAssignmentRef>(`/crew-schedule/assignments/${encodeURIComponent(id)}/check-in`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  /** Optional check-out for ground duties / standby release. */
+  checkOutCrewAssignment: (id: string, body: { at?: number } = {}) =>
+    request<CrewAssignmentRef>(`/crew-schedule/assignments/${encodeURIComponent(id)}/check-out`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  /** Reverse a check-in (clears check-in/out timestamps). */
+  undoCheckInCrewAssignment: (id: string) =>
+    request<CrewAssignmentRef>(`/crew-schedule/assignments/${encodeURIComponent(id)}/undo-check-in`, {
+      method: 'POST',
+    }),
+
   /** Atomic swap of crew on two assignments (AIMS §4.2 Swap duties).
    *  Server revalidates eligibility both ways and rolls back on conflict. */
   swapCrewAssignments: (data: { assignmentAId: string; assignmentBId: string }) =>
@@ -3701,6 +3819,11 @@ export interface CrewAssignmentRef {
   legalityResult: unknown
   lastLegalityCheckUtcIso: string | null
   notes: string | null
+  /** 4.1.7.1 Crew Check-In/Out — actual report timestamp (UTC ms).
+   *  Null when the crew has not yet reported. */
+  checkInUtcMs?: number | null
+  checkOutUtcMs?: number | null
+  checkedInByUserId?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -4380,6 +4503,108 @@ export interface OperatorHotacConfigUpsert {
   checkIn?: Partial<HotacCheckInConfig>
   transport?: Partial<HotacTransportConfig>
   email?: Partial<HotacEmailConfig>
+}
+
+// ── 4.1.7.1 Crew Check-In/Out Configuration ──
+
+export interface CheckInBasicConfig {
+  scope: 'pairing-start' | 'every-duty' | 'free'
+  earliestCheckInMinutesBeforeRrt: number
+}
+export interface CheckInLateInfoConfig {
+  lateAfterMinutes: number
+  veryLateAfterMinutes: number
+  standbyLateAfterMinutes: number
+  noShowAfterMinutes: number
+}
+export interface CheckInDelayedConfig {
+  flagWhenRrtNotAmended: boolean
+  minimumDelayMinutes: number
+}
+export interface CheckInGroundDutiesConfig {
+  requireCheckInFor: string[]
+  suppressOthersInPairing: boolean
+}
+export interface CheckInPrecheckConfig {
+  windowMinutesBeforeRrt: number
+  lateThresholdMinutesBeforeRrt: number
+}
+
+export interface OperatorCheckInConfig {
+  _id: string
+  operatorId: string
+  basic: CheckInBasicConfig
+  lateInfo: CheckInLateInfoConfig
+  delayed: CheckInDelayedConfig
+  groundDuties: CheckInGroundDutiesConfig
+  precheckIn: CheckInPrecheckConfig
+  createdAt: string
+  updatedAt: string
+}
+
+export interface OperatorCheckInConfigUpsert {
+  operatorId: string
+  basic?: Partial<CheckInBasicConfig>
+  lateInfo?: Partial<CheckInLateInfoConfig>
+  delayed?: Partial<CheckInDelayedConfig>
+  groundDuties?: Partial<CheckInGroundDutiesConfig>
+  precheckIn?: Partial<CheckInPrecheckConfig>
+}
+
+// ── 4.1.7.1 Crew Messages ──
+
+export type CrewMessageDeliveryStatus = 'queued' | 'delivered' | 'read' | 'failed'
+
+export interface CrewMessageDelivery {
+  crewId: string
+  status: CrewMessageDeliveryStatus
+  deliveredAtUtcMs: number | null
+  readAtUtcMs: number | null
+  error: string | null
+}
+
+export type CrewMessageChannel = 'inApp' | 'sms' | 'email'
+
+export interface CrewMessageRef {
+  _id: string
+  operatorId: string
+  pairingId: string | null
+  senderUserId: string
+  recipientCrewIds: string[]
+  subject: string | null
+  body: string
+  channel: CrewMessageChannel
+  deliveries: CrewMessageDelivery[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CrewMessageCreateInput {
+  pairingId?: string | null
+  recipientCrewIds: string[]
+  subject?: string | null
+  body: string
+  channel?: CrewMessageChannel
+}
+
+export interface CrewMessageAckInput {
+  crewId: string
+  status: 'delivered' | 'read' | 'failed'
+  at?: number
+  error?: string | null
+}
+
+export const DEFAULT_CHECK_IN_CONFIG: Omit<OperatorCheckInConfig, '_id' | 'operatorId' | 'createdAt' | 'updatedAt'> = {
+  basic: { scope: 'pairing-start', earliestCheckInMinutesBeforeRrt: 12 * 60 },
+  lateInfo: {
+    lateAfterMinutes: 5,
+    veryLateAfterMinutes: 20,
+    standbyLateAfterMinutes: 5,
+    noShowAfterMinutes: 60,
+  },
+  delayed: { flagWhenRrtNotAmended: false, minimumDelayMinutes: 60 },
+  groundDuties: { requireCheckInFor: [], suppressOthersInPairing: false },
+  precheckIn: { windowMinutesBeforeRrt: 0, lateThresholdMinutesBeforeRrt: 240 },
 }
 
 // ── 4.1.8.1 HotelBooking ──

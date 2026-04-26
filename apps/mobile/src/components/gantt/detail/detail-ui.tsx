@@ -7,7 +7,7 @@ export function SectionLabel({ children }: { children: string }) {
   return (
     <Text
       style={{
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '700',
         letterSpacing: 0.6,
         textTransform: 'uppercase',
@@ -84,7 +84,7 @@ export function StatTile({
         gap: 4,
       }}
     >
-      <Text style={{ fontSize: 11, color: palette.textSecondary, letterSpacing: 0.5 }}>{label.toUpperCase()}</Text>
+      <Text style={{ fontSize: 13, color: palette.textSecondary, letterSpacing: 0.5 }}>{label.toUpperCase()}</Text>
       <Text
         style={{
           fontSize: 18,
@@ -110,17 +110,18 @@ export function StatusPill({ flight, isDark }: { flight: GanttFlight; isDark: bo
         backgroundColor: bg,
       }}
     >
-      <Text style={{ fontSize: 11, fontWeight: '700', color: fg, letterSpacing: 0.5 }}>{label}</Text>
+      <Text style={{ fontSize: 13, fontWeight: '700', color: fg, letterSpacing: 0.5 }}>{label}</Text>
     </View>
   )
 }
 
 function statusStyle(f: GanttFlight, isDark: boolean): { bg: string; fg: string; label: string } {
-  if (f.ataUtc) return { bg: 'rgba(107,114,128,0.18)', fg: isDark ? '#d1d5db' : '#374151', label: 'COMPLETED' }
-  if (f.atdUtc) return { bg: 'rgba(34,197,94,0.18)', fg: '#16a34a', label: 'AIRBORNE' }
-  if (f.status === 'cancelled') return { bg: 'rgba(220,38,38,0.18)', fg: '#dc2626', label: 'CANCELLED' }
+  // All colors map to XD semantic palette (colors.status.*).
+  if (f.ataUtc) return { bg: 'rgba(143,144,166,0.18)', fg: isDark ? '#8F90A6' : '#555770', label: 'COMPLETED' }
+  if (f.atdUtc) return { bg: 'rgba(6,194,112,0.18)', fg: '#06C270', label: 'AIRBORNE' }
+  if (f.status === 'cancelled') return { bg: 'rgba(255,59,59,0.18)', fg: '#FF3B3B', label: 'CANCELLED' }
   if (f.status === 'suspended') return { bg: 'rgba(143,144,166,0.18)', fg: '#8F90A6', label: 'SUSPENDED' }
-  if (f.status === 'active' && f.aircraftReg) return { bg: 'rgba(22,163,74,0.18)', fg: '#16a34a', label: 'ACTIVE' }
-  if (f.status === 'active') return { bg: 'rgba(217,119,6,0.18)', fg: '#d97706', label: 'UNASSIGNED' }
-  return { bg: 'rgba(37,99,235,0.18)', fg: '#2563eb', label: f.status.toUpperCase() }
+  if (f.status === 'active' && f.aircraftReg) return { bg: 'rgba(6,194,112,0.18)', fg: '#06C270', label: 'ACTIVE' }
+  if (f.status === 'active') return { bg: 'rgba(255,136,0,0.18)', fg: '#FF8800', label: 'UNASSIGNED' }
+  return { bg: 'rgba(0,99,247,0.18)', fg: '#0063F7', label: f.status.toUpperCase() }
 }

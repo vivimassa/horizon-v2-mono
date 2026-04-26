@@ -3,7 +3,7 @@
 // size into the store.
 
 import { useEffect, useState } from 'react'
-import { View, useWindowDimensions, ActivityIndicator, Text } from 'react-native'
+import { View, useWindowDimensions, ActivityIndicator, Text, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { useAuthStore } from '@skyhub/ui'
@@ -16,9 +16,24 @@ import { GanttTimeHeader } from './gantt-time-header'
 import { GanttRowLabels } from './gantt-row-labels'
 import { GanttFilterSheet } from './gantt-filter-sheet'
 import { GanttDetailSheet } from './gantt-detail-sheet'
+import { GanttSearchSheet } from './gantt-search-sheet'
 import { SelectionActionBar } from './selection-action-bar'
+import { AssignSheet } from './dialogs/assign-sheet'
+import { CancelSheet } from './dialogs/cancel-sheet'
+import { RescheduleSheet } from './dialogs/reschedule-sheet'
+import { SwapSheet } from './dialogs/swap-sheet'
+import { DiversionSheet } from './dialogs/diversion-sheet'
+import { AddFlightSheet } from './dialogs/add-flight-sheet'
+import { GanttToast } from './gantt-toast'
+import { AircraftContextSheet } from './dialogs/aircraft-context-sheet'
+import { DayContextSheet } from './dialogs/day-context-sheet'
+import { FlightInformationSheet } from './flight-information-sheet'
+import { ScenarioSheet } from './dialogs/scenario-sheet'
+import { CompareSheet } from './dialogs/compare-sheet'
+import { OptimizerSheet } from './dialogs/optimizer-sheet'
 
-const ROW_LABELS_W = 96
+const ROW_LABELS_W_LANDSCAPE = 96
+const ROW_LABELS_W_PORTRAIT = 76
 const HEADER_H = 44
 
 export function GanttShell() {
@@ -42,8 +57,18 @@ export function GanttShell() {
     if (!periodCommitted) setFilterSheetOpen(true)
   }, [periodCommitted, setFilterSheetOpen])
 
+  const isTablet = win.width >= 768
+
+  // Phone default: zoom is 1D for legibility.
+  const setZoom = useMobileGanttStore((s) => s.setZoom)
+  useEffect(() => {
+    if (!isTablet && !periodCommitted) setZoom('1D')
+  }, [isTablet, periodCommitted, setZoom])
+
   // Layout dimensions excluding sticky header + row labels.
   const [shellSize, setShellSize] = useState({ width: win.width, height: win.height })
+  const isLandscape = win.width >= win.height
+  const ROW_LABELS_W = isLandscape ? ROW_LABELS_W_LANDSCAPE : ROW_LABELS_W_PORTRAIT
   const bodyWidth = Math.max(1, shellSize.width - ROW_LABELS_W)
   const bodyHeight = Math.max(1, shellSize.height - HEADER_H - 50 /* toolbar */)
 
@@ -74,7 +99,7 @@ export function GanttShell() {
 
             {/* Body row: row labels + canvas */}
             <View style={{ flex: 1, flexDirection: 'row' }}>
-              <GanttRowLabels height={bodyHeight} isDark={isDark} />
+              <GanttRowLabels height={bodyHeight} isDark={isDark} width={ROW_LABELS_W} />
               <GanttCanvas width={bodyWidth} height={bodyHeight} accent={accent} />
             </View>
 
@@ -97,30 +122,72 @@ export function GanttShell() {
               </View>
             )}
             {!loading && periodCommitted && flightsCount === 0 && !error && (
-              <CenterMsg color={palette.textSecondary} text="No flights in this period." />
+              <CenterMsg color={palette.textSecondary} text="No flights in this period." leftOffset={ROW_LABELS_W} />
             )}
-            {error && <CenterMsg color="#ef4444" text={error} />}
+            {error && <CenterMsg color="#ef4444" text={error} leftOffset={ROW_LABELS_W} />}
             {!periodCommitted && !loading && (
-              <CenterMsg color={palette.textSecondary} text="Pick a period and tap Go." />
+              <View
+                style={{
+                  position: 'absolute',
+                  top: HEADER_H,
+                  left: ROW_LABELS_W,
+                  right: 0,
+                  bottom: 0,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 14,
+                }}
+              >
+                <Text style={{ fontSize: 14, color: palette.textSecondary }}>Pick a period to load the schedule.</Text>
+                <Pressable
+                  onPress={() => setFilterSheetOpen(true)}
+                  style={{
+                    paddingHorizontal: 18,
+                    paddingVertical: 12,
+                    borderRadius: 10,
+                    backgroundColor: accent,
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Open filters</Text>
+                </Pressable>
+              </View>
             )}
           </View>
 
-          <SelectionActionBar />
+          {isTablet && <SelectionActionBar />}
           <GanttFilterSheet operatorId={operatorId} />
+          <GanttSearchSheet />
           <GanttDetailSheet />
+          {isTablet && (
+            <>
+              <AssignSheet />
+              <CancelSheet />
+              <RescheduleSheet />
+              <SwapSheet />
+              <DiversionSheet />
+              <AddFlightSheet />
+              <AircraftContextSheet />
+              <DayContextSheet />
+              <FlightInformationSheet />
+              <ScenarioSheet />
+              <CompareSheet />
+              <OptimizerSheet />
+            </>
+          )}
+          <GanttToast />
         </SafeAreaView>
       </GanttScrollProvider>
     </GestureHandlerRootView>
   )
 }
 
-function CenterMsg({ text, color }: { text: string; color: string }) {
+function CenterMsg({ text, color, leftOffset }: { text: string; color: string; leftOffset: number }) {
   return (
     <View
       style={{
         position: 'absolute',
         top: HEADER_H,
-        left: ROW_LABELS_W,
+        left: leftOffset,
         right: 0,
         bottom: 0,
         alignItems: 'center',

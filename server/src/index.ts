@@ -40,6 +40,8 @@ import { operatorMessagingConfigRoutes } from './routes/operator-messaging-confi
 import { operatorPairingConfigRoutes } from './routes/operator-pairing-config.js'
 import { operatorSchedulingConfigRoutes } from './routes/operator-scheduling-config.js'
 import { operatorHotacConfigRoutes } from './routes/operator-hotac-config.js'
+import { operatorCheckInConfigRoutes } from './routes/operator-check-in-config.js'
+import { crewMessageRoutes } from './routes/crew-messages.js'
 import { asmSsmConsumerRoutes } from './routes/asm-ssm-consumers.js'
 import { integrationPullRoutes } from './routes/integration-pull.js'
 import { mlRoutes } from './routes/ml.js'
@@ -151,6 +153,8 @@ async function main(): Promise<void> {
   await app.register(operatorPairingConfigRoutes)
   await app.register(operatorSchedulingConfigRoutes)
   await app.register(operatorHotacConfigRoutes)
+  await app.register(operatorCheckInConfigRoutes)
+  await app.register(crewMessageRoutes)
   await app.register(asmSsmConsumerRoutes)
   await app.register(integrationPullRoutes)
   await app.register(mlRoutes)

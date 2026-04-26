@@ -1,4 +1,4 @@
-export { api, setApiBaseUrl, getApiBaseUrl, setAuthCallbacks } from './client'
+export { api, setApiBaseUrl, getApiBaseUrl, setAuthCallbacks, DEFAULT_CHECK_IN_CONFIG } from './client'
 export type { LoginResponse, RefreshResponse } from './client'
 export type {
   Flight,
@@ -228,6 +228,20 @@ export type {
   HotacTransportHubLocation,
   OperatorHotacConfig,
   OperatorHotacConfigUpsert,
+  // 4.1.7.1 Crew Check-In Configuration
+  CheckInBasicConfig,
+  CheckInLateInfoConfig,
+  CheckInDelayedConfig,
+  CheckInGroundDutiesConfig,
+  CheckInPrecheckConfig,
+  OperatorCheckInConfig,
+  OperatorCheckInConfigUpsert,
+  CrewMessageDeliveryStatus,
+  CrewMessageDelivery,
+  CrewMessageChannel,
+  CrewMessageRef,
+  CrewMessageCreateInput,
+  CrewMessageAckInput,
   // 4.1.8.1 HotelBooking
   HotelBookingStatus,
   HotelBookingDisruptionFlag,

@@ -1614,6 +1614,25 @@ function drawBar(
     ctx.fill()
   }
 
+  // 4.1.7.1 Crew Check-In indicator — green tick on the left side of
+  // bars whose assignment has been checked-in via /assignments/:id/check-in.
+  // Reads as "crew has reported" at a glance during day-of-ops.
+  if (bar.checkInUtcMs && bar.width >= 14 && bar.height >= 14) {
+    const cx = x + 6
+    const cy = y + bar.height - 6
+    ctx.fillStyle = '#06C270'
+    ctx.beginPath()
+    ctx.arc(cx, cy, 4, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = '#FFFFFF'
+    ctx.lineWidth = 1.4
+    ctx.beginPath()
+    ctx.moveTo(cx - 2, cy)
+    ctx.lineTo(cx - 0.5, cy + 1.5)
+    ctx.lineTo(cx + 2, cy - 1.5)
+    ctx.stroke()
+  }
+
   // Label
   if (bar.width >= 30) {
     ctx.font = '600 11px Inter, system-ui, sans-serif'

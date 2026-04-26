@@ -63,6 +63,10 @@ const crewAssignmentSchema = new Schema(
   { _id: false, timestamps: false, collection: 'crewAssignments' },
 )
 
+// Hot: 4.1.6 Crew Schedule aggregator + auto-roster history reads.
+//   CrewAssignment.find({ operatorId, scenarioId, status: { $ne: 'cancelled' },
+//                         startUtcIso: { $lte: ... }, endUtcIso: { $gte: ... } }).
+// `status` left out — $ne can't use an index efficiently anyway.
 crewAssignmentSchema.index({ operatorId: 1, scenarioId: 1, startUtcIso: 1, endUtcIso: 1 })
 crewAssignmentSchema.index({ operatorId: 1, crewId: 1, startUtcIso: 1 })
 crewAssignmentSchema.index({ operatorId: 1, pairingId: 1 })

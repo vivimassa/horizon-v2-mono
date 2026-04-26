@@ -6,6 +6,7 @@ import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
+import compress from '@fastify/compress'
 import jwt from '@fastify/jwt'
 import multipart from '@fastify/multipart'
 import fastifyStatic from '@fastify/static'
@@ -72,6 +73,18 @@ import { loadOurAirportsData, startAutoRefresh } from './data/ourairports-cache.
 
 const port = env.PORT
 
+// Survive stray promise rejections + sync throws from background jobs.
+// Logging only — Fastify's own error handler still owns the request path.
+// Without these, any unhandled rejection (Atlas blip, fire-and-forget,
+// EventSource cleanup) crashes the whole process.
+process.on('unhandledRejection', (reason) => {
+  const msg = reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)
+  console.error('[unhandledRejection]', msg)
+})
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err.stack ?? err.message)
+})
+
 async function main(): Promise<void> {
   const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 /* 10MB */ })
 
@@ -82,6 +95,14 @@ async function main(): Promise<void> {
 
   // Plugins
   await app.register(cors, { origin: env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN })
+  // gzip/deflate JSON responses > 1KB. Crew-schedule aggregator returns
+  // 5–30MB of JSON per request — compression typically shrinks it 10–20×
+  // and is the single biggest wire-time win for the Gantt cold load.
+  await app.register(compress, {
+    global: true,
+    threshold: 1024,
+    encodings: ['gzip', 'deflate'],
+  })
   await app.register(jwt, {
     secret: env.JWT_SECRET,
     // Browser EventSource can't set Authorization header — accept ?token= on
@@ -202,9 +223,45 @@ async function main(): Promise<void> {
     console.error('  SBY color backfill error:', (e as Error).message)
   }
 
-  // Start
-  await app.listen({ port, host: '0.0.0.0' })
+  // Start — retry on EADDRINUSE because tsx watch / turbo restarts can
+  // race with the previous child releasing the socket on Windows (where
+  // SO_REUSEADDR doesn't behave like Linux). Without this, half of all
+  // hot-reloads die with "Fatal: listen EADDRINUSE :3002".
+  const maxListenAttempts = 8
+  let listenDelay = 500
+  for (let attempt = 1; attempt <= maxListenAttempts; attempt++) {
+    try {
+      await app.listen({ port, host: '0.0.0.0' })
+      break
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (code !== 'EADDRINUSE' || attempt === maxListenAttempts) throw err
+      console.warn(`[listen] port ${port} busy, retry ${attempt}/${maxListenAttempts} in ${listenDelay}ms`)
+      await new Promise((r) => setTimeout(r, listenDelay))
+      listenDelay = Math.min(listenDelay * 2, 5_000)
+    }
+  }
   console.log(`✓ Server listening on port ${port}`)
+
+  // Graceful shutdown — drain in-flight requests + close socket BEFORE the
+  // process exits so the next tsx-watch child can bind cleanly. tsx
+  // forwards SIGTERM on file change; without this handler the socket stays
+  // in TIME_WAIT and the new child gets EADDRINUSE.
+  let shuttingDown = false
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) return
+    shuttingDown = true
+    console.log(`[shutdown] ${signal} received — closing server`)
+    try {
+      await app.close()
+    } catch (e) {
+      console.error('[shutdown] app.close error:', (e as Error).message)
+    }
+    process.exit(0)
+  }
+  process.on('SIGINT', () => void shutdown('SIGINT'))
+  process.on('SIGTERM', () => void shutdown('SIGTERM'))
+  process.on('SIGHUP', () => void shutdown('SIGHUP'))
 
   // Live weather polling — fetches METAR observations for monitored airports every ~15 min.
   startWeatherPoll()

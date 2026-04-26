@@ -3619,6 +3619,16 @@ export const api = {
     return request<CrewScheduleResponse>(`/crew-schedule?${qs.toString()}`)
   },
 
+  /** Fetch the cached aggregator payload pre-built by the auto-roster
+   *  orchestrator at solve completion. Returns a 404 (which `request`
+   *  surfaces as a thrown error) when the cache is cold — callers MUST
+   *  catch and fall back to `getCrewSchedule(...)` in that case.
+   *  Cache is bounded LRU with 1h TTL and is NOT invalidated on roster
+   *  mutations; once the user assigns/swaps/deletes anything the next
+   *  read should go through the regular aggregator. */
+  getCrewScheduleFromRun: (runId: string) =>
+    request<CrewScheduleResponse>(`/crew-schedule/from-run/${encodeURIComponent(runId)}`),
+
   /** Poll the background roster-FDTL sweep status for a window. Used
    *  by the crew-schedule store when the first aggregator response
    *  flagged `rosterEvaluating: true` — the client waits on this

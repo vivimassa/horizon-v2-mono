@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import calendar
+import os
 import time
 from typing import AsyncIterator
 
@@ -55,12 +56,80 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
 
     # ── Decision variables ─────────────────────────────────────────────────
     # x[c_idx][p_idx] = 1 iff crew c is assigned to pairing p
+    # Pre-filter: only create a var for (crew, pairing) pairs that the
+    # orchestrator already marked FDTL-legal in `request.allowed`. Constraints
+    # below all guard with `if (ci, pi) in x` so they short-circuit on
+    # excluded pairs. The orchestrator owns full legality (qualification,
+    # base, position, FDTL hard caps); the solver model adds the rest as
+    # CP-SAT constraints — never relies solely on the pre-filter.
     x: dict[tuple[int, int], cp_model.IntVar] = {}
     for ci, cid in enumerate(crew_ids):
         legal = allowed_set.get(cid, set())
         for pi, pid in enumerate(pairing_ids):
             if pid in legal:
                 x[(ci, pi)] = model.new_bool_var(f"x_{ci}_{pi}")
+
+    n_pairings = len(pairing_ids)
+    possible = len(crew_ids) * n_pairings
+    legal_count = len(x)
+    pct = (100 * legal_count / possible) if possible > 0 else 0
+    print(
+        f"[solver] pre-filter: {legal_count} legal of {possible} possible "
+        f"({pct:.1f}% kept) — {len(crew_ids)} crew × {n_pairings} pairings",
+        flush=True,
+    )
+
+    # ── Symmetry breaking on interchangeable crew ─────────────────────────
+    # Cabin runs frequently have dozens of FAs at the same base with identical
+    # qualification — CP-SAT would otherwise explore all permutations of these
+    # equivalent crew. Collapse the symmetry by enforcing lex ordering on the
+    # assignment vectors of crew within an equivalence class.
+    #
+    # Equivalence relation (conservative): two crew are equivalent iff they
+    # have (a) the same gender (gender objective discriminates), and (b) the
+    # EXACT same allowed pairing set. The allowed set is built upstream from
+    # base + position + qualification + FDTL pre-filter, so identical allowed
+    # sets imply identical legality from the solver's point of view. Anything
+    # the solver doesn't see (seniority, prior assignments) stays the
+    # orchestrator's concern.
+    sym_classes: dict[tuple, list[int]] = {}
+    for ci, cid in enumerate(crew_ids):
+        key = (
+            crew_by_id[cid].gender,
+            frozenset(allowed_set.get(cid, set())),
+        )
+        sym_classes.setdefault(key, []).append(ci)
+
+    sym_class_count = 0
+    sym_crew_count = 0
+    sym_constraints_added = 0
+    pi_sorted = list(range(n_pairings))
+    for key, members in sym_classes.items():
+        if len(members) < 2:
+            continue
+        # Lex chain itself becomes a perf cost on very large classes.
+        if len(members) > 200:
+            continue
+        sym_class_count += 1
+        sym_crew_count += len(members)
+        members_sorted = sorted(members, key=lambda c: crew_ids[c])
+        # Build per-crew assignment vector aligned to pairing index order.
+        # Slots without a decision var (illegal pair) are pinned to 0 via
+        # constants so all vectors have the same length for add_lex_lesseq.
+        zero = model.new_constant(0)
+        vectors = []
+        for ci in members_sorted:
+            vec = [x[(ci, pi)] if (ci, pi) in x else zero for pi in pi_sorted]
+            vectors.append(vec)
+        for prev_vec, curr_vec in zip(vectors, vectors[1:]):
+            model.add_lex_lesseq(prev_vec, curr_vec)
+            sym_constraints_added += 1
+    print(
+        f"[solver] symmetry-breaking: {sym_class_count} classes, "
+        f"{sym_crew_count} total crew in classes >1, "
+        f"{sym_constraints_added} constraints added",
+        flush=True,
+    )
 
     # ── Hard constraint 1: each pairing covered by at most 1 crew ─────────
     # (slack_p = 1 means pairing p is unassigned)
@@ -284,7 +353,15 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
                         soft_excess_terms.append((excess, weight))
 
     # ── Objective: weighted sum — priority approximated by weight ratios ──
-    COVERAGE_WEIGHT = 1_000_000
+    # Cockpit defaults to 1M (every missing seat is critical). Cabin runs may
+    # pass a lower value via coverage_weight_default so fairness/QoL terms can
+    # trade against marginal coverage on huge problems where 100% coverage is
+    # neither required by FDTL nor operationally critical.
+    COVERAGE_WEIGHT = (
+        int(request.coverage_weight_default)
+        if request.coverage_weight_default is not None and request.coverage_weight_default > 0
+        else 1_000_000
+    )
     BH_FAIRNESS_WEIGHT = 100
     GENDER_WEIGHT_SCALE = request.config.gender_balance_weight  # 0-100
 
@@ -418,8 +495,37 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
     # ── Solve with SSE progress callbacks ──────────────────────────────────
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = float(request.time_limit_sec)
-    solver.parameters.num_workers = 4
-    solver.parameters.log_search_progress = False
+    # Use all available CPU cores (was hard-capped at 4). CP-SAT scales nearly
+    # linearly with worker count up to physical-core count for portfolio search.
+    solver.parameters.num_workers = os.cpu_count() or 8
+    # Accept solutions within 2% of optimal — CP-SAT spends most of its time
+    # chasing the last 1-2% with no operational benefit (rosters are equivalent
+    # for crew). Pairs with the 30s no-improvement early stop below; first one
+    # to fire wins. Cabin runs may override (e.g. 0.05) for huge problems.
+    solver.parameters.relative_gap_limit = (
+        float(request.relative_gap_limit_override)
+        if request.relative_gap_limit_override is not None and request.relative_gap_limit_override > 0
+        else 0.02
+    )
+    # Toggle verbose CP-SAT search log via env for diagnostics. Off by default
+    # to keep server logs clean.
+    solver.parameters.log_search_progress = (
+        os.environ.get("AUTO_ROSTER_SOLVER_DEBUG") == "1"
+    )
+
+    # Optional LNS-only mode for huge problems where exact CP-SAT search
+    # struggles to find a first feasible quickly.
+    # CAVEATS:
+    # - LNS objective scores are heuristic — NOT comparable across runs.
+    #   Audit-log readers must understand a lower score from an LNS run does
+    #   not necessarily mean a "better" roster than a higher score from an
+    #   exact run.
+    # - LNS may fail to find ANY feasible solution on over-constrained
+    #   problems where exact CP-SAT would succeed. Use behind a flag.
+    lns_mode = bool(request.lns_only)
+    if lns_mode:
+        solver.parameters.use_lns_only = True
+        solver.parameters.num_search_workers = max(8, solver.parameters.num_workers)
 
     start_ts = time.monotonic()
 
@@ -537,6 +643,15 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
 
     elapsed_ms = int((time.monotonic() - start_ts) * 1000)
     status_name = solver.status_name(status)
+
+    # Always emit a one-line solver stats summary so we can read it from
+    # server logs and track perf regressions. Independent of debug log flag.
+    print(
+        f"[solver] mode={'lns' if lns_mode else 'exact'} status={status_name} "
+        f"elapsed_ms={elapsed_ms} branches={solver.NumBranches()} "
+        f"conflicts={solver.NumConflicts()} booleans={solver.NumBooleans()}",
+        flush=True,
+    )
 
     if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         assignments = []

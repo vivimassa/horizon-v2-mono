@@ -68,9 +68,13 @@ const pairingSchema = new Schema(
   { _id: false, timestamps: false, collection: 'pairings' },
 )
 
+// Hot: 4.1.6 Crew Schedule aggregator + auto-roster scope load.
+//   Pairing.find({ operatorId, scenarioId, endDate: { $gte: from }, startDate: { $lte: to } }).
+// Equality on (operatorId, scenarioId) prefix; first range column is startDate.
 pairingSchema.index({ operatorId: 1, scenarioId: 1, startDate: 1, endDate: 1 })
 pairingSchema.index({ operatorId: 1, pairingCode: 1 })
 pairingSchema.index({ 'legs.flightId': 1, 'legs.flightDate': 1 })
+// Used when the aggregator is called with ?baseAirport=… (filter panel).
 pairingSchema.index({ operatorId: 1, baseAirport: 1, startDate: 1 })
 
 export type PairingDoc = InferSchemaType<typeof pairingSchema>

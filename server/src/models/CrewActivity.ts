@@ -36,6 +36,8 @@ const crewActivitySchema = new Schema(
   { _id: false, timestamps: false, collection: 'crewActivities' },
 )
 
+// Hot: 4.1.6 Crew Schedule aggregator + auto-roster scope load.
+//   CrewActivity.find({ operatorId, scenarioId, startUtcIso, endUtcIso }).
 crewActivitySchema.index({ operatorId: 1, scenarioId: 1, startUtcIso: 1, endUtcIso: 1 })
 crewActivitySchema.index({ operatorId: 1, crewId: 1, startUtcIso: 1 })
 crewActivitySchema.index({ operatorId: 1, activityCodeId: 1 })

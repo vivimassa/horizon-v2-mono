@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "cross-env NODE_OPTIONS=--max-old-space-size=8192 tsx watch --clear-screen=false --ignore=uploads --ignore=dist --ignore=**/*.log src/index.ts",
+    "start:prod": "cross-env NODE_OPTIONS=--max-old-space-size=8192 node dist/index.js",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/ --ext .ts --max-warnings 9999",
@@ -22,6 +23,7 @@
     "migrate": "tsx src/migrate-from-supabase.ts"
   },
   "dependencies": {
+    "@fastify/compress": "^8.3.1",
     "@fastify/cors": "^10.0.0",
     "@fastify/jwt": "^9.0.0",
     "@fastify/multipart": "^9.4.0",
@@ -39,6 +41,7 @@
     "@skyhub/eslint-config": "*",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.10.0",
+    "cross-env": "^7.0.3",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }

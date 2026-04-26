@@ -16,6 +16,37 @@ import { Airport } from '../models/Airport.js'
 import { CrewPosition } from '../models/CrewPosition.js'
 import { CrewComplement } from '../models/CrewComplement.js'
 import { loadSerializedRuleSet } from './fdtl-rule-set.js'
+import { setRosterRunPayload } from './roster-run-cache.js'
+import { buildCrewSchedulePayload, type CrewScheduleQuery } from '../routes/crew-schedule.js'
+
+/**
+ * Pre-build the /crew-schedule aggregator payload and cache it under the
+ * runId. Called fire-and-forget after a roster run completes so the
+ * post-solve "Loading roster data…" UI fetch hits a warm payload via
+ * GET /crew-schedule/from-run/:runId instead of paying the full
+ * aggregator cost (was 30+s for 133 crew × 1 month).
+ *
+ * Errors are swallowed — the regular /crew-schedule endpoint remains the
+ * source of truth, and the frontend falls back to it on cache miss.
+ */
+function prewarmRosterRunCache(
+  runId: string,
+  operatorId: string,
+  periodFrom: string,
+  periodTo: string,
+  filters: AutoRosterFilters,
+): void {
+  const q: CrewScheduleQuery = { from: periodFrom, to: periodTo }
+  if (filters.acTypes && filters.acTypes.length > 0) q.acType = filters.acTypes.join(',')
+  if (filters.base) q.base = filters.base
+  if (filters.position) q.position = filters.position
+  if (filters.crewGroupIds && filters.crewGroupIds.length > 0) q.crewGroup = filters.crewGroupIds.join(',')
+  void buildCrewSchedulePayload(operatorId, q)
+    .then((payload) => setRosterRunPayload(runId, operatorId, payload))
+    .catch((err) => {
+      console.warn(`[auto-roster] ${runId} cache prewarm failed: ${(err as Error).message}`)
+    })
+}
 
 export type AutoRosterFilters = {
   base?: string | null
@@ -821,6 +852,18 @@ export async function runAutoRoster(
       },
     })
 
+    // Cabin-scale tuning. The CP-SAT solver scales worse than linearly with
+    // (crew × pairings); a cockpit run at 130 crew and a cabin run at 600
+    // crew are not the same problem class. When crew count crosses the
+    // cabin threshold, hand the solver a softer coverage weight, a looser
+    // gap limit, and (above the LNS threshold) flip to LNS-only search.
+    // Cockpit runs see no change — every override is an opt-in field on
+    // SolveRequest with cockpit-default fallback in the Python solver.
+    const CABIN_SCALE_THRESHOLD = parseInt(process.env.AUTO_ROSTER_CABIN_THRESHOLD ?? '200', 10)
+    const LNS_SCALE_THRESHOLD = parseInt(process.env.AUTO_ROSTER_LNS_THRESHOLD ?? '500', 10)
+    const isCabinScale = crew.length >= CABIN_SCALE_THRESHOLD
+    const useLns = crew.length >= LNS_SCALE_THRESHOLD
+
     const solverPayload = {
       run_id: runId,
       crew: crew.map((c) => ({
@@ -844,6 +887,16 @@ export async function runAutoRoster(
         qol_soft_rules: qolSoftRules,
       },
       time_limit_sec: timeLimitSec,
+      // Cabin-scale knobs (cockpit runs leave these off — solver defaults apply).
+      coverage_weight_default: isCabinScale ? 500_000 : undefined,
+      relative_gap_limit_override: isCabinScale ? 0.05 : undefined,
+      lns_only: useLns,
+    }
+    if (isCabinScale) {
+      console.log(
+        `[auto-roster] ${runId} cabin-scale tuning applied — crew=${crew.length} ` +
+          `coverage_weight=500000 gap_limit=0.05 lns_only=${useLns}`,
+      )
     }
 
     // ── 4. Call Python solver, proxy SSE events ────────────────────────────
@@ -1069,7 +1122,7 @@ export async function runAutoRoster(
     // After pairings + day-off + standby, any calendar day still blank for
     // a crew gets filled with OFF (legacy carrier) or SBY (LCC). Planner
     // sees the full picture instead of gaps.
-    let chainedGapFill: { inserted: number; code: string } | null = null
+    let chainedGapFill: { inserted: number; code: string; offFallbacks: number } | null = null
     if (!signal?.aborted) {
       onEvent({
         event: 'progress',
@@ -1101,6 +1154,7 @@ export async function runAutoRoster(
       standbyAirport: chainedStandby?.airportAssigned ?? 0,
       gapFillInserted: chainedGapFill?.inserted ?? 0,
       gapFillCode: chainedGapFill?.code ?? null,
+      gapFillOffFallbacks: chainedGapFill?.offFallbacks ?? 0,
     }
 
     onEvent({
@@ -1121,6 +1175,8 @@ export async function runAutoRoster(
         updatedAt: now(),
       },
     )
+
+    prewarmRosterRunCache(runId, operatorId, periodFrom, periodTo, filters)
 
     onEvent({ event: 'committed', data: { assignedCount, rejectedCount, rejectionReasons } })
   } catch (err) {
@@ -2027,6 +2083,26 @@ async function runDaysOffAssignment(
           }
         }
 
+        // Bonus pass: extend OFFs from `need` (=minDaysOff) up to `cap`
+        // (=maxDaysOff) ONLY on days with comfortable positive slack. Without
+        // this, every crew lands at exactly minDaysOff because the objective
+        // has no reward for extra OFFs in the [min, max] band — the max-cap
+        // becomes dead config. Strict slack threshold (>= 2) keeps coverage
+        // safe; days at zero or negative slack stay assigned to standby/duty
+        // capacity. Honours the same consecutive-OFF cap and demand check.
+        if (cap > toAssign) {
+          for (const cand of pool) {
+            if (picked.length >= cap) break
+            if (picked.includes(cand.day)) continue
+            if (cand.slack < 2) continue
+            if (wouldExceedCap(cand.day)) continue
+            const availability = totalCrew - busyByDay[cand.day].size
+            if (availability - offByDay[cand.day] - 1 < demandByDay[cand.day]) continue
+            picked.push(cand.day)
+            crewOffSet.add(cand.day)
+          }
+        }
+
         for (const day of picked) {
           writeBuf.push({
             updateOne: {
@@ -2097,6 +2173,8 @@ async function runDaysOffAssignment(
     }
 
     await AutoRosterRun.updateOne({ _id: runId }, { status: 'completed', completedAt: now(), stats, updatedAt: now() })
+
+    if (!chained) prewarmRosterRunCache(runId, operatorId, periodFrom, periodTo, filters)
 
     onEvent({ event: 'committed', data: { assignedCount: inserted, rejectedCount: 0 } })
   } catch (err) {
@@ -2542,6 +2620,8 @@ async function runStandbyAssignment(
 
     await AutoRosterRun.updateOne({ _id: runId }, { status: 'completed', completedAt: now(), stats, updatedAt: now() })
 
+    if (!chained) prewarmRosterRunCache(runId, operatorId, periodFrom, periodTo, filters)
+
     onEvent({ event: 'committed', data: { assignedCount: inserted, rejectedCount: 0 } })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -2571,7 +2651,7 @@ async function runGapFillPass(
   userId?: string | null,
   filters: AutoRosterFilters = {},
   progressBand: { from: number; to: number } | null = null,
-): Promise<{ inserted: number; code: string } | null> {
+): Promise<{ inserted: number; code: string; offFallbacks: number } | null> {
   const now = () => new Date().toISOString()
   const emitProgress = (localPct: number, message: string) => {
     const pct = progressBand
@@ -2609,6 +2689,14 @@ async function runGapFillPass(
     emitProgress(100, `Gap-fill skipped — no SYS ${fillTarget} code configured`)
     return null
   }
+  // SBY→OFF fallback target. When fillTarget is SBY but the resolved SBY
+  // window can't clear the FDTL min-rest buffer from an adjacent flight,
+  // OFF can still go on that day (OFF *is* rest, no buffer). This stops
+  // gap-fill from leaving a blank day every time SBY collides with a
+  // late-evening pairing's rest tail. Loaded eagerly so we don't pay the
+  // round-trip per-rejection inside the hot loop.
+  const offFallbackCode = fillTarget === 'SBY' ? await resolveSysActivityCode(operatorId, 'OFF') : null
+  const maxDaysOffForFallback = earlyConfig?.daysOff?.maxPerPeriodDays ?? 10
   // SBY fill must honour FDTL min-rest from adjacent flight duties — standby
   // is a duty period (callable to operate), not rest. OFF fill stays at 0
   // because OFF *is* rest and may sit immediately next to a pairing.
@@ -2843,6 +2931,7 @@ async function runGapFillPass(
   }
 
   let inserted = 0
+  let offFallbacks = 0
   const crewOrdered = [...crew].sort((a, b) => String(a._id).localeCompare(String(b._id)))
   for (let i = 0; i < crewOrdered.length; i++) {
     if (signal?.aborted) break
@@ -2858,7 +2947,59 @@ async function runGapFillPass(
       const endMs = new Date(endIso).getTime()
       const sbyWindow =
         fillTarget === 'SBY' && Number.isFinite(startMs) && Number.isFinite(endMs) ? { startMs, endMs } : undefined
-      if (!canFillDay(crewId, day, sbyWindow)) continue
+      if (!canFillDay(crewId, day, sbyWindow)) {
+        // SBY→OFF fallback: SBY rejected on this day. The most common cause
+        // is the FDTL min-rest buffer extending from an adjacent flight
+        // duty. OFF doesn't need that buffer (OFF *is* rest), so retry the
+        // overlap check with no sbyWindow. If clean and crew is below
+        // maxDaysOff, drop OFF here instead of leaving the day blank.
+        if (
+          fillTarget === 'SBY' &&
+          offFallbackCode &&
+          canFillDay(crewId, day) &&
+          (offDaysByCrew.get(crewId)?.size ?? 0) < maxDaysOffForFallback
+        ) {
+          const offStartIso = `${day}T00:00:00.000Z`
+          const offEndIso = `${day}T23:59:59.999Z`
+          const offStartMs = new Date(offStartIso).getTime()
+          const offEndMs = new Date(offEndIso).getTime()
+          buf.push({
+            updateOne: {
+              filter: { operatorId, crewId, dateIso: day, activityCodeId: offFallbackCode._id },
+              update: {
+                $setOnInsert: {
+                  _id: crypto.randomUUID(),
+                  operatorId,
+                  scenarioId: null,
+                  crewId,
+                  activityCodeId: offFallbackCode._id,
+                  startUtcIso: offStartIso,
+                  endUtcIso: offEndIso,
+                  dateIso: day,
+                  notes: `auto-roster:${runId}:sby-off-fallback`,
+                  sourceRunId: runId,
+                  assignedByUserId: userId ?? null,
+                  createdAt: now(),
+                },
+                $set: { updatedAt: now() },
+              },
+              upsert: true,
+            },
+          })
+          offFallbacks++
+          inserted++
+          addInterval(crewId, offStartMs, offEndMs)
+          const offSet = offDaysByCrew.get(crewId) ?? new Set<string>()
+          offSet.add(day)
+          offDaysByCrew.set(crewId, offSet)
+          const busy = busyByCrewDay.get(crewId) ?? new Set<string>()
+          busy.add(day)
+          busyByCrewDay.set(crewId, busy)
+          console.log(`[auto-roster] ${runId} SBY→OFF fallback: crew=${crewId} day=${day} reason=insufficient_rest`)
+          if (buf.length >= FLUSH) await flush()
+        }
+        continue
+      }
       // Gap-fill intentionally ignores the max-consecutive-OFF cap. The cap
       // applies to the targeted day-off quota pass (shapes the spread of
       // OFFs across the period). Gap-fill covers leftover blank days so
@@ -2905,6 +3046,10 @@ async function runGapFillPass(
     }
   }
   await flush()
-  emitProgress(100, `Gap-fill done — ${inserted.toLocaleString()} ${fillTarget} placed (${carrierMode})`)
-  return { inserted, code: targetCode.code }
+  const fallbackSuffix = offFallbacks > 0 ? ` (incl. ${offFallbacks.toLocaleString()} SBY→OFF fallbacks)` : ''
+  emitProgress(
+    100,
+    `Gap-fill done — ${inserted.toLocaleString()} ${fillTarget} placed (${carrierMode})${fallbackSuffix}`,
+  )
+  return { inserted, code: targetCode.code, offFallbacks }
 }

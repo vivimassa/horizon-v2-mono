@@ -20,6 +20,13 @@ const crewQualificationSchema = new Schema(
 )
 
 crewQualificationSchema.index({ operatorId: 1, aircraftType: 1, position: 1 })
+// 4.1.6 Crew Schedule aggregator hot path:
+//   CrewQualification.find({ operatorId, crewId: { $in: [~133 ids] } }).
+// Without this compound, the planner relied on the single-field `crewId`
+// index, which forces Mongo to merge candidate sets and then filter by
+// operatorId post-fetch. Compound (operatorId, crewId) lets the $in scan
+// stay inside the index for the tenant.
+crewQualificationSchema.index({ operatorId: 1, crewId: 1 })
 
 export type CrewQualificationDoc = InferSchemaType<typeof crewQualificationSchema>
 export const CrewQualification = mongoose.model('CrewQualification', crewQualificationSchema)

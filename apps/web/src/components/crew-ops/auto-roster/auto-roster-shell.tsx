@@ -3340,6 +3340,12 @@ function ReviewBody({
   const [loading, setLoading] = useState(false)
   const [scheduleData, setScheduleData] = useState<CrewScheduleResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  // Tracks the runId whose orchestrator-prewarmed cache we've already
+  // tried. The cache was built with the run's own filter set, so we can
+  // only use it for the FIRST fetch after a run lands. Any subsequent
+  // filter change in the review UI must re-fetch live to honour the
+  // user's selection. One attempt per run.
+  const cacheTriedForRunRef = useRef<string | null>(null)
   // Local refresh of the run doc — handles runs whose resultRun was captured
   // before the chained day-off/standby pass wrote final stats.
   const [refreshedRun, setRefreshedRun] = useState<AutoRosterRun | null>(null)
@@ -3363,25 +3369,55 @@ function ReviewBody({
     let cancelled = false
     setLoading(true)
     setLoadError(null)
-    // Pass filter arrays as-is — API joins with commas when multi-valued.
-    // The server route accepts $in queries for multi-select filters.
+    // Try the orchestrator-prewarmed cache first — saves the 30+s
+    // /crew-schedule aggregator round-trip immediately after solve.
+    // On any failure (404 cache miss, TTL expiry, server restart, or
+    // a run that didn't go through the orchestrator) fall back to the
+    // regular /crew-schedule endpoint which is the source of truth.
+    const fallbackToFull = () =>
+      api
+        .getCrewSchedule({
+          from: periodFrom,
+          to: periodTo,
+          base: filterBase,
+          position: filterPosition,
+          acType: filterAcType,
+          crewGroup: filterCrewGroup,
+        })
+        .then((res) => {
+          if (!cancelled) setScheduleData(res)
+        })
+        .catch((err) => {
+          if (!cancelled) setLoadError(err instanceof Error ? err.message : String(err))
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+
+    const runId = effectiveRun._id
+    // Only try the prewarmed cache once per run, on the first fetch.
+    // The cached payload reflects the run's own filter set, so any
+    // subsequent UI filter change must hit the live aggregator.
+    const shouldTryCache = !!runId && cacheTriedForRunRef.current !== runId
+    if (!shouldTryCache) {
+      void fallbackToFull()
+      return () => {
+        cancelled = true
+      }
+    }
+    cacheTriedForRunRef.current = runId
     api
-      .getCrewSchedule({
-        from: periodFrom,
-        to: periodTo,
-        base: filterBase,
-        position: filterPosition,
-        acType: filterAcType,
-        crewGroup: filterCrewGroup,
-      })
+      .getCrewScheduleFromRun(runId)
       .then((res) => {
-        if (!cancelled) setScheduleData(res)
+        if (cancelled) return
+        setScheduleData(res)
+        setLoading(false)
       })
-      .catch((err) => {
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : String(err))
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
+      .catch(() => {
+        // Cache miss / expired / never-prewarmed → fall back. We don't
+        // distinguish error codes; the regular endpoint is always safe.
+        if (cancelled) return
+        void fallbackToFull()
       })
     return () => {
       cancelled = true

@@ -35,6 +35,10 @@ const crewMemoSchema = new Schema(
   { _id: false, timestamps: false, collection: 'crewMemos' },
 )
 
+// Hot: 4.1.6 Crew Schedule aggregator. Query is
+//   { operatorId, scenarioId, $or: [{scope:'pairing'}, {scope:'crew'},
+//                                   {scope:'day', dateIso: { $gte, $lte }}] }
+// Each $or branch uses the (operatorId, scenarioId, scope) prefix.
 crewMemoSchema.index({ operatorId: 1, scenarioId: 1, scope: 1, targetId: 1, dateIso: 1 })
 crewMemoSchema.index({ operatorId: 1, updatedAt: -1 })
 

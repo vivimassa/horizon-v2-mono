@@ -1430,7 +1430,12 @@ async function commitAssignments(
         ? new Date(new Date(pairing.legs[0].stdUtcIso).getTime() - 60 * 60_000).toISOString()
         : pairing.startDate + 'T00:00:00.000Z')
     const lastLeg = pairing.legs?.[pairing.legs.length - 1]
-    const endUtcIso = lastLeg?.staUtcIso ?? (pairing.endDate ?? pairing.startDate) + 'T23:59:59.000Z'
+    // Add 30-minute debrief to last-leg STA — matches the manual crew-schedule
+    // route. Using raw STA starts the FDTL min-rest clock too early, leaving a
+    // gap where SBY/next-duty could land inside the real post-duty rest window.
+    const endUtcIso = lastLeg?.staUtcIso
+      ? new Date(new Date(lastLeg.staUtcIso).getTime() + 30 * 60_000).toISOString()
+      : (pairing.endDate ?? pairing.startDate) + 'T23:59:59.000Z'
 
     commitBuf.push({
       updateOne: {
@@ -2137,20 +2142,30 @@ async function runStandbyAssignment(
     if (filters.position) crewQuery.position = filters.position
     if (filterCrewIds) crewQuery._id = { $in: filterCrewIds }
 
+    // Widen the assignment/activity fetch by minRestMs on each side. A pairing
+    // ending the day BEFORE periodFrom still imposes rest into day 1 of the
+    // roster — without this widening we'd never see it and could place SBY
+    // inside that rest window. Same for pairings starting the day after
+    // periodTo. Loaded sequentially so the query bounds know the buffer.
+    const ruleSetForStbyRest = (await loadSerializedRuleSet(operatorId).catch(() => null)) as SerializedRuleSet | null
+    const minRestMsForQuery = resolveMinRestMinutes(ruleSetForStbyRest) * 60_000
+    const queryStartIso = new Date(new Date(`${periodFrom}T00:00:00.000Z`).getTime() - minRestMsForQuery).toISOString()
+    const queryEndIso = new Date(new Date(`${periodTo}T23:59:59.999Z`).getTime() + minRestMsForQuery).toISOString()
+
     const [crew, assignments, activities, schedulingConfig, activityCodes, pairingsForDep] = await Promise.all([
       CrewMember.find(crewQuery).lean(),
       CrewAssignment.find({
         operatorId,
         scenarioId: scenarioFilter,
         status: { $ne: 'cancelled' },
-        startUtcIso: { $lte: `${periodTo}T23:59:59.999Z` },
-        endUtcIso: { $gte: `${periodFrom}T00:00:00.000Z` },
+        startUtcIso: { $lte: queryEndIso },
+        endUtcIso: { $gte: queryStartIso },
       }).lean(),
       CrewActivity.find({
         operatorId,
         scenarioId: scenarioFilter,
-        startUtcIso: { $lte: `${periodTo}T23:59:59.999Z` },
-        endUtcIso: { $gte: `${periodFrom}T00:00:00.000Z` },
+        startUtcIso: { $lte: queryEndIso },
+        endUtcIso: { $gte: queryStartIso },
       }).lean(),
       (async () => {
         if (userId) {
@@ -2242,8 +2257,8 @@ async function runStandbyAssignment(
     // today" check isn't enough: a pairing ending 23:00 doesn't touch next
     // day by the slice(0,10) loop, so we'd wrongly mark crew eligible for an
     // early-morning standby the following day with no rest.
-    const ruleSetForRest = await loadSerializedRuleSet(operatorId).catch(() => null)
-    const minRestMs = resolveMinRestMinutes((ruleSetForRest as SerializedRuleSet | null) ?? null) * 60_000
+    // Reuse ruleset already loaded for the query-bounds widening above.
+    const minRestMs = minRestMsForQuery
 
     // Per-crew interval list of every existing commitment (assignments AND
     // all activities — including any standby just placed). Kept sorted so we
@@ -2572,28 +2587,51 @@ async function runGapFillPass(
   if (filters.position) crewQuery.position = filters.position
   if (filterCrewIds) crewQuery._id = { $in: filterCrewIds }
 
+  // Load ruleset first so the data fetch can widen by minRestMs on each side.
+  // Pairings/activities ending the day BEFORE periodFrom still impose rest
+  // into day 1 of the gap-fill horizon; without widening we wouldn't see them
+  // and could place SBY inside that rest window. Same for the trailing edge.
+  const ruleSet = (await loadSerializedRuleSet(operatorId).catch(() => null)) as SerializedRuleSet | null
+
+  // Determine fill target now (carrierMode lives on the per-user config) so
+  // we can skip the rest-buffer widening when filling OFF.
+  const earlyConfig = await (async () => {
+    if (userId) {
+      const userDoc = await OperatorSchedulingConfig.findOne({ operatorId, userId }).lean()
+      if (userDoc) return userDoc
+    }
+    return OperatorSchedulingConfig.findOne({ operatorId, userId: null }).lean()
+  })()
+  const carrierMode = (earlyConfig?.carrierMode ?? 'lcc') as 'lcc' | 'legacy'
+  const fillTarget: 'OFF' | 'SBY' = carrierMode === 'legacy' ? 'OFF' : 'SBY'
+  const targetCode = await resolveSysActivityCode(operatorId, fillTarget)
+  if (!targetCode) {
+    emitProgress(100, `Gap-fill skipped — no SYS ${fillTarget} code configured`)
+    return null
+  }
+  // SBY fill must honour FDTL min-rest from adjacent flight duties — standby
+  // is a duty period (callable to operate), not rest. OFF fill stays at 0
+  // because OFF *is* rest and may sit immediately next to a pairing.
+  const minRestMs = fillTarget === 'SBY' ? resolveMinRestMinutes(ruleSet) * 60_000 : 0
+  const queryStartIso = new Date(new Date(`${periodFrom}T00:00:00.000Z`).getTime() - minRestMs).toISOString()
+  const queryEndIso = new Date(new Date(`${periodTo}T23:59:59.999Z`).getTime() + minRestMs).toISOString()
+
   const [crew, assignments, activities, schedulingConfig, activityCodes, pairingsForDep] = await Promise.all([
     CrewMember.find(crewQuery).lean(),
     CrewAssignment.find({
       operatorId,
       scenarioId: scenarioFilter,
       status: { $ne: 'cancelled' },
-      startUtcIso: { $lte: `${periodTo}T23:59:59.999Z` },
-      endUtcIso: { $gte: `${periodFrom}T00:00:00.000Z` },
+      startUtcIso: { $lte: queryEndIso },
+      endUtcIso: { $gte: queryStartIso },
     }).lean(),
     CrewActivity.find({
       operatorId,
       scenarioId: scenarioFilter,
-      startUtcIso: { $lte: `${periodTo}T23:59:59.999Z` },
-      endUtcIso: { $gte: `${periodFrom}T00:00:00.000Z` },
+      startUtcIso: { $lte: queryEndIso },
+      endUtcIso: { $gte: queryStartIso },
     }).lean(),
-    (async () => {
-      if (userId) {
-        const userDoc = await OperatorSchedulingConfig.findOne({ operatorId, userId }).lean()
-        if (userDoc) return userDoc
-      }
-      return OperatorSchedulingConfig.findOne({ operatorId, userId: null }).lean()
-    })(),
+    Promise.resolve(earlyConfig),
     ActivityCode.find({ operatorId }, { _id: 1, flags: 1 }).lean(),
     Pairing.find(
       {
@@ -2605,15 +2643,6 @@ async function runGapFillPass(
       { baseAirport: 1, legs: 1, startDate: 1, endDate: 1 },
     ).lean(),
   ])
-
-  const carrierMode = (schedulingConfig?.carrierMode ?? 'lcc') as 'lcc' | 'legacy'
-  const fillTarget: 'OFF' | 'SBY' = carrierMode === 'legacy' ? 'OFF' : 'SBY'
-  const targetCode = await resolveSysActivityCode(operatorId, fillTarget)
-  if (!targetCode) {
-    emitProgress(100, `Gap-fill skipped — no SYS ${fillTarget} code configured`)
-    return null
-  }
-  const ruleSet = (await loadSerializedRuleSet(operatorId).catch(() => null)) as SerializedRuleSet | null
 
   // Standby window resolution for SBY fills. Honours scheduling-config
   // (min/max duration, start mode, lead time, fixed times) AND the FDTL
@@ -2737,17 +2766,26 @@ async function runGapFillPass(
       set = new Set()
       busyByCrewDay.set(crewId, set)
     }
-    for (const dt = new Date(s); dt <= e; dt.setUTCDate(dt.getUTCDate() + 1)) {
-      set.add(dt.toISOString().slice(0, 10))
+    // Walk every UTC calendar day touched by [s, e]. Anchor at 00:00Z so
+    // pairings crossing midnight (e.g. 22:00→05:00) tag BOTH days, not
+    // just the start day. Anchoring at the raw start time loses interior
+    // days when the end falls before the start's HH:MM on a later date.
+    const cursor = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate()))
+    while (cursor <= e) {
+      set.add(cursor.toISOString().slice(0, 10))
+      cursor.setUTCDate(cursor.getUTCDate() + 1)
     }
   }
   for (const a of assignments) markBusy(a.crewId, new Date(a.startUtcIso), new Date(a.endUtcIso))
   for (const a of activities) markBusy(a.crewId, new Date(a.startUtcIso), new Date(a.endUtcIso))
 
-  // Gap-fill goal: NO BLANK DAYS. Use overlap-only check — the FDTL
-  // min-rest buffer doesn't apply to OFF/SBY adjacency here. A day fully
-  // outside any existing pairing/activity window is eligible.
-  const canFillDay = (crewId: string, dayIso: string): boolean => {
+  // Gap-fill goal: NO BLANK DAYS. Day must be free of any existing
+  // pairing/activity window. For SBY (a duty period), the resolved SBY
+  // window must additionally clear the FDTL min-rest buffer from every
+  // existing commitment — otherwise standby gets placed inside the rest
+  // tail of a flight duty (e.g. SBY 03:00Z right after a pairing ending
+  // 23:30Z previous day = ~3.5h gap, far below 10–12h rest).
+  const canFillDay = (crewId: string, dayIso: string, sbyWindow?: { startMs: number; endMs: number }): boolean => {
     const busy = busyByCrewDay.get(crewId)
     if (busy?.has(dayIso)) return false
     const arr = crewIntervals.get(crewId)
@@ -2756,6 +2794,22 @@ async function runGapFillPass(
       const dayEnd = new Date(`${dayIso}T23:59:59.999Z`).getTime()
       for (const itv of arr) {
         if (itv.startMs < dayEnd && itv.endMs > dayStart) return false
+      }
+      // Hard overlap with the resolved SBY window itself — runs even when
+      // minRestMs is 0. SBY can cross midnight (window > 24h or starting
+      // late evening), in which case the dayIso scan doesn't see the
+      // adjacent-day interval that the SBY tail collides with.
+      if (sbyWindow) {
+        for (const itv of arr) {
+          if (itv.startMs < sbyWindow.endMs && itv.endMs > sbyWindow.startMs) return false
+        }
+        if (minRestMs > 0) {
+          const reqStart = sbyWindow.startMs - minRestMs
+          const reqEnd = sbyWindow.endMs + minRestMs
+          for (const itv of arr) {
+            if (itv.startMs < reqEnd && itv.endMs > reqStart) return false
+          }
+        }
       }
     }
     return true
@@ -2794,8 +2848,17 @@ async function runGapFillPass(
     if (signal?.aborted) break
     const c = crewOrdered[i]
     const crewId = c._id as string
+    const crewBase = baseIdToIata.get((c as { base?: string | null }).base ?? '') ?? ''
     for (const day of periodDays) {
-      if (!canFillDay(crewId, day)) continue
+      // Resolve the SBY window first so the rest-buffer check inside
+      // canFillDay knows the actual proposed time range. OFF doesn't
+      // need this (OFF is rest, no buffer required).
+      const { startIso, endIso } = resolveFillWindow(crewBase, day)
+      const startMs = new Date(startIso).getTime()
+      const endMs = new Date(endIso).getTime()
+      const sbyWindow =
+        fillTarget === 'SBY' && Number.isFinite(startMs) && Number.isFinite(endMs) ? { startMs, endMs } : undefined
+      if (!canFillDay(crewId, day, sbyWindow)) continue
       // Gap-fill intentionally ignores the max-consecutive-OFF cap. The cap
       // applies to the targeted day-off quota pass (shapes the spread of
       // OFFs across the period). Gap-fill covers leftover blank days so
@@ -2806,8 +2869,6 @@ async function runGapFillPass(
         crewOffSet.add(day)
         offDaysByCrew.set(crewId, crewOffSet)
       }
-      const crewBase = baseIdToIata.get((c as { base?: string | null }).base ?? '') ?? ''
-      const { startIso, endIso } = resolveFillWindow(crewBase, day)
       buf.push({
         updateOne: {
           filter: { operatorId, crewId, dateIso: day, activityCodeId: targetCode._id },
@@ -2832,9 +2893,7 @@ async function runGapFillPass(
         },
       })
       inserted++
-      const s = new Date(startIso).getTime()
-      const e = new Date(endIso).getTime()
-      addInterval(crewId, s, e)
+      addInterval(crewId, startMs, endMs)
       const busy = busyByCrewDay.get(crewId) ?? new Set<string>()
       busy.add(day)
       busyByCrewDay.set(crewId, busy)

@@ -6,6 +6,7 @@ import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
+import compress from '@fastify/compress'
 import jwt from '@fastify/jwt'
 import multipart from '@fastify/multipart'
 import fastifyStatic from '@fastify/static'
@@ -94,6 +95,14 @@ async function main(): Promise<void> {
 
   // Plugins
   await app.register(cors, { origin: env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN })
+  // gzip/deflate JSON responses > 1KB. Crew-schedule aggregator returns
+  // 5–30MB of JSON per request — compression typically shrinks it 10–20×
+  // and is the single biggest wire-time win for the Gantt cold load.
+  await app.register(compress, {
+    global: true,
+    threshold: 1024,
+    encodings: ['gzip', 'deflate'],
+  })
   await app.register(jwt, {
     secret: env.JWT_SECRET,
     // Browser EventSource can't set Authorization header — accept ?token= on

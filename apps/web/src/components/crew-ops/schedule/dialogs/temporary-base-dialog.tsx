@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { MapPin, Trash2 } from 'lucide-react'
-import { api, type AirportRef } from '@skyhub/api'
+import { api, type AirportRef, type ApiError } from '@skyhub/api'
 import { useCrewScheduleStore } from '@/stores/use-crew-schedule-store'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { DialogShell, DialogCancelButton, DialogPrimaryButton } from './dialog-shell'
+import { TempBaseHero } from './dialog-heroes'
 
 interface Props {
   crewIds: string[]
@@ -42,6 +43,12 @@ export function TemporaryBaseDialog({ crewIds, fromIso, toIso, editingId, onClos
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** Set when the server returned 409 BOOKING_OUT_OF_RANGE. The user must
+   *  confirm before we retry the PATCH with `?force=true`, which
+   *  soft-cancels the orphaned positioning bookings. */
+  const [orphanConfirm, setOrphanConfirm] = useState<{
+    orphans: Array<{ _id: string; direction: string | null; flightDate: string | null }>
+  } | null>(null)
 
   useEffect(() => {
     const q = query.trim()
@@ -74,19 +81,43 @@ export function TemporaryBaseDialog({ crewIds, fromIso, toIso, editingId, onClos
 
   const effectiveCode = (picked?.iataCode ?? freeTextIata ?? '').toUpperCase()
   const validRange = fromDraft && toDraft && fromDraft <= toDraft
-  const canSubmit = effectiveCode.length === 3 && validRange && !busy
+
+  // Same-airport guard. A temp-base equal to the crew's permanent base
+  // is a no-op (no operational re-basing). Server rejects it; this
+  // surfaces the error inline before the round-trip + disables Submit.
+  // For multi-crew creates, ANY crew whose home matches blocks the
+  // whole batch — if you want to mix, do separate calls.
+  const crewList = useCrewScheduleStore((s) => s.crew)
+  const targetCrewIds = useMemo(() => (isEdit && existing ? [existing.crewId] : crewIds), [isEdit, existing, crewIds])
+  const sameAsHomeBase = useMemo(() => {
+    if (effectiveCode.length !== 3) return false
+    const targets = new Set(targetCrewIds)
+    return crewList.some((c) => targets.has(c._id) && (c.baseLabel ?? '').toUpperCase() === effectiveCode)
+  }, [crewList, targetCrewIds, effectiveCode])
+
+  const canSubmit = effectiveCode.length === 3 && validRange && !busy && !sameAsHomeBase
+
+  const submitPatch = async (force: boolean) => {
+    if (!editingId) return
+    await api.patchCrewTempBase(
+      editingId,
+      {
+        fromIso: fromDraft,
+        toIso: toDraft,
+        airportCode: effectiveCode,
+      },
+      { force },
+    )
+  }
 
   const onSubmit = async () => {
     if (!canSubmit) return
     setBusy(true)
     setError(null)
+    setOrphanConfirm(null)
     try {
       if (isEdit && editingId) {
-        await api.patchCrewTempBase(editingId, {
-          fromIso: fromDraft,
-          toIso: toDraft,
-          airportCode: effectiveCode,
-        })
+        await submitPatch(false)
       } else {
         await api.createCrewTempBases(
           crewIds.map((crewId) => ({
@@ -100,8 +131,35 @@ export function TemporaryBaseDialog({ crewIds, fromIso, toIso, editingId, onClos
       await reconcilePeriod()
       onClose()
     } catch (e) {
+      const apiErr = e as ApiError
+      const payload = apiErr.payload as {
+        error?: string
+        orphans?: Array<{ _id: string; direction: string | null; flightDate: string | null }>
+      } | null
+      if (apiErr.status === 409 && payload?.error === 'BOOKING_OUT_OF_RANGE' && payload.orphans) {
+        // Date edit orphaned existing positioning bookings. Surface the
+        // list and let the planner decide; on confirm we retry with
+        // ?force=true which soft-cancels them.
+        setOrphanConfirm({ orphans: payload.orphans })
+        setBusy(false)
+        return
+      }
       setError((e as Error).message || 'Failed to save temporary base')
       setBusy(false)
+    }
+  }
+
+  const onConfirmCascade = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await submitPatch(true)
+      await reconcilePeriod()
+      onClose()
+    } catch (e) {
+      setError((e as Error).message || 'Failed to save temporary base')
+      setBusy(false)
+      setOrphanConfirm(null)
     }
   }
 
@@ -124,6 +182,9 @@ export function TemporaryBaseDialog({ crewIds, fromIso, toIso, editingId, onClos
   return (
     <DialogShell
       title={title}
+      heroEyebrow="Crew base"
+      heroSubtitle={isEdit ? 'Adjust window or airport' : 'Re-base crew to a different airport for a closed period'}
+      heroSvg={<TempBaseHero />}
       onClose={onClose}
       width={520}
       footer={
@@ -140,7 +201,15 @@ export function TemporaryBaseDialog({ crewIds, fromIso, toIso, editingId, onClos
             </button>
           )}
           <DialogCancelButton onClick={onClose} disabled={busy} />
-          <DialogPrimaryButton onClick={onSubmit} label={isEdit ? 'Save' : 'Assign'} disabled={!canSubmit} />
+          {orphanConfirm ? (
+            <DialogPrimaryButton
+              onClick={onConfirmCascade}
+              label={`Adjust ${orphanConfirm.orphans.length} booking${orphanConfirm.orphans.length === 1 ? '' : 's'}`}
+              disabled={busy}
+            />
+          ) : (
+            <DialogPrimaryButton onClick={onSubmit} label={isEdit ? 'Save' : 'Assign'} disabled={!canSubmit} />
+          )}
         </>
       }
     >
@@ -249,6 +318,34 @@ export function TemporaryBaseDialog({ crewIds, fromIso, toIso, editingId, onClos
         {isEdit && existing && (
           <div className="text-[12px] text-hz-text-tertiary">
             Current window: {fmtDate(existing.fromIso)} → {fmtDate(existing.toIso)} · {existing.airportCode}
+          </div>
+        )}
+
+        {orphanConfirm && (
+          <div
+            className="rounded-lg p-3 text-[13px]"
+            style={{ background: 'rgba(255,136,0,0.08)', border: '1px solid rgba(255,136,0,0.35)' }}
+          >
+            <div className="font-semibold mb-1" style={{ color: '#FF8800' }}>
+              {orphanConfirm.orphans.length} positioning booking
+              {orphanConfirm.orphans.length === 1 ? '' : 's'} no longer match the new window
+            </div>
+            <ul className="space-y-1 text-[12px] text-hz-text-secondary">
+              {orphanConfirm.orphans.map((o) => (
+                <li key={o._id}>
+                  · {o.direction ?? '—'} on {o.flightDate ?? '—'}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-2 text-[12px] text-hz-text-tertiary">
+              Confirm to soft-cancel these bookings and apply the new dates. Audit trail is preserved.
+            </div>
+          </div>
+        )}
+
+        {sameAsHomeBase && (
+          <div className="text-[12px]" style={{ color: '#E63535' }}>
+            That airport is the crew's permanent base — pick a different one.
           </div>
         )}
 

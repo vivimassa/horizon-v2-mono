@@ -926,7 +926,7 @@ function SectionBody({
             </FormRow>
             <FormRow
               label="In-base rest buffer"
-              description="Additional minutes added on top of MIN_REST_HOME_BASE for duties ending at the crew's home base."
+              description="Extra rest added on top of the regulatory minimum after duties that end at the crew's home base."
             >
               <NumberStepper
                 value={draft.restBuffer.inBaseMin}
@@ -939,7 +939,7 @@ function SectionBody({
             </FormRow>
             <FormRow
               label="Out-of-base rest buffer"
-              description="Additional minutes added on top of MIN_REST_AWAY_BASE for duties ending at a layover station."
+              description="Extra rest added on top of the regulatory minimum after duties that end at a layover station away from home base."
             >
               <NumberStepper
                 value={draft.restBuffer.outOfBaseMin}
@@ -952,7 +952,7 @@ function SectionBody({
             </FormRow>
             <FormRow
               label="Augmented-crew rest buffer"
-              description="Additional minutes added after pairings flown with augmented crew (heavy / ULR ops). Applied on top of the in-base or out-of-base buffer above."
+              description="Extra rest added after pairings flown with augmented (heavy or ultra-long-range) crew. Stacks on top of the in-base or out-of-base buffer above."
             >
               <NumberStepper
                 value={draft.restBuffer.augmentedMin}

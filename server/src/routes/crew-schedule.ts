@@ -14,15 +14,80 @@ import { CrewComplement } from '../models/CrewComplement.js'
 import { FdtlScheme } from '../models/FdtlScheme.js'
 import { FdtlRule } from '../models/FdtlRule.js'
 import { Airport } from '../models/Airport.js'
+import { Operator } from '../models/Operator.js'
 import { AssignmentViolationOverride } from '../models/AssignmentViolationOverride.js'
 import { CrewQualification } from '../models/CrewQualification.js'
 import { CrewGroupAssignment } from '../models/CrewGroupAssignment.js'
 import { AircraftType } from '../models/AircraftType.js'
 import { CrewTempBase } from '../models/CrewTempBase.js'
+import { CrewFlightBooking } from '../models/CrewFlightBooking.js'
 import { loadSerializedRuleSet } from '../services/fdtl-rule-set.js'
 import { evaluateCrewRoster } from '../services/evaluate-crew-roster.js'
 import { CrewLegalityIssue } from '../models/CrewLegalityIssue.js'
 import { getRosterRunPayload } from '../services/roster-run-cache.js'
+
+/** Resolve the operator's base UTC offset (hours) — IANA tz first, then
+ *  Airport.utcOffsetHours fallback. Used by the GCS aggregator AND every
+ *  activity-write path so OFF/SBY/REST get anchored to LOCAL midnight
+ *  instead of UTC midnight (which silently shifts the row by the offset
+ *  for non-UTC bases — see the H794+OFF same-day overlap bug). */
+async function getOperatorDisplayOffsetHours(operatorId: string, atInstant: Date = new Date()): Promise<number> {
+  try {
+    const op = (await Operator.findById(operatorId).lean()) as {
+      timezone?: string | null
+      mainBaseIcao?: string | null
+    } | null
+    if (op?.timezone) {
+      const h = ianaOffsetHours(op.timezone, atInstant)
+      if (h !== 0) return h
+    }
+    if (op?.mainBaseIcao) {
+      const apt = (await Airport.findOne({
+        $or: [{ icaoCode: op.mainBaseIcao }, { iataCode: op.mainBaseIcao }],
+      }).lean()) as { utcOffsetHours?: number | null } | null
+      if (apt && typeof apt.utcOffsetHours === 'number') return apt.utcOffsetHours
+    }
+  } catch {
+    // fall through to 0
+  }
+  return 0
+}
+
+/** Build a UTC ISO instant from (LOCAL date, LOCAL HH:MM, base offset).
+ *  Example: dateIso=2026-04-10, hhmm="00:00", offset=7 → "2026-04-09T17:00:00.000Z".
+ *  Replaces `${dateIso}T${hhmm}:00.000Z` which silently treats LOCAL as UTC. */
+function localTimeToUtcIso(dateIso: string, hhmm: string, offsetHours: number): string {
+  const [hStr, mStr] = hhmm.padEnd(5, '0').split(':')
+  const h = parseInt(hStr, 10) || 0
+  const m = parseInt(mStr, 10) || 0
+  const localMidnightMs = Date.parse(`${dateIso}T00:00:00.000Z`) - offsetHours * 3_600_000
+  const ms = localMidnightMs + (h * 60 + m) * 60_000
+  return new Date(ms).toISOString()
+}
+
+/** Compute the UTC offset (in fractional hours) for an IANA timezone at
+ *  a given instant. Uses Intl.DateTimeFormat's `shortOffset` so DST is
+ *  honored automatically. Returns 0 on parse failure. */
+function ianaOffsetHours(iana: string, instant: Date): number {
+  try {
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: iana,
+      timeZoneName: 'shortOffset',
+    })
+    const parts = fmt.formatToParts(instant)
+    const tz = parts.find((p) => p.type === 'timeZoneName')?.value ?? 'GMT+0'
+    // Examples: "GMT+7", "GMT-5", "GMT+5:30", "UTC"
+    if (tz === 'UTC' || tz === 'GMT' || tz === 'GMT+0') return 0
+    const m = tz.match(/(?:GMT|UTC)([+-]\d+)(?::(\d+))?/)
+    if (!m) return 0
+    const h = parseInt(m[1], 10) || 0
+    const minutes = parseInt(m[2] ?? '0', 10)
+    const sign = h < 0 ? -1 : 1
+    return h + (sign * minutes) / 60
+  } catch {
+    return 0
+  }
+}
 
 /** Parse an FDTL rule value like "12:00" / "10:30" / raw-number minutes
  *  into total minutes. Returns 0 on parse failure so the UI falls back
@@ -87,6 +152,12 @@ function computeAssignmentWindow(p: PairingLean): { startUtcIso: string; endUtcI
   const lastLeg = p.legs[p.legs.length - 1]
   const end = lastLeg ? addMinutesIso(lastLeg.staUtcIso, 30) : `${p.endDate}T23:59:00.000Z`
   return { startUtcIso: start, endUtcIso: end }
+}
+
+/** Shift a YYYY-MM-DD string by N days (UTC). */
+function shiftIsoDate(iso: string, days: number): string {
+  const ms = new Date(iso + 'T00:00:00Z').getTime() + days * 86_400_000
+  return new Date(ms).toISOString().slice(0, 10)
 }
 
 function addMinutesIso(iso: string, mins: number): string {
@@ -353,7 +424,7 @@ export async function buildCrewSchedulePayload(
     csTime('cs:pre-assignments')
     earlyAssignments = (await timed(
       'assignments',
-      CrewAssignment.find(assignmentFilter).lean(),
+      CrewAssignment.find(assignmentFilter).batchSize(10_000).lean(),
     )) as unknown as AssignmentLean[]
     csTimeEnd('cs:pre-assignments')
     const assignedPairingIds = [...new Set(earlyAssignments.map((a) => a.pairingId))]
@@ -363,17 +434,42 @@ export async function buildCrewSchedulePayload(
     }
   }
 
+  // Mongo cursor batchSize defaults to 101. Each batch is one network
+  // round-trip; on a 30ms-RTT link a 5000-doc fetch becomes ~50 RTTs ≈
+  // 1.5s of pure latency. Bumping to 10_000 collapses the slow queries
+  // (pairings, crew, activities, assignments) into a single round-trip
+  // each. Safe ceiling: cursor batches are 16MB-capped server-side, so
+  // even 10k×2KB pairings (~20MB) splits into 2 — still 25× fewer RTTs.
+  const BATCH = 10_000
   const assignmentsPromise: Promise<AssignmentLean[]> = earlyAssignments
     ? Promise.resolve(earlyAssignments)
-    : (timed('assignments', CrewAssignment.find(assignmentFilter).lean()) as unknown as Promise<AssignmentLean[]>)
+    : (timed('assignments', CrewAssignment.find(assignmentFilter).batchSize(BATCH).lean()) as unknown as Promise<
+        AssignmentLean[]
+      >)
 
   const [pairings, crew, rawAssignments, positions, activities, activityCodes, activityGroups, memos, complements] =
     await Promise.all([
-      timed('pairings', Pairing.find(scopedPairingFilter).select('-lastLegalityResult').lean()),
-      timed('crew', CrewMember.find(crewFilter).sort({ base: 1, seniority: 1, lastName: 1 }).lean()),
+      // Positive projection — only fields the schedule UI actually reads.
+      // Trims 10 unused fields (aircraftTypeId, baseId, cockpitCount,
+      // facilityClass, numberOfDuties, numberOfSectors, layoverAirports,
+      // releaseTime, seasonCode, createdBy/At, updatedAt, lastLegalityResult).
+      // ~150 B per pairing × 2k pairings = ~300 KB shaved on M0 (where
+      // wire bandwidth is the bottleneck).
+      timed(
+        'pairings',
+        Pairing.find(scopedPairingFilter)
+          .select(
+            '_id pairingCode baseAirport aircraftTypeIcao fdtlStatus workflowStatus ' +
+              'totalBlockMinutes totalDutyMinutes pairingDays startDate endDate reportTime ' +
+              'complementKey crewCounts legs routeChain',
+          )
+          .batchSize(BATCH)
+          .lean(),
+      ),
+      timed('crew', CrewMember.find(crewFilter).sort({ base: 1, seniority: 1, lastName: 1 }).batchSize(BATCH).lean()),
       assignmentsPromise,
       timed('positions', CrewPosition.find({ operatorId }).lean()),
-      timed('activities', CrewActivity.find(activityFilter).lean()),
+      timed('activities', CrewActivity.find(activityFilter).batchSize(BATCH).lean()),
       timed('activityCodes', ActivityCode.find({ operatorId, isArchived: { $ne: true } }).lean()),
       timed('activityGroups', ActivityCodeGroup.find({ operatorId }).sort({ sortOrder: 1 }).lean()),
       timed('memos', CrewMemo.find(memoFilter).lean()),
@@ -647,6 +743,14 @@ export async function buildCrewSchedulePayload(
   // server-side eval so individual edits stay accurate.
   const rosterEvaluating = false
 
+  // Operator-base UTC offset for canvas display + activity write paths.
+  // Sample at the midpoint of the window so DST-aware operators get the
+  // offset that's in force for most of the rendered period.
+  csTime('cs:operator-offset')
+  const midMs = (Date.parse(`${q.from}T00:00:00Z`) + Date.parse(`${q.to}T23:59:59Z`)) / 2
+  const displayOffsetHours = await getOperatorDisplayOffsetHours(operatorId, new Date(midMs))
+  csTimeEnd('cs:operator-offset')
+
   csTime('cs:serialize')
   const payload = {
     pairings,
@@ -664,6 +768,7 @@ export async function buildCrewSchedulePayload(
     rosterEvaluating,
     aircraftTypes,
     tempBases,
+    displayOffsetHours,
   }
   if (CREW_SCHEDULE_DEBUG) {
     // Heavy: only stringify when debugging. Run BEFORE timeEnd so the
@@ -676,6 +781,36 @@ export async function buildCrewSchedulePayload(
   return payload
 }
 
+// ── In-process response cache for the aggregator ─────────────────────
+// First request for a given (operatorId + query) pays the full Atlas
+// round-trip cost (53s on M0). Subsequent identical requests inside
+// the TTL return instantly. Critical on Atlas free tier where bytes
+// and ops are throttled.
+//
+// Invalidation is time-only — no event-driven busting on assignment
+// mutations. Trade-off: stale view for up to TTL_MS after a write.
+// 60s feels safe for planner workflow; bump down if it bites.
+const aggCache = new Map<string, { ts: number; promise: Promise<Record<string, unknown>> }>()
+const AGG_TTL_MS = 60_000
+const AGG_MAX_ENTRIES = 32
+const aggCacheGet = async (key: string, factory: () => Promise<Record<string, unknown>>) => {
+  const hit = aggCache.get(key)
+  if (hit && Date.now() - hit.ts < AGG_TTL_MS) return hit.promise
+  // Single-flight: store the in-flight promise so concurrent identical
+  // requests don't all hit Atlas. Failed requests evict so a transient
+  // error doesn't poison the slot.
+  const promise = factory().catch((err) => {
+    aggCache.delete(key)
+    throw err
+  })
+  aggCache.set(key, { ts: Date.now(), promise })
+  if (aggCache.size > AGG_MAX_ENTRIES) {
+    const oldestKey = aggCache.keys().next().value
+    if (oldestKey !== undefined) aggCache.delete(oldestKey)
+  }
+  return promise
+}
+
 export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
   // ── GET /crew-schedule — aggregator for a period ─────────────────────
   // Thin wrapper around buildCrewSchedulePayload so the orchestrator can
@@ -683,7 +818,8 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
   app.get('/crew-schedule', async (req, reply) => {
     const q = req.query as Record<string, string>
     if (!q.from || !q.to) return reply.code(400).send({ error: 'from and to are required (ISO date)' })
-    return buildCrewSchedulePayload(req.operatorId, q as CrewScheduleQuery)
+    const cacheKey = `${req.operatorId}|${JSON.stringify(q)}`
+    return aggCacheGet(cacheKey, () => buildCrewSchedulePayload(req.operatorId, q as CrewScheduleQuery))
   })
 
   // ── GET /crew-schedule/uncrewed ──────────────────────────────────────
@@ -705,12 +841,24 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
             .map((s) => s.trim())
             .filter(Boolean)
     const acTypeList = parseList(q.acType)
+    // CrewPosition._id list — used to scope which seat codes count as
+    // "missing" so the tray matches whatever scope the auto-roster run
+    // was actually given.
+    const positionIdList = parseList(q.position)
 
+    // Pairing.startDate/endDate are stored as YYYY-MM-DD UTC date strings.
+    // For non-UTC operators this slices off any pairing whose UTC date
+    // straddles the requested LOCAL boundary (e.g. a pairing reporting
+    // 00:40 LOCAL Apr 01 in HAN has startDate=2026-03-31 — would be
+    // dropped by `endDate >= 2026-04-01`). Widen the window by 1 day on
+    // each side; the post-fetch filter picks the precise set.
+    const widenedFrom = new Date(new Date(`${q.from}T00:00:00Z`).getTime() - 86_400_000).toISOString().slice(0, 10)
+    const widenedTo = new Date(new Date(`${q.to}T00:00:00Z`).getTime() + 86_400_000).toISOString().slice(0, 10)
     const pairingFilter: Record<string, unknown> = {
       operatorId,
       scenarioId: null,
-      endDate: { $gte: q.from },
-      startDate: { $lte: q.to },
+      endDate: { $gte: widenedFrom },
+      startDate: { $lte: widenedTo },
     }
     if (acTypeList.length > 0) pairingFilter.aircraftTypeIcao = { $in: acTypeList }
     if (q.baseAirport) pairingFilter.baseAirport = q.baseAirport
@@ -760,6 +908,14 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       assignmentsByPairing.set(a.pairingId, arr)
     }
     const posByCode = new Map(positions.map((p) => [p.code, p]))
+    // When ?position=<CrewPosition._id>[,...] is supplied, narrow the
+    // shortfall to ONLY those seat codes — matches the auto-roster scope
+    // so the tray count converges with Step 4's "Unassigned · N pairings".
+    const positionScopeIds = new Set(positionIdList)
+    const positionScopeSeatCodes = new Set(
+      positions.filter((p) => positionScopeIds.has(p._id as string)).map((p) => p.code),
+    )
+    const positionScoped = positionScopeSeatCodes.size > 0
 
     const uncrewed: Array<{
       pairingId: string
@@ -776,6 +932,7 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       for (const t of taken) takenBySeatPos.set(t.seatPositionId, (takenBySeatPos.get(t.seatPositionId) ?? 0) + 1)
       const missing: Array<{ seatPositionId: string; seatCode: string; count: number }> = []
       for (const [seatCode, needed] of Object.entries(counts)) {
+        if (positionScoped && !positionScopeSeatCodes.has(seatCode)) continue
         const seat = posByCode.get(seatCode)
         if (!seat) continue
         const already = takenBySeatPos.get(seat._id as string) ?? 0
@@ -1176,16 +1333,20 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       startUtcIso = body.startUtcIso
       endUtcIso = body.endUtcIso
     } else if (body.dateIso) {
+      // Activity code defaults like "00:00"/"23:59"/"08:00" are LOCAL times.
+      // Anchor to LOCAL midnight via operator offset so an OFF/SBY/REST
+      // doesn't silently shift by N hours for non-UTC bases.
+      const offsetH = await getOperatorDisplayOffsetHours(operatorId)
       const start = code.defaultStartTime ?? '00:00'
       const end = code.defaultEndTime ?? '23:59'
-      startUtcIso = `${body.dateIso}T${start.padEnd(5, '0')}:00.000Z`
-      endUtcIso = `${body.dateIso}T${end.padEnd(5, '0')}:00.000Z`
-      // If defaults invert across midnight, push end to next day.
+      startUtcIso = localTimeToUtcIso(body.dateIso, start, offsetH)
+      endUtcIso = localTimeToUtcIso(body.dateIso, end, offsetH)
+      // If defaults invert across midnight, push end to next LOCAL day.
       if (new Date(endUtcIso).getTime() <= new Date(startUtcIso).getTime()) {
         const nextDay = new Date(new Date(body.dateIso + 'T00:00:00Z').getTime() + 86_400_000)
           .toISOString()
           .slice(0, 10)
-        endUtcIso = `${nextDay}T${end.padEnd(5, '0')}:00.000Z`
+        endUtcIso = localTimeToUtcIso(nextDay, end, offsetH)
       }
     } else {
       return reply.code(400).send({ error: 'Provide either dateIso or (startUtcIso, endUtcIso)' })
@@ -1887,19 +2048,21 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const now = new Date().toISOString()
+    // Cache offset across the bulk batch — single Operator + Airport read.
+    const offsetH = await getOperatorDisplayOffsetHours(operatorId)
     const docs = items
       .map((it) => {
         const code = codeById.get(it.activityCodeId)
         if (!code) return null
         const start = code.defaultStartTime ?? '00:00'
         const end = code.defaultEndTime ?? '23:59'
-        const startUtcIso = `${it.dateIso}T${start.padEnd(5, '0')}:00.000Z`
-        let endUtcIso = `${it.dateIso}T${end.padEnd(5, '0')}:00.000Z`
+        const startUtcIso = localTimeToUtcIso(it.dateIso, start, offsetH)
+        let endUtcIso = localTimeToUtcIso(it.dateIso, end, offsetH)
         if (new Date(endUtcIso).getTime() <= new Date(startUtcIso).getTime()) {
           const nextDay = new Date(new Date(it.dateIso + 'T00:00:00Z').getTime() + 86_400_000)
             .toISOString()
             .slice(0, 10)
-          endUtcIso = `${nextDay}T${end.padEnd(5, '0')}:00.000Z`
+          endUtcIso = localTimeToUtcIso(nextDay, end, offsetH)
         }
         return {
           _id: crypto.randomUUID(),
@@ -1958,6 +2121,34 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
     const operatorId = req.operatorId
     const parsed = tempBaseBodySchema.safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.message })
+
+    // Reject same-airport temp-bases. A crew permanently based at HAN
+    // with a temp-base also set to HAN is a no-op that confuses the
+    // auto-roster scope filter (the orchestrator excludes pairings whose
+    // base differs from the temp airport — same-base would just
+    // duplicate the permanent assignment, no operational value).
+    const crewIds = [...new Set(parsed.data.entries.map((e) => e.crewId))]
+    const crewDocs = (await CrewMember.find(
+      { operatorId, _id: { $in: crewIds } },
+      { _id: 1, base: 1 },
+    ).lean()) as Array<{ _id: string; base?: string | null }>
+    const crewBaseId = new Map(crewDocs.map((c) => [c._id, c.base ?? null]))
+    const baseIds = [...new Set(crewDocs.map((c) => c.base).filter((b): b is string => !!b))]
+    const airportDocs = (await Airport.find({ _id: { $in: baseIds } }, { _id: 1, iataCode: 1 }).lean()) as Array<{
+      _id: string
+      iataCode?: string | null
+    }>
+    const baseIata = new Map(airportDocs.map((a) => [a._id, (a.iataCode ?? '').toUpperCase()]))
+    for (const e of parsed.data.entries) {
+      const baseId = crewBaseId.get(e.crewId)
+      const homeIata = baseId ? baseIata.get(baseId) : null
+      if (homeIata && homeIata === e.airportCode.toUpperCase()) {
+        return reply.code(400).send({
+          error: `Temp base ${e.airportCode.toUpperCase()} matches the crew's permanent base — pick a different airport.`,
+        })
+      }
+    }
+
     const userId = (req as { userId?: string | null }).userId ?? null
     const docs = parsed.data.entries.map((e) => ({
       _id: crypto.randomUUID(),
@@ -1998,8 +2189,81 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
   app.patch('/crew-schedule/temp-bases/:id', async (req, reply) => {
     const { id } = req.params as { id: string }
     const operatorId = req.operatorId
+    const q = req.query as { force?: string }
+    const force = q.force === 'true' || q.force === '1'
+
     const parsed = tempBasePatchSchema.safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.message })
+
+    const existing = await CrewTempBase.findOne({ _id: id, operatorId }).lean()
+    if (!existing) return reply.code(404).send({ error: 'Not found' })
+
+    // Same-airport guard mirrors POST: don't allow patching to the
+    // crew's permanent base.
+    if (parsed.data.airportCode) {
+      const crewDoc = (await CrewMember.findOne(
+        { operatorId, _id: existing.crewId as string },
+        { base: 1 },
+      ).lean()) as { base?: string | null } | null
+      if (crewDoc?.base) {
+        const apt = (await Airport.findOne({ _id: crewDoc.base }, { iataCode: 1 }).lean()) as {
+          iataCode?: string | null
+        } | null
+        const homeIata = (apt?.iataCode ?? '').toUpperCase()
+        if (homeIata && homeIata === parsed.data.airportCode.toUpperCase()) {
+          return reply.code(400).send({
+            error: `Temp base ${parsed.data.airportCode.toUpperCase()} matches the crew's permanent base — pick a different airport.`,
+          })
+        }
+      }
+    }
+
+    const newFromIso = parsed.data.fromIso ?? (existing.fromIso as string)
+    const newToIso = parsed.data.toIso ?? (existing.toIso as string)
+
+    // Cascade check — only when the date window actually moved. Airport
+    // changes don't invalidate flanking-day bookings (the booking row
+    // already records its own dep/arr stations).
+    const datesChanged =
+      (parsed.data.fromIso && parsed.data.fromIso !== existing.fromIso) ||
+      (parsed.data.toIso && parsed.data.toIso !== existing.toIso)
+
+    if (datesChanged) {
+      const expectedOutbound = shiftIsoDate(newFromIso, -1)
+      const expectedReturn = shiftIsoDate(newToIso, 1)
+      const activeBookings = await CrewFlightBooking.find({
+        operatorId,
+        tempBaseId: id,
+        status: { $ne: 'cancelled' },
+      }).lean()
+      const orphans = activeBookings.filter((b) => {
+        if (!b.flightDate || !b.direction) return false
+        const expected = b.direction === 'outbound' ? expectedOutbound : expectedReturn
+        return b.flightDate !== expected
+      })
+      if (orphans.length > 0 && !force) {
+        return reply.code(409).send({
+          error: 'BOOKING_OUT_OF_RANGE',
+          message: `${orphans.length} positioning booking(s) no longer match the new window.`,
+          orphans: orphans.map((b) => ({
+            _id: b._id,
+            direction: b.direction,
+            flightDate: b.flightDate,
+            depStation: b.depStation,
+            arrStation: b.arrStation,
+            method: b.method,
+          })),
+        })
+      }
+      if (orphans.length > 0 && force) {
+        const now = Date.now()
+        await CrewFlightBooking.updateMany(
+          { _id: { $in: orphans.map((b) => b._id) } },
+          { $set: { status: 'cancelled', cancelledAtUtcMs: now, updatedAtUtcMs: now } },
+        )
+      }
+    }
+
     const patch: Record<string, string> = {}
     if (parsed.data.fromIso) patch.fromIso = parsed.data.fromIso
     if (parsed.data.toIso) patch.toIso = parsed.data.toIso
@@ -2023,7 +2287,15 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
     const operatorId = req.operatorId
     const res = await CrewTempBase.deleteOne({ _id: id, operatorId })
     if (res.deletedCount === 0) return reply.code(404).send({ error: 'Not found' })
-    return { success: true }
+    // Cascade — soft-cancel any positioning bookings tied to this temp base.
+    // Audit trail is preserved (no hard delete) so HOTAC sees what was
+    // released when a temp base is dropped.
+    const now = Date.now()
+    const cancelled = await CrewFlightBooking.updateMany(
+      { operatorId, tempBaseId: id, status: { $ne: 'cancelled' } },
+      { $set: { status: 'cancelled', cancelledAtUtcMs: now, updatedAtUtcMs: now } },
+    )
+    return { success: true, cancelledBookings: cancelled.modifiedCount ?? 0 }
   })
 
   // ── DELETE /crew-schedule/assignments/bulk — wipe all crew assignments for

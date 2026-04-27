@@ -42,6 +42,42 @@ def _windows_conflict(a_start: int, a_end: int, b_start: int, b_end: int, rest_m
     return a_start < b_end + rest_min_ms and b_start < a_end + rest_min_ms
 
 
+def _add_bool_lex_lesseq(
+    model: cp_model.CpModel,
+    a: list[cp_model.IntVar],
+    b: list[cp_model.IntVar],
+) -> None:
+    """Enforce vector a <=_lex vector b for boolean (0/1) variables.
+
+    Manual encoding for ortools 9.15, which exposes no add_lex_lesseq on
+    CpModel. Walks the vectors once, carrying an `equal_so_far` boolean.
+    At each index, if equal_so_far is true, require a[i] <= b[i]; then
+    update equal_so_far := equal_so_far AND (a[i] == b[i]).
+    """
+    n = len(a)
+    if n == 0 or n != len(b):
+        return
+    prev_eq: cp_model.IntVar | None = None  # None == constant True
+    for i in range(n):
+        ai, bi = a[i], b[i]
+        if prev_eq is None:
+            model.add(ai <= bi)
+        else:
+            model.add(ai <= bi).only_enforce_if(prev_eq)
+        if i == n - 1:
+            break
+        same_i = model.new_bool_var("")
+        model.add(ai == bi).only_enforce_if(same_i)
+        model.add(ai != bi).only_enforce_if(~same_i)
+        if prev_eq is None:
+            prev_eq = same_i
+        else:
+            new_eq = model.new_bool_var("")
+            model.add_bool_and([prev_eq, same_i]).only_enforce_if(new_eq)
+            model.add_bool_or([~prev_eq, ~same_i]).only_enforce_if(~new_eq)
+            prev_eq = new_eq
+
+
 async def solve(request: SolveRequest) -> AsyncIterator[dict]:
     model = cp_model.CpModel()
 
@@ -103,7 +139,6 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
     sym_class_count = 0
     sym_crew_count = 0
     sym_constraints_added = 0
-    pi_sorted = list(range(n_pairings))
     for key, members in sym_classes.items():
         if len(members) < 2:
             continue
@@ -113,16 +148,20 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
         sym_class_count += 1
         sym_crew_count += len(members)
         members_sorted = sorted(members, key=lambda c: crew_ids[c])
-        # Build per-crew assignment vector aligned to pairing index order.
-        # Slots without a decision var (illegal pair) are pinned to 0 via
-        # constants so all vectors have the same length for add_lex_lesseq.
-        zero = model.new_constant(0)
-        vectors = []
-        for ci in members_sorted:
-            vec = [x[(ci, pi)] if (ci, pi) in x else zero for pi in pi_sorted]
-            vectors.append(vec)
+        # Members of a class share the exact same allowed_set, so the set
+        # of pairing indices with a decision var is identical for every
+        # member. Iterate only those — zero-padding the vector would just
+        # bloat the lex chain without changing semantics.
+        first_ci = members_sorted[0]
+        pi_active = [pi for pi in range(n_pairings) if (first_ci, pi) in x]
+        if not pi_active:
+            continue
+        vectors = [[x[(ci, pi)] for pi in pi_active] for ci in members_sorted]
+        # ortools 9.15 has no native lex_lesseq on CpModel — encode the
+        # boolean lex chain manually: prev <=lex curr iff at the first
+        # differing index, prev=0 and curr=1.
         for prev_vec, curr_vec in zip(vectors, vectors[1:]):
-            model.add_lex_lesseq(prev_vec, curr_vec)
+            _add_bool_lex_lesseq(model, prev_vec, curr_vec)
             sym_constraints_added += 1
     print(
         f"[solver] symmetry-breaking: {sym_class_count} classes, "
@@ -495,9 +534,12 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
     # ── Solve with SSE progress callbacks ──────────────────────────────────
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = float(request.time_limit_sec)
-    # Use all available CPU cores (was hard-capped at 4). CP-SAT scales nearly
-    # linearly with worker count up to physical-core count for portfolio search.
-    solver.parameters.num_workers = os.cpu_count() or 8
+    # Cap at 8 workers. CP-SAT scaling is sublinear past ~8 (diminishing
+    # returns from portfolio search) AND the 24-worker config destabilised
+    # ortools 9.15 on Windows + Python 3.14 — native crash mid-run with
+    # no Python traceback (sub-second silent termination after Roster #N).
+    # 8 is the proven sweet spot per ortools docs.
+    solver.parameters.num_workers = min(8, os.cpu_count() or 8)
     # Accept solutions within 2% of optimal — CP-SAT spends most of its time
     # chasing the last 1-2% with no operational benefit (rosters are equivalent
     # for crew). Pairs with the 30s no-improvement early stop below; first one
@@ -525,14 +567,16 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
     lns_mode = bool(request.lns_only)
     if lns_mode:
         solver.parameters.use_lns_only = True
-        solver.parameters.num_search_workers = max(8, solver.parameters.num_workers)
+        # Match the worker cap above so LNS doesn't sneak past 8.
+        solver.parameters.num_search_workers = solver.parameters.num_workers
 
     start_ts = time.monotonic()
 
     class ProgressCallback(cp_model.CpSolverSolutionCallback):
-        def __init__(self, queue: asyncio.Queue):
+        def __init__(self, queue: asyncio.Queue, slack_vars):
             super().__init__()
             self._queue = queue
+            self._slack_vars = slack_vars
             self._best = None
             self.last_pct = 20
             self.last_covered = 0
@@ -541,7 +585,11 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
 
         def on_solution_callback(self):
             obj = int(self.objective_value)
-            unassigned = obj // COVERAGE_WEIGHT
+            # Read slack vars directly — `obj // COVERAGE_WEIGHT` overshoots
+            # because the objective also contains BH-fairness, gender, idle,
+            # QoL, and soft-consec terms whose combined weight regularly
+            # exceeds COVERAGE_WEIGHT, producing a negative `covered`.
+            unassigned = sum(int(self.value(s)) for s in self._slack_vars)
             covered = len(pairing_ids) - unassigned
             pct = max(0, min(99, 100 - int(100 * unassigned / max(1, len(pairing_ids)))))
             improved = self._best is None or obj < self._best
@@ -566,7 +614,7 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
 
     loop = asyncio.get_event_loop()
     queue: asyncio.Queue = asyncio.Queue(maxsize=64)
-    cb = ProgressCallback(queue)
+    cb = ProgressCallback(queue, slack)
 
     # Emit initial event with model size so client knows work was accepted
     yield {

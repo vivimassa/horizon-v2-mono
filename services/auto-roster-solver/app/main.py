@@ -39,10 +39,23 @@ async def solve_endpoint(request: SolveRequest):
     """Run CP-SAT solver and stream results via SSE."""
 
     async def event_stream():
-        async for event in solve(request):
+        try:
+            async for event in solve(request):
+                yield {
+                    "event": event["event"],
+                    "data": json.dumps(event["data"]),
+                }
+        except Exception as e:
+            # Surface the real exception to the orchestrator. Without this
+            # wrapper, sse_starlette tears the TCP stream down and the Node
+            # client just sees undici's generic "terminated".
+            import traceback
+            traceback.print_exc()
             yield {
-                "event": event["event"],
-                "data": json.dumps(event["data"]),
+                "event": "error",
+                "data": json.dumps({
+                    "message": f"{type(e).__name__}: {e}",
+                }),
             }
 
     return EventSourceResponse(event_stream())

@@ -81,6 +81,29 @@ const crewMemberSchema = new Schema(
      *  dialog; owned by the Crew Master Data module. */
     hrNotes: { type: String, default: null },
 
+    // ── SkyHub Crew mobile app auth ─────────────────────────────────────
+    // PIN is 6 digits, bcrypt-hashed (salt 12 — same cost factor as User).
+    // pinHash is null until the crew member completes first-login set-PIN
+    // flow. tempPinHash is the one-time temp PIN issued by Crew Ops.
+    crewApp: {
+      pinHash: { type: String, default: null },
+      pinSetAt: { type: String, default: null },
+      tempPinHash: { type: String, default: null },
+      tempPinExpiresAt: { type: String, default: null },
+      pinFailedAttempts: { type: Number, default: 0 },
+      pinLockedUntil: { type: String, default: null },
+      lastLoginAt: { type: String, default: null },
+      pushTokens: [
+        {
+          _id: false,
+          token: { type: String, required: true },
+          platform: { type: String, enum: ['ios', 'android'], required: true },
+          registeredAt: { type: String, required: true },
+          lastUsedAt: { type: String, default: null },
+        },
+      ],
+    },
+
     createdAt: { type: String, default: () => new Date().toISOString() },
     updatedAt: { type: String, default: () => new Date().toISOString() },
   },

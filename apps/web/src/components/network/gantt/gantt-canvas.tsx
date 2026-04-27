@@ -22,7 +22,10 @@ import {
   drawSlotLines,
   drawMissingTimeFlags,
   drawOverlapFlags,
+  drawCrewLines,
 } from '@/lib/gantt/draw-helpers'
+import { useCrewLinesStore } from '@/stores/use-crew-lines-store'
+import { useOperatorStore } from '@/stores/use-operator-store'
 import { FlightTooltip } from './gantt-flight-tooltip'
 import { GanttContextMenu } from './gantt-context-menu'
 import { AircraftContextMenu } from './aircraft-context-menu'
@@ -101,6 +104,35 @@ export function GanttCanvas() {
     barsByRowRef.current = layout ? buildBarsByRow(layout.bars) : new Map()
   }, [layout])
 
+  // Crew lines overlay (Movement Control). Draws polylines through bars worked
+  // by the same crew member when the user opts in via the toolbar.
+  const crewLinesMode = useCrewLinesStore((s) => s.mode)
+  const crewLines = useCrewLinesStore((s) => s.lines)
+  const loadCrewLines = useCrewLinesStore((s) => s.load)
+  const clearCrewLines = useCrewLinesStore((s) => s.clear)
+  const operatorId = useOperatorStore((s) => s.operator?._id ?? null)
+
+  useEffect(() => {
+    if (crewLinesMode === 'off' || !operatorId || !periodFrom || !periodTo) {
+      return
+    }
+    const fromMs = new Date(periodFrom + 'T00:00:00Z').getTime()
+    const toMs = new Date(periodTo + 'T00:00:00Z').getTime() + 86_400_000
+    const focusFlightId =
+      crewLinesMode === 'selected' && selectedFlightIds.size > 0 ? Array.from(selectedFlightIds)[0] : undefined
+    if (crewLinesMode === 'selected' && !focusFlightId) {
+      clearCrewLines()
+      return
+    }
+    void loadCrewLines({
+      operatorId,
+      fromUtcMs: fromMs,
+      toUtcMs: toMs,
+      flightId: focusFlightId,
+      scenarioId,
+    })
+  }, [crewLinesMode, operatorId, periodFrom, periodTo, selectedFlightIds, scenarioId, loadCrewLines, clearCrewLines])
+
   // ── Draw ──
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -133,6 +165,9 @@ export function GanttCanvas() {
     if (showOverlaps) drawOverlapFlags(ctx, barsByRowRef.current, sx, sy, vw, vh)
     if (showTat) drawTatLabels(ctx, barsByRowRef.current, sx, sy, vw, vh, isDark)
     drawNightstopLabels(ctx, barsByRowRef.current, sx, sy, vw, vh, isDark)
+    if (crewLinesMode !== 'off' && crewLines.length > 0) {
+      drawCrewLines(ctx, crewLines, layout.bars, sx, sy, vw, vh)
+    }
 
     // Drag & drop visuals
     const df = dragFlightRef.current
@@ -178,6 +213,8 @@ export function GanttCanvas() {
     showDelays,
     oooiGraceMins,
     scenarioId,
+    crewLinesMode,
+    crewLines,
   ])
 
   const drawRef = useRef(draw)

@@ -13,6 +13,11 @@ import { OptimizerRun } from '../models/OptimizerRun.js'
 import { SlotSeries } from '../models/SlotSeries.js'
 import { SlotDate } from '../models/SlotDate.js'
 import { MovementMessageLog } from '../models/MovementMessageLog.js'
+import { Pairing } from '../models/Pairing.js'
+import { CrewAssignment } from '../models/CrewAssignment.js'
+import { CrewMember } from '../models/CrewMember.js'
+import { CrewPosition } from '../models/CrewPosition.js'
+import { resolveCrewForFlight } from '../services/flight-crew-resolver.js'
 import { encodeMvtMessage } from '@skyhub/logic/src/iata/mvt-encoder'
 import type { MvtActionCode } from '@skyhub/logic/src/iata/types'
 
@@ -1107,6 +1112,14 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
     // Per-date tail from FlightInstance overrides ScheduledFlight default
     const tailReg = instance?.tail?.registration ?? (sf.aircraftReg as string) ?? null
 
+    // Operational crew on FlightInstance is reserved for check-in overrides.
+    // When unset, fall back to rostered crew computed from Pairing → CrewAssignment.
+    const operationalCrew = instance?.crew ?? []
+    const rostered =
+      operationalCrew.length === 0
+        ? await resolveCrewForFlight(q.operatorId, q.sfId, q.opDate)
+        : { crew: [], pairings: [] }
+
     const [depAirport, arrAirport, acType, acReg, lopa] = await Promise.all([
       findAirport(sf.depStation as string),
       findAirport(sf.arrStation as string),
@@ -1237,7 +1250,29 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
         reason: d.reason ?? '',
         category: d.category ?? '',
       })),
-      crew: (instance?.crew ?? []).map((c) => ({ employeeId: c.employeeId, role: c.role, name: c.name })),
+      crew:
+        operationalCrew.length > 0
+          ? operationalCrew.map((c) => ({
+              employeeId: c.employeeId,
+              role: c.role,
+              name: c.name,
+              source: 'operational' as const,
+              pairingId: null,
+              pairingCode: null,
+              status: null,
+              crewId: null,
+            }))
+          : rostered.crew.map((c) => ({
+              employeeId: c.employeeId,
+              role: c.role,
+              name: c.name,
+              source: 'rostered' as const,
+              pairingId: c.pairingId,
+              pairingCode: c.pairingCode,
+              status: c.status,
+              crewId: c.crewId,
+            })),
+      pairings: rostered.pairings,
       memos: (instance?.memos ?? []).map((m) => ({
         id: m.id,
         category: m.category ?? 'general',
@@ -2245,4 +2280,198 @@ export async function ganttRoutes(app: FastifyInstance): Promise<void> {
       scheduledFlightCount: scheduledFlights.length,
     }
   })
+
+  // ── GET /gantt/crew-lines — connect crew across flight legs for the Movement Control overlay ──
+  //
+  // Returns one "line" per crew member whose Pairing legs intersect the requested
+  // window. Each line carries its leg segments in chronological order so the canvas
+  // can polyline through the centroids of the matching flight bars. Two modes:
+  //  - flightId set: only crew on that specific flight (fan out to their other legs)
+  //  - flightId unset: every active crew in the window (use sparingly)
+  app.get('/gantt/crew-lines', async (req, reply) => {
+    const q = req.query as Record<string, string>
+    if (!q.operatorId || !q.fromUtcMs || !q.toUtcMs) {
+      return reply.code(400).send({ error: 'operatorId, fromUtcMs, toUtcMs required' })
+    }
+    const fromMs = Number(q.fromUtcMs)
+    const toMs = Number(q.toUtcMs)
+    if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || toMs <= fromMs) {
+      return reply.code(400).send({ error: 'fromUtcMs/toUtcMs must be a valid range' })
+    }
+    const fromIso = new Date(fromMs).toISOString()
+    const toIso = new Date(toMs).toISOString()
+    const scenarioId = q.scenarioId ?? null
+
+    // Step 1 — find pairing scope for the window. If a focus flightId is given,
+    // first locate its pairings, then fan out to every CrewAssignment crewId, then
+    // load EVERY pairing those crew touch in the window.
+    const focusFlightId = q.flightId
+    let scopedPairingIds: string[]
+    if (focusFlightId) {
+      const focusPairings = await Pairing.find({
+        operatorId: q.operatorId,
+        scenarioId,
+        'legs.flightId': focusFlightId,
+      })
+        .lean()
+        .select({ _id: 1 })
+      const focusIds = focusPairings.map((p) => p._id)
+      if (focusIds.length === 0) return { lines: [] }
+
+      const crewOnFocus = await CrewAssignment.find({
+        operatorId: q.operatorId,
+        scenarioId,
+        pairingId: { $in: focusIds },
+        status: { $ne: 'cancelled' },
+      })
+        .lean()
+        .select({ crewId: 1 })
+      const focusCrewIds = Array.from(new Set(crewOnFocus.map((a) => a.crewId)))
+      if (focusCrewIds.length === 0) return { lines: [] }
+
+      const expanded = await CrewAssignment.find({
+        operatorId: q.operatorId,
+        scenarioId,
+        crewId: { $in: focusCrewIds },
+        status: { $ne: 'cancelled' },
+        startUtcIso: { $lte: toIso },
+        endUtcIso: { $gte: fromIso },
+      })
+        .lean()
+        .select({ pairingId: 1 })
+      scopedPairingIds = Array.from(new Set(expanded.map((a) => a.pairingId)))
+    } else {
+      const windowAssignments = await CrewAssignment.find({
+        operatorId: q.operatorId,
+        scenarioId,
+        status: { $ne: 'cancelled' },
+        startUtcIso: { $lte: toIso },
+        endUtcIso: { $gte: fromIso },
+      })
+        .lean()
+        .select({ pairingId: 1 })
+      scopedPairingIds = Array.from(new Set(windowAssignments.map((a) => a.pairingId)))
+    }
+
+    if (scopedPairingIds.length === 0) return { lines: [] }
+
+    // Step 2 — load pairings + assignments + crew/seat dictionaries in parallel
+    const [pairings, assignments] = await Promise.all([
+      Pairing.find({ operatorId: q.operatorId, _id: { $in: scopedPairingIds } })
+        .lean()
+        .select({ _id: 1, legs: 1 }),
+      CrewAssignment.find({
+        operatorId: q.operatorId,
+        scenarioId,
+        pairingId: { $in: scopedPairingIds },
+        status: { $ne: 'cancelled' },
+      })
+        .lean()
+        .select({ crewId: 1, pairingId: 1, seatPositionId: 1 }),
+    ])
+
+    const crewIds = Array.from(new Set(assignments.map((a) => a.crewId)))
+    const seatIds = Array.from(new Set(assignments.map((a) => a.seatPositionId)))
+    const [members, seats] = await Promise.all([
+      CrewMember.find({ operatorId: q.operatorId, _id: { $in: crewIds } })
+        .lean()
+        .select({ _id: 1, firstName: 1, lastName: 1 }),
+      CrewPosition.find({ operatorId: q.operatorId, _id: { $in: seatIds } })
+        .lean()
+        .select({ _id: 1, code: 1 }),
+    ])
+
+    const memberById = new Map(members.map((m) => [m._id, m]))
+    const seatCodeById = new Map(seats.map((s) => [s._id, s.code]))
+    const pairingById = new Map(pairings.map((p) => [p._id, p]))
+
+    // Step 3 — group by crewId, fan to leg segments
+    type Segment = {
+      flightId: string
+      flightDate: string
+      stdMs: number
+      staMs: number
+      depStation: string
+      arrStation: string
+      pairingId: string
+      isDeadhead: boolean
+    }
+    const linesByCrew = new Map<string, { name: string; role: string; segments: Segment[] }>()
+
+    for (const a of assignments) {
+      const m = memberById.get(a.crewId)
+      if (!m) continue
+      const pairing = pairingById.get(a.pairingId)
+      if (!pairing) continue
+
+      let entry = linesByCrew.get(a.crewId)
+      if (!entry) {
+        entry = {
+          name: `${m.firstName} ${m.lastName}`.trim(),
+          role: seatCodeById.get(a.seatPositionId) ?? 'UNK',
+          segments: [],
+        }
+        linesByCrew.set(a.crewId, entry)
+      }
+
+      for (const leg of pairing.legs ?? []) {
+        const stdMs = new Date(leg.stdUtcIso).getTime()
+        const staMs = new Date(leg.staUtcIso).getTime()
+        if (!Number.isFinite(stdMs) || !Number.isFinite(staMs)) continue
+        if (staMs < fromMs || stdMs > toMs) continue
+        entry.segments.push({
+          flightId: leg.flightId,
+          flightDate: leg.flightDate,
+          stdMs,
+          staMs,
+          depStation: leg.depStation,
+          arrStation: leg.arrStation,
+          pairingId: a.pairingId,
+          isDeadhead: !!leg.isDeadhead,
+        })
+      }
+    }
+
+    // De-dup segments (multiple assignments per pairing → same legs repeat) + sort
+    const lines = Array.from(linesByCrew.entries()).map(([crewId, entry]) => {
+      const seen = new Set<string>()
+      const unique: Segment[] = []
+      for (const s of entry.segments.sort((a, b) => a.stdMs - b.stdMs)) {
+        const key = `${s.flightId}|${s.flightDate}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        unique.push(s)
+      }
+      return {
+        crewId,
+        name: entry.name,
+        role: entry.role,
+        color: crewLineColor(crewId),
+        segments: unique,
+      }
+    })
+
+    return { lines }
+  })
+}
+
+/** Deterministic palette — same crewId always maps to the same hue. */
+function crewLineColor(crewId: string): string {
+  const palette = [
+    '#3B82F6',
+    '#14B8A6',
+    '#F97316',
+    '#A855F7',
+    '#EC4899',
+    '#22C55E',
+    '#EAB308',
+    '#06B6D4',
+    '#F43F5E',
+    '#84CC16',
+  ]
+  let hash = 0
+  for (let i = 0; i < crewId.length; i++) {
+    hash = (hash * 31 + crewId.charCodeAt(i)) | 0
+  }
+  return palette[Math.abs(hash) % palette.length]
 }

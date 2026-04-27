@@ -749,3 +749,94 @@ export function drawMissingTimeFlags(
     }
   }
 }
+
+// ── Crew Lines (Movement Control overlay) ──
+
+export interface CrewLineSegmentForDraw {
+  flightId: string
+  /** Used as a fallback x-anchor when the flight has no bar in this layout. */
+  stdMs: number
+  staMs: number
+}
+
+export interface CrewLineForDraw {
+  crewId: string
+  name: string
+  role: string
+  color: string
+  segments: CrewLineSegmentForDraw[]
+}
+
+/**
+ * Draw polylines connecting flight bars worked by the same crew member.
+ * Each line passes through the centroid of every bar in `segments[]` (chronological).
+ * Bars not present in this layout (e.g. crew flying for a different operator on
+ * a connection) are skipped without breaking the polyline.
+ *
+ * Visual: 1.5px line, 0.6 alpha, deterministic color per crewId. Drawn on top
+ * of bars but below tooltips/now-line.
+ */
+export function drawCrewLines(
+  ctx: CanvasRenderingContext2D,
+  lines: CrewLineForDraw[],
+  bars: BarLayout[],
+  sx: number,
+  sy: number,
+  vw: number,
+  vh: number,
+) {
+  if (lines.length === 0 || bars.length === 0) return
+  const barByFlightId = new Map<string, BarLayout>()
+  for (const b of bars) barByFlightId.set(b.flightId, b)
+
+  ctx.save()
+  ctx.lineWidth = 1.5
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.globalAlpha = 0.6
+
+  for (const line of lines) {
+    const points: Array<{ x: number; y: number }> = []
+    for (const seg of line.segments) {
+      const bar = barByFlightId.get(seg.flightId)
+      if (!bar) continue
+      points.push({
+        x: bar.x + bar.width / 2,
+        y: bar.y + bar.height / 2,
+      })
+    }
+    if (points.length < 2) continue
+
+    // Cull lines whose bounding box lies entirely outside the viewport.
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    for (const p of points) {
+      if (p.x < minX) minX = p.x
+      if (p.x > maxX) maxX = p.x
+      if (p.y < minY) minY = p.y
+      if (p.y > maxY) maxY = p.y
+    }
+    if (maxX < sx || minX > sx + vw || maxY < sy || minY > sy + vh) continue
+
+    ctx.strokeStyle = line.color
+    ctx.beginPath()
+    ctx.moveTo(points[0].x, points[0].y)
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y)
+    }
+    ctx.stroke()
+
+    // Endpoint dots so users can see where each leg's connection terminates
+    // even when the line crosses many cluttered rows.
+    ctx.fillStyle = line.color
+    for (const p of points) {
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+
+  ctx.restore()
+}

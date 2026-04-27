@@ -24,6 +24,7 @@ import {
   CheckCircle,
   CalendarClock,
   Crosshair,
+  Users,
   MessageSquare,
   Radio,
   SlidersHorizontal,
@@ -36,6 +37,7 @@ import { Tooltip } from '@/components/ui/tooltip'
 import { RibbonSection, RibbonBtn, RibbonDivider as Divider } from '@/components/ui/ribbon-primitives'
 import { FormatPopover } from '@/components/ui/format-popover'
 import { useGanttStore } from '@/stores/use-gantt-store'
+import { useCrewLinesStore } from '@/stores/use-crew-lines-store'
 import { BulkAssignDialog } from '@/components/network/gantt/bulk-assign-dialog'
 import { RecoveryDialog } from './recovery-dialog'
 import { RecoveryParametersPanel } from './recovery-parameters-panel'
@@ -68,6 +70,18 @@ export function OpsToolbar({
 
   const singleSelectedFlightId = selectedFlightIds.size === 1 ? [...selectedFlightIds][0] : null
   const toggleTat = useGanttStore((s) => s.toggleTat)
+  const crewLinesMode = useCrewLinesStore((s) => s.mode)
+  const setCrewLinesMode = useCrewLinesStore((s) => s.setMode)
+  const cycleCrewLines = useCallback(() => {
+    setCrewLinesMode(crewLinesMode === 'off' ? 'selected' : crewLinesMode === 'selected' ? 'all' : 'off')
+  }, [crewLinesMode, setCrewLinesMode])
+  const crewLinesLabel = crewLinesMode === 'all' ? 'Crew (All)' : crewLinesMode === 'selected' ? 'Crew (Sel)' : 'Crew'
+  const crewLinesTooltip =
+    crewLinesMode === 'off'
+      ? 'Show crew lines for selected flight (click again for all)'
+      : crewLinesMode === 'selected'
+        ? 'Showing crew lines for selected flight — click for all crew in window'
+        : 'Showing crew lines for all crew in window — click to hide'
   const refreshIntervalMins = useGanttStore((s) => s.refreshIntervalMins)
   const setRefreshIntervalMins = useGanttStore((s) => s.setRefreshIntervalMins)
   // showMissingTimes removed from Display — controlled by alertCategories.missingTimes
@@ -753,6 +767,16 @@ export function OpsToolbar({
               hoverBg={hoverBg}
               activeBg={activeBg}
               tooltip={showTat ? 'Hide turnaround times' : 'Show turnaround times'}
+            />
+            <RibbonBtn
+              icon={Users}
+              label={crewLinesLabel}
+              onClick={cycleCrewLines}
+              active={crewLinesMode !== 'off'}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip={crewLinesTooltip}
             />
             <RibbonBtn
               icon={Crosshair}

@@ -26,7 +26,11 @@ const PUBLIC_PATHS = [
   // per-operator inboundMessageToken. Feeds GET /feed-status on the OCC wall.
   '/feeds/heartbeat',
 ]
-const PUBLIC_PREFIXES = ['/uploads/']
+// /crew-app/* is the SkyHub Crew mobile app surface. It has its own JWT
+// scope ('crew') and its own onRequest hook in routes/crew-app/*. The main
+// auth middleware skips the entire prefix so crew tokens (which lack
+// userId) never get wired into ops request decorators.
+const PUBLIC_PREFIXES = ['/uploads/', '/crew-app/']
 
 const INTERNAL_PATHS = ['/gantt/seed-oooi']
 
@@ -54,7 +58,14 @@ export function registerAuthMiddleware(app: FastifyInstance) {
         userId: string
         operatorId: string
         role: string
+        scope?: string
       }>()
+
+      // Crew-scoped tokens (issued by /crew-app/auth/login) cannot access
+      // the ops API. Reject hard — never silently downgrade.
+      if (decoded.scope === 'crew') {
+        return reply.code(403).send({ error: 'Crew token cannot access ops API' })
+      }
 
       request.userId = decoded.userId
       request.operatorId = decoded.operatorId

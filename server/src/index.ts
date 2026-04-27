@@ -13,6 +13,10 @@ import fastifyStatic from '@fastify/static'
 import { connectDB } from './db/connection.js'
 import { registerAuthMiddleware } from './middleware/authenticate.js'
 import { authRoutes } from './routes/auth.js'
+import { crewAppAuthRoutes } from './routes/crew-app-auth.js'
+import { crewAppSyncRoutes } from './routes/crew-app-sync.js'
+import { crewAppPushTokenRoutes } from './routes/crew-app-push-tokens.js'
+import { registerCrewChangeEmitter } from './services/crew-change-emitter.js'
 import { flightRoutes } from './routes/flights.js'
 import { referenceRoutes } from './routes/reference.js'
 import { userRoutes } from './routes/users.js'
@@ -146,6 +150,14 @@ async function main(): Promise<void> {
 
   // Routes
   await app.register(authRoutes)
+  await app.register(crewAppAuthRoutes)
+  await app.register(crewAppSyncRoutes)
+  await app.register(crewAppPushTokenRoutes)
+
+  // Wire Mongoose post-save hooks → Expo Push fanout (SkyHub Crew app).
+  // Must run after models are loaded (they are — registered as side-effects
+  // of the route imports above).
+  registerCrewChangeEmitter()
   await app.register(flightRoutes)
   await app.register(referenceRoutes)
   await app.register(userRoutes)

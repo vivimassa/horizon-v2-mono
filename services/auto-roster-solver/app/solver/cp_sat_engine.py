@@ -136,26 +136,34 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
         )
         sym_classes.setdefault(key, []).append(ci)
 
+    # Budget guard: lex chain cost ≈ class_size × n_active_pairings booleans.
+    # Above the budget the chain hurts more than it helps — CP-SAT spends all
+    # its time satisfying lex order instead of finding good assignments. The
+    # old `> 200 members` guard fired too late: a 125-crew class with 2000
+    # pairings still pays 250k extra booleans. Switch to a work-product cap.
+    SYM_WORK_BUDGET = 5000
     sym_class_count = 0
     sym_crew_count = 0
     sym_constraints_added = 0
+    sym_classes_skipped_budget = 0
     for key, members in sym_classes.items():
         if len(members) < 2:
             continue
-        # Lex chain itself becomes a perf cost on very large classes.
-        if len(members) > 200:
-            continue
-        sym_class_count += 1
-        sym_crew_count += len(members)
         members_sorted = sorted(members, key=lambda c: crew_ids[c])
-        # Members of a class share the exact same allowed_set, so the set
-        # of pairing indices with a decision var is identical for every
-        # member. Iterate only those — zero-padding the vector would just
-        # bloat the lex chain without changing semantics.
         first_ci = members_sorted[0]
         pi_active = [pi for pi in range(n_pairings) if (first_ci, pi) in x]
         if not pi_active:
             continue
+        # Skip classes whose lex-chain cost would dwarf the rest of the model.
+        if len(members) * len(pi_active) > SYM_WORK_BUDGET:
+            sym_classes_skipped_budget += 1
+            continue
+        sym_class_count += 1
+        sym_crew_count += len(members)
+        # Members of a class share the exact same allowed_set, so the set
+        # of pairing indices with a decision var is identical for every
+        # member. Iterate only those — zero-padding the vector would just
+        # bloat the lex chain without changing semantics.
         vectors = [[x[(ci, pi)] for pi in pi_active] for ci in members_sorted]
         # ortools 9.15 has no native lex_lesseq on CpModel — encode the
         # boolean lex chain manually: prev <=lex curr iff at the first
@@ -166,7 +174,8 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
     print(
         f"[solver] symmetry-breaking: {sym_class_count} classes, "
         f"{sym_crew_count} total crew in classes >1, "
-        f"{sym_constraints_added} constraints added",
+        f"{sym_constraints_added} constraints added "
+        f"(skipped {sym_classes_skipped_budget} over budget)",
         flush=True,
     )
 
@@ -531,6 +540,77 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
 
     model.minimize(sum(obj_terms))
 
+    # ── Greedy warm-start hint ────────────────────────────────────────────
+    # Without a hint CP-SAT begins from the all-zero solution (every pairing
+    # unassigned). For exact-mode runs this means the first feasible solution
+    # the solver finds is ~0% filled, then it spends 100s+ of search just to
+    # nudge coverage up a few percent — by the time the no-improvement timer
+    # fires, the run accepts a nearly-empty roster.
+    #
+    # Build a fast greedy roster (sort pairings by start, assign each to the
+    # legal crew with lowest accumulated block hours that doesn't violate
+    # rest or sibling-seat mutex) and feed it in as a CP-SAT hint. The solver
+    # will use it as the starting point and improve from there. Hints are
+    # advisory: if greedy violates any constraint the solver silently ignores
+    # them. They never make the solution worse than no-hint.
+    pairings_sorted = sorted(
+        range(n_pairings),
+        key=lambda pi: pairing_by_id[pairing_ids[pi]].start_utc_ms or 0,
+    )
+    # Per-crew state for greedy:
+    greedy_intervals: dict[int, list[tuple[int, int]]] = {ci: [] for ci in range(len(crew_ids))}
+    greedy_bh: dict[int, int] = {ci: 0 for ci in range(len(crew_ids))}
+    greedy_parents: dict[int, set[str]] = {ci: set() for ci in range(len(crew_ids))}
+    greedy_assignments: dict[int, int] = {}  # pi -> ci
+
+    for pi in pairings_sorted:
+        pid = pairing_ids[pi]
+        p = pairing_by_id[pid]
+        parent = p.parent_pairing_id or pid
+        # Candidate crew: those with a decision var for this pairing.
+        candidates = []
+        for ci in range(len(crew_ids)):
+            if (ci, pi) not in x:
+                continue
+            if parent in greedy_parents[ci]:
+                continue
+            # Rest check vs already-assigned intervals.
+            ok = True
+            if p.start_utc_ms > 0 and p.end_utc_ms > 0:
+                for (a_start, a_end) in greedy_intervals[ci]:
+                    if _windows_conflict(a_start, a_end, p.start_utc_ms, p.end_utc_ms, rest_min_ms):
+                        ok = False
+                        break
+            if not ok:
+                continue
+            candidates.append(ci)
+        if not candidates:
+            continue
+        # Pick least-loaded crew. Tie-break by lower ci for determinism.
+        best_ci = min(candidates, key=lambda ci: (greedy_bh[ci], ci))
+        greedy_assignments[pi] = best_ci
+        greedy_bh[best_ci] += int(p.bh_min or 0)
+        if p.start_utc_ms > 0 and p.end_utc_ms > 0:
+            greedy_intervals[best_ci].append((p.start_utc_ms, p.end_utc_ms))
+        greedy_parents[best_ci].add(parent)
+
+    greedy_filled = len(greedy_assignments)
+    print(
+        f"[solver] greedy warm-start: {greedy_filled}/{n_pairings} pairings "
+        f"({100 * greedy_filled // max(1, n_pairings)}%)",
+        flush=True,
+    )
+    # Apply hints. For assigned (ci, pi): x=1, slack_pi=0. For unassigned
+    # pairings: slack_pi=1. Non-hinted x vars remain free.
+    for pi, ci in greedy_assignments.items():
+        var = x.get((ci, pi))
+        if var is not None:
+            model.add_hint(var, 1)
+        model.add_hint(slack[pi], 0)
+    for pi in range(n_pairings):
+        if pi not in greedy_assignments:
+            model.add_hint(slack[pi], 1)
+
     # ── Solve with SSE progress callbacks ──────────────────────────────────
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = float(request.time_limit_sec)
@@ -582,6 +662,7 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
             self.last_covered = 0
             self.solution_count = 0
             self.last_improvement_ts = time.monotonic()
+            self.full_coverage_ts: float | None = None
 
         def on_solution_callback(self):
             obj = int(self.objective_value)
@@ -591,10 +672,14 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
             # exceeds COVERAGE_WEIGHT, producing a negative `covered`.
             unassigned = sum(int(self.value(s)) for s in self._slack_vars)
             covered = len(pairing_ids) - unassigned
-            pct = max(0, min(99, 100 - int(100 * unassigned / max(1, len(pairing_ids)))))
+            # Allow 100 once fully covered — old min(99, ...) cap was a
+            # progress-bar workaround that hid the operational milestone.
+            pct = max(0, min(100, 100 - int(100 * unassigned / max(1, len(pairing_ids)))))
             improved = self._best is None or obj < self._best
             if improved:
                 self.last_improvement_ts = time.monotonic()
+            if unassigned == 0 and self.full_coverage_ts is None:
+                self.full_coverage_ts = time.monotonic()
             self.last_pct = pct
             self.last_covered = covered
             self.solution_count += 1
@@ -636,7 +721,14 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
     # CP-SAT may spend long time before first feasible solution; without
     # heartbeats the SSE stream looks dead to the client.
     # Early stop: if no improvement for NO_IMPROVEMENT_STOP_SEC, abort search.
-    NO_IMPROVEMENT_STOP_SEC = 30.0
+    # Scale cutoff with problem size — a 142×2130 cockpit run needs more time
+    # to escape local optima than a 30×400 toy run. Floor 30s, ceiling 180s.
+    problem_size = len(crew_ids) * len(pairing_ids)
+    NO_IMPROVEMENT_STOP_SEC = float(max(30, min(180, problem_size // 2000)))
+    # Once 100% coverage reached, secondary terms (BH spread / idle / QoL)
+    # produce only microscopic objective gains. Cap post-coverage grind to
+    # this many seconds total — beyond that the roster is good enough.
+    POST_COVERAGE_GRIND_SEC = 30.0
     heartbeat_interval = 2.0
     next_heartbeat = time.monotonic() + heartbeat_interval
     early_stopped = False
@@ -647,8 +739,26 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
         except asyncio.TimeoutError:
             pass
         now = time.monotonic()
-        # Early stop check — only after we have at least one solution.
+        # Post-coverage grind cap: once 100% coverage hit, give POST_COVERAGE_GRIND_SEC
+        # for fairness polishing then stop. Solver otherwise hunts BH-spread
+        # micro-improvements (sub-millisecond block hours moves) for minutes.
         if (
+            not early_stopped
+            and cb.full_coverage_ts is not None
+            and (now - cb.full_coverage_ts) >= POST_COVERAGE_GRIND_SEC
+        ):
+            solver.stop_search()
+            early_stopped = True
+            yield {
+                "event": "progress",
+                "data": {
+                    "pct": cb.last_pct,
+                    "message": f"100% coverage reached — accepting roster after {int(POST_COVERAGE_GRIND_SEC)}s fairness polish",
+                    "best_obj": cb._best,
+                },
+            }
+        # Early stop check — only after we have at least one solution.
+        elif (
             not early_stopped
             and cb.solution_count > 0
             and (now - cb.last_improvement_ts) >= NO_IMPROVEMENT_STOP_SEC

@@ -81,7 +81,21 @@ export interface FlightDetail {
   fuel: { initial: number | null; uplift: number | null; burn: number | null; flightPlan: number | null } | null
   cargo: Array<{ category: string; weight: number | null; pieces: number | null }>
   delays: Array<{ code: string; minutes: number; reason: string; category: string }>
-  crew: Array<{ employeeId: string; role: string; name: string }>
+  crew: Array<{
+    employeeId: string
+    role: string
+    name: string
+    /** 'operational' = check-in override on FlightInstance.crew[];
+     *  'rostered'    = computed from Pairing → CrewAssignment. */
+    source: 'operational' | 'rostered'
+    pairingId: string | null
+    pairingCode: string | null
+    status: 'planned' | 'confirmed' | 'rostered' | 'cancelled' | null
+    crewId: string | null
+  }>
+  /** Pairings whose legs include this flight. Empty when the flight is
+   *  not yet rostered. Used by the Crew tab to deep-link into Crew Ops. */
+  pairings: Array<{ id: string; code: string }>
   memos: Array<{ id: string; category: string; content: string; author: string; pinned: boolean; createdAt: string }>
   connections: {
     outgoing: Array<{ flightNumber: string; pax: number }>

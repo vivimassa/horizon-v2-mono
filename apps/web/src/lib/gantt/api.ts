@@ -208,3 +208,41 @@ export async function deleteOptimizerRun(operatorId: string, runId: string): Pro
   if (!res.ok) throw new Error(`Delete optimizer run API ${res.status}`)
   return res.json()
 }
+
+export interface CrewLineSegment {
+  flightId: string
+  flightDate: string
+  stdMs: number
+  staMs: number
+  depStation: string
+  arrStation: string
+  pairingId: string
+  isDeadhead: boolean
+}
+
+export interface CrewLine {
+  crewId: string
+  name: string
+  role: string
+  color: string
+  segments: CrewLineSegment[]
+}
+
+export async function fetchCrewLines(params: {
+  operatorId: string
+  fromUtcMs: number
+  toUtcMs: number
+  flightId?: string
+  scenarioId?: string
+}): Promise<{ lines: CrewLine[] }> {
+  const qs = new URLSearchParams({
+    operatorId: params.operatorId,
+    fromUtcMs: String(params.fromUtcMs),
+    toUtcMs: String(params.toUtcMs),
+  })
+  if (params.flightId) qs.set('flightId', params.flightId)
+  if (params.scenarioId) qs.set('scenarioId', params.scenarioId)
+  const res = await authedFetch(`${API_BASE}/gantt/crew-lines?${qs}`)
+  if (!res.ok) throw new Error(`Crew lines API ${res.status}`)
+  return res.json()
+}

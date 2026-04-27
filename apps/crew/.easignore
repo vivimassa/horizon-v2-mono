@@ -1,0 +1,45 @@
+# Workspace node_modules — EAS reinstalls deps on the build VM, no need
+# to ship 500MB of dev tooling, native build artifacts, etc.
+node_modules
+**/node_modules
+
+# Other apps in the monorepo — crew app doesn't need them at build time.
+# Workspace packages it DOES need (@skyhub/*) come in via package.json
+# resolution which EAS handles via npm install.
+../mobile
+../web
+
+# Server + services
+../../server
+../../services
+
+# Other workspace packages crew doesn't depend on
+../../packages/api
+../../packages/ui
+../../packages/types
+../../packages/eslint-config
+../../packages/env
+
+# Build / cache
+**/dist
+**/.turbo
+**/.next
+**/.expo
+**/.metro-cache
+**/coverage
+**/.cache
+
+# Git, editor, OS
+.git
+.vscode
+.idea
+.DS_Store
+
+# Secrets — already in .gitignore but belt+suspenders
+.secret/
+.secrets/
+*.serviceaccount.json
+fcm-*.json
+google-services.json
+GoogleService-Info.plist
+.env*

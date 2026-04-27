@@ -3,8 +3,10 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { pipeline } from 'node:stream/promises'
-import type { FastifyInstance } from 'fastify'
+import bcrypt from 'bcryptjs'
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { CrewMember } from '../models/CrewMember.js'
+import { CREW_TEMP_PIN_TTL_HOURS } from './crew-app-auth.js'
 import { CrewPhone } from '../models/CrewPhone.js'
 import { CrewPassport } from '../models/CrewPassport.js'
 import { CrewLicense } from '../models/CrewLicense.js'
@@ -262,6 +264,71 @@ export async function crewRoutes(app: FastifyInstance): Promise<void> {
       },
     )
     return { success: true }
+  })
+
+  // ─── Issue temp PIN for SkyHub Crew mobile app first-login ────────────
+  // Generates a one-time 6-digit PIN, bcrypts it onto
+  // CrewMember.crewApp.tempPinHash (TTL 72h), and returns the plaintext
+  // PIN exactly once. Admin reads the toast/copy-to-clipboard and passes
+  // it to the crew member out-of-band (SMS, hand-off). The plaintext PIN
+  // is never stored — only its hash. Crew uses it at the /login/set-pin
+  // screen to set their permanent PIN.
+  //
+  // RBAC: administrator + manager only (issuing a PIN = full account
+  // takeover ability for that crew member).
+  const ADMIN_ROLES = new Set(['administrator', 'manager'])
+  async function requireCrewAdmin(req: FastifyRequest, reply: FastifyReply) {
+    if (!ADMIN_ROLES.has(req.userRole)) {
+      return reply.code(403).send({ error: 'Forbidden — administrator or manager role required' })
+    }
+  }
+
+  app.post('/crew/:id/issue-temp-pin', { preHandler: requireCrewAdmin }, async (req, reply) => {
+    const { id } = req.params as { id: string }
+    const operatorId = req.operatorId
+    const crew = await CrewMember.findOne({ _id: id, operatorId }).lean()
+    if (!crew) return reply.code(404).send({ error: 'Crew member not found' })
+    if (crew.status !== 'active') {
+      return reply.code(400).send({ error: 'Cannot issue PIN — crew member is not active' })
+    }
+
+    // Cryptographically random 6-digit PIN. Use rejection sampling on
+    // raw bytes to avoid modulo bias toward low digits.
+    let tempPin: string
+    do {
+      const buf = crypto.randomBytes(4)
+      const n = buf.readUInt32BE(0)
+      if (n >= 4_000_000_000) continue // bias guard for n % 1_000_000
+      tempPin = String(n % 1_000_000).padStart(6, '0')
+      break
+    } while (true)
+
+    const hash = await bcrypt.hash(tempPin, 12)
+    const expiresAt = new Date(Date.now() + CREW_TEMP_PIN_TTL_HOURS * 60 * 60_000).toISOString()
+
+    await CrewMember.updateOne(
+      { _id: id, operatorId },
+      {
+        $set: {
+          'crewApp.tempPinHash': hash,
+          'crewApp.tempPinExpiresAt': expiresAt,
+          // Wipe permanent PIN if previously set — issuing a new temp
+          // PIN is the recovery path when crew forgets their PIN.
+          'crewApp.pinHash': null,
+          'crewApp.pinFailedAttempts': 0,
+          'crewApp.pinLockedUntil': null,
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    )
+
+    return {
+      success: true,
+      tempPin,
+      expiresAt,
+      ttlHours: CREW_TEMP_PIN_TTL_HOURS,
+      employeeId: crew.employeeId,
+    }
   })
 
   // ─── Sync expiries explicitly ─────────────────────────

@@ -7,10 +7,12 @@
  */
 
 import { useEffect, useCallback, useState, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { useGanttStore } from '@/stores/use-gantt-store'
 import { useOperatorStore } from '@/stores/use-operator-store'
+import { useCrewLinesStore } from '@/stores/use-crew-lines-store'
 import { EmptyPanel } from '@/components/ui/empty-panel'
 import { RunwayLoadingPanel } from '@/components/ui/runway-loading-panel'
 import { useRunwayLoading } from '@/hooks/use-runway-loading'
@@ -66,6 +68,28 @@ export function MovementControlShell() {
     const ops = useOperatorStore.getState()
     if (!ops.loaded) ops.loadOperator()
   }, [])
+
+  // Deep-link from Crew Ops: /flight-ops/control/movement-control?focusFlightId=<sfId>&date=<YYYY-MM-DD>
+  // After flights load, open the Flight Information dialog on the focused leg and
+  // turn crew lines on in 'selected' mode so the user immediately sees the pairing.
+  const searchParams = useSearchParams()
+  const focusFlightId = searchParams?.get('focusFlightId') ?? null
+  const focusDate = searchParams?.get('date') ?? null
+  const focusAppliedRef = useRef(false)
+  useEffect(() => {
+    if (!focusFlightId || focusAppliedRef.current) return
+    if (!flights || flights.length === 0) return
+    const composedId = focusDate ? `${focusFlightId}|${focusDate}` : null
+    const target = composedId
+      ? flights.find((f) => f.id === composedId)
+      : flights.find((f) => f.scheduledFlightId === focusFlightId)
+    if (!target) return
+    focusAppliedRef.current = true
+    const s = useGanttStore.getState()
+    s.selectFlight(target.id, false)
+    s.openFlightInfo(target.id)
+    useCrewLinesStore.getState().setMode('selected')
+  }, [focusFlightId, focusDate, flights])
 
   const handleGo = useCallback(async () => {
     await runway.run(() => useGanttStore.getState().commitPeriod(), 'Loading flights…', 'Flights loaded')

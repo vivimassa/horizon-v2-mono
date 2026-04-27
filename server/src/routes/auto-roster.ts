@@ -794,44 +794,35 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
     bus.subscribers.add(forward)
     req.socket.on('close', endStream)
 
-    // If orchestrator isn't running (e.g. server restart lost state),
-    // re-drive it and wire its events through the bus. Pull the original
-    // POST args off the doc so the run resumes with the SAME mode +
-    // filters the user submitted — without this the run silently
-    // widens to the full operator and ignores filterBase/Position/etc.
+    // Server restart / orchestrator death detection.
+    //
+    // If the run doc says 'running' but no in-memory orchestrator exists for
+    // this runId, the server restarted (or the orchestrator crashed) and the
+    // CP-SAT solver state is gone. Auto-resume was tried previously: it
+    // re-ran the entire orchestrator from scratch (60s+ of FDTL pre-compile
+    // before the first event), and it is NOT idempotent — already-committed
+    // assignments could be double-written.
+    //
+    // Cleaner UX: mark the run failed with a clear message and let the user
+    // re-run manually. They lose nothing — partial commits stay in place;
+    // re-running upserts on (operatorId, crewId, pairingId).
     if (!activeRuns.has(runId)) {
-      const newAc = new AbortController()
-      activeRuns.set(runId, newAc)
-
-      const docArgs = doc as unknown as {
-        mode?: 'general' | 'daysOff' | 'standby' | 'longDuties' | null
-        longDutiesMinDays?: number | null
-        daysOffActivityCodeId?: string | null
-        timeLimitSec?: number | null
-        filterBase?: string | null
-        filterPosition?: string | null
-        filterAcTypes?: string[] | null
-        filterCrewGroupIds?: string[] | null
-      }
-      void runAutoRoster(
-        runId,
-        operatorId,
-        doc.periodFrom,
-        doc.periodTo,
-        docArgs.timeLimitSec ?? 1800,
-        (event: AutoRosterEvent) => emitToBus(runId, event),
-        newAc.signal,
-        req.userId ?? null,
-        (docArgs.mode as 'general' | 'daysOff' | 'standby' | 'longDuties') ?? 'general',
-        docArgs.longDutiesMinDays ?? 2,
+      const nowIso = new Date().toISOString()
+      await AutoRosterRun.updateOne(
+        { _id: runId },
         {
-          base: docArgs.filterBase ?? null,
-          position: docArgs.filterPosition ?? null,
-          acTypes: docArgs.filterAcTypes ?? null,
-          crewGroupIds: docArgs.filterCrewGroupIds ?? null,
+          status: 'failed',
+          error: 'Run interrupted by server restart — please re-run',
+          completedAt: nowIso,
+          updatedAt: nowIso,
         },
-        docArgs.daysOffActivityCodeId ?? null,
-      ).finally(() => activeRuns.delete(runId))
+      )
+      send('error', {
+        message: 'Run interrupted by server restart — please re-run',
+        runId,
+      })
+      endStream()
+      return reply
     }
 
     // Heartbeat so proxies / EventSource don't drop the connection on long

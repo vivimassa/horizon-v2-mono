@@ -1,6 +1,7 @@
 'use client'
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { Loader2 } from 'lucide-react'
 import type { CrewPositionRef, PairingRef, UncrewedPairingRef } from '@skyhub/api'
 import { api, type ApiError } from '@skyhub/api'
 import { useCrewScheduleStore, type UncrewedFilterState } from '@/stores/use-crew-schedule-store'
@@ -96,6 +97,7 @@ export const UncrewedDutiesTray = memo(function UncrewedDutiesTray({
   rowH,
 }: Props) {
   const selectPairing = useCrewScheduleStore((s) => s.selectPairing)
+  const uncrewedLoading = useCrewScheduleStore((s) => s.uncrewedLoading)
   const selectedPairingId = useCrewScheduleStore((s) => s.selectedPairingId)
   const canvasScrollLeft = useCrewScheduleStore((s) => s.scrollLeft)
   const uncrewedFilter = useCrewScheduleStore((s) => s.uncrewedFilter)
@@ -404,6 +406,7 @@ export const UncrewedDutiesTray = memo(function UncrewedDutiesTray({
         activities: storeState.activities,
         activityCodes: storeState.activityCodes,
         pairings: storeState.pairings,
+        flightBookings: storeState.flightBookings,
         ruleSet: storeState.ruleSet,
       })
       // Drag-drop: drop feedback was already shown inline via the
@@ -505,9 +508,16 @@ export const UncrewedDutiesTray = memo(function UncrewedDutiesTray({
             style={{ backgroundColor: 'var(--module-accent, #3E7BFA)' }}
           />
           Uncrewed ·{' '}
-          {filterActive && filteredUncrewed.length !== uncrewed.length
-            ? `${filteredUncrewed.length} / ${uncrewed.length}`
-            : uncrewed.length}
+          {uncrewedLoading ? (
+            <span className="inline-flex items-center gap-1.5 ml-0.5">
+              <Loader2 size={12} className="animate-spin text-[#9A9BA8]" />
+              <span className="text-[#9A9BA8] normal-case tracking-normal text-[12px]">Loading…</span>
+            </span>
+          ) : filterActive && filteredUncrewed.length !== uncrewed.length ? (
+            `${filteredUncrewed.length} / ${uncrewed.length}`
+          ) : (
+            uncrewed.length
+          )}
         </div>
       </div>
 
@@ -519,7 +529,13 @@ export const UncrewedDutiesTray = memo(function UncrewedDutiesTray({
         />
         <div ref={scrollRef} className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto relative">
           <div className="relative" style={{ width: totalWidth, height: contentHeight }}>
-            {filteredUncrewed.length === 0 && (
+            {uncrewedLoading && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-black/30 backdrop-blur-[1px] text-[13px] text-[#A7A9B5]">
+                <Loader2 size={14} className="animate-spin" />
+                <span>Loading uncrewed duties…</span>
+              </div>
+            )}
+            {!uncrewedLoading && filteredUncrewed.length === 0 && (
               <div className="absolute inset-0 flex items-center px-3 text-[13px] text-[#9A9BA8]">
                 {uncrewed.length === 0 ? 'No uncrewed duties.' : 'No uncrewed duties match the current filter.'}
               </div>

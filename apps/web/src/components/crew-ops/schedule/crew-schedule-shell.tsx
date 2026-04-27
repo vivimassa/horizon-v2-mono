@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
-import { api } from '@skyhub/api'
+import { api, type CrewFlightBookingRef } from '@skyhub/api'
 import { useTheme } from '@/components/theme-provider'
 import { EmptyPanel } from '@/components/ui/empty-panel'
 import { RunwayLoadingPanel } from '@/components/ui/runway-loading-panel'
@@ -26,6 +26,7 @@ import { PairingDetailsDialogHost } from './dialogs/pairing-details-dialog-host'
 import { DateTotalsDialog } from './dialogs/date-totals-dialog'
 import { LegalityReportDialog } from './dialogs/legality-report-dialog'
 import { TemporaryBaseDialog } from './dialogs/temporary-base-dialog'
+import { FlightBookingDrawer } from '@/components/crew-ops/transport/views/flight-booking-drawer'
 import { CrewScheduleCheatsheet } from './crew-schedule-cheatsheet'
 import { CrewScheduleCommandPalette } from './crew-schedule-command-palette'
 import { CrewScheduleSmartFilter } from './crew-schedule-smart-filter'
@@ -74,6 +75,7 @@ export function CrewScheduleShell() {
   const memos = useCrewScheduleStore((s) => s.memos)
   const fdtl = useCrewScheduleStore((s) => s.fdtl)
   const aircraftTypes = useCrewScheduleStore((s) => s.aircraftTypes)
+  const displayOffsetHours = useCrewScheduleStore((s) => s.displayOffsetHours)
   const publishedOverlay = useCrewScheduleStore((s) => s.publishedOverlay)
   const publishedOverlayVisible = useCrewScheduleStore((s) => s.publishedOverlayVisible)
   const uncrewedTrayVisible = useCrewScheduleStore((s) => s.uncrewedTrayVisible)
@@ -129,7 +131,15 @@ export function CrewScheduleShell() {
   }, [loadContext])
 
   const handleGo = useCallback(async () => {
-    await runway.run(() => commitPeriod(), 'Loading crew schedule…', 'Schedule loaded')
+    await runway.run(() => commitPeriod(), {
+      loadingLabel: 'Loading crew schedule…',
+      doneLabel: 'Schedule loaded',
+      // Calibrates from past loads in localStorage so the bar shape
+      // matches whatever the actual aggregator latency is for this
+      // operator + period (50s+ for big tenants, sub-2s for tiny).
+      loadKey: 'crew-schedule',
+      expectedMs: 30_000,
+    })
   }, [runway, commitPeriod])
 
   // Post-mutation refresh — silent reconcile so the loading flag does
@@ -306,6 +316,7 @@ export function CrewScheduleShell() {
       grouping: crewGrouping ?? undefined,
       restRules: fdtl.restRules,
       aircraftTypes,
+      displayOffsetHours,
     })
   }, [
     periodCommitted,
@@ -331,6 +342,7 @@ export function CrewScheduleShell() {
     crewGrouping,
     fdtl,
     aircraftTypes,
+    displayOffsetHours,
   ])
 
   const pairingsById = useMemo(() => new Map(pairings.map((p) => [p._id, p])), [pairings])
@@ -487,6 +499,7 @@ export function CrewScheduleShell() {
           <DateTotalsDialog />
           <LegalityReportDialog />
           <TemporaryBaseDialogHost />
+          <PositioningDrawerHost onAfterMutate={handleRefresh} />
           <CrewScheduleMemoOverlay onAfterMutate={handleRefresh} />
           <CrewScheduleCheatsheet open={cheatsheetOpen} onClose={() => setCheatsheetOpen(false)} />
           <CrewScheduleCommandPalette
@@ -534,6 +547,110 @@ function TemporaryBaseDialogHost() {
       toIso={dialog.toIso}
       editingId={dialog.editingId}
       onClose={close}
+    />
+  )
+}
+
+function PositioningDrawerHost({ onAfterMutate }: { onAfterMutate: () => void }) {
+  const drawer = useCrewScheduleStore((s) => s.positioningDrawer)
+  const close = useCrewScheduleStore((s) => s.closePositioningDrawer)
+  const loadFlightBookings = useCrewScheduleStore((s) => s.loadFlightBookings)
+  const activities = useCrewScheduleStore((s) => s.activities)
+  const assignments = useCrewScheduleStore((s) => s.assignments)
+  const activityCodes = useCrewScheduleStore((s) => s.activityCodes)
+  const pairings = useCrewScheduleStore((s) => s.pairings)
+  const [existing, setExisting] = useState<CrewFlightBookingRef | null>(null)
+  const [resolved, setResolved] = useState(false)
+
+  // Conflict detection — any activity / assignment for this crew on the
+  // flightDate. Soft warning only; positioning around a half-day duty is
+  // legitimate (training in the morning, position in the evening).
+  const conflicts = useMemo<Array<{ kind: 'activity' | 'pairing'; label: string; window: string }>>(() => {
+    if (!drawer) return []
+    const out: Array<{ kind: 'activity' | 'pairing'; label: string; window: string }> = []
+    const day = drawer.flightDate
+    const codeMap = new Map(activityCodes.map((c) => [c._id, c.code]))
+    const pairingMap = new Map(pairings.map((p) => [p._id, p.pairingCode]))
+    const fmt = (iso: string) => iso.slice(11, 16)
+    for (const a of activities) {
+      if (a.crewId !== drawer.crewId) continue
+      if (a.startUtcIso.slice(0, 10) > day || a.endUtcIso.slice(0, 10) < day) continue
+      out.push({
+        kind: 'activity',
+        label: codeMap.get(a.activityCodeId ?? '') ?? a.activityCodeId ?? '?',
+        window: `${fmt(a.startUtcIso)}–${fmt(a.endUtcIso)}Z`,
+      })
+    }
+    for (const a of assignments) {
+      if (a.crewId !== drawer.crewId) continue
+      if (a.startUtcIso.slice(0, 10) > day || a.endUtcIso.slice(0, 10) < day) continue
+      out.push({
+        kind: 'pairing',
+        label: pairingMap.get(a.pairingId) ?? a.pairingId,
+        window: `${fmt(a.startUtcIso)}–${fmt(a.endUtcIso)}Z`,
+      })
+    }
+    return out
+  }, [drawer, activities, assignments, activityCodes, pairings])
+
+  // When the drawer opens with a bookingId, fetch the row so the form
+  // initialises in edit mode. We refilter on the temp base id + direction
+  // because the click handler only stashes the id from the cached chip,
+  // which can be stale by milliseconds.
+  useEffect(() => {
+    if (!drawer) {
+      setExisting(null)
+      setResolved(false)
+      return
+    }
+    if (!drawer.bookingId) {
+      setExisting(null)
+      setResolved(true)
+      return
+    }
+    let cancelled = false
+    setResolved(false)
+    api
+      .getCrewFlightBookings({ tempBaseId: drawer.tempBaseId })
+      .then((rows) => {
+        if (cancelled) return
+        const row =
+          rows.find((r) => r._id === drawer.bookingId) ?? rows.find((r) => r.direction === drawer.direction) ?? null
+        setExisting(row)
+        setResolved(true)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setExisting(null)
+          setResolved(true)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [drawer])
+
+  if (!drawer || !resolved) return null
+  return (
+    <FlightBookingDrawer
+      existing={existing}
+      leg={null}
+      positioning={{
+        tempBaseId: drawer.tempBaseId,
+        direction: drawer.direction,
+        crewId: drawer.crewId,
+        flightDate: drawer.flightDate,
+        depStation: drawer.depStation,
+        arrStation: drawer.arrStation,
+        conflicts,
+      }}
+      onClosed={(changed) => {
+        close()
+        if (changed) {
+          void loadFlightBookings()
+          onAfterMutate()
+        }
+      }}
     />
   )
 }

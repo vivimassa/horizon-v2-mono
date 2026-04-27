@@ -122,6 +122,9 @@ interface Data {
   /** Roster-level FDTL issues for the visible window. */
   crewIssues: CrewLegalityIssueRef[]
   aircraftTypes: Array<{ icaoType: string; family: string | null; color: string | null }>
+  /** Operator-base UTC offset (hours). Drives canvas timezone display so
+   *  the day grid reads in operator-local time instead of UTC. Default 0. */
+  displayOffsetHours: number
   /** Operator scheduling soft-rule config (4.1.6.3). Loaded once per commitPeriod. */
   schedulingConfig: OperatorSchedulingConfig | null
   /** Soft-rule violations keyed by crewId. Amber warnings in Gantt row headers. */
@@ -184,6 +187,19 @@ interface State extends Data {
         tempBaseId: string
         crewId: string
         dateIso: string
+        pageX: number
+        pageY: number
+      }
+    | {
+        kind: 'positioning-chip'
+        tempBaseId: string
+        direction: 'outbound' | 'return'
+        crewId: string
+        airportCode: string
+        flightDate: string
+        depStation: string
+        arrStation: string
+        bookingId: string | null
         pageX: number
         pageY: number
       }
@@ -280,6 +296,29 @@ interface State extends Data {
    *  visible period. Reads as suppression input for `base_mismatch` and
    *  paints a highlight band on the Gantt. */
   tempBases: TempBaseAssignment[]
+
+  /** Crew flight bookings (deadhead + temp-base positioning) for the
+   *  visible window. Loaded alongside the schedule and after every
+   *  positioning save. Used to paint POS chips on the flanking days of
+   *  a temp base band and to drive the bidirectional binding with
+   *  /crew-ops/control/hotac/transport-management. */
+  flightBookings: import('@skyhub/api').CrewFlightBookingRef[]
+
+  /** Open positioning drawer state — set when the user clicks a
+   *  flanking-day "+" or an existing POS chip on the canvas. The shell
+   *  mounts the FlightBookingDrawer when this is non-null. */
+  positioningDrawer: {
+    tempBaseId: string
+    direction: 'outbound' | 'return'
+    /** Existing booking when editing; null when creating. */
+    bookingId: string | null
+    crewId: string
+    /** YYYY-MM-DD — the flanking day this drawer is for. */
+    flightDate: string
+    /** Origin/destination prefilled from the temp base + crew home base. */
+    depStation: string
+    arrStation: string
+  } | null
 
   /** Memo overlay state — opens a small modal with a memo composer/list
    *  scoped to the right target. Set by the context-menu memo items and
@@ -534,6 +573,11 @@ interface State extends Data {
   closeMemoOverlay: () => void
   openTempBaseDialog: (d: NonNullable<State['tempBaseDialog']>) => void
   closeTempBaseDialog: () => void
+  /** Load `crewFlightBookings` for the visible window. Called from
+   *  commitPeriod / reconcilePeriod and after a positioning save. */
+  loadFlightBookings: () => Promise<void>
+  openPositioningDrawer: (d: NonNullable<State['positioningDrawer']>) => void
+  closePositioningDrawer: () => void
   setExportCanvasRef: (el: HTMLCanvasElement | null) => void
   setCapacityError: (e: State['capacityError']) => void
   clearCapacityError: () => void
@@ -747,6 +791,15 @@ async function loadSchedulingConfigAndViolations(
   }
 }
 
+/**
+ * Generation counter for `loadUncrewed`. Module-scoped (not in store
+ * state) so reading/writing it doesn't trigger React re-renders. Each
+ * call increments it; only the call whose value still matches at
+ * resolve-time is allowed to commit its response. Prevents stale tray
+ * data when the user re-clicks Go or changes filters mid-flight.
+ */
+let uncrewedFetchGen = 0
+
 export const useCrewScheduleStore = create<State>((set, get) => {
   const { from, to } = defaultPeriod()
   return {
@@ -770,6 +823,7 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     ruleSet: null,
     crewIssues: [],
     aircraftTypes: [],
+    displayOffsetHours: 0,
     schedulingConfig: null,
     softViolations: {},
 
@@ -827,6 +881,8 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     crewGrouping: hydrateGrouping(),
     tempBaseDialog: null,
     tempBases: [],
+    flightBookings: [],
+    positioningDrawer: null,
 
     // Scroll / container
     containerWidth: 0,
@@ -884,18 +940,26 @@ export const useCrewScheduleStore = create<State>((set, get) => {
           crewIssues: res.crewIssues ?? [],
           aircraftTypes: res.aircraftTypes ?? [],
           tempBases: res.tempBases ?? [],
+          displayOffsetHours: (res as { displayOffsetHours?: number }).displayOffsetHours ?? 0,
           periodCommitted: true,
           loading: false,
           error: null,
         })
         // Load scheduling config + compute soft violations in background.
         void loadSchedulingConfigAndViolations(get, set, s.periodFromIso, s.periodToIso)
-        // Tray was already-open before this commit (rare since default is
-        // hidden, but persists across reloads). Lazy-fetch its data so the
-        // skeleton doesn't sit empty.
-        if (get().uncrewedTrayVisible) {
-          void get().loadUncrewed()
-        }
+        // Pull positioning + deadhead bookings for the visible window so the
+        // canvas can paint POS chips on temp-base flanking days. Cheap call;
+        // failures are silent (stored as []).
+        void get().loadFlightBookings()
+        // Background prefetch — always run after the main aggregator
+        // resolves so the tray is ready (or close to ready) by the time
+        // the user clicks. Sequential (after `set(...)` above) so it
+        // doesn't fight the main aggregator for TCP bandwidth on M0
+        // Atlas. The 60s server-side response cache makes the actual
+        // tray-click idempotent if the user does click within the TTL.
+        // Generation guard inside `loadUncrewed` discards results if
+        // the user re-clicks Go before this finishes.
+        void get().loadUncrewed()
         // Roster-FDTL sweep is now on-demand — triggered by the Legality
         // Check dialog, not by page load. Avoids mid-view flicker from a
         // late response updating `crewIssues` while the planner is
@@ -946,7 +1010,9 @@ export const useCrewScheduleStore = create<State>((set, get) => {
           crewIssues: res.crewIssues ?? [],
           aircraftTypes: res.aircraftTypes ?? [],
           tempBases: res.tempBases ?? [],
+          displayOffsetHours: (res as { displayOffsetHours?: number }).displayOffsetHours ?? 0,
         })
+        void get().loadFlightBookings()
         // Fire-and-forget roster re-evaluation. Any assignment / activity
         // mutation upstream (assign / swap / delete) can invalidate FDTL
         // findings, so we always sweep in the background. The next
@@ -1193,6 +1259,12 @@ export const useCrewScheduleStore = create<State>((set, get) => {
       }
     },
     loadUncrewed: async () => {
+      // Generation guard — protects against stale results when the user
+      // re-clicks Go (or changes filters) while a prior prefetch is still
+      // in flight. Each call increments the module-scoped counter and
+      // remembers its own value; only the latest issued call commits its
+      // response to the store.
+      const gen = ++uncrewedFetchGen
       const s = get()
       try {
         set({ uncrewedLoading: true })
@@ -1204,6 +1276,7 @@ export const useCrewScheduleStore = create<State>((set, get) => {
           acType: s.filters.acTypeIcaos.length === 1 ? s.filters.acTypeIcaos[0] : undefined,
           crewGroup: s.filters.crewGroupIds.length === 1 ? s.filters.crewGroupIds[0] : undefined,
         })
+        if (gen !== uncrewedFetchGen) return // newer call superseded us
         // Merge uncrewed pairings into the existing pairings list,
         // de-duplicating by _id. Existing entries win (already hydrated
         // with crewCounts overlay etc.).
@@ -1216,7 +1289,10 @@ export const useCrewScheduleStore = create<State>((set, get) => {
       } catch {
         // Silent — tray will stay empty until next open.
       } finally {
-        set({ uncrewedLoading: false })
+        // Only the latest call clears the loading flag; otherwise an
+        // earlier prefetch landing late would race a newer one and
+        // flicker the spinner off prematurely.
+        if (gen === uncrewedFetchGen) set({ uncrewedLoading: false })
       }
     },
     setCrewGrouping: (g) => {
@@ -1236,6 +1312,20 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     closeMemoOverlay: () => set({ memoOverlay: null }),
     openTempBaseDialog: (d) => set({ tempBaseDialog: d, contextMenu: null }),
     closeTempBaseDialog: () => set({ tempBaseDialog: null }),
+    loadFlightBookings: async () => {
+      const s = get()
+      try {
+        const rows = await api.getCrewFlightBookings({
+          from: s.periodFromIso,
+          to: s.periodToIso,
+        })
+        set({ flightBookings: rows })
+      } catch {
+        // Non-critical — stale chips self-heal on next reconcile.
+      }
+    },
+    openPositioningDrawer: (d) => set({ positioningDrawer: d, contextMenu: null }),
+    closePositioningDrawer: () => set({ positioningDrawer: null }),
     setExportCanvasRef: (el) => set({ exportCanvasRef: el }),
     setCapacityError: (e) => set({ capacityError: e }),
     clearCapacityError: () => set({ capacityError: null }),

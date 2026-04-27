@@ -64,6 +64,7 @@ export const CrewScheduleLeftPanel = memo(function CrewScheduleLeftPanel({ rows,
   const selectCrew = useCrewScheduleStore((s) => s.selectCrew)
   const scrollTop = useCrewScheduleStore((s) => s.scrollTop)
   const openContextMenu = useCrewScheduleStore((s) => s.openContextMenu)
+  const displayOffsetHours = useCrewScheduleStore((s) => s.displayOffsetHours)
   // softViolations from use-crew-schedule-store intentionally not used — soft
   // rules are now honoured inside the solver via weighted penalties. Amber
   // markers were noise; hard FDTL violations still surface on the bars.
@@ -99,10 +100,21 @@ export const CrewScheduleLeftPanel = memo(function CrewScheduleLeftPanel({ rows,
   return (
     <div className="shrink-0 border-r border-hz-border/30 flex flex-col overflow-hidden" style={{ width: LEFT_W }}>
       <div
-        className="flex items-center px-4 text-[11px] font-semibold uppercase tracking-wider text-hz-text-tertiary border-b border-hz-border/30 shrink-0"
+        className="flex items-center justify-between gap-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-hz-text-tertiary border-b border-hz-border/30 shrink-0"
         style={{ height: HEADER_H }}
       >
-        Crew · {rows.length.toLocaleString()}
+        <span>Crew · {rows.length.toLocaleString()}</span>
+        {/* Timezone badge — proves at a glance that the day grid columns
+            are in operator-LOCAL time, not UTC. The offset is read from
+            the server payload (displayOffsetHours), which derives it
+            from the operator's IANA timezone. */}
+        <span
+          title="Day grid columns are in operator base local time"
+          className="rounded-md border border-hz-border/40 bg-hz-bg-hover/50 px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-hz-text-secondary"
+        >
+          LT {displayOffsetHours >= 0 ? '+' : ''}
+          {displayOffsetHours}
+        </span>
       </div>
       <div ref={viewportRef} className="relative flex-1 min-h-0 overflow-hidden">
         {/* Full-height sizer so the implicit scrollbar proportions are correct

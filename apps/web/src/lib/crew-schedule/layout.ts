@@ -102,6 +102,11 @@ export interface CrewScheduleLayout {
   rowH: number
   /** Resolved bar height in px. */
   barH: number
+  /** Operator-base UTC offset in milliseconds. Canvas adds this to a UTC
+   *  instant before computing display labels (`getUTCDate`) or local-day
+   *  ISO strings (`toISOString().slice(0,10)`). Bar x-positioning needs
+   *  no extra adjustment because `periodStartMs` is already shifted. */
+  displayOffsetMs: number
 }
 
 /** Four row-height levels, matching `ROW_HEIGHT_LEVELS` in @/lib/gantt/types. */
@@ -175,6 +180,13 @@ export interface BuildLayoutInput {
    *  colour-code by fleet. Falls back to a stable palette when `.color`
    *  is null, and to the accent when the ICAO is unresolved. */
   aircraftTypes?: Array<{ icaoType: string; color: string | null }>
+  /** Operator-base UTC offset in hours. When set, the canvas grid renders
+   *  in operator-local time: x=0 of the canvas aligns with local midnight
+   *  on `periodFromIso`, day-column labels read local-day not UTC-day.
+   *  All UTC instants on bars/activities slot into the correct LOCAL day
+   *  column (e.g. a 03:00 SGN flight no longer drifts into the previous
+   *  UTC-day column). Defaults to 0 (UTC display). */
+  displayOffsetHours?: number
 }
 
 /**
@@ -266,7 +278,13 @@ export function sortCrewRoster(input: SortCrewInput): CrewMemberListItemRef[] {
 }
 
 export function buildCrewScheduleLayout(input: BuildLayoutInput): CrewScheduleLayout {
-  const periodStartMs = new Date(input.periodFromIso + 'T00:00:00Z').getTime()
+  const displayOffsetMs = (input.displayOffsetHours ?? 0) * 3_600_000
+  // Shift the canvas origin BACK by the offset so x=0 corresponds to
+  // local midnight on periodFromIso. A UTC instant E that occurs at
+  // local time T on day D is then at x = (E - localMidnightUtc(D))/h*pph
+  // — i.e. the bar lands T hours into the local-day column. UTC default
+  // (offset=0) collapses to the legacy behavior.
+  const periodStartMs = new Date(input.periodFromIso + 'T00:00:00Z').getTime() - displayOffsetMs
   const periodDays = periodLengthInDays(input.periodFromIso, input.periodToIso)
   const visibleDays = zoomVisibleDays(input.zoom, periodDays)
   const pph = computePixelsPerHour(input.containerWidth, visibleDays)
@@ -591,6 +609,7 @@ export function buildCrewScheduleLayout(input: BuildLayoutInput): CrewScheduleLa
     pph,
     rowH: ROW_H,
     barH: BAR_H,
+    displayOffsetMs,
   }
 }
 

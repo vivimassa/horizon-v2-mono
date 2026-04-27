@@ -24,6 +24,7 @@ import { computeDropLegality } from '@/lib/crew-schedule/drop-legality'
 import { checkAssignmentViolations, partitionViolations } from '@/lib/crew-schedule/violations'
 import { ActivityHoverTooltip } from './activity-hover-tooltip'
 import { PairingHoverTooltip } from './pairing-hover-tooltip'
+import { PositioningHoverTooltip } from './positioning-hover-tooltip'
 
 const HEADER_H = 48
 
@@ -114,9 +115,35 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
   const activityCodes = useCrewScheduleStore((s) => s.activityCodes)
   const [activityHoverPos, setActivityHoverPos] = useState<{ x: number; y: number } | null>(null)
   const [pairingHoverPos, setPairingHoverPos] = useState<{ x: number; y: number } | null>(null)
+  /** Positioning chip hover — captures the hit details + cursor position
+   *  so the tooltip can render booking info (when one exists) or the
+   *  "right-click to assign" hint (when the day is still empty). */
+  const [positioningHover, setPositioningHover] = useState<{
+    hit: (typeof positioningHitsRef.current)[number]
+    clientX: number
+    clientY: number
+  } | null>(null)
   const rangeSelection = useCrewScheduleStore((s) => s.rangeSelection)
   const dragState = useCrewScheduleStore((s) => s.dragState)
   const tempBases = useCrewScheduleStore((s) => s.tempBases)
+  const flightBookings = useCrewScheduleStore((s) => s.flightBookings)
+  /** Hit zones for the "+" / POS chip glyphs painted on a temp base's
+   *  flanking days. Recomputed on every draw — read by `onClick` before
+   *  the empty-cell selection branch fires. */
+  const positioningHitsRef = useRef<
+    Array<{
+      x: number
+      y: number
+      w: number
+      h: number
+      tempBaseId: string
+      direction: 'outbound' | 'return'
+      crewId: string
+      airportCode: string
+      flightDate: string
+      bookingId: string | null
+    }>
+  >([])
   const selectAssignment = useCrewScheduleStore((s) => s.selectAssignment)
   const selectPairing = useCrewScheduleStore((s) => s.selectPairing)
   const selectActivity = useCrewScheduleStore((s) => s.selectActivity)
@@ -302,6 +329,8 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
     // Temp base bands — subtle dark-yellow fill spanning the assigned
     // period for each crew row with an active assignment. Painted above
     // gridlines/zebra but below bars so duty pills remain legible.
+    // Reset positioning hit zones every frame — they're recomputed below.
+    const positioningHits: typeof positioningHitsRef.current = []
     if (tempBases.length > 0) {
       const tempBaseFill = isDark ? 'rgba(217,160,35,0.18)' : 'rgba(217,160,35,0.22)'
       const tempBaseBorder = isDark ? 'rgba(217,160,35,0.55)' : 'rgba(176,128,20,0.7)'
@@ -312,49 +341,141 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
         arr.push(t)
         byCrew.set(t.crewId, arr)
       }
+      // Index bookings by (tempBaseId, direction) for quick chip lookup.
+      const bookingsByKey = new Map<string, (typeof flightBookings)[number]>()
+      for (const b of flightBookings) {
+        if (b.purpose === 'temp-base-positioning' && b.tempBaseId && b.direction) {
+          bookingsByKey.set(`${b.tempBaseId}|${b.direction}`, b)
+        }
+      }
       ctx.save()
       ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif'
       ctx.textBaseline = 'middle'
+      const dayPx = layout.pph * 24
       for (const row of layout.rows) {
         const entries = byCrew.get(row.crewId)
         if (!entries) continue
         const y = row.y - sy
         if (y + row.height < 0 || y > h - HEADER_H) continue
         for (const t of entries) {
-          const fromMs = new Date(t.fromIso + 'T00:00:00Z').getTime()
-          const toMs = new Date(t.toIso + 'T00:00:00Z').getTime() + 86_400_000
+          // fromIso is a LOCAL date (e.g. "2026-04-01" SGN). Convert to
+          // UTC instant of LOCAL midnight by subtracting displayOffsetMs
+          // so x positioning aligns with the local-shifted canvas origin.
+          const fromMs = new Date(t.fromIso + 'T00:00:00Z').getTime() - layout.displayOffsetMs
+          const toMs = new Date(t.toIso + 'T00:00:00Z').getTime() - layout.displayOffsetMs + 86_400_000
           const x0 = ((fromMs - layout.periodStartMs) / 3_600_000) * layout.pph - sx
           const x1 = ((toMs - layout.periodStartMs) / 3_600_000) * layout.pph - sx
-          if (x1 < 0 || x0 > w) continue
-          const width = x1 - x0
-          ctx.fillStyle = tempBaseFill
-          ctx.fillRect(x0, y, width, row.height)
-          ctx.strokeStyle = tempBaseBorder
-          ctx.lineWidth = 1
-          ctx.strokeRect(x0 + 0.5, y + 0.5, width - 1, row.height - 1)
+          if (x1 >= 0 && x0 <= w) {
+            const width = x1 - x0
+            ctx.fillStyle = tempBaseFill
+            ctx.fillRect(x0, y, width, row.height)
+            ctx.strokeStyle = tempBaseBorder
+            ctx.lineWidth = 1
+            ctx.strokeRect(x0 + 0.5, y + 0.5, width - 1, row.height - 1)
 
-          // Adaptive label: pick the longest variant that fits, drop
-          // entirely when the band is narrower than the shortest form.
-          const long = `TEMPORARY ${t.airportCode} BASE`
-          const mid = `TEMP BASE ${t.airportCode}`
-          const short = `TEMP ${t.airportCode}`
-          ctx.fillStyle = tempBaseLabel
-          let label: string | null = null
-          for (const candidate of [long, mid, short]) {
-            if (ctx.measureText(candidate).width + 16 <= width) {
-              label = candidate
-              break
+            // Adaptive label: pick the longest variant that fits, drop
+            // entirely when the band is narrower than the shortest form.
+            const long = `TEMPORARY ${t.airportCode} BASE`
+            const mid = `TEMP BASE ${t.airportCode}`
+            const short = `TEMP ${t.airportCode}`
+            ctx.fillStyle = tempBaseLabel
+            let label: string | null = null
+            for (const candidate of [long, mid, short]) {
+              if (ctx.measureText(candidate).width + 16 <= width) {
+                label = candidate
+                break
+              }
+            }
+            if (label) {
+              const cx = Math.max(x0 + 8, Math.min(x0 + width / 2, x1 - 8))
+              ctx.textAlign = 'center'
+              ctx.fillText(label, cx, y + row.height / 2)
             }
           }
-          if (label) {
-            const cx = Math.max(x0 + 8, Math.min(x0 + width / 2, x1 - 8))
+
+          // Flanking-day positioning glyphs. The day BEFORE fromIso is
+          // the outbound positioning leg; the day AFTER toIso is the
+          // return. Each glyph is a small chip centered in its day cell.
+          const flanks: Array<{ direction: 'outbound' | 'return'; cellX: number; dateIso: string }> = []
+          const beforeX = x0 - dayPx
+          const afterX = x1
+          if (beforeX + dayPx > 0 && beforeX < w) {
+            const dayBeforeMs = new Date(t.fromIso + 'T00:00:00Z').getTime() - 86_400_000
+            flanks.push({
+              direction: 'outbound',
+              cellX: beforeX,
+              dateIso: new Date(dayBeforeMs).toISOString().slice(0, 10),
+            })
+          }
+          if (afterX + dayPx > 0 && afterX < w) {
+            const dayAfterMs = new Date(t.toIso + 'T00:00:00Z').getTime() + 86_400_000
+            flanks.push({
+              direction: 'return',
+              cellX: afterX,
+              dateIso: new Date(dayAfterMs).toISOString().slice(0, 10),
+            })
+          }
+          for (const flank of flanks) {
+            const key = `${t._id}|${flank.direction}`
+            const booking = bookingsByKey.get(key)
+            const chipW = Math.min(38, Math.max(22, dayPx - 6))
+            const chipH = Math.min(20, row.height - 10)
+            const chipX = flank.cellX + (dayPx - chipW) / 2
+            const chipY = y + (row.height - chipH) / 2
+            const cancelled = booking?.status === 'cancelled'
+
+            ctx.save()
+            // Subtle filled rect with same accent palette as the band so
+            // the glyphs read as part of the temp-base group.
+            if (booking && !cancelled) {
+              ctx.fillStyle = isDark ? 'rgba(217,160,35,0.32)' : 'rgba(176,128,20,0.22)'
+            } else if (cancelled) {
+              ctx.fillStyle = isDark ? 'rgba(120,120,128,0.22)' : 'rgba(110,110,130,0.14)'
+            } else {
+              ctx.fillStyle = isDark ? 'rgba(217,160,35,0.10)' : 'rgba(217,160,35,0.14)'
+            }
+            ctx.strokeStyle = cancelled ? (isDark ? 'rgba(255,255,255,0.18)' : 'rgba(90,90,110,0.30)') : tempBaseBorder
+            // Rounded rect.
+            const r = 4
+            ctx.beginPath()
+            ctx.moveTo(chipX + r, chipY)
+            ctx.lineTo(chipX + chipW - r, chipY)
+            ctx.quadraticCurveTo(chipX + chipW, chipY, chipX + chipW, chipY + r)
+            ctx.lineTo(chipX + chipW, chipY + chipH - r)
+            ctx.quadraticCurveTo(chipX + chipW, chipY + chipH, chipX + chipW - r, chipY + chipH)
+            ctx.lineTo(chipX + r, chipY + chipH)
+            ctx.quadraticCurveTo(chipX, chipY + chipH, chipX, chipY + chipH - r)
+            ctx.lineTo(chipX, chipY + r)
+            ctx.quadraticCurveTo(chipX, chipY, chipX + r, chipY)
+            ctx.fill()
+            ctx.lineWidth = 1
+            ctx.stroke()
+
+            ctx.fillStyle = cancelled ? (isDark ? '#9CA3AF' : '#6B7280') : tempBaseLabel
             ctx.textAlign = 'center'
-            ctx.fillText(label, cx, y + row.height / 2)
+            ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif'
+            const glyph = booking ? 'POS' : '+'
+            ctx.fillText(glyph, chipX + chipW / 2, chipY + chipH / 2 + 0.5)
+            ctx.restore()
+
+            positioningHits.push({
+              x: chipX + sx,
+              y: chipY + sy,
+              w: chipW,
+              h: chipH,
+              tempBaseId: t._id,
+              direction: flank.direction,
+              crewId: row.crewId,
+              airportCode: t.airportCode,
+              flightDate: flank.dateIso,
+              bookingId: booking?._id ?? null,
+            })
           }
         }
       }
       ctx.restore()
     }
+    positioningHitsRef.current = positioningHits
 
     // Rest strips first (beneath bars so bars appear on top at edges).
     // Drawn with a SQUARE left edge + rounded right edge so the strip
@@ -470,8 +591,10 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
     // Range-selection highlight (AIMS §4.6 block). Drawn after bars so
     // the tint is visible on top of duties without obscuring them.
     if (rangeSelection && rangeSelection.crewIds.length > 0) {
-      const fromMs = new Date(rangeSelection.fromIso + 'T00:00:00Z').getTime()
-      const toMs = new Date(rangeSelection.toIso + 'T00:00:00Z').getTime() + 86_400_000
+      // Range-selection ISO strings are LOCAL days; convert to UTC instant
+      // of LOCAL midnight before measuring against the local-shifted origin.
+      const fromMs = new Date(rangeSelection.fromIso + 'T00:00:00Z').getTime() - layout.displayOffsetMs
+      const toMs = new Date(rangeSelection.toIso + 'T00:00:00Z').getTime() - layout.displayOffsetMs + 86_400_000
       const x0 = ((fromMs - layout.periodStartMs) / 3_600_000) * layout.pph - sx
       const x1 = ((toMs - layout.periodStartMs) / 3_600_000) * layout.pph - sx
       const idxSet = new Set(rangeSelection.crewIds)
@@ -498,7 +621,10 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
     if (selectedCrewId && selectedDateIso) {
       const row = layout.rows.find((r) => r.crewId === selectedCrewId)
       if (row) {
-        const dayMs = new Date(selectedDateIso + 'T00:00:00Z').getTime()
+        // selectedDateIso is a LOCAL date string. periodStartMs is the UTC
+        // instant of LOCAL midnight on day 0, so subtracting offsetMs from
+        // a UTC-parsed midnight gives the matching local-midnight instant.
+        const dayMs = new Date(selectedDateIso + 'T00:00:00Z').getTime() - layout.displayOffsetMs
         const dayIdx = Math.round((dayMs - layout.periodStartMs) / 86_400_000)
         if (dayIdx >= 0 && dayIdx < layout.periodDays) {
           const x0 = dayIdx * 24 * layout.pph - sx
@@ -523,6 +649,12 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
     drawNowLine(ctx, layout, sx, h - HEADER_H)
 
     ctx.restore()
+
+    // Re-paint the date header LAST so it sits as a fully-opaque sticky
+    // strip above all content. Without this, glyphs / chips that render
+    // close to a row's top edge can bleed into the header band when the
+    // user scrolls the Gantt vertically.
+    drawHeader(ctx, layout, sx, w, isDark)
   }, [
     layout,
     isDark,
@@ -537,6 +669,7 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
     rangeSelection,
     dragState,
     tempBases,
+    flightBookings,
   ])
 
   useEffect(() => {
@@ -577,7 +710,9 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
       const row = hitTestRow(layout.rows, y)
       if (!row) return null
       const dayIdx = Math.max(0, Math.min(layout.periodDays - 1, Math.floor(x / (layout.pph * 24))))
-      const dayMs = layout.periodStartMs + dayIdx * 86_400_000
+      // periodStartMs + dayIdx*day = local midnight of dayIdx (in UTC).
+      // +displayOffsetMs converts to a UTC instant whose UTC date == local date.
+      const dayMs = layout.periodStartMs + dayIdx * 86_400_000 + layout.displayOffsetMs
       return { crewId: row.crewId, dateIso: new Date(dayMs).toISOString().slice(0, 10) }
     },
     [layout],
@@ -690,6 +825,7 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
                 activities: s.activities,
                 activityCodes: s.activityCodes,
                 pairings: s.pairings,
+                flightBookings: s.flightBookings,
                 ruleSet: s.ruleSet,
               }),
             )
@@ -924,6 +1060,7 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
               pairingsById,
               activities: s.activities,
               activityCodes: s.activityCodes,
+              flightBookings: s.flightBookings,
               ruleSet: s.ruleSet,
             })
             legality = { level: full.level, reason: full.reason, checks: full.checks, overridable: full.overridable }
@@ -1028,6 +1165,12 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
         clearRangeSelection()
         return
       }
+      // Note: left-click on a positioning chip falls through to the
+      // empty-cell branch below. Selecting the cell opens the Assign tab
+      // with activity codes (same behaviour as any empty cell on a flank
+      // day) so planners can still drop OFF / SBY / training onto it.
+      // The positioning drawer only opens via right-click → context menu.
+
       // Click landed on empty canvas — clear any active range, and mark
       // the clicked cell in 'view' mode so user sees the accent border.
       clearRangeSelection()
@@ -1037,7 +1180,7 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
       if (!row) return
       const dayIdx = Math.floor(p.x / (layout.pph * 24))
       if (dayIdx < 0 || dayIdx >= layout.periodDays) return
-      const dayMs = layout.periodStartMs + dayIdx * 86_400_000
+      const dayMs = layout.periodStartMs + dayIdx * 86_400_000 + layout.displayOffsetMs
       const dateIso = new Date(dayMs).toISOString().slice(0, 10)
       selectDateCell(row.crewId, dateIso, 'view')
     },
@@ -1088,7 +1231,7 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
       if (viewportY < HEADER_H) {
         const dayIdx = Math.floor(rawX / (layout.pph * 24))
         if (dayIdx < 0 || dayIdx >= layout.periodDays) return
-        const dayMs = layout.periodStartMs + dayIdx * 86_400_000
+        const dayMs = layout.periodStartMs + dayIdx * 86_400_000 + layout.displayOffsetMs
         const dateIso = new Date(dayMs).toISOString().slice(0, 10)
         e.preventDefault()
         openContextMenu({ kind: 'date-header', dateIso, pageX: e.clientX, pageY: e.clientY })
@@ -1131,12 +1274,44 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
         return
       }
 
+      // Positioning chip hit — right-click on the "+" / POS glyph paints
+      // a small contextual menu with Assign / Edit / Cancel actions.
+      // Stored hits use post-HEADER_H content coords (matches `bars`).
+      {
+        const px = rawX
+        const py = rawY - HEADER_H
+        for (const hit of positioningHitsRef.current) {
+          if (px >= hit.x && px <= hit.x + hit.w && py >= hit.y && py <= hit.y + hit.h) {
+            e.preventDefault()
+            // Use `baseLabel` (IATA string), not `base` (Airport _id UUID).
+            // Falls back to '' rather than rendering a UUID in the drawer header.
+            const crewMember = useCrewScheduleStore.getState().crew.find((c) => c._id === hit.crewId)
+            const homeBase = (crewMember?.baseLabel ?? '').toUpperCase()
+            const tempCode = hit.airportCode.toUpperCase()
+            openContextMenu({
+              kind: 'positioning-chip',
+              tempBaseId: hit.tempBaseId,
+              direction: hit.direction,
+              crewId: hit.crewId,
+              airportCode: hit.airportCode,
+              flightDate: hit.flightDate,
+              depStation: hit.direction === 'outbound' ? homeBase : tempCode,
+              arrStation: hit.direction === 'outbound' ? tempCode : homeBase,
+              bookingId: hit.bookingId,
+              pageX: e.clientX,
+              pageY: e.clientY,
+            })
+            return
+          }
+        }
+      }
+
       // Empty cell on a crew row (§4.3).
       const row = hitTestRow(layout.rows, y)
       if (!row) return
       const dayIdx = Math.floor(x / (layout.pph * 24))
       if (dayIdx < 0 || dayIdx >= layout.periodDays) return
-      const dayMs = layout.periodStartMs + dayIdx * 86_400_000
+      const dayMs = layout.periodStartMs + dayIdx * 86_400_000 + layout.displayOffsetMs
       const dateIso = new Date(dayMs).toISOString().slice(0, 10)
 
       // Temp-base band hit — one item "Modify Temp Assignment…".
@@ -1204,7 +1379,9 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
         const store = useCrewScheduleStore.getState()
         const assign = store.assignments.find((a) => a._id === barHit.assignmentId)
         if (!assign) return
-        const dateIso = new Date(assign.startUtcIso).toISOString().slice(0, 10)
+        const dateIso = new Date(new Date(assign.startUtcIso).getTime() + layout.displayOffsetMs)
+          .toISOString()
+          .slice(0, 10)
         store.selectDateCell(barHit.crewId, dateIso, 'assign')
         store.setRightPanelOpen(true)
         store.setInspectorTab('assign')
@@ -1217,7 +1394,11 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
       if (activityHit) {
         const store = useCrewScheduleStore.getState()
         const act = store.activities.find((a) => a._id === activityHit.activityId)
-        const dateIso = act?.dateIso ?? (act ? new Date(act.startUtcIso).toISOString().slice(0, 10) : null)
+        const dateIso =
+          act?.dateIso ??
+          (act
+            ? new Date(new Date(act.startUtcIso).getTime() + layout.displayOffsetMs).toISOString().slice(0, 10)
+            : null)
         if (!dateIso) return
         store.startReplaceActivity({
           activityId: activityHit.activityId,
@@ -1234,7 +1415,7 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
 
       const dayIdx = Math.floor(x / (layout.pph * 24))
       if (dayIdx < 0 || dayIdx >= layout.periodDays) return
-      const dayMs = layout.periodStartMs + dayIdx * 86_400_000
+      const dayMs = layout.periodStartMs + dayIdx * 86_400_000 + layout.displayOffsetMs
       const dateIso = new Date(dayMs).toISOString().slice(0, 10)
       selectDateCell(row.crewId, dateIso, 'assign')
       useCrewScheduleStore.getState().setRightPanelOpen(true)
@@ -1466,6 +1647,8 @@ function DragGhost() {
 }
 
 function drawHeader(ctx: CanvasRenderingContext2D, layout: CrewScheduleLayout, sx: number, w: number, isDark: boolean) {
+  // Solid fill — fully opaque so vertically scrolled content never bleeds
+  // through. Caller paints this LAST in the draw cycle.
   ctx.fillStyle = isDark ? '#191921' : '#FFFFFF'
   ctx.fillRect(0, 0, w, HEADER_H)
   ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.06)' : '#E4E4EB'
@@ -1475,27 +1658,50 @@ function drawHeader(ctx: CanvasRenderingContext2D, layout: CrewScheduleLayout, s
   ctx.lineTo(w, HEADER_H)
   ctx.stroke()
 
-  ctx.font = '600 11px Inter, system-ui, sans-serif'
-  ctx.fillStyle = isDark ? '#A7A9B5' : '#6B6C7B'
   ctx.textBaseline = 'middle'
+  ctx.textAlign = 'center'
 
   const days = layout.periodDays
   const dayW = layout.pph * 24
+  // ≥ 28-day windows (full month / quarter view) get a stacked layout —
+  // big day number on top, single DOW letter below — so each column
+  // stays legible even when dayW shrinks below 28 px. Shorter windows
+  // keep the inline `WED 01` form which reads well at wide spacing.
+  const stacked = days >= 28
+  const mutedColor = isDark ? '#A7A9B5' : '#6B6C7B'
+  const dowFull = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+  const dowShort = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
   for (let i = 0; i < days; i += 1) {
     const x = i * dayW - sx
     if (x + dayW < 0 || x > w) continue
-    const dayMs = layout.periodStartMs + i * 86_400_000
+    // periodStartMs is the UTC instant of LOCAL midnight on day 0. Adding
+    // displayOffsetMs shifts to a UTC instant whose getUTC* prints the
+    // correct local date (e.g. SGN local Apr 1 → instant 2026-04-01T00:00Z
+    // which getUTCDate=1, getUTCDay=Wed).
+    const dayMs = layout.periodStartMs + i * 86_400_000 + layout.displayOffsetMs
     const d = new Date(dayMs)
-    const dow = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][d.getUTCDay()]
-    const label = `${dow} ${String(d.getUTCDate()).padStart(2, '0')}`
-    const isWeekend = d.getUTCDay() === 0 || d.getUTCDay() === 6
+    const jsDay = d.getUTCDay()
+    const isWeekend = jsDay === 0 || jsDay === 6
     if (isWeekend) {
       ctx.fillStyle = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'
       ctx.fillRect(x, 0, dayW, HEADER_H)
-      ctx.fillStyle = isDark ? '#A7A9B5' : '#6B6C7B'
     }
-    ctx.fillText(label, x + 8, HEADER_H / 2)
+    ctx.fillStyle = mutedColor
+    const cx = x + dayW / 2
+    if (stacked) {
+      // Big day number on top, small DOW letter below.
+      ctx.font = '700 14px Inter, system-ui, sans-serif'
+      ctx.fillStyle = isDark ? '#FFFFFF' : '#0E0E14'
+      ctx.fillText(String(d.getUTCDate()).padStart(2, '0'), cx, HEADER_H / 2 - 7)
+      ctx.font = '600 9px Inter, system-ui, sans-serif'
+      ctx.fillStyle = mutedColor
+      ctx.fillText(dowShort[jsDay], cx, HEADER_H / 2 + 9)
+    } else {
+      ctx.font = '600 11px Inter, system-ui, sans-serif'
+      ctx.fillText(`${dowFull[jsDay]} ${String(d.getUTCDate()).padStart(2, '0')}`, cx, HEADER_H / 2)
+    }
   }
+  ctx.textAlign = 'start'
 }
 
 function drawGrid(
@@ -1512,7 +1718,10 @@ function drawGrid(
   for (let i = 0; i < days; i += 1) {
     const x = i * dayW - visX0
     if (x + dayW < 0 || x > visX1 - visX0) continue
-    const dayMs = layout.periodStartMs + i * 86_400_000
+    // Shift by displayOffsetMs so weekend shading matches local-day Sat/Sun
+    // (matches drawHeader). Without the shift, an SGN crew sees weekend
+    // bands offset by 7h, splitting the local Saturday across two columns.
+    const dayMs = layout.periodStartMs + i * 86_400_000 + layout.displayOffsetMs
     const d = new Date(dayMs)
     const jsDay = d.getUTCDay()
     if (jsDay === 0 || jsDay === 6) {

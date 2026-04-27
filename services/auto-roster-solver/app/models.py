@@ -103,9 +103,3 @@ class SolveRequest(BaseModel):
     allowed: dict[str, list[str]]
     config: SolverConfig = SolverConfig()
     time_limit_sec: int = 60
-    # Cabin-specific knobs (all optional, safe defaults preserve cockpit
-    # behaviour). Set by the orchestrator on cabin runs where the model is
-    # 4-6× larger and the marginal value of provable optimality is low.
-    coverage_weight_default: int | None = None
-    relative_gap_limit_override: float | None = None
-    lns_only: bool = False

@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "concurrently -n turbo,solver -c cyan,magenta \"npm:dev:turbo\" \"npm:dev:solver\"",
     "dev:turbo": "turbo dev",
+    "predev:solver": "node scripts/free-solver-port.mjs",
     "dev:solver": "cd services/auto-roster-solver && python -m uvicorn app.main:app --host 0.0.0.0 --port 8082 --reload",
     "build": "turbo build",
     "lint": "turbo lint",

@@ -480,17 +480,25 @@ export function AutoRosterShell() {
   ])
 
   const handleCancel = useCallback(async () => {
-    if (!activeRunId) return
+    // Fall back to the lock banner's runId when the page was reattached
+    // to someone else's (or a prior session's) run — `activeRunId` is
+    // only populated when WE started the run from this tab. Without
+    // this fallback the Cancel button silently no-ops on reattached
+    // runs (the exact scenario after a server restart leaves an
+    // orphaned full-scope run that needs to be killed).
+    const targetRunId = activeRunId ?? lock?.runId ?? null
+    if (!targetRunId) return
     esRef.current?.close()
     try {
-      await api.cancelAutoRoster(activeRunId)
+      await api.cancelAutoRoster(targetRunId)
     } catch {
       /* ignore */
     }
     setPhase('cancelled')
     setActiveRunId(null)
+    setLock(null)
     void loadHistory()
-  }, [activeRunId, loadHistory])
+  }, [activeRunId, lock?.runId, loadHistory])
 
   if (!operator?._id) {
     return (
@@ -2028,15 +2036,21 @@ function ManpowerChart({
           (() => {
             const y = toY(data.crewTotal)
             const borderColor = isDark ? '#0E0E14' : 'rgba(15,23,42,0.85)'
+            // Pin badge BELOW the line when too close to the chart top
+            // (PT) — otherwise the rect clips above the plot area and
+            // "Total N" overflows the panel border.
+            const badgeAbove = y - 26 >= PT
+            const rectY = badgeAbove ? y - 26 : y + 4
+            const textY = badgeAbove ? y - 11 : y + 19
             return (
               <g style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.45))' }}>
                 <line x1={PL} y1={y} x2={W - PR} y2={y} stroke={borderColor} strokeWidth={6} strokeLinecap="round" />
                 <line x1={PL} y1={y} x2={W - PR} y2={y} stroke="#FDDD48" strokeWidth={3} strokeLinecap="round" />
                 <g>
-                  <rect x={W - PR - 108} y={y - 26} width={104} height={22} rx={4} fill={borderColor} />
+                  <rect x={W - PR - 108} y={rectY} width={104} height={22} rx={4} fill={borderColor} />
                   <text
                     x={W - PR - 56}
-                    y={y - 11}
+                    y={textY}
                     textAnchor="middle"
                     fontSize={14}
                     fontWeight={700}
@@ -3454,7 +3468,13 @@ function ReviewBody({
   // crash when viewing those modes.
   const assignedPairings = (stats.assignedPairings as number | undefined) ?? 0
   const pairingsTotal = (stats.pairingsTotal as number | undefined) ?? 0
+  // Distinct REAL pairings missing at least one seat (post-fix orchestrator
+  // semantic). Older runs persisted seat-slot counts under the same key —
+  // accept that pre-fix runs still show the legacy value.
   const unassignedPairings = (stats.unassignedPairings as number | undefined) ?? 0
+  // Sum of unfilled seat slots across those pairings. Multi-seat (cabin)
+  // runs typically show seats >> pairings.
+  const unassignedSeats = (stats.unassignedSeats as number | undefined) ?? null
   const virtualSeatsTotal = (stats.virtualSeatsTotal as number | undefined) ?? null
   const crewTotal = (stats.crewTotal as number | undefined) ?? 0
   const durationMs = (stats.durationMs as number | undefined) ?? 0
@@ -3527,7 +3547,12 @@ function ReviewBody({
     },
     {
       label: 'Unassigned',
-      value: unassignedPairings.toLocaleString(),
+      // Show distinct pairings; append seat count when it differs (cabin
+      // runs where one pairing aggregates multiple unfilled slots).
+      value:
+        unassignedSeats != null && unassignedSeats !== unassignedPairings
+          ? `${unassignedPairings.toLocaleString()} pairings · ${unassignedSeats.toLocaleString()} seats`
+          : unassignedPairings.toLocaleString(),
       tone: unassignedPairings > 0 ? '#FF3B3B' : '#06C270',
     },
     {
@@ -3642,8 +3667,12 @@ function ReviewBody({
             >
               <AlertTriangle size={14} className="mt-0.5 shrink-0" style={{ color: '#FF8800' }} />
               <p className="text-[13px]" style={{ color: '#FF8800' }}>
-                {unassignedPairings} pairing{unassignedPairings !== 1 ? 's' : ''} could not be filled — no FDTL-legal
-                crew available. Check qualifications, base coverage, or extend the solver time limit.
+                {unassignedPairings} pairing{unassignedPairings !== 1 ? 's' : ''}
+                {unassignedSeats != null && unassignedSeats !== unassignedPairings
+                  ? ` (${unassignedSeats} seat${unassignedSeats !== 1 ? 's' : ''})`
+                  : ''}{' '}
+                could not be filled — no FDTL-legal crew available. Check qualifications, base coverage, or extend the
+                solver time limit.
               </p>
             </div>
           )}

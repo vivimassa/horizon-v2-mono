@@ -672,6 +672,9 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
     // planners see has something friendlier than a UUID.
     const userName = (req as { userName?: string | null }).userName ?? null
 
+    const toArr = (v: string | string[] | null | undefined): string[] | null =>
+      v == null ? null : Array.isArray(v) ? v : [v]
+
     await AutoRosterRun.create({
       _id: runId,
       operatorId,
@@ -687,6 +690,18 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
       lastProgressMessage: 'Starting…',
       stats: null,
       error: null,
+      // Persist original POST args so SSE re-drive can resume with the
+      // SAME scope the user submitted. Without this, a server restart
+      // between POST and SSE-connect causes the run to widen to the full
+      // operator (filters drop, mode resets to 'general').
+      mode,
+      longDutiesMinDays,
+      daysOffActivityCodeId: body.daysOffActivityCodeId ?? null,
+      timeLimitSec,
+      filterBase: body.base ?? null,
+      filterPosition: body.position ?? null,
+      filterAcTypes: toArr(body.acType),
+      filterCrewGroupIds: toArr(body.crewGroup),
       createdAt: now,
       updatedAt: now,
     })
@@ -697,9 +712,6 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
     const ac = new AbortController()
     activeRuns.set(runId, ac)
     getOrCreateBus(runId)
-
-    const toArr = (v: string | string[] | null | undefined): string[] | null =>
-      v == null ? null : Array.isArray(v) ? v : [v]
 
     void runAutoRoster(
       runId,
@@ -783,20 +795,42 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
     req.socket.on('close', endStream)
 
     // If orchestrator isn't running (e.g. server restart lost state),
-    // re-drive it and wire its events through the bus.
+    // re-drive it and wire its events through the bus. Pull the original
+    // POST args off the doc so the run resumes with the SAME mode +
+    // filters the user submitted — without this the run silently
+    // widens to the full operator and ignores filterBase/Position/etc.
     if (!activeRuns.has(runId)) {
       const newAc = new AbortController()
       activeRuns.set(runId, newAc)
 
+      const docArgs = doc as unknown as {
+        mode?: 'general' | 'daysOff' | 'standby' | 'longDuties' | null
+        longDutiesMinDays?: number | null
+        daysOffActivityCodeId?: string | null
+        timeLimitSec?: number | null
+        filterBase?: string | null
+        filterPosition?: string | null
+        filterAcTypes?: string[] | null
+        filterCrewGroupIds?: string[] | null
+      }
       void runAutoRoster(
         runId,
         operatorId,
         doc.periodFrom,
         doc.periodTo,
-        60,
+        docArgs.timeLimitSec ?? 1800,
         (event: AutoRosterEvent) => emitToBus(runId, event),
         newAc.signal,
         req.userId ?? null,
+        (docArgs.mode as 'general' | 'daysOff' | 'standby' | 'longDuties') ?? 'general',
+        docArgs.longDutiesMinDays ?? 2,
+        {
+          base: docArgs.filterBase ?? null,
+          position: docArgs.filterPosition ?? null,
+          acTypes: docArgs.filterAcTypes ?? null,
+          crewGroupIds: docArgs.filterCrewGroupIds ?? null,
+        },
+        docArgs.daysOffActivityCodeId ?? null,
       ).finally(() => activeRuns.delete(runId))
     }
 

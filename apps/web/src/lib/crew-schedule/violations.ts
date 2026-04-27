@@ -2,6 +2,7 @@ import type {
   ActivityCodeRef,
   CrewActivityRef,
   CrewAssignmentRef,
+  CrewFlightBookingRef,
   CrewMemberListItemRef,
   PairingRef,
 } from '@skyhub/api'
@@ -51,6 +52,9 @@ export interface CheckViolationsInput {
    *  are conservatively treated as rest. */
   activityCodes?: ActivityCodeRef[]
   pairings?: PairingRef[]
+  /** Crew flight bookings — positioning legs add duty time to the FDTL
+   *  evaluator. Null/empty means the validator runs without them. */
+  flightBookings?: CrewFlightBookingRef[]
   ruleSet?: unknown | null
 }
 
@@ -63,6 +67,7 @@ export function checkAssignmentViolations({
   activities,
   activityCodes,
   pairings,
+  flightBookings,
   ruleSet,
 }: CheckViolationsInput): AssignmentViolation[] {
   const list: AssignmentViolation[] = []
@@ -139,6 +144,7 @@ export function checkAssignmentViolations({
       activities: activities ?? [],
       pairingsById,
       activityCodesById,
+      bookings: flightBookings,
     })
     const candidate = buildCandidateDuty(pairing)
     if (candidate) {

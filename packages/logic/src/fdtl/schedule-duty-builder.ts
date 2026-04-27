@@ -50,6 +50,28 @@ export interface ActivityCodeMeta {
   flags: string[]
 }
 
+/** Crew flight booking — used by the FDTL evaluator to add duty time for
+ *  positioning legs that are not attached to a pairing assignment.
+ *
+ *  Behaviour:
+ *  - `purpose='temp-base-positioning'` rows emit a `kind:'activity'` duty
+ *    with `dutyMinutes = window length`, `fdpMinutes = 0`, `blockMinutes = 0`.
+ *    Positioning is duty time but never FDP (deadheading rule under all
+ *    common regulators — CAAV VAR 15, EASA ORO.FTL, FAA Part 117).
+ *  - `purpose='pairing-deadhead'` rows are SKIPPED here; they're already
+ *    represented by the parent pairing's assignment, so emitting them would
+ *    double-count duty hours.
+ *  - `status='cancelled'` rows are skipped. */
+export interface BookingLike {
+  _id: string
+  crewIds?: string[]
+  status: string
+  purpose?: string | null
+  flightDate?: string | null
+  stdUtcMs?: number | null
+  staUtcMs?: number | null
+}
+
 export interface BuildScheduleDutiesInput {
   crewId: string
   assignments: AssignmentLike[]
@@ -59,6 +81,9 @@ export interface BuildScheduleDutiesInput {
    *  or missing entries, all unclassified activities are treated as `rest`
    *  to avoid the AL-counts-as-168h-duty class of false-positive. */
   activityCodesById?: Map<string, ActivityCodeMeta>
+  /** Crew flight bookings (positioning legs). Optional — callers that
+   *  don't load bookings get pre-FDTL-aware behaviour. */
+  bookings?: BookingLike[]
 }
 
 export function buildScheduleDuties(input: BuildScheduleDutiesInput): ScheduleDuty[] {
@@ -139,7 +164,54 @@ export function buildScheduleDuties(input: BuildScheduleDutiesInput): ScheduleDu
       label: cat.category === 'rest' ? 'rest' : 'activity',
     })
   }
+
+  // Crew flight bookings — positioning legs as duty (no FDP). See the
+  // BookingLike doc-comment for the kept/skipped rules.
+  for (const b of input.bookings ?? []) {
+    if (b.status === 'cancelled') continue
+    if (b.purpose !== 'temp-base-positioning') continue
+    if (!b.crewIds || !b.crewIds.includes(input.crewId)) continue
+    const window = bookingDutyWindowMs(b)
+    if (!window) continue
+    const dutyMin = Math.max(0, (window.endMs - window.startMs) / 60_000)
+    out.push({
+      id: b._id,
+      kind: 'activity',
+      startUtcMs: window.startMs,
+      endUtcMs: window.endMs,
+      // Positioning counts toward duty + cumulative limits, never FDP.
+      // Block time is zero — no flying, just sitting in the cabin.
+      dutyMinutes: dutyMin,
+      blockMinutes: 0,
+      fdpMinutes: 0,
+      landings: 0,
+      departureStation: null,
+      arrivalStation: null,
+      isAugmented: false,
+      label: 'positioning',
+    })
+  }
   return out
+}
+
+/** Duty-window for a positioning booking. STD/STA when known give a
+ *  realistic envelope (report -60min, debrief +30min); otherwise we fall
+ *  back to a conservative full-UTC-day window keyed off `flightDate`. */
+function bookingDutyWindowMs(b: BookingLike): { startMs: number; endMs: number } | null {
+  if (b.stdUtcMs != null && b.staUtcMs != null) {
+    const startMs = b.stdUtcMs - 60 * 60_000
+    const endMs = b.staUtcMs + 30 * 60_000
+    if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs) {
+      return { startMs, endMs }
+    }
+  }
+  if (b.flightDate) {
+    const dayStart = new Date(`${b.flightDate}T00:00:00Z`).getTime()
+    if (Number.isFinite(dayStart)) {
+      return { startMs: dayStart, endMs: dayStart + 86_400_000 - 1 }
+    }
+  }
+  return null
 }
 
 /** Build a ScheduleDuty for a candidate pairing not yet assigned.

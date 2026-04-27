@@ -5,6 +5,7 @@ import { api, type ActivityCodeRef } from '@skyhub/api'
 import { useCrewScheduleStore } from '@/stores/use-crew-schedule-store'
 import { ActivityCodePicker } from '../activity-code-picker'
 import { DialogShell, DialogCancelButton, DialogPrimaryButton } from './dialog-shell'
+import { AssignSeriesHero } from './dialog-heroes'
 
 interface Props {
   fromIso: string
@@ -142,6 +143,9 @@ export function AssignSeriesDialog({ fromIso, toIso, crewId, onClose, onAfterMut
   return (
     <DialogShell
       title="Assign series of duties"
+      heroEyebrow="Bulk fill"
+      heroSubtitle="Stamp the same activity across a date range"
+      heroSvg={<AssignSeriesHero />}
       onClose={onClose}
       width={540}
       footer={

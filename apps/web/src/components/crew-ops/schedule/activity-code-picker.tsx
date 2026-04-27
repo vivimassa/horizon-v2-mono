@@ -201,12 +201,12 @@ function ActivityCodeRow({
         className="w-full flex items-center gap-3 px-2 h-11 hover:bg-hz-border/10 text-left disabled:opacity-50 transition-colors"
       >
         <span
-          className="inline-flex items-center justify-center h-7 min-w-[52px] px-2.5 rounded-md text-[13px] font-bold text-white tabular-nums shrink-0"
+          className="inline-flex items-center justify-center h-6 w-[56px] rounded-md text-[11px] font-bold text-white tabular-nums shrink-0 tracking-wider"
           style={{ backgroundColor: pillBg }}
         >
           {shortLabel}
         </span>
-        <span className="flex-1 text-[14px] text-hz-text truncate">{code.name}</span>
+        <span className="flex-1 text-[13px] text-hz-text truncate">{code.name}</span>
         {code.requiresTime ? (
           <Clock className="w-4 h-4 text-hz-text-tertiary shrink-0" />
         ) : (

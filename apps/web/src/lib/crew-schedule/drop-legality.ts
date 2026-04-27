@@ -2,6 +2,7 @@ import type {
   ActivityCodeRef,
   CrewActivityRef,
   CrewAssignmentRef,
+  CrewFlightBookingRef,
   CrewMemberListItemRef,
   CrewPositionRef,
   PairingRef,
@@ -53,6 +54,8 @@ export interface ComputeDropLegalityInput {
    *  classify activities (annual leave, day off, training…) as duty vs
    *  rest. Without this, all activities default to rest. */
   activityCodes?: ActivityCodeRef[]
+  /** Crew flight bookings — positioning legs add duty time to FDTL. */
+  flightBookings?: CrewFlightBookingRef[]
   ruleSet?: unknown | null
 }
 
@@ -148,6 +151,7 @@ export function computeDropLegality(input: ComputeDropLegalityInput): DropLegali
     activities: input.activities,
     activityCodes: input.activityCodes,
     pairingsById: input.pairingsById,
+    flightBookings: input.flightBookings,
     ruleSet: input.ruleSet ?? null,
   })
   if (fdtl && fdtl.level === 'violation') {
@@ -177,6 +181,7 @@ interface FdtlCheckInput {
   activities?: CrewActivityRef[]
   activityCodes?: ActivityCodeRef[]
   pairingsById: Map<string, PairingRef>
+  flightBookings?: CrewFlightBookingRef[]
   ruleSet: unknown | null
 }
 
@@ -193,6 +198,7 @@ function runFdtlChecks(
     activities: input.activities ?? [],
     pairingsById: input.pairingsById,
     activityCodesById,
+    bookings: input.flightBookings,
   })
   const candidate = buildCandidateDuty(input.pairing)
   if (!candidate) return null
@@ -233,6 +239,7 @@ export interface ComputeAssignFromUncrewedInput {
   pairingsById: Map<string, PairingRef>
   activities?: CrewActivityRef[]
   activityCodes?: ActivityCodeRef[]
+  flightBookings?: CrewFlightBookingRef[]
   ruleSet?: unknown | null
 }
 
@@ -336,6 +343,7 @@ export function computeAssignFromUncrewedLegality(input: ComputeAssignFromUncrew
     activities: input.activities,
     activityCodes: input.activityCodes,
     pairingsById: input.pairingsById,
+    flightBookings: input.flightBookings,
     ruleSet: input.ruleSet ?? null,
   })
   if (fdtl && fdtl.level === 'violation') {

@@ -1,9 +1,10 @@
 'use client'
 
-import { AlertTriangle } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTheme } from '@/components/theme-provider'
 import type { AssignmentViolation } from '@/lib/crew-schedule/violations'
+import { DialogHeroBand } from './dialog-shell'
+import { OverrideHero } from './dialog-heroes'
 
 /**
  * Modal shown before a rule-violating assignment is persisted. Lists
@@ -77,26 +78,14 @@ export function AssignmentOverrideDialog({ violations, busy, onCancel, onConfirm
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header with warning glyph */}
-        <div
-          className="px-5 pt-5 pb-4 flex gap-3 items-start"
-          style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}
-        >
-          <div
-            className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
-            style={{ background: 'rgba(255,136,0,0.15)' }}
-          >
-            <AlertTriangle size={20} color="#FF8800" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-bold tracking-wide uppercase" style={{ color: '#FF8800' }}>
-              Rule violation
-            </div>
-            <div className="text-[15px] font-semibold mt-0.5" style={{ color: isDark ? '#FFFFFF' : '#0E0E14' }}>
-              {violations.length === 1 ? violations[0].title : `${violations.length} violations detected`}
-            </div>
-          </div>
-        </div>
+        <DialogHeroBand
+          eyebrow="Rule violation"
+          title={violations.length === 1 ? violations[0].title : `${violations.length} violations detected`}
+          subtitle="Override is logged for the Schedule Legality Check report."
+          svg={<OverrideHero />}
+          onClose={busy ? () => undefined : onCancel}
+          isDark={isDark}
+        />
 
         {/* Violation list */}
         <div className="px-5 py-4 space-y-3">

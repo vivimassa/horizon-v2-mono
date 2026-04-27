@@ -7,6 +7,7 @@ import { useTheme } from '@/components/theme-provider'
 import { useCrewScheduleStore } from '@/stores/use-crew-schedule-store'
 import { useDateFormat } from '@/hooks/use-date-format'
 import { DialogShell, DialogCancelButton } from './dialog-shell'
+import { FlightChangesHero } from './dialog-heroes'
 
 /**
  * Phase 4 — "Flight schedule changes" dialog, opened from the pairing
@@ -64,6 +65,13 @@ export function FlightScheduleChangesDialog() {
   return (
     <DialogShell
       title={`Flight schedule changes · ${pairingCode}`}
+      heroEyebrow="Schedule delta"
+      heroSubtitle={
+        changedLegs.length === 0
+          ? 'No deltas vs the frozen pairing'
+          : `${changedLegs.length} leg${changedLegs.length === 1 ? '' : 's'} drifted vs the frozen pairing`
+      }
+      heroSvg={<FlightChangesHero />}
       onClose={close}
       width={640}
       footer={<DialogCancelButton onClick={close} label="Close" />}

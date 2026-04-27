@@ -8,6 +8,7 @@ import { useDateFormat } from '@/hooks/use-date-format'
 import { isEligibleForSeat } from '@/lib/crew-schedule/seat-eligibility'
 import { checkAssignmentViolations, partitionViolations } from '@/lib/crew-schedule/violations'
 import { DialogShell, DialogCancelButton } from './dialog-shell'
+import { AssignPairingHero } from './dialog-heroes'
 
 interface Props {
   crewId: string
@@ -34,6 +35,7 @@ export function AssignPairingDialog({ crewId, dateIso, onClose, onAfterMutate }:
   const tempBases = useCrewScheduleStore((s) => s.tempBases)
   const assignmentsAll = useCrewScheduleStore((s) => s.assignments)
   const activitiesAll = useCrewScheduleStore((s) => s.activities)
+  const flightBookingsAll = useCrewScheduleStore((s) => s.flightBookings)
   const activityCodesAll = useCrewScheduleStore((s) => s.activityCodes)
   const pairingsAll = useCrewScheduleStore((s) => s.pairings)
   const ruleSet = useCrewScheduleStore((s) => s.ruleSet)
@@ -106,6 +108,7 @@ export function AssignPairingDialog({ crewId, dateIso, onClose, onAfterMutate }:
             activities: activitiesAll,
             activityCodes: activityCodesAll,
             pairings: pairingsAll,
+            flightBookings: flightBookingsAll,
             ruleSet,
           }),
         )
@@ -138,6 +141,9 @@ export function AssignPairingDialog({ crewId, dateIso, onClose, onAfterMutate }:
   return (
     <DialogShell
       title="Assign pairing"
+      heroEyebrow="Pairing pool"
+      heroSubtitle="Pick an uncrewed pairing for this crew on this date"
+      heroSvg={<AssignPairingHero />}
       onClose={onClose}
       width={520}
       bodyPadding={false}

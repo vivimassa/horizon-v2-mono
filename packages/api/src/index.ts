@@ -284,6 +284,9 @@ export type {
   CrewFlightBookingRef,
   CrewFlightBookingCreateInput,
   CrewFlightBookingPatchInput,
+  CrewFlightBookingPurpose,
+  CrewFlightBookingDirection,
+  FlightSearchResult,
   // 4.1.8.2 TransportEmail
   TransportEmailStatus,
   TransportEmailDeliveryStatus,

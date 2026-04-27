@@ -1,9 +1,10 @@
 'use client'
 
-import { XCircle } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useTheme } from '@/components/theme-provider'
 import type { AssignmentViolation } from '@/lib/crew-schedule/violations'
+import { DialogHeroBand } from './dialog-shell'
+import { BlockedHero } from './dialog-heroes'
 
 /**
  * Modal shown when an assignment hits one or more hard-block violations
@@ -47,25 +48,14 @@ export function AssignmentBlockedDialog({ violations, onClose }: Props) {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className="px-5 pt-5 pb-4 flex gap-3 items-start"
-          style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}
-        >
-          <div
-            className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
-            style={{ background: 'rgba(230,53,53,0.15)' }}
-          >
-            <XCircle size={20} color="#E63535" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-bold tracking-wide uppercase" style={{ color: '#E63535' }}>
-              Illegal assignment
-            </div>
-            <div className="text-[15px] font-semibold mt-0.5" style={{ color: isDark ? '#FFFFFF' : '#0E0E14' }}>
-              {violations.length === 1 ? violations[0].title : `${violations.length} violations`}
-            </div>
-          </div>
-        </div>
+        <DialogHeroBand
+          eyebrow="Illegal assignment"
+          title={violations.length === 1 ? violations[0].title : `${violations.length} violations`}
+          subtitle="Cannot be overridden — update qualifications or pick a different crew."
+          svg={<BlockedHero />}
+          onClose={onClose}
+          isDark={isDark}
+        />
 
         <div className="px-5 py-4 space-y-3">
           {violations.map((v) => (

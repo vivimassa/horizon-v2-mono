@@ -555,6 +555,46 @@ export function CrewScheduleContextMenu({ onAfterMutate }: Props) {
         ]
       }
 
+      case 'positioning-chip': {
+        const direction = menu.direction === 'outbound' ? 'Outbound' : 'Return'
+        const items: MenuItem[] = [
+          {
+            icon: MapPin,
+            label: menu.bookingId ? `Edit positioning · ${direction}…` : `Assign positioning · ${direction}…`,
+            onClick: () => {
+              useCrewScheduleStore.getState().openPositioningDrawer({
+                tempBaseId: menu.tempBaseId,
+                direction: menu.direction,
+                bookingId: menu.bookingId,
+                crewId: menu.crewId,
+                flightDate: menu.flightDate,
+                depStation: menu.depStation,
+                arrStation: menu.arrStation,
+              })
+            },
+          },
+        ]
+        if (menu.bookingId) {
+          items.push({
+            icon: Trash2,
+            destructive: true,
+            label: 'Cancel booking',
+            onClick: async () => {
+              setBusy(true)
+              try {
+                await api.cancelCrewFlightBooking(menu.bookingId as string)
+                await useCrewScheduleStore.getState().loadFlightBookings()
+                onAfterMutate()
+              } finally {
+                setBusy(false)
+                useCrewScheduleStore.getState().closeContextMenu()
+              }
+            },
+          })
+        }
+        return [items]
+      }
+
       case 'block': {
         // Resolve the activities + assignments across every crew in the
         // range so Delete can wipe them in one pass. Single-crew blocks

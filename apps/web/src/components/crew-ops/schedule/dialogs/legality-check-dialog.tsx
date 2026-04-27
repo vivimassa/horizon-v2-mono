@@ -11,8 +11,10 @@ import {
   type CrewMemberListItemRef,
 } from '@skyhub/api'
 import { useCrewScheduleStore } from '@/stores/use-crew-schedule-store'
-import { AlertTriangle, CheckCircle2, Loader2, ShieldAlert, X, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Loader2, XCircle } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
+import { DialogHeroBand } from './dialog-shell'
+import { LegalityHero } from './dialog-heroes'
 import { useDateFormat } from '@/hooks/use-date-format'
 
 /**
@@ -262,36 +264,16 @@ export function LegalityCheckDialog({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div
-          className="px-5 py-4 flex items-center gap-3 shrink-0"
-          style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}
-        >
-          <div
-            className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center"
-            style={{ background: 'var(--module-accent-tint, rgba(124,58,237,0.15))' }}
-          >
-            <ShieldAlert size={18} color="var(--module-accent, #7c3aed)" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[15px] font-bold" style={{ color: isDark ? '#FFFFFF' : '#0E0E14' }}>
-              Legality Check
-            </div>
-            <div className="text-[13px] mt-0.5 truncate" style={{ color: isDark ? '#A7A9B5' : '#6B6C7B' }}>
-              {subtitle}
-              {' · '}
-              {issues.length === 0 ? 'No issues' : `${violations} violation${violations === 1 ? '' : 's'}`}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-md flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10"
-            aria-label="Close"
-          >
-            <X size={16} />
-          </button>
-        </div>
+        <DialogHeroBand
+          eyebrow="Roster legality"
+          title="Legality Check"
+          subtitle={`${subtitle} · ${
+            issues.length === 0 ? 'No issues' : `${violations} violation${violations === 1 ? '' : 's'}`
+          }`}
+          svg={<LegalityHero />}
+          onClose={onClose}
+          isDark={isDark}
+        />
 
         {/* Body */}
         <div className="flex-1 min-h-0 overflow-y-auto">

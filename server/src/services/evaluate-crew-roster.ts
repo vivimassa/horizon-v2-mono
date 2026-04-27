@@ -3,6 +3,7 @@ import { validateCrewAssignment } from '@skyhub/logic/src/fdtl/crew-schedule-val
 import { buildScheduleDuties } from '@skyhub/logic/src/fdtl/schedule-duty-builder'
 import { CrewAssignment } from '../models/CrewAssignment.js'
 import { CrewActivity } from '../models/CrewActivity.js'
+import { CrewFlightBooking } from '../models/CrewFlightBooking.js'
 import { ActivityCode } from '../models/ActivityCode.js'
 import { CrewMember } from '../models/CrewMember.js'
 import { Pairing } from '../models/Pairing.js'
@@ -38,7 +39,7 @@ export async function evaluateCrewRoster(
   const historyFromMs = fromMs - 30 * 86_400_000
   const historyFromIso = new Date(historyFromMs).toISOString().slice(0, 10)
 
-  const [crewList, pairings, assignments, activities, activityCodes, overrides] = await Promise.all([
+  const [crewList, pairings, assignments, activities, activityCodes, overrides, bookings] = await Promise.all([
     CrewMember.find({ operatorId }, { _id: 1, base: 1 }).lean(),
     Pairing.find({ operatorId }).lean(),
     CrewAssignment.find({
@@ -60,7 +61,24 @@ export async function evaluateCrewRoster(
       scenarioId,
       overriddenAtUtc: { $gte: new Date(historyFromMs).toISOString() },
     }).lean(),
+    // Crew flight bookings — positioning legs as duty (no FDP). Pairing-
+    // deadhead rows are skipped inside the builder to avoid double-count.
+    CrewFlightBooking.find({
+      operatorId,
+      status: { $ne: 'cancelled' },
+      flightDate: { $gte: historyFromIso, $ne: null },
+    }).lean(),
   ])
+
+  const adaptedBookings = bookings.map((b) => ({
+    _id: b._id as string,
+    crewIds: (b.crewIds ?? []) as string[],
+    status: b.status as string,
+    purpose: (b.purpose ?? null) as string | null,
+    flightDate: (b.flightDate ?? null) as string | null,
+    stdUtcMs: (b.stdUtcMs ?? null) as number | null,
+    staUtcMs: (b.staUtcMs ?? null) as number | null,
+  }))
 
   const activityCodesById = new Map<string, { flags: string[] }>(
     activityCodes.map((c) => [c._id as string, { flags: (c.flags ?? []) as string[] }]),
@@ -147,6 +165,7 @@ export async function evaluateCrewRoster(
       })),
       pairingsById,
       activityCodesById,
+      bookings: adaptedBookings,
     })
 
     allDuties.sort((a, b) => a.startUtcMs - b.startUtcMs)

@@ -14,15 +14,20 @@ import type {
 import {
   AlertTriangle,
   BedDouble,
+  Briefcase,
+  CalendarClock,
   CheckCircle,
   ChevronRight,
   Clock,
   Moon,
+  PlusCircle,
   Timer,
   Trash2,
+  User,
   Users,
   X,
   XCircle,
+  type LucideIcon,
 } from 'lucide-react'
 import type { LegalityResult } from '../pairing/types'
 import { computeNightHours, computeTafb, minutesToHM, resolveRequiredRestMinutes } from '../pairing/lib/pairing-metrics'
@@ -99,25 +104,11 @@ export function CrewScheduleRightPanel({ onRefresh }: Props) {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between px-4 h-12 shrink-0 border-b border-hz-border/30">
-        <div className="flex items-center gap-1">
-          {(['duty', 'assign', 'bio', 'expiry'] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className="h-8 px-3 rounded-md text-[13px] font-medium capitalize transition-colors"
-              style={{
-                background: tab === t ? 'var(--module-accent)' : 'transparent',
-                color: tab === t ? '#FFFFFF' : undefined,
-              }}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
+      <div className="flex items-center justify-between gap-2 px-3 h-12 shrink-0 border-b border-hz-border/30">
+        <InspectorTabBar tab={tab} setTab={setTab} />
         <button
           onClick={() => setRightPanelOpen(false)}
-          className="w-8 h-8 rounded-md hover:bg-hz-border/20 flex items-center justify-center"
+          className="w-8 h-8 rounded-md hover:bg-hz-border/20 flex items-center justify-center text-hz-text-tertiary hover:text-hz-text transition-colors shrink-0"
           aria-label="Close inspector"
         >
           <X className="w-4 h-4" />
@@ -180,6 +171,49 @@ export function CrewScheduleRightPanel({ onRefresh }: Props) {
   )
 }
 
+/** Segmented-control tab bar for the right inspector. Each tab carries a
+ *  Lucide icon + label. Active tab gets a soft accent-tinted pill with an
+ *  accent dot so the user clocks the active state at a glance even at the
+ *  smaller font size. Container has its own subtle bg + border so the
+ *  segment reads as one coherent control instead of four floating pills. */
+function InspectorTabBar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
+  const items: Array<{ id: Tab; label: string; icon: LucideIcon }> = [
+    { id: 'duty', label: 'Duty', icon: Briefcase },
+    { id: 'assign', label: 'Assign', icon: PlusCircle },
+    { id: 'bio', label: 'Bio', icon: User },
+    { id: 'expiry', label: 'Expiry', icon: CalendarClock },
+  ]
+  return (
+    <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-hz-border/15 border border-hz-border/30">
+      {items.map(({ id, label, icon: Icon }) => {
+        const active = tab === id
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={`group relative inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-semibold uppercase tracking-wider transition-all ${
+              active ? 'text-white shadow-sm' : 'text-hz-text-tertiary hover:text-hz-text hover:bg-hz-border/30'
+            }`}
+            style={
+              active
+                ? {
+                    background: 'var(--module-accent)',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.18), 0 0 0 1px rgba(255,255,255,0.08) inset',
+                  }
+                : undefined
+            }
+            aria-pressed={active}
+          >
+            <Icon className="w-3.5 h-3.5" strokeWidth={active ? 2.4 : 2} />
+            <span>{label}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function DutyTab({ pairing, positions }: { pairing: PairingRef | null; positions: CrewPositionRef[] }) {
   if (!pairing) return <div className="p-4 text-[13px] text-hz-text-tertiary">No pairing selected.</div>
 
@@ -211,7 +245,7 @@ function DutyTab({ pairing, positions }: { pairing: PairingRef | null; positions
           the header quiet. */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-[16px] font-bold tracking-tight tabular-nums text-hz-text">{pairing.pairingCode}</h3>
+          <h3 className="text-[15px] font-bold tracking-tight tabular-nums text-hz-text">{pairing.pairingCode}</h3>
           {pairing.fdtlStatus === 'violation' && (
             <span
               className="inline-flex items-center gap-1 text-[12px] font-bold px-2 h-[22px] rounded-full tabular-nums"
@@ -664,7 +698,7 @@ function ActivityAssignTab({
                   ? 'Replace Activity'
                   : 'Assign Activity'}
             </div>
-            <div className="text-[15px] font-semibold truncate">
+            <div className="text-[14px] font-semibold truncate">
               {crew ? `${crew.lastName} ${crew.firstName}` : '—'}
             </div>
             <div className="text-[13px] text-hz-text-secondary tabular-nums">
@@ -822,7 +856,7 @@ function BioTab({ crew }: { crew: CrewMemberListItemRef | null }) {
         }}
       >
         <div
-          className="w-11 h-11 rounded-full flex items-center justify-center text-[14px] font-bold shrink-0"
+          className="w-11 h-11 rounded-full flex items-center justify-center text-[13px] font-bold shrink-0"
           style={{
             background: 'var(--module-accent)',
             color: 'white',
@@ -833,7 +867,7 @@ function BioTab({ crew }: { crew: CrewMemberListItemRef | null }) {
         <div className="flex-1 min-w-0">
           <a
             href={`/crew-ops/control/crew-profile?id=${encodeURIComponent(crew._id)}`}
-            className="block text-[15px] font-bold tabular-nums text-hz-text hover:underline truncate"
+            className="block text-[14px] font-bold tabular-nums text-hz-text hover:underline truncate"
             title={`${crew.lastName} ${crew.firstName} — open full profile`}
           >
             {crew.lastName} {crew.firstName}

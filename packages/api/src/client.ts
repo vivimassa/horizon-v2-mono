@@ -3043,6 +3043,9 @@ export const api = {
       from?: string
       to?: string
       pairingId?: string
+      tempBaseId?: string | string[]
+      purpose?: CrewFlightBookingPurpose | CrewFlightBookingPurpose[]
+      crewId?: string
       status?: string[]
       method?: string[]
     } = {},
@@ -3051,10 +3054,27 @@ export const api = {
     if (params.from) qs.set('from', params.from)
     if (params.to) qs.set('to', params.to)
     if (params.pairingId) qs.set('pairingId', params.pairingId)
+    if (params.crewId) qs.set('crewId', params.crewId)
+    const tbIds = Array.isArray(params.tempBaseId) ? params.tempBaseId : params.tempBaseId ? [params.tempBaseId] : []
+    for (const id of tbIds) qs.append('tempBaseId', id)
+    const purposes = Array.isArray(params.purpose) ? params.purpose : params.purpose ? [params.purpose] : []
+    for (const p of purposes) qs.append('purpose', p)
     for (const s of params.status ?? []) qs.append('status', s)
     for (const s of params.method ?? []) qs.append('method', s)
     const url = qs.toString() ? `/crew-flight-bookings?${qs.toString()}` : '/crew-flight-bookings'
     return request<CrewFlightBookingRef[]>(url)
+  },
+
+  // GET /flights/search — origin/destination/date filter for the GCS
+  // positioning drawer. Returns slim rows; manual fallback is the client's
+  // job when the result is empty.
+  searchFlights: (params: { origin: string; destination: string; date: string }) => {
+    const qs = new URLSearchParams({
+      origin: params.origin,
+      destination: params.destination,
+      date: params.date,
+    })
+    return request<FlightSearchResult[]>(`/flights/search?${qs.toString()}`)
   },
 
   createCrewFlightBooking: (body: CrewFlightBookingCreateInput) =>
@@ -3831,11 +3851,17 @@ export const api = {
       body: JSON.stringify({ entries }),
     }),
 
-  patchCrewTempBase: (id: string, data: { fromIso?: string; toIso?: string; airportCode?: string }) =>
-    request<TempBaseRef>(`/crew-schedule/temp-bases/${encodeURIComponent(id)}`, {
+  patchCrewTempBase: (
+    id: string,
+    data: { fromIso?: string; toIso?: string; airportCode?: string },
+    options: { force?: boolean } = {},
+  ) => {
+    const qs = options.force ? '?force=true' : ''
+    return request<TempBaseRef>(`/crew-schedule/temp-bases/${encodeURIComponent(id)}${qs}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
-    }),
+    })
+  },
 
   deleteCrewTempBase: (id: string) =>
     request<{ success: boolean }>(`/crew-schedule/temp-bases/${encodeURIComponent(id)}`, {
@@ -5081,17 +5107,38 @@ export interface CrewFlightAttachmentRef {
   uploadedByUserId: string | null
 }
 
+export type CrewFlightBookingPurpose = 'pairing-deadhead' | 'temp-base-positioning'
+export type CrewFlightBookingDirection = 'outbound' | 'return'
+
+export interface FlightSearchResult {
+  _id: string
+  flightNumber: string
+  operatingDate: string
+  stdUtcMs: number
+  staUtcMs: number
+  depCode: string
+  arrCode: string
+  tail: string | null
+  icaoType: string | null
+  status: string
+}
+
 export interface CrewFlightBookingRef {
   _id: string
   operatorId: string
-  pairingId: string
-  legId: string
+  purpose: CrewFlightBookingPurpose
+  pairingId: string | null
+  legId: string | null
+  tempBaseId: string | null
+  direction: CrewFlightBookingDirection | null
   pairingCode: string
   crewIds: string[]
   method: CrewFlightBookingMethod
   carrierCode: string | null
   flightNumber: string | null
   flightDate: string | null
+  stdUtcMs: number | null
+  staUtcMs: number | null
   depStation: string | null
   arrStation: string | null
   bookingClass: CrewFlightBookingClass | null
@@ -5113,16 +5160,34 @@ export interface CrewFlightBookingRef {
   createdByUserId: string | null
 }
 
-interface CrewFlightBookingTicketCreate {
-  method: 'ticket'
+interface CrewFlightBookingKeyPairing {
+  purpose?: 'pairing-deadhead'
   pairingId: string
   legId: string
+  tempBaseId?: null
+  direction?: null
+}
+
+interface CrewFlightBookingKeyTempBase {
+  purpose: 'temp-base-positioning'
+  tempBaseId: string
+  direction: CrewFlightBookingDirection
+  pairingId?: null
+  legId?: null
+}
+
+type CrewFlightBookingKey = CrewFlightBookingKeyPairing | CrewFlightBookingKeyTempBase
+
+interface CrewFlightBookingTicketFields {
+  method: 'ticket'
   pairingCode?: string
   crewIds?: string[]
   notes?: string | null
   carrierCode: string
   flightNumber?: string | null
   flightDate?: string | null
+  stdUtcMs?: number | null
+  staUtcMs?: number | null
   depStation?: string | null
   arrStation?: string | null
   bookingClass?: CrewFlightBookingClass | null
@@ -5132,10 +5197,8 @@ interface CrewFlightBookingTicketCreate {
   fareCurrency?: string
 }
 
-interface CrewFlightBookingGendecCreate {
+interface CrewFlightBookingGendecFields {
   method: 'gendec'
-  pairingId: string
-  legId: string
   pairingCode?: string
   crewIds?: string[]
   notes?: string | null
@@ -5143,17 +5206,23 @@ interface CrewFlightBookingGendecCreate {
   carrierCode?: string | null
   flightNumber?: string | null
   flightDate?: string | null
+  stdUtcMs?: number | null
+  staUtcMs?: number | null
   depStation?: string | null
   arrStation?: string | null
 }
 
-export type CrewFlightBookingCreateInput = CrewFlightBookingTicketCreate | CrewFlightBookingGendecCreate
+export type CrewFlightBookingCreateInput =
+  | (CrewFlightBookingKey & CrewFlightBookingTicketFields)
+  | (CrewFlightBookingKey & CrewFlightBookingGendecFields)
 
 export interface CrewFlightBookingPatchInput {
   method?: CrewFlightBookingMethod
   carrierCode?: string | null
   flightNumber?: string | null
   flightDate?: string | null
+  stdUtcMs?: number | null
+  staUtcMs?: number | null
   depStation?: string | null
   arrStation?: string | null
   bookingClass?: CrewFlightBookingClass | null

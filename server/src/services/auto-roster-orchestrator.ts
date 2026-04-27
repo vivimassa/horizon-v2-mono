@@ -18,7 +18,6 @@ import { CrewComplement } from '../models/CrewComplement.js'
 import { loadSerializedRuleSet } from './fdtl-rule-set.js'
 import { setRosterRunPayload } from './roster-run-cache.js'
 import { buildCrewSchedulePayload, type CrewScheduleQuery } from '../routes/crew-schedule.js'
-import { localDayWindowUtc } from '../utils/local-day-window.js'
 
 /**
  * Pre-build the /crew-schedule aggregator payload and cache it under the
@@ -1723,22 +1722,6 @@ async function runDaysOffAssignment(
 
     if (signal?.aborted) return
 
-    // Crew base UUID → utcOffsetHours, so OFF windows can be anchored to
-    // base-local midnight (rule #8). Without this, OFF for SGN crew (UTC+7)
-    // covers 07:00→06:59 next day in local time — early-morning flights on
-    // the OFF date land outside the stored UTC window and the solver
-    // happily assigns crew to them.
-    const dayOffBaseIds = [...new Set(crew.map((c) => c.base).filter((v): v is string => !!v))]
-    const dayOffBaseDocs =
-      dayOffBaseIds.length > 0
-        ? await Airport.find({ _id: { $in: dayOffBaseIds } }, { _id: 1, utcOffsetHours: 1 }).lean()
-        : []
-    const baseIdToUtcOffset = new Map<string, number>()
-    for (const a of dayOffBaseDocs) {
-      const off = (a as { utcOffsetHours?: number | null }).utcOffsetHours
-      if (typeof off === 'number') baseIdToUtcOffset.set(a._id as string, off)
-    }
-
     // Resolve day-off activity code. If the caller named one explicitly
     // (UI dropdown), verify it exists + is active + has is_day_off flag.
     // Otherwise fall back to first active SYSTEM OFF code.
@@ -1851,17 +1834,13 @@ async function runDaysOffAssignment(
       const e = new Date(a.endUtcIso).getTime()
       if (Number.isFinite(s) && Number.isFinite(e)) addDayOffInterval(a.crewId, s, e)
     }
-    // Overlap check uses base-local day bounds — must match the bounds the
-    // OFF write below uses, otherwise check passes for a UTC day while the
-    // actual OFF interval (base-local) collides with an existing duty.
     const canPlaceDayOff = (crewId: string, dayIso: string): boolean => {
       const arr = dayOffIntervals.get(crewId)
       if (!arr || arr.length === 0) return true
-      const crewDoc = crew.find((c) => (c._id as string) === crewId)
-      const offsetHours = baseIdToUtcOffset.get((crewDoc as { base?: string | null } | undefined)?.base ?? '') ?? 0
-      const w = localDayWindowUtc(offsetHours, dayIso)
+      const dayStart = new Date(`${dayIso}T00:00:00.000Z`).getTime()
+      const dayEnd = new Date(`${dayIso}T23:59:59.999Z`).getTime()
       for (const itv of arr) {
-        if (itv.startMs < w.endUtcMs && itv.endMs > w.startUtcMs) return false
+        if (itv.startMs < dayEnd && itv.endMs > dayStart) return false
       }
       return true
     }
@@ -2124,9 +2103,7 @@ async function runDaysOffAssignment(
           }
         }
 
-        const crewOffsetHours = baseIdToUtcOffset.get((c as { base?: string | null }).base ?? '') ?? 0
         for (const day of picked) {
-          const w = localDayWindowUtc(crewOffsetHours, day)
           writeBuf.push({
             updateOne: {
               filter: { operatorId, crewId, dateIso: day, activityCodeId: dayOffCode._id },
@@ -2137,8 +2114,8 @@ async function runDaysOffAssignment(
                   scenarioId: null,
                   crewId,
                   activityCodeId: dayOffCode._id,
-                  startUtcIso: w.startUtcIso,
-                  endUtcIso: w.endUtcIso,
+                  startUtcIso: `${day}T00:00:00.000Z`,
+                  endUtcIso: `${day}T23:59:59.999Z`,
                   dateIso: day,
                   notes: `auto-roster:${runId}`,
                   sourceRunId: runId,
@@ -2155,7 +2132,9 @@ async function runDaysOffAssignment(
           busyByDay[day].add(crewId)
           // Reserve this OFF window in the interval map so a later crew's
           // overlap check sees it (e.g. another rest activity spanning days).
-          addDayOffInterval(crewId, w.startUtcMs, w.endUtcMs)
+          const offStart = new Date(`${day}T00:00:00.000Z`).getTime()
+          const offEnd = new Date(`${day}T23:59:59.999Z`).getTime()
+          addDayOffInterval(crewId, offStart, offEnd)
         }
         if (writeBuf.length >= FLUSH_THRESHOLD) await flushBuf()
       } catch (crewErr) {
@@ -2793,41 +2772,20 @@ async function runGapFillPass(
       if (prev === undefined || ms < prev) firstDepMsByBaseDay.set(key, ms)
     }
   }
-  // Crew base (_id) → IATA for dep lookup, plus utcOffsetHours so OFF /
-  // SBY→OFF fallback windows can be anchored to base-local midnight.
+  // Crew base (_id) → IATA for dep lookup.
   const crewBaseIds = [
     ...new Set(crew.map((c) => (c as { base?: string | null }).base).filter((v): v is string => !!v)),
   ]
   const crewBaseDocs =
-    crewBaseIds.length > 0
-      ? await Airport.find({ _id: { $in: crewBaseIds } }, { _id: 1, iataCode: 1, utcOffsetHours: 1 }).lean()
-      : []
+    crewBaseIds.length > 0 ? await Airport.find({ _id: { $in: crewBaseIds } }, { _id: 1, iataCode: 1 }).lean() : []
   const baseIdToIata = new Map(
     crewBaseDocs.map((a) => [a._id as string, ((a.iataCode as string | null) ?? '').toUpperCase()]),
   )
-  const baseIdToUtcOffset = new Map<string, number>()
-  for (const a of crewBaseDocs) {
-    const off = (a as { utcOffsetHours?: number | null }).utcOffsetHours
-    if (typeof off === 'number') baseIdToUtcOffset.set(a._id as string, off)
-  }
-  // Crew _id → utcOffsetHours, derived once outside the per-day inner loop.
-  const crewIdToUtcOffset = new Map<string, number>()
-  for (const c of crew) {
-    const baseId = (c as { base?: string | null }).base ?? ''
-    crewIdToUtcOffset.set(c._id as string, baseIdToUtcOffset.get(baseId) ?? 0)
-  }
 
-  const resolveFillWindow = (
-    crewBase: string,
-    crewId: string,
-    dayIso: string,
-  ): { startIso: string; endIso: string } => {
+  const resolveFillWindow = (crewBase: string, dayIso: string): { startIso: string; endIso: string } => {
     if (fillTarget === 'OFF') {
-      // Day-off = base-local 00:00 → 23:59. Legacy carriers treat this as
-      // a paid off day; anchored to crew base TZ so a 03:00-local flight
-      // on the OFF date is correctly seen as overlapping the OFF window.
-      const w = localDayWindowUtc(crewIdToUtcOffset.get(crewId) ?? 0, dayIso)
-      return { startIso: w.startUtcIso, endIso: w.endUtcIso }
+      // Day-off = whole UTC day. Legacy carriers treat this as a paid off day.
+      return { startIso: `${dayIso}T00:00:00.000Z`, endIso: `${dayIso}T23:59:59.999Z` }
     }
     // SBY: compute using scheduling-config rules.
     let startMs: number | null = null
@@ -2920,13 +2878,8 @@ async function runGapFillPass(
     if (busy?.has(dayIso)) return false
     const arr = crewIntervals.get(crewId)
     if (arr && arr.length > 0) {
-      // Day window in base-local terms — must match the bounds the OFF
-      // write (and SBY→OFF fallback) uses so a passing check leads to a
-      // non-conflicting OFF interval. UTC midnights would mis-align by
-      // utcOffsetHours for any non-UTC base.
-      const dayWin = localDayWindowUtc(crewIdToUtcOffset.get(crewId) ?? 0, dayIso)
-      const dayStart = dayWin.startUtcMs
-      const dayEnd = dayWin.endUtcMs
+      const dayStart = new Date(`${dayIso}T00:00:00.000Z`).getTime()
+      const dayEnd = new Date(`${dayIso}T23:59:59.999Z`).getTime()
       for (const itv of arr) {
         if (itv.startMs < dayEnd && itv.endMs > dayStart) return false
       }
@@ -2989,7 +2942,7 @@ async function runGapFillPass(
       // Resolve the SBY window first so the rest-buffer check inside
       // canFillDay knows the actual proposed time range. OFF doesn't
       // need this (OFF is rest, no buffer required).
-      const { startIso, endIso } = resolveFillWindow(crewBase, crewId, day)
+      const { startIso, endIso } = resolveFillWindow(crewBase, day)
       const startMs = new Date(startIso).getTime()
       const endMs = new Date(endIso).getTime()
       const sbyWindow =
@@ -3006,9 +2959,10 @@ async function runGapFillPass(
           canFillDay(crewId, day) &&
           (offDaysByCrew.get(crewId)?.size ?? 0) < maxDaysOffForFallback
         ) {
-          // OFF window is base-local 00:00 → 23:59 (rule #8). Hardcoded UTC
-          // midnights only happen to be correct for UTC+0 bases.
-          const offWin = localDayWindowUtc(crewIdToUtcOffset.get(crewId) ?? 0, day)
+          const offStartIso = `${day}T00:00:00.000Z`
+          const offEndIso = `${day}T23:59:59.999Z`
+          const offStartMs = new Date(offStartIso).getTime()
+          const offEndMs = new Date(offEndIso).getTime()
           buf.push({
             updateOne: {
               filter: { operatorId, crewId, dateIso: day, activityCodeId: offFallbackCode._id },
@@ -3019,8 +2973,8 @@ async function runGapFillPass(
                   scenarioId: null,
                   crewId,
                   activityCodeId: offFallbackCode._id,
-                  startUtcIso: offWin.startUtcIso,
-                  endUtcIso: offWin.endUtcIso,
+                  startUtcIso: offStartIso,
+                  endUtcIso: offEndIso,
                   dateIso: day,
                   notes: `auto-roster:${runId}:sby-off-fallback`,
                   sourceRunId: runId,
@@ -3034,7 +2988,7 @@ async function runGapFillPass(
           })
           offFallbacks++
           inserted++
-          addInterval(crewId, offWin.startUtcMs, offWin.endUtcMs)
+          addInterval(crewId, offStartMs, offEndMs)
           const offSet = offDaysByCrew.get(crewId) ?? new Set<string>()
           offSet.add(day)
           offDaysByCrew.set(crewId, offSet)

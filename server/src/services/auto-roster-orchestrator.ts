@@ -7,6 +7,8 @@ import { Pairing } from '../models/Pairing.js'
 import { CrewMember } from '../models/CrewMember.js'
 import { CrewAssignment } from '../models/CrewAssignment.js'
 import { CrewActivity } from '../models/CrewActivity.js'
+import { CrewFlightBooking } from '../models/CrewFlightBooking.js'
+import { CrewTempBase } from '../models/CrewTempBase.js'
 import { ActivityCode } from '../models/ActivityCode.js'
 import { AutoRosterRun } from '../models/AutoRosterRun.js'
 import { OperatorSchedulingConfig } from '../models/OperatorSchedulingConfig.js'
@@ -293,6 +295,17 @@ export async function runAutoRoster(
     if (filters.base) crewQuery.base = filters.base
     if (filters.position) crewQuery.position = filters.position
     if (filterCrewIds) crewQuery._id = { $in: filterCrewIds }
+    // Diagnostic: scope SHAPE only — never dump resolved crew IDs.
+    // With 8000+ cabin crew the array would flood logs every run.
+    console.log(
+      `[auto-roster ${runId.slice(0, 8)}] scope:`,
+      `mode=${mode}`,
+      `base=${filters.base ?? '·'}`,
+      `position=${filters.position ?? '·'}`,
+      `acTypes=${filters.acTypes?.join(',') ?? '·'}`,
+      `crewGroups=${filters.crewGroupIds?.join(',') ?? '·'}`,
+      `→ ${filterCrewIds == null ? 'no allowlist' : `${filterCrewIds.length} crew allowlist`}`,
+    )
 
     // Pairing.baseAirport stores IATA; crew filter passes airport _id (UUID).
     // Resolve UUID → IATA so we can narrow the pairing pool to the same base.
@@ -460,6 +473,27 @@ export async function runAutoRoster(
       endUtcIso: { $gte: historyFromIso },
     }).lean()
 
+    // Crew flight bookings — passed into `buildScheduleDuties` so the
+    // FDTL evaluator counts temp-base positioning legs as duty time
+    // (no FDP). Pairing-deadhead rows are skipped inside the builder
+    // because their parent pairing assignment already represents the
+    // duty window — emitting them here would double-count duty hours.
+    const historyFromIsoDate = historyFromIso.slice(0, 10)
+    const flightBookings = await CrewFlightBooking.find({
+      operatorId,
+      status: { $ne: 'cancelled' },
+      flightDate: { $gte: historyFromIsoDate, $ne: null },
+    }).lean()
+    const adaptedBookings = flightBookings.map((b) => ({
+      _id: b._id as string,
+      crewIds: (b.crewIds ?? []) as string[],
+      status: b.status as string,
+      purpose: (b.purpose ?? null) as string | null,
+      flightDate: (b.flightDate ?? null) as string | null,
+      stdUtcMs: (b.stdUtcMs ?? null) as number | null,
+      staUtcMs: (b.staUtcMs ?? null) as number | null,
+    }))
+
     const activityCodes = await ActivityCode.find({ operatorId }, { _id: 1, code: 1, flags: 1 }).lean()
     const activityCodesById = new Map<string, { flags: string[] }>(
       activityCodes.map((c) => [c._id as string, { flags: (c.flags ?? []) as string[] }]),
@@ -485,12 +519,34 @@ export async function runAutoRoster(
         activityCodeId: x.activityCodeId ?? null,
       }))
 
+    // Temp-base lookup — fetched once, indexed per crew. During a TEMP
+    // window the crew is OFF their permanent base. The user spec is:
+    // "we don't assign HAN base duties to him" — i.e. exclude any
+    // pairing whose `baseAirport` doesn't match the active temp-base
+    // airport for that crew on that pairing's date range. CXR-temp HAN
+    // crew → HAN pairings excluded; CXR-temp CXR pairings still allowed.
+    const tempBaseDocs = (await CrewTempBase.find({
+      operatorId,
+      crewId: { $in: crew.map((c) => c._id as string) },
+      // Window-overlap: tempBase.fromIso <= periodTo && tempBase.toIso >= periodFrom
+      fromIso: { $lte: periodTo },
+      toIso: { $gte: periodFrom },
+    }).lean()) as Array<{ crewId: string; fromIso: string; toIso: string; airportCode: string }>
+    const tempBasesByCrew = new Map<string, Array<{ fromIso: string; toIso: string; airportCode: string }>>()
+    for (const tb of tempBaseDocs) {
+      const arr = tempBasesByCrew.get(tb.crewId) ?? []
+      arr.push({ fromIso: tb.fromIso, toIso: tb.toIso, airportCode: (tb.airportCode ?? '').toUpperCase() })
+      tempBasesByCrew.set(tb.crewId, arr)
+    }
+    let tempBaseSkipped = 0
+
     let seatIncompatSkipped = 0
 
     for (const crewMember of crew) {
       const crewId = crewMember._id as string
       const rawBase = (crewMember as { base?: string | null }).base ?? ''
       const homeBase = baseIdToIata.get(rawBase) || 'XXXX'
+      const crewTempBases = tempBasesByCrew.get(crewId) ?? []
 
       const crewPositionId = (crewMember as { position?: string | null }).position ?? null
       const crewPositionCode = crewPositionId ? (positionIdToCode.get(crewPositionId) ?? null) : null
@@ -501,6 +557,7 @@ export async function runAutoRoster(
         activities: adaptActivities(historyActivities),
         pairingsById,
         activityCodesById,
+        bookings: adaptedBookings,
       })
 
       const legalPairingIds: string[] = []
@@ -533,6 +590,24 @@ export async function runAutoRoster(
           const seatCodes = Object.keys(seatCounts).filter((k) => (seatCounts[k] ?? 0) > 0)
           if (seatCodes.length > 0 && !seatCodes.includes(crewPositionCode)) {
             seatIncompatSkipped++
+            continue
+          }
+        }
+
+        // Temp-base exclusion: if any temp-base window for this crew
+        // overlaps the pairing's date range AND the temp airport differs
+        // from the pairing's base, the crew is operationally based
+        // elsewhere and must NOT be assigned this pairing. Pairings out
+        // of the temp airport itself stay allowed.
+        if (crewTempBases.length > 0) {
+          const pStart = pairing.startDate
+          const pEnd = (pairing as { endDate?: string | null }).endDate ?? pStart
+          const pBaseIata = ((pairing as { baseAirport?: string | null }).baseAirport ?? '').toUpperCase()
+          const blockedByTempBase = crewTempBases.some(
+            (tb) => tb.fromIso <= pEnd && tb.toIso >= pStart && tb.airportCode !== pBaseIata,
+          )
+          if (blockedByTempBase) {
+            tempBaseSkipped++
             continue
           }
         }
@@ -584,7 +659,8 @@ export async function runAutoRoster(
         pct: 15,
         message:
           `FDTL check done — ${totalLegalPairs.toLocaleString()} legal matches, avg ${avgLegalPerCrew}/crew` +
-          (seatIncompatSkipped > 0 ? ` (${seatIncompatSkipped.toLocaleString()} skipped on position mismatch)` : ''),
+          (seatIncompatSkipped > 0 ? ` (${seatIncompatSkipped.toLocaleString()} skipped on position mismatch)` : '') +
+          (tempBaseSkipped > 0 ? ` (${tempBaseSkipped.toLocaleString()} skipped on temp-base mismatch)` : ''),
         best_obj: null,
       },
     })
@@ -1036,6 +1112,7 @@ export async function runAutoRoster(
       historyAssignments,
       adaptActivities(historyActivities),
       activityCodesById,
+      adaptedBookings,
       baseIdToIata,
       userId ?? null,
     )
@@ -1140,10 +1217,47 @@ export async function runAutoRoster(
       }
     }
 
+    // Canonical unassigned set — the source of truth for "what did the
+    // solver fail to fill". Both Step 4 and the GCS uncrewed tray read
+    // this list so the two views can never diverge again.
+    //
+    // Derivation: every virtual seat the solver was given (virtualPairings)
+    // minus the seats it actually placed (decodedProposals). Group missing
+    // seats by their parent real pairing.
+    const placedVirtualIds = new Set<string>(
+      decodedProposals.map((p) =>
+        p.seatCode != null && p.seatIndex != null ? `${p.pairingId}__${p.seatCode}__${p.seatIndex}` : p.pairingId,
+      ),
+    )
+    const missingSeatsByPairing = new Map<string, Record<string, number>>()
+    let unassignedSeatCount = 0
+    for (const v of virtualPairings) {
+      if (placedVirtualIds.has(v.id)) continue
+      unassignedSeatCount++
+      const realId = v.parent_pairing_id || v.id
+      const seatCode = v.seat_code || '·'
+      const acc = missingSeatsByPairing.get(realId) ?? {}
+      acc[seatCode] = (acc[seatCode] ?? 0) + 1
+      missingSeatsByPairing.set(realId, acc)
+    }
+    const unassignedPairingsList = Array.from(missingSeatsByPairing.entries()).map(([pairingId, missingSeats]) => ({
+      pairingId,
+      missingSeats,
+    }))
+
     const stats = {
       ...(solutionData.stats as object),
       assignedPairings: assignedCount,
-      unassignedPairings: pairings.length - assignedCount,
+      // Distinct REAL pairings missing at least one seat the solver tried
+      // to fill. Matches what the user sees in the Uncrewed Duties tray
+      // when scoped to the same filters.
+      unassignedPairings: unassignedPairingsList.length,
+      // Sum of unfilled SEAT slots across all unassigned pairings. This
+      // is what the solver "couldn't place" in raw decision-variable
+      // terms; previously was mis-labelled as `unassignedPairings`.
+      unassignedSeats: unassignedSeatCount,
+      // Full list — Step 4 + tray hydrate from this so counts match.
+      unassignedPairingsList,
       pairingsTotal: pairings.length,
       virtualSeatsTotal: virtualPairings.length,
       crewTotal: crew.length,
@@ -1231,6 +1345,15 @@ async function commitAssignments(
     activityCodeId?: string | null
   }>,
   activityCodesById: Map<string, { flags: string[] }>,
+  adaptedBookings: Array<{
+    _id: string
+    crewIds: string[]
+    status: string
+    purpose: string | null
+    flightDate: string | null
+    stdUtcMs: number | null
+    staUtcMs: number | null
+  }>,
   baseIdToIata: Map<string, string>,
   userId: string | null,
 ): Promise<{
@@ -1344,6 +1467,7 @@ async function commitAssignments(
       activities: existingActivities,
       pairingsById,
       activityCodesById,
+      bookings: adaptedBookings,
     })
 
     const overlaps = existingDuties.some((d) => candidate.startUtcMs < d.endUtcMs && candidate.endUtcMs > d.startUtcMs)

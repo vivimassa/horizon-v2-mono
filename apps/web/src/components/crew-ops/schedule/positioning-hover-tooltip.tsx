@@ -4,6 +4,7 @@ import { memo, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import type { CrewFlightBookingRef } from '@skyhub/api'
 import { useTheme } from '@/components/theme-provider'
+import { useDateFormat } from '@/hooks/use-date-format'
 
 interface Props {
   /** Hit metadata captured at hover-time (covers both the "no booking yet"
@@ -72,6 +73,7 @@ export const PositioningHoverTooltip = memo(function PositioningHoverTooltip({
 }: Props) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+  const fmtDate = useDateFormat()
   const ref = useFollowCursor(clientX, clientY)
   if (typeof document === 'undefined') return null
 
@@ -134,7 +136,7 @@ export const PositioningHoverTooltip = memo(function PositioningHoverTooltip({
             {hit.depStation || '—'} → {hit.arrStation || '—'}
           </span>
           <span className="text-[11px] tabular-nums" style={{ color: muted }}>
-            {hit.flightDate}
+            {fmtDate(hit.flightDate)}
           </span>
         </div>
 

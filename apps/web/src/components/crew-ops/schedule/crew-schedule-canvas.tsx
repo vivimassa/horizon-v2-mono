@@ -127,6 +127,11 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
   const dragState = useCrewScheduleStore((s) => s.dragState)
   const tempBases = useCrewScheduleStore((s) => s.tempBases)
   const flightBookings = useCrewScheduleStore((s) => s.flightBookings)
+  // Subscribed so the positioning hover-tooltip auto-hides whenever a
+  // context menu or the positioning drawer is open — otherwise the
+  // tooltip keeps following the mouse over the open dialog.
+  const contextMenu = useCrewScheduleStore((s) => s.contextMenu)
+  const positioningDrawer = useCrewScheduleStore((s) => s.positioningDrawer)
   /** Hit zones for the "+" / POS chip glyphs painted on a temp base's
    *  flanking days. Recomputed on every draw — read by `onClick` before
    *  the empty-cell selection branch fires. */
@@ -1305,6 +1310,7 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
         for (const hit of positioningHitsRef.current) {
           if (px >= hit.x && px <= hit.x + hit.w && py >= hit.y && py <= hit.y + hit.h) {
             e.preventDefault()
+            setPositioningHover(null)
             // Use `baseLabel` (IATA string), not `base` (Airport _id UUID).
             // Falls back to '' rather than rendering a UUID in the drawer header.
             const crewMember = useCrewScheduleStore.getState().crew.find((c) => c._id === hit.crewId)
@@ -1517,6 +1523,8 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
         })()}
       {positioningHover &&
         !dragState &&
+        !contextMenu &&
+        !positioningDrawer &&
         (() => {
           const store = useCrewScheduleStore.getState()
           const hit = positioningHover.hit

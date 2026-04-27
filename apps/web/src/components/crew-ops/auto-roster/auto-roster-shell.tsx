@@ -53,6 +53,7 @@ import { NumberStepper } from '@/components/admin/_shared/form-primitives'
 import { Tooltip } from '@/components/ui/tooltip'
 import { Dropdown } from '@/components/ui/dropdown'
 import { EmptyPanel } from '@/components/ui/empty-panel'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { collapseDock } from '@/lib/dock-store'
 
 const MODULE_ACCENT = MODULE_THEMES.workforce.accent
@@ -2680,38 +2681,11 @@ function InlineRow({
 }
 
 function Toggle({ on, onChange, accent }: { on: boolean; onChange: (v: boolean) => void; accent: string }) {
-  // Inline pixel dimensions — Tailwind size utilities were getting overridden
-  // by a parent rule, letting the thumb spill past the track on the "on" state.
-  const TRACK_W = 40
-  const TRACK_H = 24
-  const THUMB = 20
-  const PAD = 2
-  const TRAVEL = TRACK_W - THUMB - PAD * 2 // 16
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!on)}
-      role="switch"
-      aria-checked={on}
-      className="relative shrink-0 rounded-full transition-colors"
-      style={{
-        width: TRACK_W,
-        height: TRACK_H,
-        background: on ? accent : 'rgba(125,125,140,0.35)',
-      }}
-    >
-      <span
-        className="absolute bg-white rounded-full shadow transition-transform"
-        style={{
-          top: PAD,
-          left: PAD,
-          width: THUMB,
-          height: THUMB,
-          transform: on ? `translateX(${TRAVEL}px)` : 'translateX(0)',
-        }}
-      />
-    </button>
-  )
+  // Kept the local `Toggle` wrapper so existing call sites still compile
+  // unchanged. The accent prop is ignored — global ToggleSwitch defaults to
+  // iOS green per the design system.
+  void accent
+  return <ToggleSwitch checked={on} onChange={onChange} size="md" />
 }
 
 // ── Step 3: Generate Roster ───────────────────────────────────────────────────

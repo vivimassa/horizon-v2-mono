@@ -4,6 +4,7 @@ import { Palette, Moon, Sun, Sparkles, Type } from 'lucide-react'
 import { accentTint, type Palette as PaletteType } from '@skyhub/ui/theme'
 import { useDisplay } from '@/components/display-provider'
 import { TEXT_SCALE_OPTIONS, type TextScale } from '@/lib/fonts'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
 
 const ACCENT_PRESETS = [
   { name: 'Green', hex: '#15803d' },
@@ -125,30 +126,11 @@ function Toggle({
   accent: string
   isDark: boolean
 }) {
-  return (
-    <button
-      onClick={(e) => {
-        e.stopPropagation()
-        onToggle()
-      }}
-      className="relative rounded-full cursor-pointer transition-colors shrink-0"
-      style={{
-        width: 44,
-        height: 24,
-        backgroundColor: on ? accent : isDark ? '#444' : '#ddd',
-      }}
-    >
-      <div
-        className="absolute top-[2px] rounded-full bg-white transition-all"
-        style={{
-          width: 20,
-          height: 20,
-          left: on ? 22 : 2,
-          boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
-        }}
-      />
-    </button>
-  )
+  // Local wrapper kept so call sites compile unchanged. Accent/isDark are
+  // ignored — the global ToggleSwitch is iOS green per the design system.
+  void accent
+  void isDark
+  return <ToggleSwitch checked={on} onChange={() => onToggle()} size="md" />
 }
 
 function SectionLabel({ label, palette }: { label: string; palette: PaletteType }) {

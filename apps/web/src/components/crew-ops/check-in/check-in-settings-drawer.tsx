@@ -5,6 +5,7 @@ import { X, Save, Settings as SettingsIcon, Clock, AlertTriangle, Plane, FileTex
 import { useTheme } from '@/components/theme-provider'
 import { useCheckInConfigStore } from '@/stores/use-check-in-config-store'
 import type { OperatorCheckInConfig } from '@skyhub/api'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
 
 interface Props {
   open: boolean
@@ -423,36 +424,9 @@ function TextRow({
 }
 
 function ToggleRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
-  const TRACK_W = 40
-  const TRACK_H = 24
-  const THUMB = 20
-  const PAD = 2
-  const TRAVEL = TRACK_W - THUMB - PAD * 2 // 16
   return (
     <FieldRow label={label}>
-      <button
-        type="button"
-        onClick={() => onChange(!checked)}
-        role="switch"
-        aria-checked={checked}
-        className="relative shrink-0 rounded-full transition-colors"
-        style={{
-          width: TRACK_W,
-          height: TRACK_H,
-          background: checked ? '#06C270' : 'rgba(125,125,140,0.35)',
-        }}
-      >
-        <span
-          className="absolute bg-white rounded-full shadow transition-transform"
-          style={{
-            top: PAD,
-            left: PAD,
-            width: THUMB,
-            height: THUMB,
-            transform: checked ? `translateX(${TRAVEL}px)` : 'translateX(0)',
-          }}
-        />
-      </button>
+      <ToggleSwitch checked={checked} onChange={onChange} size="md" />
     </FieldRow>
   )
 }

@@ -17,7 +17,7 @@ export {
 } from './select'
 export { Checkbox, CheckboxIndicator, CheckboxLabel, CheckboxIcon } from './checkbox'
 export { RadioGroup, Radio, RadioIndicator, RadioLabel, RadioIcon } from './radio'
-export { Switch } from './switch'
+export { Switch, ToggleSwitch, type ToggleSwitchSize } from './switch'
 export { Slider, SliderTrack, SliderFilledTrack, SliderThumb } from './slider'
 export {
   FormControl,

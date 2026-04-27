@@ -1,9 +1,10 @@
 import { useState, useCallback } from 'react'
-import { Text, View, ScrollView, Pressable, TextInput, Alert, Switch } from 'react-native'
+import { Text, View, ScrollView, Pressable, TextInput, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { api } from '@skyhub/api'
 import { ChevronLeft, ClipboardCheck } from 'lucide-react-native'
+import { Switch } from '@skyhub/ui'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { useDevice } from '../../../hooks/useDevice'
@@ -223,11 +224,7 @@ export default function MaintenanceCheckAddScreen() {
           </View>
 
           <View className="flex-row items-center mb-4" style={{ gap: 10 }}>
-            <Switch
-              value={requiresGrounding}
-              onValueChange={setRequiresGrounding}
-              trackColor={{ false: palette.border, true: accent }}
-            />
+            <Switch value={requiresGrounding} onValueChange={setRequiresGrounding} />
             <Text style={{ fontSize: 15, color: palette.text }}>Requires Grounding</Text>
             <Text style={{ fontSize: 13, color: palette.textTertiary }}>
               {requiresGrounding ? '- aircraft grounded' : '- can stay in service'}

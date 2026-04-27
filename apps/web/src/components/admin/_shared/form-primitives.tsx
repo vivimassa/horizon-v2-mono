@@ -16,6 +16,7 @@
 
 import * as React from 'react'
 import { useTheme } from '@/components/theme-provider'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
 
 /** Contextual help copy shown above a section body. */
 export function HelpBlock({ children }: { children: React.ReactNode }) {
@@ -105,7 +106,11 @@ export function FormRow({
   )
 }
 
-/** Switch-style on/off toggle. Pass `danger` for destructive-action toggles. */
+/**
+ * Switch-style on/off toggle. iOS-style green track is the default; pass
+ * `accent` to use a module accent instead, or `danger` for destructive
+ * toggles. Thin wrapper over the global ToggleSwitch primitive.
+ */
 export function Toggle({
   checked,
   onChange,
@@ -114,33 +119,10 @@ export function Toggle({
 }: {
   checked: boolean
   onChange: (v: boolean) => void
-  accent: string
+  accent?: string
   danger?: boolean
 }) {
-  const on = danger ? '#FF8800' : accent
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      aria-pressed={checked}
-      className="shrink-0 rounded-full relative transition-colors duration-200"
-      style={{
-        width: 40,
-        height: 22,
-        background: checked ? on : 'rgba(125,125,140,0.30)',
-      }}
-    >
-      <div
-        className="absolute top-[2px] rounded-full bg-white transition-all duration-200"
-        style={{
-          width: 18,
-          height: 18,
-          left: checked ? 20 : 2,
-          boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-        }}
-      />
-    </button>
-  )
+  return <ToggleSwitch checked={checked} onChange={onChange} accent={accent} danger={danger} size="md" />
 }
 
 /** Slider with a live-read value badge. Step is always 1. */

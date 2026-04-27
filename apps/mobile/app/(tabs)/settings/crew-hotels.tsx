@@ -1,12 +1,12 @@
 import { useState, useMemo, useCallback, memo } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
-import { View, SectionList, Pressable, Switch, Platform } from 'react-native'
+import { View, SectionList, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { api, type CrewHotelRef } from '@skyhub/api'
 import { ChevronRight, BedDouble, Plus, RefreshCw } from 'lucide-react-native'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
-import { ListScreenHeader, SearchInput, Text } from '@skyhub/ui'
+import { ListScreenHeader, SearchInput, Switch, Text } from '@skyhub/ui'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { useHubBack } from '../../../lib/use-hub-back'
 
@@ -102,13 +102,7 @@ export default function CrewHotelsList() {
           </View>
           <View className="flex-row items-center justify-between" style={{ paddingHorizontal: 16, paddingTop: 10 }}>
             <Text style={{ fontSize: 13, color: palette.textSecondary }}>Active only</Text>
-            <Switch
-              value={activeOnly}
-              onValueChange={setActiveOnly}
-              ios_backgroundColor={isDark ? 'rgba(120,120,128,0.32)' : 'rgba(120,120,128,0.16)'}
-              trackColor={{ false: isDark ? '#3f3f46' : '#e5e7eb', true: '#34C759' }}
-              thumbColor={Platform.OS === 'android' ? (activeOnly ? '#fff' : '#f4f3f4') : undefined}
-            />
+            <Switch value={activeOnly} onValueChange={setActiveOnly} />
           </View>
         </View>
 

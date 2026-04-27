@@ -24,6 +24,7 @@ import {
   XCircle,
   AlertTriangle,
 } from 'lucide-react-native'
+import { Switch as UiSwitch } from '@skyhub/ui'
 import { accentTint, type Palette as PaletteType } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { useOperatorStore } from '../../../src/stores/use-operator-store'
@@ -963,35 +964,11 @@ function Switch({
   accent: string
   isDark: boolean
 }) {
-  return (
-    <Pressable
-      onPress={() => onChange(!value)}
-      accessibilityRole="switch"
-      accessibilityState={{ checked: value }}
-      style={{
-        width: 42,
-        height: 24,
-        borderRadius: 999,
-        padding: 2,
-        justifyContent: 'center',
-        backgroundColor: value ? accent : isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.14)',
-      }}
-    >
-      <View
-        style={{
-          width: 20,
-          height: 20,
-          borderRadius: 10,
-          backgroundColor: '#fff',
-          transform: [{ translateX: value ? 18 : 0 }],
-          shadowColor: '#000',
-          shadowOpacity: 0.15,
-          shadowRadius: 3,
-          shadowOffset: { width: 0, height: 1 },
-        }}
-      />
-    </Pressable>
-  )
+  // Local wrapper kept so call sites compile unchanged. Accent/isDark are
+  // ignored — global Switch is iOS green per the design system.
+  void accent
+  void isDark
+  return <UiSwitch value={value} onValueChange={onChange} />
 }
 
 function Stepper({

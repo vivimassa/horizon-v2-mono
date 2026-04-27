@@ -13,6 +13,7 @@ import {
 } from '@/components/filter-panel'
 import { getOperatorId } from '@/stores/use-operator-store'
 import { useCrewCheckInStore } from '@/stores/use-crew-checkin-store'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
 
 interface CrewCheckInFilterPanelProps {
   onGo: () => void
@@ -181,46 +182,7 @@ function ToggleRow({ label, checked, onChange }: { label: string; checked: boole
   return (
     <label className="flex items-center justify-between gap-2 cursor-pointer text-[13px]">
       <span className="text-hz-text-secondary flex-1">{label}</span>
-      <Toggle on={checked} onChange={onChange} />
+      <ToggleSwitch checked={checked} onChange={onChange} size="sm" />
     </label>
-  )
-}
-
-/** Track 36×20, thumb 16×16, 2px padding both sides — knob never escapes pill.
- *  Inline pixel sizing because Tailwind size utilities can be overridden by
- *  parent rules and let the thumb spill on `on` state (see auto-roster Toggle). */
-function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
-  const TRACK_W = 36
-  const TRACK_H = 20
-  const THUMB = 16
-  const PAD = 2
-  const TRAVEL = TRACK_W - THUMB - PAD * 2 // 16
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.preventDefault()
-        onChange(!on)
-      }}
-      role="switch"
-      aria-checked={on}
-      className="relative shrink-0 rounded-full transition-colors"
-      style={{
-        width: TRACK_W,
-        height: TRACK_H,
-        background: on ? '#06C270' : 'rgba(125,125,140,0.35)',
-      }}
-    >
-      <span
-        className="absolute bg-white rounded-full shadow transition-transform"
-        style={{
-          top: PAD,
-          left: PAD,
-          width: THUMB,
-          height: THUMB,
-          transform: on ? `translateX(${TRAVEL}px)` : 'translateX(0)',
-        }}
-      />
-    </button>
   )
 }

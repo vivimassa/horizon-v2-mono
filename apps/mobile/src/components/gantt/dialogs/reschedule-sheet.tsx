@@ -1,9 +1,9 @@
 // Reschedule a flight — pick new STD time, optional reason, optional propagate.
 
 import { useEffect, useMemo, useState } from 'react'
-import { View, Text, TextInput, Switch } from 'react-native'
+import { View, Text, TextInput } from 'react-native'
 import { api } from '@skyhub/api'
-import { useAuthStore } from '@skyhub/ui'
+import { useAuthStore, Switch } from '@skyhub/ui'
 import { useMobileGanttStore } from '../../../stores/use-mobile-gantt-store'
 import { useAppTheme } from '../../../../providers/ThemeProvider'
 import { DialogShell, FieldLabel } from './dialog-shell'
@@ -18,7 +18,7 @@ function formatHHMM(ms: number): string {
 }
 
 export function RescheduleSheet() {
-  const { palette, accent } = useAppTheme()
+  const { palette } = useAppTheme()
   const target = useMobileGanttStore((s) => s.mutationSheet)
   const flights = useMobileGanttStore((s) => s.flights)
   const closeMutationSheet = useMobileGanttStore((s) => s.closeMutationSheet)
@@ -185,13 +185,7 @@ export function RescheduleSheet() {
             Shift downstream legs in the same rotation by the same delta.
           </Text>
         </View>
-        <Switch
-          value={propagate && !!flight.rotationId}
-          onValueChange={setPropagate}
-          disabled={!flight.rotationId}
-          trackColor={{ false: '#8F90A6', true: accent }}
-          thumbColor={'#fff'}
-        />
+        <Switch value={propagate && !!flight.rotationId} onValueChange={setPropagate} disabled={!flight.rotationId} />
       </View>
     </DialogShell>
   )

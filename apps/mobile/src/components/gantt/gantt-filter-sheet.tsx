@@ -2,9 +2,10 @@
 // + overlay toggles + Go.
 
 import { useMemo, useRef, useEffect, useCallback } from 'react'
-import { View, Text, Pressable, ScrollView, TextInput, Switch } from 'react-native'
+import { View, Text, Pressable, ScrollView, TextInput } from 'react-native'
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet'
 import { LinearGradient } from 'expo-linear-gradient'
+import { Switch } from '@skyhub/ui'
 import type { ColorMode, BarLabelMode } from '@skyhub/types'
 import { useMobileGanttStore } from '../../stores/use-mobile-gantt-store'
 import { useAppTheme } from '../../../providers/ThemeProvider'
@@ -166,16 +167,15 @@ export function GanttFilterSheet({ operatorId }: Props) {
           </Section>
 
           <Section label="OVERLAYS" palette={palette}>
-            <ToggleRow label="TAT minutes" value={showTat} onChange={toggleTat} palette={palette} accent={accent} />
-            <ToggleRow label="Slot risk" value={showSlots} onChange={toggleSlots} palette={palette} accent={accent} />
+            <ToggleRow label="TAT minutes" value={showTat} onChange={toggleTat} palette={palette} />
+            <ToggleRow label="Slot risk" value={showSlots} onChange={toggleSlots} palette={palette} />
             <ToggleRow
               label="Missing OOOI flags"
               value={showMissingTimes}
               onChange={toggleMissingTimes}
               palette={palette}
-              accent={accent}
             />
-            <ToggleRow label="Delays" value={showDelays} onChange={toggleDelays} palette={palette} accent={accent} />
+            <ToggleRow label="Delays" value={showDelays} onChange={toggleDelays} palette={palette} />
           </Section>
 
           <Pressable
@@ -319,13 +319,11 @@ function ToggleRow({
   value,
   onChange,
   palette,
-  accent,
 }: {
   label: string
   value: boolean
   onChange: () => void
   palette: { text: string; border: string }
-  accent: string
 }) {
   return (
     <View
@@ -339,12 +337,7 @@ function ToggleRow({
       }}
     >
       <Text style={{ fontSize: 14, color: palette.text }}>{label}</Text>
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        trackColor={{ false: '#8F90A6', true: accent }}
-        thumbColor={value ? '#fff' : '#eee'}
-      />
+      <Switch value={value} onValueChange={onChange} />
     </View>
   )
 }

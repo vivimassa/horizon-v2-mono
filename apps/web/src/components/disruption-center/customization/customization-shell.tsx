@@ -26,6 +26,7 @@ import {
 import { colors, accentTint, type Palette as PaletteType } from '@skyhub/ui/theme'
 import { MasterDetailLayout } from '@/components/layout'
 import { Dropdown } from '@/components/ui/dropdown'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { useTheme } from '@/components/theme-provider'
 import { useOperatorStore } from '@/stores/use-operator-store'
 import { useDisruptionStore } from '@/stores/use-disruption-store'
@@ -732,25 +733,15 @@ function SectionBody({
                   style={{ background: innerBg, border: `1px solid ${innerBorder}` }}
                 >
                   <div className="flex items-center gap-3 mb-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next = [...draft.resolutionTypes]
-                        next[idx] = { ...next[idx], enabled: !next[idx].enabled }
-                        setDraft({ ...draft, resolutionTypes: next })
+                    <ToggleSwitch
+                      checked={r.enabled}
+                      onChange={(next) => {
+                        const list = [...draft.resolutionTypes]
+                        list[idx] = { ...list[idx], enabled: next }
+                        setDraft({ ...draft, resolutionTypes: list })
                       }}
-                      role="switch"
-                      aria-checked={r.enabled}
-                      className="h-5 w-9 rounded-full transition-colors shrink-0 relative"
-                      style={{
-                        background: r.enabled ? accent : isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)',
-                      }}
-                    >
-                      <span
-                        className="absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all"
-                        style={{ left: r.enabled ? 18 : 2 }}
-                      />
-                    </button>
+                      size="sm"
+                    />
                     <span className="text-[14px] font-semibold text-hz-text">{defaultLabel}</span>
                     {!r.enabled && <span className="text-[13px] text-hz-text-tertiary italic">Hidden from picker</span>}
                   </div>

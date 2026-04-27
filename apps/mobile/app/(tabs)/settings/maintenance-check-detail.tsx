@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { Text, View, ScrollView, Pressable, TextInput, Alert, Switch } from 'react-native'
+import { Text, View, ScrollView, Pressable, TextInput, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { api, type MaintenanceCheckTypeRef, type AircraftTypeRef } from '@skyhub/api'
 import { ChevronLeft, Pencil, X, Trash2, Save, ClipboardCheck } from 'lucide-react-native'
+import { Switch } from '@skyhub/ui'
 import { accentTint, type Palette } from '@skyhub/ui/theme'
 import { useAppTheme } from '../../../providers/ThemeProvider'
 import { useDevice } from '../../../hooks/useDevice'
@@ -353,7 +354,6 @@ export default function MaintenanceCheckDetailScreen() {
               <Switch
                 value={get('requiresGrounding') ?? true}
                 onValueChange={(v) => handleFieldChange('requiresGrounding', v)}
-                trackColor={{ false: palette.border, true: accent }}
               />
             ) : (
               <View
@@ -377,11 +377,7 @@ export default function MaintenanceCheckDetailScreen() {
 
           <View className="flex-row items-center mb-4" style={{ gap: 10 }}>
             {editing ? (
-              <Switch
-                value={get('isActive') ?? true}
-                onValueChange={(v) => handleFieldChange('isActive', v)}
-                trackColor={{ false: palette.border, true: accent }}
-              />
+              <Switch value={get('isActive') ?? true} onValueChange={(v) => handleFieldChange('isActive', v)} />
             ) : (
               <View
                 style={{

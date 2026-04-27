@@ -852,18 +852,6 @@ export async function runAutoRoster(
       },
     })
 
-    // Cabin-scale tuning. The CP-SAT solver scales worse than linearly with
-    // (crew × pairings); a cockpit run at 130 crew and a cabin run at 600
-    // crew are not the same problem class. When crew count crosses the
-    // cabin threshold, hand the solver a softer coverage weight, a looser
-    // gap limit, and (above the LNS threshold) flip to LNS-only search.
-    // Cockpit runs see no change — every override is an opt-in field on
-    // SolveRequest with cockpit-default fallback in the Python solver.
-    const CABIN_SCALE_THRESHOLD = parseInt(process.env.AUTO_ROSTER_CABIN_THRESHOLD ?? '200', 10)
-    const LNS_SCALE_THRESHOLD = parseInt(process.env.AUTO_ROSTER_LNS_THRESHOLD ?? '500', 10)
-    const isCabinScale = crew.length >= CABIN_SCALE_THRESHOLD
-    const useLns = crew.length >= LNS_SCALE_THRESHOLD
-
     const solverPayload = {
       run_id: runId,
       crew: crew.map((c) => ({
@@ -887,16 +875,6 @@ export async function runAutoRoster(
         qol_soft_rules: qolSoftRules,
       },
       time_limit_sec: timeLimitSec,
-      // Cabin-scale knobs (cockpit runs leave these off — solver defaults apply).
-      coverage_weight_default: isCabinScale ? 500_000 : undefined,
-      relative_gap_limit_override: isCabinScale ? 0.05 : undefined,
-      lns_only: useLns,
-    }
-    if (isCabinScale) {
-      console.log(
-        `[auto-roster] ${runId} cabin-scale tuning applied — crew=${crew.length} ` +
-          `coverage_weight=500000 gap_limit=0.05 lns_only=${useLns}`,
-      )
     }
 
     // ── 4. Call Python solver, proxy SSE events ────────────────────────────

@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { z } from 'zod'
 import { CrewFlightBooking } from '../models/CrewFlightBooking.js'
 import { CarrierCode } from '../models/CarrierCode.js'
+import { Operator } from '../models/Operator.js'
 import {
   persistFlightBookingAttachment,
   deleteFlightBookingAttachmentFile,
@@ -25,11 +26,25 @@ const STATUSES = ['pending', 'booked', 'confirmed', 'cancelled'] as const
 const METHODS = ['ticket', 'gendec'] as const
 const GENDEC_POSITIONS = ['cockpit-jumpseat', 'cabin-jumpseat', 'pax-seat'] as const
 const BOOKING_CLASSES = ['Y', 'J', 'F', 'C', 'W'] as const
+const PURPOSES = ['pairing-deadhead', 'temp-base-positioning'] as const
+const DIRECTIONS = ['outbound', 'return'] as const
 
+/**
+ * Booking identity is discriminated by `purpose`:
+ *   pairing-deadhead   → pairingId + legId required, tempBaseId/direction null
+ *   temp-base-positioning → tempBaseId + direction required, pairingId/legId null
+ *
+ * The fields are flattened on the wire (rather than nested) so the existing
+ * row shape stays compatible — clients that don't know about positioning
+ * just see `pairingId`/`legId` populated as before.
+ */
 const baseFields = z.object({
-  pairingId: z.string().min(1),
-  legId: z.string().min(1),
+  purpose: z.enum(PURPOSES).optional().default('pairing-deadhead'),
+  pairingId: z.string().nullable().optional(),
+  legId: z.string().nullable().optional(),
   pairingCode: z.string().optional().default(''),
+  tempBaseId: z.string().nullable().optional(),
+  direction: z.enum(DIRECTIONS).nullable().optional(),
   crewIds: z.array(z.string()).max(50).optional().default([]),
   notes: z.string().nullable().optional(),
 })
@@ -42,6 +57,8 @@ const ticketFields = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'flightDate must be YYYY-MM-DD')
     .nullable()
     .optional(),
+  stdUtcMs: z.number().int().nullable().optional(),
+  staUtcMs: z.number().int().nullable().optional(),
   depStation: z.string().nullable().optional(),
   arrStation: z.string().nullable().optional(),
   bookingClass: z.enum(BOOKING_CLASSES).nullable().optional(),
@@ -64,6 +81,8 @@ const createSchema = z.discriminatedUnion('method', [
       .regex(/^\d{4}-\d{2}-\d{2}$/, 'flightDate must be YYYY-MM-DD')
       .nullable()
       .optional(),
+    stdUtcMs: z.number().int().nullable().optional(),
+    staUtcMs: z.number().int().nullable().optional(),
     depStation: z.string().nullable().optional(),
     arrStation: z.string().nullable().optional(),
   }),
@@ -78,6 +97,8 @@ const patchSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable()
     .optional(),
+  stdUtcMs: z.number().int().nullable().optional(),
+  staUtcMs: z.number().int().nullable().optional(),
   depStation: z.string().nullable().optional(),
   arrStation: z.string().nullable().optional(),
   bookingClass: z.enum(BOOKING_CLASSES).nullable().optional(),
@@ -98,6 +119,40 @@ async function requireOpsRole(req: FastifyRequest, reply: FastifyReply) {
   }
 }
 
+/** Enforce "exactly one of (pairingId+legId) or (tempBaseId+direction)" by purpose. */
+function validatePurposeKey(input: {
+  purpose: 'pairing-deadhead' | 'temp-base-positioning'
+  pairingId?: string | null
+  legId?: string | null
+  tempBaseId?: string | null
+  direction?: 'outbound' | 'return' | null
+}): string | null {
+  if (input.purpose === 'pairing-deadhead') {
+    if (!input.pairingId || !input.legId) return 'pairingId and legId required for pairing-deadhead'
+    if (input.tempBaseId || input.direction) return 'tempBaseId/direction must be null for pairing-deadhead'
+    return null
+  }
+  if (!input.tempBaseId || !input.direction) {
+    return 'tempBaseId and direction required for temp-base-positioning'
+  }
+  if (input.pairingId || input.legId) {
+    return 'pairingId/legId must be null for temp-base-positioning'
+  }
+  return null
+}
+
+/** True when `code` matches the operator's own IATA. Own carrier is
+ *  never registered in /admin/carrier-codes (that table holds carriers
+ *  you BOOK seats on, not the carrier you ARE) — but a positioning leg
+ *  on the operator's own metal is the most common case. Treat it as
+ *  always valid. */
+async function isOwnOperatorIata(operatorId: string, code: string): Promise<boolean> {
+  if (!code) return false
+  const op = await Operator.findOne({ _id: operatorId }, { iataCode: 1 }).lean()
+  const own = (op as { iataCode?: string | null } | null)?.iataCode
+  return !!own && own.toUpperCase() === code.toUpperCase()
+}
+
 async function carrierExists(operatorId: string, code: string): Promise<boolean> {
   if (!code) return false
   const c = await CarrierCode.findOne({
@@ -109,6 +164,13 @@ async function carrierExists(operatorId: string, code: string): Promise<boolean>
 }
 
 export async function crewFlightBookingRoutes(app: FastifyInstance) {
+  // Reconcile indexes once at boot so the legacy non-partial unique on
+  // (operatorId, pairingId, legId) is replaced by the discriminated partial
+  // pair. syncIndexes drops indexes not declared in the schema.
+  CrewFlightBooking.syncIndexes().catch((err) => {
+    app.log.warn({ err }, 'crew-flight-bookings: syncIndexes failed')
+  })
+
   // ── List ──
   app.get('/crew-flight-bookings', async (req, reply) => {
     const operatorId = req.operatorId
@@ -117,12 +179,24 @@ export async function crewFlightBookingRoutes(app: FastifyInstance) {
       from?: string
       to?: string
       pairingId?: string
+      tempBaseId?: string | string[]
+      purpose?: string | string[]
+      crewId?: string
       status?: string | string[]
       method?: string | string[]
     }
 
     const filter: Record<string, unknown> = { operatorId }
     if (q.pairingId) filter.pairingId = q.pairingId
+    if (q.tempBaseId) {
+      const arr = Array.isArray(q.tempBaseId) ? q.tempBaseId : [q.tempBaseId]
+      filter.tempBaseId = arr.length === 1 ? arr[0] : { $in: arr }
+    }
+    if (q.purpose) {
+      const arr = Array.isArray(q.purpose) ? q.purpose : [q.purpose]
+      if (arr.length > 0) filter.purpose = { $in: arr }
+    }
+    if (q.crewId) filter.crewIds = q.crewId
     if (q.status) {
       const arr = Array.isArray(q.status) ? q.status : [q.status]
       if (arr.length > 0) filter.status = { $in: arr }
@@ -152,21 +226,35 @@ export async function crewFlightBookingRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Validation failed', details: parsed.error.issues })
     }
 
-    // Carrier-code FK enforcement when method='ticket'.
+    const purposeError = validatePurposeKey({
+      purpose: parsed.data.purpose,
+      pairingId: parsed.data.pairingId ?? null,
+      legId: parsed.data.legId ?? null,
+      tempBaseId: parsed.data.tempBaseId ?? null,
+      direction: parsed.data.direction ?? null,
+    })
+    if (purposeError) return reply.code(400).send({ error: purposeError })
+
+    // Carrier-code FK enforcement when method='ticket'. Own-operator
+    // IATA always passes (positioning crew on own metal as a pax ticket
+    // is a common workflow — the operator's own code isn't kept in the
+    // /admin/carrier-codes table because that table is for OTHER airlines).
     if (parsed.data.method === 'ticket') {
-      const ok = await carrierExists(operatorId, parsed.data.carrierCode)
-      if (!ok) {
-        return reply
-          .code(400)
-          .send({ error: `Carrier code '${parsed.data.carrierCode}' not found in /admin/carrier-codes` })
-      }
-    } else if (parsed.data.method === 'gendec' && parsed.data.carrierCode) {
-      // Optional carrier on GENDEC — but if provided, must be a real one.
-      const ok = await carrierExists(operatorId, parsed.data.carrierCode)
-      if (!ok) {
-        return reply.code(400).send({ error: `Carrier code '${parsed.data.carrierCode}' not found` })
+      const isOwn = await isOwnOperatorIata(operatorId, parsed.data.carrierCode)
+      if (!isOwn) {
+        const ok = await carrierExists(operatorId, parsed.data.carrierCode)
+        if (!ok) {
+          return reply
+            .code(400)
+            .send({ error: `Carrier code '${parsed.data.carrierCode}' not found in /admin/carrier-codes` })
+        }
       }
     }
+    // GENDEC carrier is informational only. The operator's own IATA isn't
+    // always registered in /admin/carrier-codes (it's the carrier you ARE,
+    // not a carrier you book seats on), and cross-airline jumpseats need
+    // ICA which the client warns about separately. We don't FK-validate
+    // here — let any string through.
 
     const now = Date.now()
     const userId = req.userId ?? null
@@ -176,8 +264,11 @@ export async function crewFlightBookingRoutes(app: FastifyInstance) {
       const doc = await CrewFlightBooking.create({
         _id,
         operatorId,
-        pairingId: parsed.data.pairingId,
-        legId: parsed.data.legId,
+        purpose: parsed.data.purpose,
+        pairingId: parsed.data.pairingId ?? null,
+        legId: parsed.data.legId ?? null,
+        tempBaseId: parsed.data.tempBaseId ?? null,
+        direction: parsed.data.direction ?? null,
         pairingCode: parsed.data.pairingCode,
         crewIds: parsed.data.crewIds,
         method: parsed.data.method,
@@ -187,6 +278,8 @@ export async function crewFlightBookingRoutes(app: FastifyInstance) {
             : (parsed.data.carrierCode?.toUpperCase() ?? null),
         flightNumber: parsed.data.flightNumber ?? null,
         flightDate: parsed.data.flightDate ?? null,
+        stdUtcMs: parsed.data.stdUtcMs ?? null,
+        staUtcMs: parsed.data.staUtcMs ?? null,
         depStation: parsed.data.depStation ?? null,
         arrStation: parsed.data.arrStation ?? null,
         bookingClass: parsed.data.method === 'ticket' ? (parsed.data.bookingClass ?? null) : null,
@@ -205,9 +298,12 @@ export async function crewFlightBookingRoutes(app: FastifyInstance) {
       })
       return doc.toObject()
     } catch (err) {
-      // Likely E11000 dup-key on (pairingId, legId).
       if (err instanceof Error && /E11000/.test(err.message)) {
-        return reply.code(409).send({ error: 'A booking already exists for this leg' })
+        const msg =
+          parsed.data.purpose === 'temp-base-positioning'
+            ? 'A booking already exists for this temp base direction'
+            : 'A booking already exists for this leg'
+        return reply.code(409).send({ error: msg })
       }
       throw err
     }
@@ -243,9 +339,12 @@ export async function crewFlightBookingRoutes(app: FastifyInstance) {
       if (!finalCarrier) {
         return reply.code(400).send({ error: 'carrierCode is required when method=ticket' })
       }
-      const ok = await carrierExists(operatorId, finalCarrier)
-      if (!ok) {
-        return reply.code(400).send({ error: `Carrier code '${finalCarrier}' not found` })
+      const isOwn = await isOwnOperatorIata(operatorId, finalCarrier)
+      if (!isOwn) {
+        const ok = await carrierExists(operatorId, finalCarrier)
+        if (!ok) {
+          return reply.code(400).send({ error: `Carrier code '${finalCarrier}' not found` })
+        }
       }
     }
 

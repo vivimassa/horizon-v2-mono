@@ -29,6 +29,12 @@ function dateToDayMs(dateStr: string): number {
 }
 
 export async function flightRoutes(app: FastifyInstance): Promise<void> {
+  // Reconcile schema-declared indexes — picks up the new
+  // (operatorId, depStation, arrStation) index added for /flights/search.
+  ScheduledFlight.syncIndexes().catch((err) => {
+    app.log.warn({ err }, 'flights: ScheduledFlight syncIndexes failed')
+  })
+
   // GET /flights?from=&to= — operatorId is always req.operatorId (from JWT)
   //
   // With from+to: expand ScheduledFlight patterns over the date range and overlay
@@ -264,6 +270,149 @@ export async function flightRoutes(app: FastifyInstance): Promise<void> {
       return ((a as any).schedule.stdUtc as number) - ((b as any).schedule.stdUtc as number)
     })
 
+    return out
+  })
+
+  // GET /flights/search?origin=HAN&destination=CXR&date=YYYY-MM-DD
+  // Returns a slim list of company flights between the two stations on the
+  // given operating date. Used by the GCS positioning drawer to populate the
+  // candidate flight list. Origin/destination accept IATA or ICAO; we match
+  // either by joining ScheduledFlight.depStation against both Airport.iataCode
+  // and Airport.icaoCode.
+  app.get('/flights/search', async (req, reply) => {
+    const q = req.query as { origin?: string; destination?: string; date?: string }
+    const operatorId = req.operatorId as string
+    if (!q.origin || !q.destination || !q.date) {
+      return reply.code(400).send({ error: 'origin, destination and date are required' })
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(q.date)) {
+      return reply.code(400).send({ error: 'date must be YYYY-MM-DD' })
+    }
+
+    const origin = q.origin.toUpperCase()
+    const destination = q.destination.toUpperCase()
+    const date = q.date
+
+    // Resolve airport codes to both IATA + ICAO so a HAN/VVNB pattern still
+    // matches when the user typed only one form. Projection trimmed to keep
+    // the response small — only the two code fields are needed.
+    const airports = await Airport.find(
+      {
+        $or: [{ iataCode: { $in: [origin, destination] } }, { icaoCode: { $in: [origin, destination] } }],
+      },
+      { iataCode: 1, icaoCode: 1 },
+    )
+      .lean()
+      .limit(8)
+    const codesFor = (code: string): string[] => {
+      const out = new Set<string>([code])
+      for (const ap of airports) {
+        if (ap.iataCode === code || ap.icaoCode === code) {
+          if (ap.iataCode) out.add(ap.iataCode as string)
+          if (ap.icaoCode) out.add(ap.icaoCode as string)
+        }
+      }
+      return [...out]
+    }
+    const originCodes = codesFor(origin)
+    const destCodes = codesFor(destination)
+
+    // ScheduledFlight stores a single station code; effectiveFrom/Until is a
+    // closed range; daysOfWeek is a string SSIM list ('1'..'7').
+    const dateMs = dateToDayMs(date)
+    const jsDay = new Date(date + 'T12:00:00Z').getUTCDay()
+    const ssimDay = jsDay === 0 ? 7 : jsDay
+    const effFromMax = `${date}T23:59:59Z`
+    const effUntilMin = `${date}T00:00:00Z`
+
+    // Run pattern + per-date instance fetch in parallel. Slim projections
+    // and a 200-row cap keep the wire payload small for high-frequency
+    // airports (HAN-SGN can have 30+ patterns spanning a year).
+    const [patterns, instances] = await Promise.all([
+      ScheduledFlight.find(
+        {
+          operatorId,
+          isActive: { $ne: false },
+          scenarioId: null,
+          status: { $ne: 'cancelled' },
+          depStation: { $in: originCodes },
+          arrStation: { $in: destCodes },
+        },
+        {
+          _id: 1,
+          flightNumber: 1,
+          depStation: 1,
+          arrStation: 1,
+          stdUtc: 1,
+          staUtc: 1,
+          daysOfWeek: 1,
+          effectiveFrom: 1,
+          effectiveUntil: 1,
+          departureDayOffset: 1,
+          arrivalDayOffset: 1,
+          aircraftReg: 1,
+          aircraftTypeIcao: 1,
+        },
+      )
+        .lean()
+        .limit(200),
+      FlightInstance.find(
+        { operatorId, operatingDate: date },
+        { _id: 1, scheduledFlightId: 1, status: 1, tail: 1, estimated: 1 },
+      )
+        .lean()
+        .limit(500),
+    ])
+    const instById = new Map(instances.map((i) => [i._id as string, i]))
+
+    type Candidate = {
+      _id: string
+      flightNumber: string
+      operatingDate: string
+      stdUtcMs: number
+      staUtcMs: number
+      depCode: string
+      arrCode: string
+      tail: string | null
+      icaoType: string | null
+      status: string
+    }
+    const out: Candidate[] = []
+    for (const sf of patterns) {
+      // Effective range filter — both `effectiveFrom` and `effectiveUntil`
+      // are stored as ISO strings so a string compare works.
+      if (sf.effectiveFrom && sf.effectiveFrom > effFromMax) continue
+      if (sf.effectiveUntil && sf.effectiveUntil < effUntilMin) continue
+      if (sf.daysOfWeek && !sf.daysOfWeek.includes(String(ssimDay))) continue
+
+      const depOffset = sf.departureDayOffset ?? 1
+      const arrOffset = sf.arrivalDayOffset ?? 1
+      const stdMs = dateMs + (depOffset - 1) * DAY_MS + timeStringToMs(sf.stdUtc)
+      const staMs = dateMs + (arrOffset - 1) * DAY_MS + timeStringToMs(sf.staUtc)
+      const compositeId = `${sf._id}|${date}`
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const inst = instById.get(compositeId) as any
+      if (inst?.status === 'cancelled') continue
+
+      out.push({
+        _id: compositeId,
+        flightNumber: sf.flightNumber,
+        operatingDate: date,
+        stdUtcMs: inst?.estimated?.etdUtc ?? stdMs,
+        staUtcMs: inst?.estimated?.etaUtc ?? staMs,
+        depCode: sf.depStation,
+        arrCode: sf.arrStation,
+        tail: inst?.tail?.registration ?? sf.aircraftReg ?? null,
+        icaoType: inst?.tail?.icaoType ?? sf.aircraftTypeIcao ?? null,
+        status: inst?.status ?? (sf.aircraftReg ? 'assigned' : 'scheduled'),
+      })
+    }
+
+    out.sort((a, b) => a.stdUtcMs - b.stdUtcMs)
+    // Tell the browser this is safe to cache for a minute — same route+date
+    // request inside the cache window skips the network entirely. Schedules
+    // change at most a few times an hour in production; 60s is conservative.
+    reply.header('Cache-Control', 'private, max-age=60')
     return out
   })
 

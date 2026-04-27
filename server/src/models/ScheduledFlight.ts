@@ -65,6 +65,10 @@ scheduledFlightSchema.index({ operatorId: 1, seasonCode: 1, scenarioId: 1 })
 scheduledFlightSchema.index({ operatorId: 1, flightNumber: 1, effectiveFrom: 1 })
 scheduledFlightSchema.index({ operatorId: 1, rotationId: 1 })
 scheduledFlightSchema.index({ operatorId: 1, scenarioId: 1, sourceFlightId: 1 })
+// Supports GCS positioning drawer's flight-candidate search:
+// GET /flights/search?origin=&destination=&date= filters on
+// (operatorId, depStation, arrStation) before applying date math client-side.
+scheduledFlightSchema.index({ operatorId: 1, depStation: 1, arrStation: 1 })
 
 export type ScheduledFlightDoc = InferSchemaType<typeof scheduledFlightSchema>
 export const ScheduledFlight = mongoose.model('ScheduledFlight', scheduledFlightSchema)

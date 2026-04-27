@@ -1089,6 +1089,7 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
         setActivityHover(null)
         setActivityHoverPos(null)
         setPairingHoverPos({ x: e.clientX, y: e.clientY })
+        setPositioningHover(null)
         container.style.cursor = 'grab'
         return
       }
@@ -1098,13 +1099,34 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
         setActivityHover(activityHit.activityId)
         setActivityHoverPos({ x: e.clientX, y: e.clientY })
         setPairingHoverPos(null)
+        setPositioningHover(null)
         container.style.cursor = 'pointer'
         return
+      }
+      // Positioning chip hover — runs after bar/activity priority so an
+      // overlapping duty pill always wins. Hit zones store post-HEADER_H
+      // content coords (same convention as bars).
+      {
+        const px = p.rawX
+        const py = p.rawY - HEADER_H
+        const phit = positioningHitsRef.current.find(
+          (h) => px >= h.x && px <= h.x + h.w && py >= h.y && py <= h.y + h.h,
+        )
+        if (phit) {
+          setHover(null)
+          setActivityHover(null)
+          setActivityHoverPos(null)
+          setPairingHoverPos(null)
+          setPositioningHover({ hit: phit, clientX: e.clientX, clientY: e.clientY })
+          container.style.cursor = 'pointer'
+          return
+        }
       }
       setHover(null)
       setActivityHover(null)
       setActivityHoverPos(null)
       setPairingHoverPos(null)
+      setPositioningHover(null)
       container.style.cursor = e.shiftKey ? 'crosshair' : 'default'
     },
     [layout, pointerToContent, resolveCellAt, setHover, setActivityHover, setRangeSelection, setDragState],
@@ -1490,6 +1512,37 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
               assignment={assign}
               clientX={pairingHoverPos.x}
               clientY={pairingHoverPos.y}
+            />
+          )
+        })()}
+      {positioningHover &&
+        !dragState &&
+        (() => {
+          const store = useCrewScheduleStore.getState()
+          const hit = positioningHover.hit
+          const booking = hit.bookingId ? (store.flightBookings.find((b) => b._id === hit.bookingId) ?? null) : null
+          // Derive dep/arr from the crew's home base (`baseLabel`, IATA)
+          // and the temp base airport code, mirroring the open-drawer
+          // logic. Hit struct only carries airportCode + direction.
+          const crewMember = store.crew.find((c) => c._id === hit.crewId)
+          const homeBase = (crewMember?.baseLabel ?? '').toUpperCase()
+          const tempCode = hit.airportCode.toUpperCase()
+          const depStation = hit.direction === 'outbound' ? homeBase : tempCode
+          const arrStation = hit.direction === 'outbound' ? tempCode : homeBase
+          return (
+            <PositioningHoverTooltip
+              hit={{
+                direction: hit.direction,
+                depStation,
+                arrStation,
+                flightDate: hit.flightDate,
+                airportCode: hit.airportCode,
+                bookingId: hit.bookingId,
+              }}
+              booking={booking}
+              localOffsetHours={store.displayOffsetHours}
+              clientX={positioningHover.clientX}
+              clientY={positioningHover.clientY}
             />
           )
         })()}

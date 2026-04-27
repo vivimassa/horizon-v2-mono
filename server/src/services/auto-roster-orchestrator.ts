@@ -540,6 +540,39 @@ export async function runAutoRoster(
     }
     let tempBaseSkipped = 0
 
+    // Operator-level rest-buffer config (4.1.6.3 "Rest Buffer" tab).
+    // Hoisted above the per-crew loop so the inner check is a cheap
+    // numeric compare. Disabled by default — `enabled=false` zeros all
+    // three buffers so the hot loop short-circuits.
+    const restBuf =
+      (
+        schedulingConfig as {
+          restBuffer?: { enabled?: boolean; inBaseMin?: number; outOfBaseMin?: number; augmentedMin?: number }
+        } | null
+      )?.restBuffer ?? null
+    const restBufferEnabled = !!restBuf?.enabled
+    const restBufferInBaseMin = restBufferEnabled ? (restBuf?.inBaseMin ?? 0) : 0
+    const restBufferOutBaseMin = restBufferEnabled ? (restBuf?.outOfBaseMin ?? 0) : 0
+    const restBufferAugMin = restBufferEnabled ? (restBuf?.augmentedMin ?? 0) : 0
+    const baseFdtlRestMs = (resolveMinRestMinutes(ruleSet) || 0) * 60_000
+    let restBufferSkipped = 0
+
+    // Temp-base POSITIONING-day hard block. POS day = no other duty.
+    // Operating a duty + positioning flight on the same day is too
+    // tiring; hard-coded per planner direction. Index POS dates per
+    // crew from the already-fetched `adaptedBookings`.
+    const posDatesByCrew = new Map<string, Set<string>>()
+    for (const b of adaptedBookings) {
+      if (b.purpose !== 'temp-base-positioning') continue
+      if (!b.flightDate) continue
+      for (const cid of b.crewIds ?? []) {
+        const set = posDatesByCrew.get(cid) ?? new Set<string>()
+        set.add(b.flightDate)
+        posDatesByCrew.set(cid, set)
+      }
+    }
+    let posDaySkipped = 0
+
     let seatIncompatSkipped = 0
 
     for (const crewMember of crew) {
@@ -547,6 +580,7 @@ export async function runAutoRoster(
       const rawBase = (crewMember as { base?: string | null }).base ?? ''
       const homeBase = baseIdToIata.get(rawBase) || 'XXXX'
       const crewTempBases = tempBasesByCrew.get(crewId) ?? []
+      const crewPosDates = posDatesByCrew.get(crewId) ?? null
 
       const crewPositionId = (crewMember as { position?: string | null }).position ?? null
       const crewPositionCode = crewPositionId ? (positionIdToCode.get(crewPositionId) ?? null) : null
@@ -612,6 +646,26 @@ export async function runAutoRoster(
           }
         }
 
+        // Temp-base POSITIONING-day hard block. If this crew has a
+        // positioning flight on any day the pairing touches, exclude
+        // it. Operating a duty + POS on the same day is too tiring;
+        // planner directive is "POS day = no other duty".
+        if (crewPosDates) {
+          const pStart = pairing.startDate
+          const pEnd = (pairing as { endDate?: string | null }).endDate ?? pStart
+          let collides = false
+          for (const d of crewPosDates) {
+            if (d >= pStart && d <= pEnd) {
+              collides = true
+              break
+            }
+          }
+          if (collides) {
+            posDaySkipped++
+            continue
+          }
+        }
+
         const candidate = buildCandidateDuty(pairing)
         if (!candidate) continue
 
@@ -625,9 +679,44 @@ export async function runAutoRoster(
           ruleSet,
         })
 
-        if (result.overall !== 'violation') {
-          legalPairingIds.push(pairingId)
+        if (result.overall === 'violation') continue
+
+        // Operator-level rest-buffer hard rule (4.1.6.3 Rest Buffer tab).
+        // FDTL evaluator already enforced regulatory minimum rest above;
+        // this stacks an extra operator margin per scenario:
+        //   • prior duty ended at home → +inBaseMin
+        //   • prior duty ended at layover → +outOfBaseMin
+        //   • prior duty was augmented → +augmentedMin (additive)
+        // Buffer is symmetric — also enforced for candidate→existing
+        // direction so back-fills don't sneak in under the margin.
+        if (restBufferEnabled) {
+          let blockedByBuffer = false
+          for (const d of existingDuties) {
+            if (d.kind !== 'pairing') continue
+            const wasAtHome = d.arrivalStation === homeBase
+            const augExtra = d.isAugmented ? restBufferAugMin : 0
+            const bufferMs = ((wasAtHome ? restBufferInBaseMin : restBufferOutBaseMin) + augExtra) * 60_000
+            if (bufferMs <= 0) continue
+            const requiredRestMs = baseFdtlRestMs + bufferMs
+            if (d.endUtcMs <= candidate.startUtcMs) {
+              if (candidate.startUtcMs - d.endUtcMs < requiredRestMs) {
+                blockedByBuffer = true
+                break
+              }
+            } else if (candidate.endUtcMs <= d.startUtcMs) {
+              if (d.startUtcMs - candidate.endUtcMs < requiredRestMs) {
+                blockedByBuffer = true
+                break
+              }
+            }
+          }
+          if (blockedByBuffer) {
+            restBufferSkipped++
+            continue
+          }
         }
+
+        legalPairingIds.push(pairingId)
       }
 
       if (legalPairingIds.length === 0 && pairings.length > 0) {
@@ -660,7 +749,9 @@ export async function runAutoRoster(
         message:
           `FDTL check done — ${totalLegalPairs.toLocaleString()} legal matches, avg ${avgLegalPerCrew}/crew` +
           (seatIncompatSkipped > 0 ? ` (${seatIncompatSkipped.toLocaleString()} skipped on position mismatch)` : '') +
-          (tempBaseSkipped > 0 ? ` (${tempBaseSkipped.toLocaleString()} skipped on temp-base mismatch)` : ''),
+          (tempBaseSkipped > 0 ? ` (${tempBaseSkipped.toLocaleString()} skipped on temp-base mismatch)` : '') +
+          (posDaySkipped > 0 ? ` (${posDaySkipped.toLocaleString()} skipped on POS-day overlap)` : '') +
+          (restBufferSkipped > 0 ? ` (${restBufferSkipped.toLocaleString()} skipped on rest buffer)` : ''),
         best_obj: null,
       },
     })
@@ -953,7 +1044,14 @@ export async function runAutoRoster(
         gender_balance_weight: genderBalanceWeight,
         destination_rules: schedulingConfig?.destinationRules?.filter((r) => r.enabled) ?? [],
         objective_priority: priorityOrder,
-        min_rest_min: resolveMinRestMinutes(ruleSet),
+        // Bump the global min-rest the solver uses by the LARGER of the
+        // two location-buffers so its interval-overlap constraint never
+        // proposes anything tighter than what the orchestrator pre-filter
+        // would reject. Augmented buffer is per-pairing → handled in the
+        // pre-filter only, not surfaced to the solver.
+        min_rest_min:
+          resolveMinRestMinutes(ruleSet) +
+          (restBufferEnabled ? Math.max(restBufferInBaseMin, restBufferOutBaseMin) : 0),
         fdtl_limits: extractFdtlLimitsForSolver(ruleSet),
         weekly_rest: extractWeeklyRestForSolver(ruleSet),
         soft_consec_duty: extractSoftConsecDutyRules(

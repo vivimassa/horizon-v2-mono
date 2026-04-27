@@ -34,6 +34,7 @@ import {
   MapPin,
   Target,
   Heart,
+  Moon,
   Plus,
   Trash2,
   type LucideIcon,
@@ -64,11 +65,19 @@ import { Tooltip } from '@/components/ui/tooltip'
 import { MultiSelectField, type MultiSelectOption } from '@/components/filter-panel/fields'
 import { Select } from '@/components/selection-criteria/select'
 import { HelpCircle } from 'lucide-react'
-import { GeneralHero, DaysOffHero, StandbyHero, DestinationHero, OptimizationHero, QolHero } from './section-heroes'
+import {
+  GeneralHero,
+  DaysOffHero,
+  StandbyHero,
+  DestinationHero,
+  OptimizationHero,
+  QolHero,
+  RestBufferHero,
+} from './section-heroes'
 
 const MODULE_ACCENT = MODULE_THEMES.workforce.accent
 
-type SectionKey = 'general' | 'days-off' | 'standby' | 'destinations' | 'qol' | 'optimization'
+type SectionKey = 'general' | 'days-off' | 'standby' | 'destinations' | 'qol' | 'rest-buffer' | 'optimization'
 
 interface SectionDef {
   key: SectionKey
@@ -93,6 +102,12 @@ const SECTIONS: SectionDef[] = [
     label: 'Quality of Life',
     desc: 'Wind down before vacations, ease back into duty after',
     icon: Heart,
+  },
+  {
+    key: 'rest-buffer',
+    label: 'Rest Buffer',
+    desc: 'Operator-level safety margin stacked on top of FDTL minimum rest',
+    icon: Moon,
   },
 ]
 
@@ -124,6 +139,7 @@ interface Draft {
   destinationRules: SchedulingDestinationRule[]
   qolRules: SchedulingQolRule[]
   qolBirthday: { enabled: boolean }
+  restBuffer: { enabled: boolean; inBaseMin: number; outOfBaseMin: number; augmentedMin: number }
   objectives: { genderBalanceOnLayovers: boolean; genderBalanceWeight: number }
 }
 
@@ -155,6 +171,7 @@ const DEFAULT_DRAFT: Draft = {
   destinationRules: [],
   qolRules: [],
   qolBirthday: { enabled: false },
+  restBuffer: { enabled: false, inBaseMin: 0, outOfBaseMin: 0, augmentedMin: 0 },
   objectives: { genderBalanceOnLayovers: true, genderBalanceWeight: 80 },
 }
 
@@ -234,6 +251,10 @@ function configToDraft(cfg: OperatorSchedulingConfig | null): Draft {
     }),
     qolRules: cfg.qolRules ?? [],
     qolBirthday: { ...DEFAULT_DRAFT.qolBirthday, ...(cfg.qolBirthday ?? {}) },
+    restBuffer: {
+      ...DEFAULT_DRAFT.restBuffer,
+      ...((cfg as { restBuffer?: Partial<Draft['restBuffer']> }).restBuffer ?? {}),
+    },
     objectives: { ...DEFAULT_DRAFT.objectives, ...(cfg.objectives ?? {}) },
   }
 }
@@ -247,6 +268,7 @@ function draftToUpsert(operatorId: string, d: Draft): OperatorSchedulingConfigUp
     destinationRules: d.destinationRules,
     qolRules: d.qolRules,
     qolBirthday: d.qolBirthday,
+    restBuffer: d.restBuffer,
     objectives: d.objectives,
   }
 }
@@ -321,6 +343,7 @@ export function SchedulingConfigShell() {
       if (section === 'standby') return { ...prev, standby: { ...DEFAULT_DRAFT.standby } }
       if (section === 'destinations') return { ...prev, destinationRules: [] }
       if (section === 'qol') return { ...prev, qolRules: [], qolBirthday: { ...DEFAULT_DRAFT.qolBirthday } }
+      if (section === 'rest-buffer') return { ...prev, restBuffer: { ...DEFAULT_DRAFT.restBuffer } }
       if (section === 'optimization') return { ...prev, objectives: { ...DEFAULT_DRAFT.objectives } }
       return prev
     })
@@ -548,6 +571,8 @@ function SectionHero({ section, accent, isDark }: { section: SectionKey; accent:
       return <DestinationHero accent={accent} isDark={isDark} />
     case 'qol':
       return <QolHero accent={accent} isDark={isDark} />
+    case 'rest-buffer':
+      return <RestBufferHero accent={accent} isDark={isDark} />
     case 'optimization':
       return <OptimizationHero accent={accent} isDark={isDark} />
   }
@@ -574,6 +599,8 @@ function SectionBody({
     setDraft((prev) => ({ ...prev, standby: { ...prev.standby, ...p } }))
   const patchObjectives = (p: Partial<Draft['objectives']>) =>
     setDraft((prev) => ({ ...prev, objectives: { ...prev.objectives, ...p } }))
+  const patchRestBuffer = (p: Partial<Draft['restBuffer']>) =>
+    setDraft((prev) => ({ ...prev, restBuffer: { ...prev.restBuffer, ...p } }))
 
   switch (section) {
     case 'general':
@@ -876,6 +903,69 @@ function SectionBody({
 
     case 'qol':
       return <QolRulesSection draft={draft} setDraft={setDraft} isDark={isDark} accent={accent} palette={palette} />
+
+    case 'rest-buffer':
+      return (
+        <div className="max-w-4xl space-y-6">
+          <HelpBlock>
+            Operator-level safety buffer added on top of the regulatory FDTL minimum rest. Hard rules — the auto-roster
+            solver rejects any candidate pairing whose preceding rest gap is below FDTL minimum + buffer. Useful for
+            operators that want a recovery margin above what the regulator requires (e.g. add 30 min to in-base rest as
+            a buffer against operational delays).
+          </HelpBlock>
+          <SectionCard title="Rest Buffer" subtitle="Stack additional minutes on top of FDTL minimum rest.">
+            <FormRow
+              label="Apply Rest Buffers"
+              description="Master toggle. When off, all three buffers below are ignored."
+            >
+              <Toggle
+                checked={draft.restBuffer.enabled}
+                onChange={(v) => patchRestBuffer({ enabled: v })}
+                accent="#06C270"
+              />
+            </FormRow>
+            <FormRow
+              label="In-base rest buffer"
+              description="Additional minutes added on top of MIN_REST_HOME_BASE for duties ending at the crew's home base."
+            >
+              <NumberStepper
+                value={draft.restBuffer.inBaseMin}
+                onChange={(v) => patchRestBuffer({ inBaseMin: v })}
+                min={0}
+                max={1440}
+                step={15}
+                suffix="min"
+              />
+            </FormRow>
+            <FormRow
+              label="Out-of-base rest buffer"
+              description="Additional minutes added on top of MIN_REST_AWAY_BASE for duties ending at a layover station."
+            >
+              <NumberStepper
+                value={draft.restBuffer.outOfBaseMin}
+                onChange={(v) => patchRestBuffer({ outOfBaseMin: v })}
+                min={0}
+                max={1440}
+                step={15}
+                suffix="min"
+              />
+            </FormRow>
+            <FormRow
+              label="Augmented-crew rest buffer"
+              description="Additional minutes added after pairings flown with augmented crew (heavy / ULR ops). Applied on top of the in-base or out-of-base buffer above."
+            >
+              <NumberStepper
+                value={draft.restBuffer.augmentedMin}
+                onChange={(v) => patchRestBuffer({ augmentedMin: v })}
+                min={0}
+                max={1440}
+                step={15}
+                suffix="min"
+              />
+            </FormRow>
+          </SectionCard>
+        </div>
+      )
 
     case 'optimization':
       return (

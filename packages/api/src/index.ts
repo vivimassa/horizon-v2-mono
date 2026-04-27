@@ -215,6 +215,7 @@ export type {
   SchedulingDestinationRule,
   SchedulingQolRule,
   SchedulingQolBirthdayConfig,
+  SchedulingRestBufferConfig,
   SchedulingObjectivesConfig,
   OperatorSchedulingConfig,
   OperatorSchedulingConfigUpsert,

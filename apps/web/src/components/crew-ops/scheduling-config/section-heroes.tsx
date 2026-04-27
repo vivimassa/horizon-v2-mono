@@ -937,3 +937,131 @@ export function QolHero({ accent, isDark }: HeroProps) {
     </HeroFrame>
   )
 }
+
+export function RestBufferHero({ accent, isDark }: HeroProps) {
+  // Visualises a rest gap as two duty bars with a labelled gap. The gap
+  // is split into FDTL minimum (solid) + buffer (striped) so planners
+  // see the safety margin stacking on top of regulation.
+  const dim = isDark ? '#8F90A6' : '#555770'
+  const stripeId = 'rest-buffer-stripes'
+  return (
+    <HeroFrame accent={accent} isDark={isDark}>
+      <svg
+        className="absolute right-6 top-1/2 -translate-y-1/2"
+        width="280"
+        height="150"
+        viewBox="0 0 280 150"
+        aria-hidden
+      >
+        <defs>
+          <pattern id={stripeId} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width="6" height="6" fill="#06C27022" />
+            <line x1="0" y1="0" x2="0" y2="6" stroke="#06C270" strokeWidth="1.2" />
+          </pattern>
+        </defs>
+        {/* Lane labels */}
+        <text
+          x="40"
+          y="22"
+          fontSize="9"
+          fontWeight="700"
+          textAnchor="middle"
+          fontFamily="system-ui"
+          fill={dim}
+          letterSpacing="0.08em"
+        >
+          PRIOR DUTY
+        </text>
+        <text
+          x="240"
+          y="22"
+          fontSize="9"
+          fontWeight="700"
+          textAnchor="middle"
+          fontFamily="system-ui"
+          fill={dim}
+          letterSpacing="0.08em"
+        >
+          NEXT DUTY
+        </text>
+
+        {/* Duty bars */}
+        <rect x="0" y="40" width="80" height="22" rx="6" fill={`${accent}cc`} />
+        <text
+          x="40"
+          y="55"
+          fontSize="9"
+          fontWeight="700"
+          textAnchor="middle"
+          fontFamily="ui-monospace, monospace"
+          fill="#fff"
+        >
+          DUTY
+        </text>
+        <rect x="200" y="40" width="80" height="22" rx="6" fill={`${accent}cc`} />
+        <text
+          x="240"
+          y="55"
+          fontSize="9"
+          fontWeight="700"
+          textAnchor="middle"
+          fontFamily="ui-monospace, monospace"
+          fill="#fff"
+        >
+          DUTY
+        </text>
+
+        {/* Rest gap — FDTL minimum (solid green) + buffer (striped green) */}
+        <rect x="80" y="44" width="78" height="14" rx="3" fill="#06C27044" stroke="#06C270" strokeWidth="0.8" />
+        <text
+          x="119"
+          y="54"
+          fontSize="8"
+          fontWeight="700"
+          textAnchor="middle"
+          fontFamily="ui-monospace, monospace"
+          fill="#06C270"
+        >
+          FDTL MIN
+        </text>
+        <rect
+          x="158"
+          y="44"
+          width="42"
+          height="14"
+          rx="3"
+          fill={`url(#${stripeId})`}
+          stroke="#06C270"
+          strokeWidth="0.8"
+        />
+        <text
+          x="179"
+          y="54"
+          fontSize="8"
+          fontWeight="700"
+          textAnchor="middle"
+          fontFamily="ui-monospace, monospace"
+          fill="#06C270"
+        >
+          BUFFER
+        </text>
+
+        {/* Caption arrow */}
+        <line x1="80" y1="74" x2="200" y2="74" stroke={dim} strokeWidth="1" strokeDasharray="2 2" />
+        <text x="140" y="90" fontSize="9" fontWeight="600" textAnchor="middle" fontFamily="system-ui" fill={dim}>
+          Effective rest = FDTL minimum + buffer
+        </text>
+        <text x="140" y="128" fontSize="9" fontWeight="600" textAnchor="middle" fontFamily="system-ui" fill={dim}>
+          Hard rule · solver rejects shorter gaps
+        </text>
+      </svg>
+      <HeroTitle
+        accent={accent}
+        isDark={isDark}
+        eyebrow="Rest buffer · Hard rule"
+        title="Stack safety margin on top of FDTL"
+        caption="Operator-level minutes added to the regulatory minimum rest. Three independent buffers cover home, layover, and augmented operations."
+      />
+    </HeroFrame>
+  )
+}

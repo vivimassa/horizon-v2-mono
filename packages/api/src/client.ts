@@ -4460,6 +4460,18 @@ export interface SchedulingObjectivesConfig {
   priorityOrder: string[]
 }
 
+/** Operator-level safety buffer stacked on top of FDTL minimum rest.
+ *  All values in MINUTES. enabled=false short-circuits all three to 0. */
+export interface SchedulingRestBufferConfig {
+  enabled: boolean
+  /** Extra rest after a duty that ends at home base. */
+  inBaseMin: number
+  /** Extra rest after a duty that ends at a layover (out-of-base) station. */
+  outOfBaseMin: number
+  /** Extra rest after pairings flown with augmented crew. */
+  augmentedMin: number
+}
+
 export interface OperatorSchedulingConfig {
   _id: string
   operatorId: string
@@ -4469,6 +4481,7 @@ export interface OperatorSchedulingConfig {
   destinationRules: SchedulingDestinationRule[]
   qolRules: SchedulingQolRule[]
   qolBirthday: SchedulingQolBirthdayConfig
+  restBuffer: SchedulingRestBufferConfig
   objectives: SchedulingObjectivesConfig
   createdAt: string
   updatedAt: string
@@ -4482,6 +4495,7 @@ export interface OperatorSchedulingConfigUpsert {
   destinationRules?: SchedulingDestinationRule[]
   qolRules?: SchedulingQolRule[]
   qolBirthday?: Partial<SchedulingQolBirthdayConfig>
+  restBuffer?: Partial<SchedulingRestBufferConfig>
   objectives?: Partial<SchedulingObjectivesConfig>
 }
 

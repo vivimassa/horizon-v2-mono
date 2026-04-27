@@ -116,6 +116,26 @@ const objectivesSchema = new Schema(
   { _id: false },
 )
 
+// Operator-level safety buffer stacked ON TOP of the regulatory FDTL
+// minimum rest. Hard rules — solver / orchestrator reject any candidate
+// pairing whose preceding-rest gap is below (FDTL minimum + buffer).
+// Three independent buffers cover the three operational profiles:
+//   inBaseMin       — rest at home base after a duty that ends at home
+//   outOfBaseMin    — layover rest at a turn-around station
+//   augmentedMin    — additional rest after pairings flown with augmented
+//                     crew (complementKey ∈ aug1/aug2). Augmented duties
+//                     are longer + more fatiguing so deserve extra recovery.
+// All values in MINUTES. enabled=false short-circuits all three to 0.
+const restBufferSchema = new Schema(
+  {
+    enabled: { type: Boolean, default: false },
+    inBaseMin: { type: Number, default: 0, min: 0, max: 1440 },
+    outOfBaseMin: { type: Number, default: 0, min: 0, max: 1440 },
+    augmentedMin: { type: Number, default: 0, min: 0, max: 1440 },
+  },
+  { _id: false },
+)
+
 const operatorSchedulingConfigSchema = new Schema(
   {
     _id: { type: String, required: true },
@@ -130,6 +150,7 @@ const operatorSchedulingConfigSchema = new Schema(
     destinationRules: { type: [destinationRuleSchema], default: [] },
     qolRules: { type: [qolRuleSchema], default: [] },
     qolBirthday: { type: qolBirthdaySchema, default: () => ({}) },
+    restBuffer: { type: restBufferSchema, default: () => ({}) },
     objectives: { type: objectivesSchema, default: () => ({}) },
 
     createdAt: { type: String, default: () => new Date().toISOString() },

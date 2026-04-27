@@ -98,6 +98,15 @@ const objectivesSchema = z
   })
   .optional()
 
+const restBufferSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    inBaseMin: z.number().int().min(0).max(1440).optional(),
+    outOfBaseMin: z.number().int().min(0).max(1440).optional(),
+    augmentedMin: z.number().int().min(0).max(1440).optional(),
+  })
+  .optional()
+
 const upsertSchema = z.object({
   operatorId: z.string().min(1),
   carrierMode: z.enum(['lcc', 'legacy']).optional(),
@@ -106,6 +115,7 @@ const upsertSchema = z.object({
   destinationRules: z.array(destinationRuleSchema).optional(),
   qolRules: z.array(qolRuleSchema).max(40).optional(),
   qolBirthday: qolBirthdaySchema,
+  restBuffer: restBufferSchema,
   objectives: objectivesSchema,
 })
 
@@ -174,6 +184,10 @@ export async function operatorSchedulingConfigRoutes(app: FastifyInstance) {
       ...((existing?.qolBirthday as Record<string, unknown>) ?? {}),
       ...(parsed.data.qolBirthday ?? {}),
     }
+    const mergedRestBuffer = {
+      ...((existing?.restBuffer as Record<string, unknown>) ?? {}),
+      ...(parsed.data.restBuffer ?? {}),
+    }
 
     const set: Record<string, unknown> = {
       operatorId,
@@ -182,6 +196,7 @@ export async function operatorSchedulingConfigRoutes(app: FastifyInstance) {
       standby: mergedStandby,
       objectives: mergedObjectives,
       qolBirthday: mergedQolBirthday,
+      restBuffer: mergedRestBuffer,
       updatedAt: now,
     }
 

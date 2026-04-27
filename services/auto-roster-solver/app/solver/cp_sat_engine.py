@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import calendar
+import os
 import time
 from typing import AsyncIterator
 
@@ -55,12 +56,28 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
 
     # ── Decision variables ─────────────────────────────────────────────────
     # x[c_idx][p_idx] = 1 iff crew c is assigned to pairing p
+    # Pre-filter: only create a var for (crew, pairing) pairs that the
+    # orchestrator already marked FDTL-legal in `request.allowed`. Constraints
+    # below all guard with `if (ci, pi) in x` so they short-circuit on
+    # excluded pairs. The orchestrator owns full legality (qualification,
+    # base, position, FDTL hard caps); the solver model adds the rest as
+    # CP-SAT constraints — never relies solely on the pre-filter.
     x: dict[tuple[int, int], cp_model.IntVar] = {}
     for ci, cid in enumerate(crew_ids):
         legal = allowed_set.get(cid, set())
         for pi, pid in enumerate(pairing_ids):
             if pid in legal:
                 x[(ci, pi)] = model.new_bool_var(f"x_{ci}_{pi}")
+
+    n_pairings = len(pairing_ids)
+    possible = len(crew_ids) * n_pairings
+    legal_count = len(x)
+    pct = (100 * legal_count / possible) if possible > 0 else 0
+    print(
+        f"[solver] pre-filter: {legal_count} legal of {possible} possible "
+        f"({pct:.1f}% kept) — {len(crew_ids)} crew × {n_pairings} pairings",
+        flush=True,
+    )
 
     # ── Hard constraint 1: each pairing covered by at most 1 crew ─────────
     # (slack_p = 1 means pairing p is unassigned)
@@ -418,8 +435,19 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
     # ── Solve with SSE progress callbacks ──────────────────────────────────
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = float(request.time_limit_sec)
-    solver.parameters.num_workers = 4
-    solver.parameters.log_search_progress = False
+    # Use all available CPU cores (was hard-capped at 4). CP-SAT scales nearly
+    # linearly with worker count up to physical-core count for portfolio search.
+    solver.parameters.num_workers = os.cpu_count() or 8
+    # Accept solutions within 2% of optimal — CP-SAT spends most of its time
+    # chasing the last 1-2% with no operational benefit (rosters are equivalent
+    # for crew). Pairs with the 30s no-improvement early stop below; first one
+    # to fire wins.
+    solver.parameters.relative_gap_limit = 0.02
+    # Toggle verbose CP-SAT search log via env for diagnostics. Off by default
+    # to keep server logs clean.
+    solver.parameters.log_search_progress = (
+        os.environ.get("AUTO_ROSTER_SOLVER_DEBUG") == "1"
+    )
 
     start_ts = time.monotonic()
 
@@ -537,6 +565,15 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
 
     elapsed_ms = int((time.monotonic() - start_ts) * 1000)
     status_name = solver.status_name(status)
+
+    # Always emit a one-line solver stats summary so we can read it from
+    # server logs and track perf regressions. Independent of debug log flag.
+    print(
+        f"[solver] status={status_name} elapsed_ms={elapsed_ms} "
+        f"branches={solver.NumBranches()} conflicts={solver.NumConflicts()} "
+        f"booleans={solver.NumBooleans()}",
+        flush=True,
+    )
 
     if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         assignments = []

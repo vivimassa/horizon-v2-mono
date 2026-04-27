@@ -193,19 +193,24 @@ function InspectorTabBar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }
             type="button"
             onClick={() => setTab(id)}
             className={`group relative inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[12px] font-semibold uppercase tracking-wider transition-all ${
-              active ? 'text-white shadow-sm' : 'text-hz-text-tertiary hover:text-hz-text hover:bg-hz-border/30'
+              active ? '' : 'text-hz-text-tertiary hover:text-hz-text hover:bg-hz-border/30'
             }`}
             style={
               active
                 ? {
-                    background: 'var(--module-accent)',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.18), 0 0 0 1px rgba(255,255,255,0.08) inset',
+                    // Faint accent wash. `color-mix` blends the operator
+                    // accent at ~20% over transparent so the active tab
+                    // reads soft yet on-brand in both themes — no white
+                    // text on a saturated accent slab.
+                    background: 'color-mix(in srgb, var(--module-accent) 20%, transparent)',
+                    color: 'var(--module-accent)',
+                    boxShadow: '0 0 0 1px color-mix(in srgb, var(--module-accent) 35%, transparent) inset',
                   }
                 : undefined
             }
             aria-pressed={active}
           >
-            <Icon className="w-3.5 h-3.5" strokeWidth={active ? 2.4 : 2} />
+            <Icon className="w-3.5 h-3.5" strokeWidth={active ? 2.2 : 2} />
             <span>{label}</span>
           </button>
         )

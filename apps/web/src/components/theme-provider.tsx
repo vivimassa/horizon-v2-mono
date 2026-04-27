@@ -12,7 +12,7 @@ interface ThemeContextValue {
   theme: Theme
   toggle: () => void
   moduleKey: ModuleKey
-  moduleTheme: { accent: string; bg: string; bgSubtle: string } | null
+  moduleTheme: { accent: string; accentDark?: string; bg: string; bgSubtle: string } | null
 }
 
 const ThemeCtx = createContext<ThemeContextValue>({
@@ -35,10 +35,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const moduleKey = (currentModule?.module ?? null) as ModuleKey
   const moduleTheme = moduleKey ? (MODULE_THEMES[moduleKey] ?? null) : null
 
-  // Resolve accent for dark mode — same hue, 80% saturation, 70% lightness
-  function resolveAccent(hex: string, isDark: boolean): string {
-    if (!isDark) return hex
-    return darkAccent(hex)
+  // Resolve accent for dark mode. Modules can opt out of the global 80%-
+  // saturation cheat by setting an explicit `accentDark` (e.g. workforce
+  // uses a neutral 30%-sat cyan that doesn't read well via the formula).
+  function resolveAccent(light: string, isDark: boolean, overrideDark: string | undefined): string {
+    if (!isDark) return light
+    return overrideDark ?? darkAccent(light)
   }
 
   // Apply module theme CSS custom properties
@@ -46,12 +48,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const root = document.documentElement
     const isDark = theme === 'dark'
     if (moduleTheme) {
-      const accent = resolveAccent(moduleTheme.accent, isDark)
+      const accent = resolveAccent(moduleTheme.accent, isDark, moduleTheme.accentDark)
       root.style.setProperty('--module-accent', accent)
       root.style.setProperty('--module-bg', isDark ? hexToRgba(accent, 0.12) : moduleTheme.bg)
       root.style.setProperty('--module-bg-subtle', isDark ? hexToRgba(accent, 0.06) : moduleTheme.bgSubtle)
     } else {
-      const accent = resolveAccent('#1e40af', isDark)
+      const accent = resolveAccent('#1e40af', isDark, undefined)
       root.style.setProperty('--module-accent', accent)
       root.style.setProperty('--module-bg', isDark ? hexToRgba(accent, 0.12) : '#dbeafe')
       root.style.setProperty('--module-bg-subtle', isDark ? hexToRgba(accent, 0.06) : '#eff6ff')

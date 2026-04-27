@@ -1218,13 +1218,19 @@ export function getTopLevelModules(): ModuleEntry[] {
   return MODULE_REGISTRY.filter((m) => m.level === 0)
 }
 
-/** Module theme colors for dynamic theming */
-export const MODULE_THEMES: Record<string, { accent: string; bg: string; bgSubtle: string }> = {
+/** Module theme colors for dynamic theming.
+ *  `accentDark` (optional) overrides the auto-derived dark variant from
+ *  `darkAccent()`. Use when the cheat formula (30% saturation, hue
+ *  preserved) gives a more on-brand result than the global 80% formula. */
+export const MODULE_THEMES: Record<string, { accent: string; accentDark?: string; bg: string; bgSubtle: string }> = {
   home: { accent: '#1e40af', bg: '#dbeafe', bgSubtle: '#eff6ff' },
   network: { accent: '#2563eb', bg: '#dbeafe', bgSubtle: '#eff6ff' },
   operations: { accent: '#F59E0B', bg: '#fde68a', bgSubtle: '#fef3c7' },
   ground: { accent: '#059669', bg: '#d1fae5', bgSubtle: '#ecfdf5' },
-  workforce: { accent: '#7c3aed', bg: '#ede9fe', bgSubtle: '#f5f3ff' },
+  // Crew Ops — Graphite Cyan. Neutral aviation-instrument feel.
+  // Light: hsl(195, 55%, 42%) ≈ #308AB0 (vivid steel-cyan)
+  // Dark : hsl(195, 16%, 64%) ≈ #90AAB6 (washed cyan, 30% sat of light)
+  workforce: { accent: '#308AB0', accentDark: '#90AAB6', bg: '#bae6fd', bgSubtle: '#e0f2fe' },
   integration: { accent: '#0891b2', bg: '#cffafe', bgSubtle: '#ecfeff' },
   admin: { accent: '#4338ca', bg: '#e0e7ff', bgSubtle: '#eef2ff' },
   sysadmin: { accent: '#B45309', bg: '#fed7aa', bgSubtle: '#ffedd5' },

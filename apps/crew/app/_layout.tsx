@@ -5,6 +5,7 @@ import { ActivityIndicator, View, AppState } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import * as Notifications from 'expo-notifications'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { DatabaseProvider, useDatabase } from '../src/providers/DatabaseProvider'
 import { hydrateSecureStorage, secureTokenStorage } from '../src/lib/secure-token-storage'
 import { promptBiometric } from '../src/lib/biometric-gate'
@@ -12,6 +13,17 @@ import { crewApi } from '../src/lib/api-client'
 import { registerForPush } from '../src/lib/push-register'
 import { useCrewAuthStore } from '../src/stores/use-crew-auth-store'
 import { syncCrewData } from '../src/sync/sync-trigger'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      gcTime: 10 * 60_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+})
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -126,8 +138,8 @@ function AuthGate() {
 
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-page-light dark:bg-page-dark">
-        <ActivityIndicator size="large" color="#1e40af" />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0E0E14' }}>
+        <ActivityIndicator size="large" color="#1e88ff" />
       </View>
     )
   }
@@ -139,9 +151,11 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <DatabaseProvider>
-          <AuthGate />
-        </DatabaseProvider>
+        <QueryClientProvider client={queryClient}>
+          <DatabaseProvider>
+            <AuthGate />
+          </DatabaseProvider>
+        </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   )

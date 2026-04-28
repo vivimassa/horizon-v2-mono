@@ -20,3 +20,13 @@ __pycache__/
 
 # OurAirports lookup cache (downloaded at runtime by SSIM Import)
 .cache/
+
+# Local dev tunnel logs + design handoff bundles
+.cloudflared-*.log
+.crewdeck-*
+.crewdeck-design/
+
+# Claude Code session state
+.claude/scheduled_tasks.lock
+**/.claude/scheduled_tasks.lock
+.claude/plans/

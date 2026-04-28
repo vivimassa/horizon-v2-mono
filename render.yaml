@@ -1,0 +1,49 @@
+# SkyHub server — Render Blueprint
+#
+# Deploys the Fastify API at server/ with workspace deps built via Turbo.
+#
+# Setup:
+#   1. Push this repo to GitHub (already at vivimassa/horizon-v2-mono).
+#   2. Render dashboard → New → Blueprint → connect this repo.
+#   3. Set the two secret env vars below (sync: false) in Render UI:
+#         MONGODB_URI   — full Atlas connection string
+#         JWT_SECRET    — ≥32 random chars
+#   4. Deploy. URL will be https://skyhub-server.onrender.com (or
+#      whatever name Render auto-assigns).
+#
+# Free tier caveats:
+#   - Service sleeps after 15 min idle. First crew-app request after
+#     sleep takes ~30s to wake. Fine for testing; not pilot-grade.
+#   - 512MB RAM. The dev script's NODE_OPTIONS=--max-old-space-size=8192
+#     is dev-only; production `node dist/index.js` runs lean.
+
+services:
+  - type: web
+    name: skyhub-server
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: .
+    # Server has accumulated TS errors that block tsc; we run via tsx in
+    # production until those are paid down. tsx ships in server's
+    # devDependencies and gets installed by `npm install` (Render does
+    # not strip dev deps during build).
+    buildCommand: npm install
+    startCommand: cd server && npx tsx src/index.ts
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: JWT_ACCESS_EXPIRY
+        value: 15m
+      - key: JWT_REFRESH_EXPIRY
+        value: 7d
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false

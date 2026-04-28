@@ -5,6 +5,8 @@ import { CrewAssignment } from '../models/CrewAssignment.js'
 import { CrewActivity } from '../models/CrewActivity.js'
 import { CrewMessage } from '../models/CrewMessage.js'
 import { Pairing } from '../models/Pairing.js'
+import { Airport } from '../models/Airport.js'
+import { CrewPosition } from '../models/CrewPosition.js'
 import { requireCrewAuth } from '../middleware/authenticate-crew.js'
 
 // ── Window bounds ───────────────────────────────────────────────────────
@@ -292,16 +294,26 @@ export async function crewAppSyncRoutes(app: FastifyInstance) {
     }
 
     // ── Profile (own record) ──
+    // Resolve base UUID → ICAO code, position UUID → position code/name
+    // so the device shows human-readable labels (e.g. HAN, CP) instead of
+    // raw IDs.
     const profileBucket: Bucket<CrewProfileRow> = { created: [], updated: [], deleted: [] }
     const profileUpdatedMs = isoToMs(profile.updatedAt)
     if (profileUpdatedMs > lastPulledAt || lastPulledAt === 0) {
+      const [baseDoc, positionDoc] = await Promise.all([
+        profile.base ? Airport.findById(profile.base, { icaoCode: 1, iataCode: 1 }).lean() : Promise.resolve(null),
+        profile.position ? CrewPosition.findById(profile.position, { code: 1, name: 1 }).lean() : Promise.resolve(null),
+      ])
+      const baseLabel = baseDoc?.iataCode ?? baseDoc?.icaoCode ?? null
+      const positionLabel = positionDoc?.code ?? positionDoc?.name ?? null
+
       const row: CrewProfileRow = {
         id: profile._id as string,
         employee_id: profile.employeeId,
         first_name: profile.firstName,
         last_name: profile.lastName,
-        position: profile.position ?? null,
-        base: profile.base ?? null,
+        position: positionLabel,
+        base: baseLabel,
         photo_url: profile.photoUrl ?? null,
         is_schedule_visible: profile.isScheduleVisible !== false,
         updated_at_ms: profileUpdatedMs,
@@ -309,6 +321,23 @@ export async function crewAppSyncRoutes(app: FastifyInstance) {
       if (lastPulledAt === 0) profileBucket.created.push(row)
       else profileBucket.updated.push(row)
     }
+
+    req.log.info(
+      {
+        crewId,
+        operatorId,
+        lastPulledAt,
+        scheduleHidden,
+        counts: {
+          assignments: assignmentBucket.created.length + assignmentBucket.updated.length,
+          pairings: pairingBucket.created.length + pairingBucket.updated.length,
+          legs: legBucket.created.length + legBucket.updated.length,
+          activities: activityBucket.created.length + activityBucket.updated.length,
+          messages: messageBucket.created.length + messageBucket.updated.length,
+        },
+      },
+      '[crew-sync] pull',
+    )
 
     return {
       changes: {

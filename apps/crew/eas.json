@@ -18,6 +18,9 @@
       },
       "ios": {
         "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://regulatory-knee-rogers-earnings.trycloudflare.com"
       }
     },
     "production": {

@@ -16,6 +16,11 @@ import { authRoutes } from './routes/auth.js'
 import { crewAppAuthRoutes } from './routes/crew-app-auth.js'
 import { crewAppSyncRoutes } from './routes/crew-app-sync.js'
 import { crewAppPushTokenRoutes } from './routes/crew-app-push-tokens.js'
+import { crewAppProfileRoutes } from './routes/crew-app-profile.js'
+import { crewAppFdtlRoutes } from './routes/crew-app-fdtl.js'
+import { crewAppStatsRoutes } from './routes/crew-app-stats.js'
+import { crewAppPairingRoutes } from './routes/crew-app-pairing.js'
+import { crewAppWxRoutes } from './routes/crew-app-wx.js'
 import { registerCrewChangeEmitter } from './services/crew-change-emitter.js'
 import { flightRoutes } from './routes/flights.js'
 import { referenceRoutes } from './routes/reference.js'
@@ -153,6 +158,11 @@ async function main(): Promise<void> {
   await app.register(crewAppAuthRoutes)
   await app.register(crewAppSyncRoutes)
   await app.register(crewAppPushTokenRoutes)
+  await app.register(crewAppProfileRoutes)
+  await app.register(crewAppFdtlRoutes)
+  await app.register(crewAppStatsRoutes)
+  await app.register(crewAppPairingRoutes)
+  await app.register(crewAppWxRoutes)
 
   // Wire Mongoose post-save hooks → Expo Push fanout (SkyHub Crew app).
   // Must run after models are loaded (they are — registered as side-effects

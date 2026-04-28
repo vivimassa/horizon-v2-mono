@@ -90,6 +90,134 @@ export interface AuthResponse {
   profile: CrewProfile
 }
 
+// ── Phase B types: server endpoints under /crew-app/me/* ──────────────
+
+export interface FullProfile {
+  identity: {
+    firstName: string
+    middleName: string | null
+    lastName: string
+    gender: string | null
+    dateOfBirth: string | null
+    nationality: string | null
+    employeeId: string
+    shortCode: string | null
+    photoUrl: string | null
+  }
+  employment: {
+    contractType: string | null
+    base: string | null
+    position: string | null
+    employmentDate: string | null
+    seniority: number | null
+    seniorityGroup: number
+    languages: string[]
+    ratings: string[]
+  }
+  contact: {
+    emailPrimary: string | null
+    emailSecondary: string | null
+    phones: { id: string; priority: number; type: string; number: string; smsEnabled: boolean }[]
+    address: {
+      line1: string | null
+      line2: string | null
+      city: string | null
+      state: string | null
+      zip: string | null
+      country: string | null
+    }
+    emergency: { name: string | null; relationship: string | null; phone: string | null }
+  }
+  passports: {
+    id: string
+    number: string
+    country: string
+    nationality: string | null
+    placeOfIssue: string | null
+    issueDate: string | null
+    expiry: string
+    isActive: boolean
+  }[]
+  visas: {
+    id: string
+    country: string
+    type: string | null
+    number: string | null
+    issueDate: string | null
+    expiry: string
+  }[]
+  licenses: {
+    id: string
+    number: string
+    type: string
+    country: string | null
+    placeOfIssue: string | null
+    issueDate: string | null
+    temporary: boolean
+  }[]
+  expiries: {
+    id: string
+    codeId: string
+    codeShort: string | null
+    codeLabel: string | null
+    aircraftType: string | null
+    expiryDate: string | null
+    isExpired: boolean
+    daysUntil: number | null
+  }[]
+  _ratings: string[]
+}
+
+export interface FdtlSummary {
+  computedAtMs: number
+  fdpUsedMinutes: number
+  fdpLimitMinutes: number
+  duty7DayMinutes: number
+  duty7DayLimitMinutes: number
+  duty28DayMinutes: number
+  duty28DayLimitMinutes: number
+  minRestMinutes: number
+  restStartUtcMs: number | null
+  restEndUtcMs: number | null
+  nextReportUtcMs: number | null
+}
+
+export type StatsPeriod = 'month' | '28d' | 'year'
+
+export interface CrewStats {
+  period: StatsPeriod
+  range: { fromIso: string; toIso: string }
+  blockMinutes: number
+  dutyMinutes: number
+  sectors: number
+  nightDuties: number
+  daysOff: number
+  avgBlockMinutesPerDay: number
+  weekly: { weekLabel: string; blockMinutes: number }[]
+  trends: { blockDeltaMinutes: number; dutyDeltaMinutes: number; sectorsDelta: number }
+}
+
+export interface PairingCrewMember {
+  crewId: string
+  firstName: string
+  lastName: string
+  employeeId: string
+  positionCode: string | null
+  positionLabel: string | null
+  seatIndex: number
+}
+
+export interface LegWx {
+  dep: string
+  arr: string
+  metarDep: string | null
+  metarArr: string | null
+  tafDep: string | null
+  tafArr: string | null
+  source: 'noaa'
+  fetchedAtMs: number
+}
+
 export const crewApi = {
   listOperators: () => request<{ operators: OperatorOption[] }>('/crew-app/auth/operators', { auth: false }),
 
@@ -99,6 +227,25 @@ export const crewApi = {
       auth: false,
       body: { operatorId, employeeId, pin },
     }),
+
+  fullProfile: () => request<FullProfile>('/crew-app/me/full-profile'),
+
+  fdtl: (atIso?: string) =>
+    request<FdtlSummary>(`/crew-app/me/fdtl${atIso ? `?atIso=${encodeURIComponent(atIso)}` : ''}`),
+
+  stats: (period: StatsPeriod, atIso?: string) => {
+    const qs = new URLSearchParams({ period })
+    if (atIso) qs.set('atIso', atIso)
+    return request<CrewStats>(`/crew-app/me/stats?${qs.toString()}`)
+  },
+
+  pairingCrew: (pairingId: string) =>
+    request<{ pairingId: string; crew: PairingCrewMember[] }>(
+      `/crew-app/pairings/${encodeURIComponent(pairingId)}/crew`,
+    ),
+
+  legWx: (dep: string, arr: string) =>
+    request<LegWx>(`/crew-app/wx?dep=${encodeURIComponent(dep)}&arr=${encodeURIComponent(arr)}`),
 
   setPin: (operatorId: string, employeeId: string, tempPin: string, newPin: string) =>
     request<AuthResponse>('/crew-app/auth/set-pin', {

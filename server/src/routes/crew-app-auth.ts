@@ -3,8 +3,29 @@ import bcrypt from 'bcryptjs'
 import { z } from 'zod'
 import { CrewMember } from '../models/CrewMember.js'
 import { Operator } from '../models/Operator.js'
+import { Airport } from '../models/Airport.js'
+import { CrewPosition } from '../models/CrewPosition.js'
 import { getServerEnv } from '@skyhub/env/server'
 import { requireCrewAuth } from '../middleware/authenticate-crew.js'
+
+/**
+ * Resolve a CrewMember's `base` (Airport._id) to ICAO/IATA code and
+ * `position` (CrewPosition._id) to its short code. The crew app shows
+ * these as label chips ("HAN Base · CP"), not raw UUIDs.
+ */
+async function resolveProfileLabels(
+  base: string | null | undefined,
+  position: string | null | undefined,
+): Promise<{ baseLabel: string | null; positionLabel: string | null }> {
+  const [baseDoc, positionDoc] = await Promise.all([
+    base ? Airport.findById(base, { icaoCode: 1, iataCode: 1 }).lean() : Promise.resolve(null),
+    position ? CrewPosition.findById(position, { code: 1, name: 1 }).lean() : Promise.resolve(null),
+  ])
+  return {
+    baseLabel: baseDoc?.iataCode ?? baseDoc?.icaoCode ?? null,
+    positionLabel: positionDoc?.code ?? positionDoc?.name ?? null,
+  }
+}
 
 // PIN policy: 6-digit numeric. bcrypt salt 12 (matches User password hashing).
 const PIN_REGEX = /^\d{6}$/
@@ -161,6 +182,7 @@ export async function crewAppAuthRoutes(app: FastifyInstance) {
       expiresIn: env.JWT_REFRESH_EXPIRY,
     })
 
+    const { baseLabel, positionLabel } = await resolveProfileLabels(crew.base, crew.position)
     return {
       accessToken,
       refreshToken,
@@ -170,8 +192,8 @@ export async function crewAppAuthRoutes(app: FastifyInstance) {
         employeeId: crew.employeeId,
         firstName: crew.firstName,
         lastName: crew.lastName,
-        position: crew.position,
-        base: crew.base,
+        position: positionLabel,
+        base: baseLabel,
         photoUrl: crew.photoUrl ?? null,
         isScheduleVisible: crew.isScheduleVisible ?? true,
       },
@@ -229,6 +251,10 @@ export async function crewAppAuthRoutes(app: FastifyInstance) {
       expiresIn: env.JWT_REFRESH_EXPIRY,
     })
 
+    const { baseLabel: spBaseLabel, positionLabel: spPositionLabel } = await resolveProfileLabels(
+      crew.base,
+      crew.position,
+    )
     return {
       accessToken,
       refreshToken,
@@ -238,8 +264,8 @@ export async function crewAppAuthRoutes(app: FastifyInstance) {
         employeeId: crew.employeeId,
         firstName: crew.firstName,
         lastName: crew.lastName,
-        position: crew.position,
-        base: crew.base,
+        position: spPositionLabel,
+        base: spBaseLabel,
         photoUrl: crew.photoUrl ?? null,
       },
     }

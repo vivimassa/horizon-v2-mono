@@ -348,7 +348,14 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
     # For each configured rule, per crew, per sliding (limit+1)-day window:
     # excess = max(0, sum_duty_days_in_window - limit). Penalty = excess ×
     # weight × SOFT_CONSEC_WEIGHT_SCALE added to the objective.
-    SOFT_CONSEC_WEIGHT_SCALE = 200  # 1 excess day @ weight 5 → 1000 obj points
+    #
+    # Scale at 5000 (was 200) — at weight=5 the penalty is 25k per excess
+    # day, ~2.5% of the COVERAGE_WEIGHT (1M). The previous 200 scale put
+    # one excess duty-day at 1000 obj points = noise next to coverage,
+    # leaving 6+ consecutive duty stretches when the planner had set
+    # max=4. Higher scale gives the cap real teeth without making it
+    # hard (a stretch is still legal if FDTL allows it; just costly).
+    SOFT_CONSEC_WEIGHT_SCALE = 5000
     soft_excess_terms: list[tuple[cp_model.IntVar, int]] = []
     soft_rules = request.config.soft_consec_duty or []
     if soft_rules and crew_ids and pairing_ids:

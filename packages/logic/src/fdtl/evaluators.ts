@@ -340,28 +340,56 @@ export function evaluateMinRestInWindow(resolved: ResolvedRule, ctx: EvaluatorCo
     .sort((a, b) => a.startUtcMs - b.startUtcMs)
   if (pool.length === 0) return []
 
-  const refMs = pool.reduce((m, d) => (d.endUtcMs > m ? d.endUtcMs : m), ctx.candidate.endUtcMs)
-  const floorMs = refMs - windowMs
+  // ── EVERY rolling window must satisfy the rule, not just the latest ──
+  // The prior implementation anchored a single window at `max(endUtcMs)`
+  // across the whole roster. For mid-period candidates with later
+  // pairings already proposed, the relevant window slid past — the
+  // validator returned 'pass' while a window ending IN THE CANDIDATE'S
+  // STRETCH had max-gap < required rest. Anchor a window at every
+  // duty's end (and the candidate's end). The minimum max-gap across
+  // those anchors decides the verdict — that's the worst rolling
+  // window in the candidate's neighbourhood, and the only one that
+  // matters for legality.
+  const anchorSet = new Set<number>()
+  for (const d of pool) anchorSet.add(d.endUtcMs)
+  // Add anchors slightly after each duty start as well — captures the
+  // moment a long prior-rest block falls out of the rolling window.
+  for (const d of pool) anchorSet.add(d.startUtcMs + 1)
+  const anchors = [...anchorSet].sort((a, b) => a - b)
 
-  const merged: Array<{ s: number; e: number }> = []
-  for (const d of pool) {
-    const s = Math.max(d.startUtcMs, floorMs)
-    const e = Math.min(d.endUtcMs, refMs)
-    if (e <= s) continue
-    const last = merged[merged.length - 1]
-    if (last && s <= last.e) last.e = Math.max(last.e, e)
-    else merged.push({ s, e })
+  let worstAnchorRefMs = ctx.candidate.endUtcMs
+  let worstAnchorFloorMs = worstAnchorRefMs - windowMs
+  let worstMaxGapMs = Number.POSITIVE_INFINITY
+
+  for (const refMs of anchors) {
+    const floorMs = refMs - windowMs
+    const merged: Array<{ s: number; e: number }> = []
+    for (const d of pool) {
+      const s = Math.max(d.startUtcMs, floorMs)
+      const e = Math.min(d.endUtcMs, refMs)
+      if (e <= s) continue
+      const last = merged[merged.length - 1]
+      if (last && s <= last.e) last.e = Math.max(last.e, e)
+      else merged.push({ s, e })
+    }
+    let maxGapMs = 0
+    if (merged.length === 0) maxGapMs = windowMs
+    else {
+      maxGapMs = merged[0].s - floorMs
+      for (let i = 1; i < merged.length; i += 1) maxGapMs = Math.max(maxGapMs, merged[i].s - merged[i - 1].e)
+      maxGapMs = Math.max(maxGapMs, refMs - merged[merged.length - 1].e)
+    }
+    if (maxGapMs < worstMaxGapMs) {
+      worstMaxGapMs = maxGapMs
+      worstAnchorRefMs = refMs
+      worstAnchorFloorMs = floorMs
+    }
+    // Early exit — once we know SOME window already violates, no point
+    // scanning further. Validator caller only cares about pass/violation.
+    if (worstMaxGapMs / 60_000 < restMin) break
   }
 
-  let maxGapMs = 0
-  if (merged.length === 0) maxGapMs = windowMs
-  else {
-    maxGapMs = merged[0].s - floorMs
-    for (let i = 1; i < merged.length; i += 1) maxGapMs = Math.max(maxGapMs, merged[i].s - merged[i - 1].e)
-    maxGapMs = Math.max(maxGapMs, refMs - merged[merged.length - 1].e)
-  }
-
-  const maxGapMin = Math.floor(maxGapMs / 60_000)
+  const maxGapMin = Math.floor(worstMaxGapMs / 60_000)
   // Binary: gap ≥ required rest = legal. Below = violation. No warning
   // band — being 50 min above the minimum is not "close to illegal", it
   // is simply legal. Anything that flags here blocks + audit.
@@ -376,8 +404,8 @@ export function evaluateMinRestInWindow(resolved: ResolvedRule, ctx: EvaluatorCo
       status,
       ruleCode: resolved.rule.code,
       legalReference: resolved.rule.legalReference,
-      windowFromIso: new Date(floorMs).toISOString(),
-      windowToIso: new Date(refMs).toISOString(),
+      windowFromIso: new Date(worstAnchorFloorMs).toISOString(),
+      windowToIso: new Date(worstAnchorRefMs).toISOString(),
       windowLabel: `${Math.round(windowMin / 60)}H`,
       shortReason:
         status === 'pass'

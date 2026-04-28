@@ -37,6 +37,11 @@ services:
         value: "22"
       - key: NODE_ENV
         value: production
+      # Skip the root `prepare: husky` hook on Render's install — husky
+      # is a dev-only git-hook tool and isn't on PATH during npm install
+      # in CI. Husky 9 respects HUSKY=0.
+      - key: HUSKY
+        value: "0"
       - key: CORS_ORIGIN
         value: "*"
       - key: JWT_ACCESS_EXPIRY

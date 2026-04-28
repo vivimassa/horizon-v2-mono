@@ -15,6 +15,7 @@ import {
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { BlurView } from 'expo-blur'
+import { LinearGradient } from 'expo-linear-gradient'
 import { ChevronDown, Eye, EyeOff, Check } from 'lucide-react-native'
 import { crewApi, ApiError, type OperatorOption } from '../../src/lib/api-client'
 import { secureTokenStorage } from '../../src/lib/secure-token-storage'
@@ -279,32 +280,45 @@ export default function Login() {
                   </View>
                 )}
 
-                {/* Sign in */}
+                {/* Sign in — gradient glass button */}
                 <Pressable
                   disabled={!canSubmit}
                   onPress={submit}
                   style={{
                     marginTop: 18,
-                    height: 46,
-                    borderRadius: 10,
-                    backgroundColor: canSubmit ? '#1e40af' : 'rgba(30,64,175,0.45)',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    shadowColor: '#1e40af',
+                    height: 50,
+                    borderRadius: 12,
+                    overflow: 'hidden',
+                    opacity: canSubmit ? 1 : 0.55,
+                    shadowColor: '#60a5fa',
                     shadowOpacity: canSubmit ? 0.45 : 0,
                     shadowRadius: 16,
-                    shadowOffset: { width: 0, height: 4 },
-                    elevation: canSubmit ? 6 : 0,
+                    shadowOffset: { width: 0, height: 6 },
+                    elevation: canSubmit ? 8 : 0,
                   }}
                 >
-                  {submitting ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <ActivityIndicator color="#fff" size="small" />
-                      <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>Signing in…</Text>
-                    </View>
-                  ) : (
-                    <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>Sign in</Text>
-                  )}
+                  <LinearGradient
+                    colors={['#60a5fa', '#3b82f6']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={{
+                      flex: 1,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,255,255,0.18)',
+                      borderRadius: 12,
+                    }}
+                  >
+                    {submitting ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <ActivityIndicator color="#fff" size="small" />
+                        <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Signing in…</Text>
+                      </View>
+                    ) : (
+                      <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Sign in</Text>
+                    )}
+                  </LinearGradient>
                 </Pressable>
               </View>
             </BlurView>

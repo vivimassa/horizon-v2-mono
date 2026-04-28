@@ -3,30 +3,30 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, Switch, Text, View } f
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import {
-  AlertTriangle,
   Award,
   Bell,
   Book,
-  Calendar,
   ChevronRight,
   FileText,
   Globe,
+  LifeBuoy,
   LogOut,
   Moon,
+  Palette,
   RefreshCw,
-  Settings as SettingsIcon,
-  Share2,
+  Shield,
+  Smartphone,
   Sun,
   Trash2,
-  Users,
   Wallet,
 } from 'lucide-react-native'
-import { Card, Chip, FieldLabel, SectionHeader } from '../../src/components/primitives'
+import { Chip, Glass } from '../../src/components/primitives'
 import { useTheme } from '../../src/theme/use-theme'
 import type { Theme } from '../../src/theme/tokens'
 import { TYPE } from '../../src/theme/tokens'
 import { useCrewAuthStore } from '../../src/stores/use-crew-auth-store'
 import { useCrewOperatorStore } from '../../src/stores/use-crew-operator-store'
+import { useThemeStore, type ThemeMode } from '../../src/stores/use-theme-store'
 import { useDatabase } from '../../src/providers/DatabaseProvider'
 import { secureTokenStorage } from '../../src/lib/secure-token-storage'
 import { crewApi } from '../../src/lib/api-client'
@@ -43,10 +43,9 @@ export default function MoreTab() {
   const operator = useCrewOperatorStore((s) => s.selectedOperator)
   const pushToken = useCrewAuthStore((s) => s.expoPushToken)
   const database = useDatabase()
+  const themeMode = useThemeStore((s) => s.mode)
+  const setThemeMode = useThemeStore((s) => s.setMode)
 
-  const [shareFamily, setShareFamily] = useState(true)
-  const [shareCrew, setShareCrew] = useState(false)
-  const [calSync, setCalSync] = useState(true)
   const [biometric, setBiometric] = useState(secureTokenStorage.isBiometricEnabled())
   const [pushOn, setPushOn] = useState(true)
   const fullProfileQ = useFullProfile()
@@ -106,13 +105,13 @@ export default function MoreTab() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 16 }}
         showsVerticalScrollIndicator={false}
       >
         <Text style={{ ...TYPE.pageTitle, color: t.text }}>More</Text>
 
-        {/* Profile */}
-        <Card t={t} padding={16} onPress={() => router.push('/profile/contact')}>
+        {/* Profile hero */}
+        <Glass tier="hero" padding={16} onPress={() => router.push('/profile/contact')}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
             <View
               style={{
@@ -127,228 +126,240 @@ export default function MoreTab() {
               <Text style={{ color: '#fff', fontWeight: '700', fontSize: 20, letterSpacing: 0.5 }}>{init}</Text>
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={{ color: t.text, fontWeight: '600', fontSize: 16, letterSpacing: -0.3 }} numberOfLines={1}>
+              <Text style={{ color: t.text, fontWeight: '700', fontSize: 16, letterSpacing: -0.3 }} numberOfLines={1}>
                 {fullName}
               </Text>
               <Text style={{ ...TYPE.caption, color: t.textSec, marginTop: 3 }} numberOfLines={1}>
-                {profile?.employeeId} · {profile?.position ?? '—'}
+                {profile?.position ?? '—'} · {profile?.employeeId} · {profile?.base ?? operator?.code ?? 'BASE'} base
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                <Tag t={t}>{(profile?.base ?? operator?.code ?? 'BASE') + ' Base'}</Tag>
+                <Chip t={t} kind="ontime">
+                  Active
+                </Chip>
                 {ratings.map((r) => (
-                  <Tag key={r} t={t}>
+                  <Chip key={r} t={t} kind="departed">
                     {r}
-                  </Tag>
+                  </Chip>
                 ))}
               </View>
             </View>
             <ChevronRight color={t.textTer} size={18} />
           </View>
-        </Card>
+        </Glass>
 
-        {/* Sharing */}
-        <View style={{ gap: 10 }}>
-          <SectionHeader t={t}>Roster Sharing</SectionHeader>
+        {/* Account */}
+        <Eyebrow t={t}>ACCOUNT</Eyebrow>
+        <Glass tier="standard" padding={0}>
+          <NavRow
+            t={t}
+            icon={<Award color={t.accent} size={18} />}
+            title="Licenses & Certificates"
+            sub={ratings.length > 0 ? ratings.join(' · ') : 'ATPL · ratings'}
+            badge={
+              expiredCount > 0
+                ? { text: `${expiredCount} expired`, kind: 'cancelled' }
+                : expiringSoonCount > 0
+                  ? { text: `${expiringSoonCount} expiring 30d`, kind: 'delayed' }
+                  : undefined
+            }
+            onPress={() => router.push('/documents/licenses')}
+          />
+          <Divider t={t} />
+          <NavRow
+            t={t}
+            icon={<Book color={t.accent} size={18} />}
+            title="Training records"
+            sub="Recurrent due 14 Jun"
+          />
+          <Divider t={t} />
+          <NavRow t={t} icon={<Wallet color={t.accent} size={18} />} title="Pay Slips" sub="April available" last />
+        </Glass>
+
+        {/* App */}
+        <Eyebrow t={t}>APP</Eyebrow>
+        <Glass tier="standard" padding={0}>
           <ToggleRow
             t={t}
-            icon={<Share2 color={shareFamily ? t.accent : t.textSec} size={18} />}
-            title="Share with Family"
-            sub="Family can view your roster via web link, no app needed"
-            on={shareFamily}
-            setOn={setShareFamily}
+            icon={<Bell color={pushOn ? t.accent : t.textSec} size={18} />}
+            title="Notifications"
+            sub="Schedule changes · Roster"
+            on={pushOn}
+            setOn={setPushOn}
           />
+          <Divider t={t} />
           <ToggleRow
             t={t}
-            icon={<Users color={shareCrew ? t.accent : t.textSec} size={18} />}
-            title="Share with Crew"
-            sub="Colleagues can see your roster for trip coordination"
-            on={shareCrew}
-            setOn={setShareCrew}
+            icon={<Smartphone color={biometric ? t.accent : t.textSec} size={18} />}
+            title="Biometric Unlock"
+            sub="Face ID / fingerprint on app open"
+            on={biometric}
+            setOn={toggleBiometric}
           />
-          <ToggleRow
-            t={t}
-            icon={<Calendar color={calSync ? t.accent : t.textSec} size={18} />}
-            title="Calendar Sync"
-            sub={calSync ? 'Synced with device calendar · 2m ago' : 'Off'}
-            on={calSync}
-            setOn={setCalSync}
-          />
-        </View>
-
-        {/* Documents */}
-        <View style={{ gap: 10 }}>
-          <SectionHeader t={t}>Documents</SectionHeader>
-          <Card t={t} padding={0}>
-            <NavRow
-              t={t}
-              icon={<Award color={t.text} size={18} />}
-              title="Licenses & Certificates"
-              badge={
-                expiredCount > 0
-                  ? { text: `${expiredCount} expired`, kind: 'cancelled' }
-                  : expiringSoonCount > 0
-                    ? { text: `${expiringSoonCount} expiring 30d`, kind: 'delayed' }
-                    : undefined
-              }
-              onPress={() => router.push('/documents/licenses')}
-            />
-            <Divider t={t} />
-            <NavRow t={t} icon={<Book color={t.text} size={18} />} title="Company Manuals" sub="Coming soon" />
-            <Divider t={t} />
-            <NavRow t={t} icon={<FileText color={t.text} size={18} />} title="Safety Reports (FRM)" sub="Coming soon" />
-            <Divider t={t} />
-            <NavRow t={t} icon={<Wallet color={t.text} size={18} />} title="Pay Slips" sub="Coming soon" last />
-          </Card>
-        </View>
-
-        {/* Settings */}
-        <View style={{ gap: 10 }}>
-          <SectionHeader t={t}>Settings</SectionHeader>
-          <Card t={t} padding={0}>
-            <ToggleRow
-              t={t}
-              flat
-              icon={<Bell color={pushOn ? t.accent : t.textSec} size={18} />}
-              title="Notifications"
-              sub="Schedule changes · Roster"
-              on={pushOn}
-              setOn={setPushOn}
-            />
-            <Divider t={t} />
-            <ToggleRow
-              t={t}
-              flat
-              icon={<Award color={biometric ? t.accent : t.textSec} size={18} />}
-              title="Biometric Unlock"
-              sub="Face ID / fingerprint on app open"
-              on={biometric}
-              setOn={toggleBiometric}
-            />
-            <Divider t={t} />
-            <NavRow
-              t={t}
-              icon={<Moon color={t.text} size={18} />}
-              title="Appearance"
-              sub="Dark"
-              chevron={false}
-              right={
-                <View style={{ flexDirection: 'row', backgroundColor: t.hover, padding: 2, borderRadius: 8, gap: 4 }}>
-                  {[
-                    { k: false, l: 'Light', icon: Sun },
-                    { k: true, l: 'Dark', icon: Moon },
-                  ].map((o) => {
-                    const I = o.icon
-                    const active = o.k === true // forced dark Phase A
-                    return (
-                      <View
-                        key={o.l}
-                        style={{
-                          paddingHorizontal: 10,
-                          paddingVertical: 4,
-                          borderRadius: 6,
-                          backgroundColor: active ? t.page : 'transparent',
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 4,
-                        }}
-                      >
-                        <I color={active ? t.text : t.textSec} size={11} />
-                        <Text style={{ fontSize: 11, fontWeight: '600', color: active ? t.text : t.textSec }}>
-                          {o.l}
-                        </Text>
-                      </View>
-                    )
-                  })}
-                </View>
-              }
-            />
-            <Divider t={t} />
-            <NavRow t={t} icon={<Globe color={t.text} size={18} />} title="Language" sub="English (US)" />
-            <Divider t={t} />
-            <NavRow
-              t={t}
-              icon={<RefreshCw color={t.text} size={18} />}
-              title="Offline Data"
-              sub={
-                syncStatus.lastError
-                  ? `Last error: ${syncStatus.lastError}`
-                  : syncStatus.counts
-                    ? `${syncStatus.counts.assignments} duties · ${syncStatus.counts.pairings} pairings · ${syncStatus.counts.legs} legs${syncStatus.lastSyncMs ? ` · ${fmtSince(syncStatus.lastSyncMs)}` : ''}`
-                    : syncStatus.lastSyncMs
-                      ? `Last sync ${fmtSince(syncStatus.lastSyncMs)}`
-                      : 'Not synced yet'
-              }
-              right={
-                syncStatus.inFlight ? (
-                  <ActivityIndicator color={t.accent} size="small" />
-                ) : (
-                  <Pressable onPress={onSyncNow}>
-                    <Text style={{ ...TYPE.badge, color: t.accent, fontSize: 12 }}>Sync Now</Text>
-                  </Pressable>
-                )
-              }
-              chevron={false}
-            />
-            <Divider t={t} />
-            <NavRow
-              t={t}
-              icon={<SettingsIcon color={t.text} size={18} />}
-              title="About"
-              sub="SkyHub Crew · v0.1.0"
-              last
-            />
-          </Card>
-        </View>
-
-        {/* Reset local data */}
-        <View style={{ gap: 10, marginTop: 8 }}>
-          <SectionHeader t={t}>Recovery</SectionHeader>
-          <Card t={t} padding={14} onPress={onResetLocal}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 8,
-                  backgroundColor: t.status.delayed.bg,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Trash2 color={t.status.delayed.fg} size={18} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: t.text, fontWeight: '600', fontSize: 14 }}>Reset local data</Text>
-                <Text style={{ ...TYPE.caption, color: t.textSec, marginTop: 2 }}>
-                  Wipe offline cache and pull fresh from server. Stays signed in.
-                </Text>
-              </View>
-              <ChevronRight color={t.textTer} size={14} />
+          <Divider t={t} />
+          <View
+            style={{ paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+          >
+            <View
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                backgroundColor: t.accentSoft,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Palette color={t.accent} size={18} />
             </View>
-          </Card>
-        </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: t.text, fontWeight: '500', fontSize: 14 }}>Appearance</Text>
+              <Text style={{ ...TYPE.caption, color: t.textSec, marginTop: 2 }}>{themeLabel(themeMode)}</Text>
+            </View>
+            <ThemeSegmented t={t} mode={themeMode} setMode={setThemeMode} />
+          </View>
+          <Divider t={t} />
+          <NavRow t={t} icon={<Globe color={t.accent} size={18} />} title="Language" sub="English (US)" />
+          <Divider t={t} />
+          <NavRow
+            t={t}
+            icon={<RefreshCw color={t.accent} size={18} />}
+            title="Offline Data"
+            sub={
+              syncStatus.lastError
+                ? `Last error: ${syncStatus.lastError}`
+                : syncStatus.counts
+                  ? `${syncStatus.counts.assignments} duties · ${syncStatus.counts.pairings} pairings · ${syncStatus.counts.legs} legs${syncStatus.lastSyncMs ? ` · ${fmtSince(syncStatus.lastSyncMs)}` : ''}`
+                  : syncStatus.lastSyncMs
+                    ? `Last sync ${fmtSince(syncStatus.lastSyncMs)}`
+                    : 'Not synced yet'
+            }
+            right={
+              syncStatus.inFlight ? (
+                <ActivityIndicator color={t.accent} size="small" />
+              ) : (
+                <Pressable onPress={onSyncNow}>
+                  <Text style={{ ...TYPE.badge, color: t.accent, fontSize: 12 }}>Sync Now</Text>
+                </Pressable>
+              )
+            }
+            chevron={false}
+            last
+          />
+        </Glass>
 
-        {/* Sign out */}
-        <Pressable
-          onPress={logout}
-          style={{
-            marginTop: 8,
-            paddingVertical: 14,
-            borderRadius: 12,
-            borderWidth: 0.5,
-            borderColor: t.status.cancelled.fg + '55',
-            backgroundColor: t.card,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-          }}
-        >
-          <LogOut color={t.status.cancelled.fg} size={16} />
-          <Text style={{ color: t.status.cancelled.fg, fontWeight: '600', fontSize: 14 }}>Sign out</Text>
+        {/* Support */}
+        <Eyebrow t={t}>SUPPORT</Eyebrow>
+        <Glass tier="standard" padding={0}>
+          <NavRow t={t} icon={<LifeBuoy color={t.accent} size={18} />} title="Help & FAQ" />
+          <Divider t={t} />
+          <NavRow t={t} icon={<Shield color={t.accent} size={18} />} title="Privacy & terms" />
+          <Divider t={t} />
+          <NavRow
+            t={t}
+            icon={<FileText color={t.accent} size={18} />}
+            title="Safety Reports (FRM)"
+            sub="Submit a report"
+            last
+          />
+        </Glass>
+
+        {/* Recovery */}
+        <Glass tier="soft" padding={14} onPress={onResetLocal}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 8,
+                backgroundColor: t.status.delayed.bg,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Trash2 color={t.status.delayed.fg} size={18} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: t.text, fontWeight: '600', fontSize: 14 }}>Reset local data</Text>
+              <Text style={{ ...TYPE.caption, color: t.textSec, marginTop: 2 }}>
+                Wipe offline cache and pull fresh from server. Stays signed in.
+              </Text>
+            </View>
+            <ChevronRight color={t.textTer} size={14} />
+          </View>
+        </Glass>
+
+        {/* Sign out — outlined glass-soft, not red fill (per design / iOS 18 convention) */}
+        <Pressable onPress={logout}>
+          <Glass tier="soft" padding={0} style={{ borderColor: t.status.cancelled.fg + '55' }}>
+            <View
+              style={{
+                paddingVertical: 14,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              <LogOut color={t.status.cancelled.fg} size={16} />
+              <Text style={{ color: t.status.cancelled.fg, fontWeight: '600', fontSize: 14 }}>Sign out</Text>
+            </View>
+          </Glass>
         </Pressable>
+
+        <Text style={{ textAlign: 'center', color: t.textTer, fontSize: 12, marginTop: 4 }}>
+          SkyHub Aviation · v0.2.0
+        </Text>
       </ScrollView>
     </SafeAreaView>
+  )
+}
+
+function themeLabel(mode: ThemeMode): string {
+  if (mode === 'dark') return 'Dark'
+  if (mode === 'light') return 'Light'
+  return 'System'
+}
+
+function ThemeSegmented({ t, mode, setMode }: { t: Theme; mode: ThemeMode; setMode: (m: ThemeMode) => void }) {
+  const items: { k: ThemeMode; l: string; icon: React.ReactNode }[] = [
+    { k: 'light', l: 'Light', icon: <Sun color={mode === 'light' ? t.text : t.textSec} size={11} /> },
+    { k: 'dark', l: 'Dark', icon: <Moon color={mode === 'dark' ? t.text : t.textSec} size={11} /> },
+    { k: 'system', l: 'Auto', icon: null },
+  ]
+  return (
+    <View style={{ flexDirection: 'row', backgroundColor: t.hover, padding: 2, borderRadius: 8, gap: 4 }}>
+      {items.map((o) => {
+        const active = mode === o.k
+        return (
+          <Pressable
+            key={o.k}
+            onPress={() => setMode(o.k)}
+            style={{
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderRadius: 6,
+              backgroundColor: active ? t.page : 'transparent',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            {o.icon}
+            <Text style={{ fontSize: 11, fontWeight: '600', color: active ? t.text : t.textSec }}>{o.l}</Text>
+          </Pressable>
+        )
+      })}
+    </View>
+  )
+}
+
+function Eyebrow({ t, children }: { t: Theme; children: React.ReactNode }) {
+  return (
+    <Text
+      style={{ color: t.accent, fontSize: 11, fontWeight: '700', letterSpacing: 1.5, marginTop: 6, marginBottom: -6 }}
+    >
+      {children}
+    </Text>
   )
 }
 
@@ -360,14 +371,6 @@ function fmtSince(ms: number): string {
   return `${Math.floor(delta / 86_400_000)}d ago`
 }
 
-function Tag({ t, children }: { t: Theme; children: React.ReactNode }) {
-  return (
-    <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, backgroundColor: t.hover }}>
-      <Text style={{ ...TYPE.badge, color: t.textSec }}>{children}</Text>
-    </View>
-  )
-}
-
 function ToggleRow({
   t,
   icon,
@@ -375,7 +378,6 @@ function ToggleRow({
   sub,
   on,
   setOn,
-  flat,
 }: {
   t: Theme
   icon: React.ReactNode
@@ -383,16 +385,15 @@ function ToggleRow({
   sub: string
   on: boolean
   setOn: (v: boolean) => void
-  flat?: boolean
 }) {
-  const body = (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+  return (
+    <View style={{ paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
       <View
         style={{
-          width: 34,
-          height: 34,
+          width: 32,
+          height: 32,
           borderRadius: 8,
-          backgroundColor: on ? t.accent + '22' : t.hover,
+          backgroundColor: on ? t.accentSoft : t.hover,
           alignItems: 'center',
           justifyContent: 'center',
         }}
@@ -400,19 +401,11 @@ function ToggleRow({
         {icon}
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ color: t.text, fontWeight: '600', fontSize: 13 }}>{title}</Text>
+        <Text style={{ color: t.text, fontWeight: '500', fontSize: 14 }}>{title}</Text>
         <Text style={{ ...TYPE.caption, color: t.textSec, marginTop: 2 }}>{sub}</Text>
       </View>
       <Switch value={on} onValueChange={setOn} trackColor={{ false: t.hover, true: t.accent }} thumbColor="#fff" />
     </View>
-  )
-  if (flat) {
-    return <View style={{ paddingHorizontal: 14, paddingVertical: 12 }}>{body}</View>
-  }
-  return (
-    <Card t={t} padding={12} onPress={() => setOn(!on)}>
-      {body}
-    </Card>
   )
 }
 
@@ -445,7 +438,6 @@ function NavRow({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        borderBottomWidth: 0,
       }}
     >
       <View
@@ -453,7 +445,7 @@ function NavRow({
           width: 32,
           height: 32,
           borderRadius: 8,
-          backgroundColor: t.hover,
+          backgroundColor: t.accentSoft,
           alignItems: 'center',
           justifyContent: 'center',
         }}
@@ -480,5 +472,5 @@ function NavRow({
 }
 
 function Divider({ t }: { t: Theme }) {
-  return <View style={{ height: 0.5, backgroundColor: t.border, marginLeft: 58 }} />
+  return <View style={{ height: 1, backgroundColor: t.border, marginLeft: 58 }} />
 }

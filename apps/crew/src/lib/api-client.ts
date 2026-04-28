@@ -227,6 +227,13 @@ export interface ActivityCodeMeta {
   flags: string[]
 }
 
+export interface TopRoute {
+  depIcao: string
+  arrIcao: string
+  sectors: number
+  blockMinutes: number
+}
+
 export const crewApi = {
   listOperators: () => request<{ operators: OperatorOption[] }>('/crew-app/auth/operators', { auth: false }),
 
@@ -247,6 +254,9 @@ export const crewApi = {
     if (atIso) qs.set('atIso', atIso)
     return request<CrewStats>(`/crew-app/me/stats?${qs.toString()}`)
   },
+
+  topRoutes: (period: StatsPeriod) =>
+    request<{ routes: TopRoute[] }>(`/crew-app/me/stats/routes?period=${encodeURIComponent(period)}`),
 
   pairingCrew: (pairingId: string) =>
     request<{ pairingId: string; crew: PairingCrewMember[] }>(

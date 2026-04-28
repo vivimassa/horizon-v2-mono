@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { ScrollView, Text, View, Pressable, ActivityIndicator } from 'react-native'
+import { ActivityIndicator, Dimensions, Pressable, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Bed, FileText } from 'lucide-react-native'
-import { Card, FieldLabel, ProgressBar, SectionHeader } from '../../src/components/primitives'
+import { Bed, FileText, Moon, TrendingDown, TrendingUp } from 'lucide-react-native'
+import { AreaChart, FieldLabel, Glass, ProgressBar, SectionHeader, Sparkline } from '../../src/components/primitives'
 import { useTheme } from '../../src/theme/use-theme'
 import type { Theme } from '../../src/theme/tokens'
 import { TYPE } from '../../src/theme/tokens'
 import { useStats } from '../../src/data/use-stats'
 import { useFdtl } from '../../src/data/use-fdtl'
+import { useTopRoutes } from '../../src/data/use-top-routes'
 import { fmtBlock, fmtTime } from '../../src/data/format'
 import type { StatsPeriod } from '../../src/lib/api-client'
 
@@ -22,14 +23,21 @@ export default function StatsTab() {
   const [period, setPeriod] = useState<StatsPeriod>('month')
   const statsQ = useStats(period)
   const fdtlQ = useFdtl()
+  const topRoutesQ = useTopRoutes(period)
 
   const stats = statsQ.data
   const fdtl = fdtlQ.data
+  const screenW = Dimensions.get('window').width
+
+  const weeklyValues = stats?.weekly.map((w) => w.blockMinutes / 60) ?? []
+  const blockH = (stats?.blockMinutes ?? 0) / 60
+  const blockTrendDelta = (stats?.trends.blockDeltaMinutes ?? 0) / 60
+  const blockTrendPct = blockH > 0 ? Math.round((blockTrendDelta / blockH) * 100) : 0
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 16 }}
         showsVerticalScrollIndicator={false}
       >
         <View>
@@ -43,10 +51,10 @@ export default function StatsTab() {
         <View
           style={{
             flexDirection: 'row',
-            backgroundColor: t.card,
-            borderWidth: 0.5,
+            backgroundColor: t.hover,
+            borderWidth: 1,
             borderColor: t.cardBorder,
-            borderRadius: 10,
+            borderRadius: 12,
             padding: 3,
             gap: 2,
           }}
@@ -57,30 +65,111 @@ export default function StatsTab() {
               onPress={() => setPeriod(p.id)}
               style={{
                 flex: 1,
-                paddingVertical: 7,
-                borderRadius: 8,
-                backgroundColor: period === p.id ? t.page : 'transparent',
-                borderWidth: period === p.id ? 0.5 : 0,
-                borderColor: t.cardBorder,
+                paddingVertical: 8,
+                borderRadius: 9,
+                backgroundColor: period === p.id ? t.accent : 'transparent',
                 alignItems: 'center',
               }}
             >
-              <Text style={{ fontSize: 13, fontWeight: '600', color: period === p.id ? t.text : t.textSec }}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: period === p.id ? '#fff' : t.textSec }}>
                 {p.label}
               </Text>
             </Pressable>
           ))}
         </View>
 
-        {/* FDTL */}
-        <View style={{ gap: 10 }}>
+        {/* Hero block hours tile */}
+        <Glass tier="hero" padding={16}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+            <View>
+              <Text style={{ color: t.accent, fontSize: 11, fontWeight: '700', letterSpacing: 1.5 }}>BLOCK HOURS</Text>
+              <Text style={{ color: t.text, fontSize: 28, fontWeight: '700', letterSpacing: -0.6, marginTop: 4 }}>
+                {fmtBlock(stats?.blockMinutes ?? 0)}
+              </Text>
+              {blockTrendDelta !== 0 && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                  {blockTrendDelta > 0 ? (
+                    <TrendingUp color={t.status.ontime.fg} size={14} />
+                  ) : (
+                    <TrendingDown color={t.status.cancelled.fg} size={14} />
+                  )}
+                  <Text
+                    style={{
+                      color: blockTrendDelta > 0 ? t.status.ontime.fg : t.status.cancelled.fg,
+                      fontSize: 13,
+                    }}
+                  >
+                    {blockTrendDelta > 0 ? '+' : ''}
+                    {blockTrendPct}% vs last
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <FieldLabel t={t}>Limit</FieldLabel>
+              <Text style={{ color: t.text, fontSize: 14, fontWeight: '600', marginTop: 2 }}>100h</Text>
+            </View>
+          </View>
+          {weeklyValues.length > 1 && (
+            <View style={{ marginTop: 14 }}>
+              <AreaChart values={weeklyValues} color={t.accent} width={screenW - 64} height={90} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+                {(stats?.weekly ?? []).map((w) => (
+                  <Text
+                    key={w.weekLabel}
+                    style={{ fontSize: 11, color: t.textSec, letterSpacing: 1, fontWeight: '500' }}
+                  >
+                    {w.weekLabel}
+                  </Text>
+                ))}
+              </View>
+            </View>
+          )}
+        </Glass>
+
+        {/* Mini stat tiles */}
+        {stats && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <StatTile
+              t={t}
+              label="Duty Hrs"
+              value={fmtBlock(stats.dutyMinutes)}
+              sub={`${Math.round((stats.dutyMinutes / 60 / 100) * 100)}% of 100h`}
+              spark={weeklyValues}
+            />
+            <StatTile
+              t={t}
+              label="Sectors"
+              value={String(stats.sectors)}
+              sub={stats.trends.sectorsDelta > 0 ? `+${stats.trends.sectorsDelta} vs last` : 'no change'}
+              spark={weeklyValues.map((v) => Math.max(1, Math.round(v / 4)))}
+            />
+            <StatTile
+              t={t}
+              label="Night duty"
+              value={String(stats.nightDuties)}
+              sub="this period"
+              icon={<Moon color={t.duty.rest} size={14} />}
+            />
+            <StatTile
+              t={t}
+              label="Days off"
+              value={String(stats.daysOff)}
+              sub="this period"
+              icon={<Bed color={t.duty.training} size={14} />}
+            />
+          </View>
+        )}
+
+        {/* FDTL Compliance */}
+        <View style={{ gap: 12 }}>
           <SectionHeader t={t}>FDTL Compliance</SectionHeader>
           {fdtlQ.isLoading ? (
-            <Card t={t} padding={20}>
+            <Glass tier="standard" padding={20}>
               <ActivityIndicator color={t.accent} />
-            </Card>
+            </Glass>
           ) : fdtl ? (
-            <>
+            <View style={{ gap: 8 }}>
               <FdtlBar t={t} title="Today's FDP" usedMin={fdtl.fdpUsedMinutes} limitMin={fdtl.fdpLimitMinutes} />
               <FdtlBar
                 t={t}
@@ -94,8 +183,7 @@ export default function StatsTab() {
                 usedMin={fdtl.duty28DayMinutes}
                 limitMin={fdtl.duty28DayLimitMinutes}
               />
-
-              <Card t={t} padding={14}>
+              <Glass tier="standard" padding={14}>
                 <FieldLabel t={t}>Rest Requirement</FieldLabel>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
                   <View
@@ -122,94 +210,53 @@ export default function StatsTab() {
                   <RestRow t={t} k="Rest ends" v={fdtl.restEndUtcMs ? fmtTime(fdtl.restEndUtcMs) : '—'} />
                   <RestRow t={t} k="Next report" v={fdtl.nextReportUtcMs ? fmtTime(fdtl.nextReportUtcMs) : '—'} />
                 </View>
-              </Card>
-            </>
-          ) : (
-            <Card t={t} padding={20}>
-              <Text style={{ ...TYPE.caption, color: t.textSec, textAlign: 'center' }}>FDTL unavailable</Text>
-            </Card>
-          )}
-        </View>
-
-        {/* Stats grid */}
-        <View style={{ gap: 10 }}>
-          <SectionHeader t={t}>
-            This {period === 'month' ? 'Month' : period === '28d' ? '28 Days' : 'Year'}
-          </SectionHeader>
-          {statsQ.isLoading ? (
-            <Card t={t} padding={20}>
-              <ActivityIndicator color={t.accent} />
-            </Card>
-          ) : stats && stats.blockMinutes === 0 && stats.dutyMinutes === 0 ? (
-            <Card t={t} padding={20}>
-              <Text style={{ ...TYPE.caption, color: t.textSec, textAlign: 'center' }}>
-                No completed duty in this period yet.
-              </Text>
-            </Card>
-          ) : stats ? (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-              <StatCell
-                t={t}
-                label="Block"
-                value={fmtBlock(stats.blockMinutes)}
-                trend={fmtTrend(stats.trends.blockDeltaMinutes)}
-              />
-              <StatCell
-                t={t}
-                label="Duty"
-                value={fmtBlock(stats.dutyMinutes)}
-                trend={fmtTrend(stats.trends.dutyDeltaMinutes)}
-              />
-              <StatCell
-                t={t}
-                label="Sectors"
-                value={String(stats.sectors)}
-                trend={fmtTrendPlain(stats.trends.sectorsDelta)}
-              />
-              <StatCell t={t} label="Night Duties" value={String(stats.nightDuties)} />
-              <StatCell t={t} label="Days Off" value={String(stats.daysOff)} />
-              <StatCell t={t} label="Avg Block/Day" value={fmtBlock(stats.avgBlockMinutesPerDay)} />
+              </Glass>
             </View>
           ) : (
-            <Card t={t} padding={20}>
-              <Text style={{ ...TYPE.caption, color: t.textSec, textAlign: 'center' }}>Stats unavailable</Text>
-            </Card>
+            <Glass tier="standard" padding={20}>
+              <Text style={{ ...TYPE.caption, color: t.textSec, textAlign: 'center' }}>FDTL unavailable</Text>
+            </Glass>
           )}
         </View>
 
-        {/* Weekly chart */}
-        {stats && stats.weekly.length > 0 && (
-          <View style={{ gap: 10 }}>
-            <SectionHeader t={t}>Block by Week</SectionHeader>
-            <Card t={t} padding={14}>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 12, height: 130 }}>
-                {stats.weekly.map((w) => {
-                  const maxMin = Math.max(1, ...stats.weekly.map((x) => x.blockMinutes))
-                  const h = (w.blockMinutes / maxMin) * 90
-                  return (
-                    <View
-                      key={w.weekLabel}
-                      style={{ flex: 1, alignItems: 'center', gap: 6, height: '100%', justifyContent: 'flex-end' }}
-                    >
-                      <Text style={{ ...TYPE.caption, color: t.text, fontWeight: '600', fontSize: 11 }}>
-                        {fmtBlock(w.blockMinutes)}
+        {/* Top Routes */}
+        {topRoutesQ.data && topRoutesQ.data.routes.length > 0 && (
+          <View style={{ gap: 12 }}>
+            <SectionHeader t={t}>Top Routes</SectionHeader>
+            <Glass tier="standard" padding={14}>
+              {topRoutesQ.data.routes.map((r, i, arr) => {
+                const max = Math.max(...arr.map((x) => x.sectors))
+                const pct = (r.sectors / max) * 100
+                return (
+                  <View key={`${r.depIcao}-${r.arrIcao}`} style={{ marginBottom: i === arr.length - 1 ? 0 : 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                      <Text style={{ color: t.text, fontSize: 14, fontWeight: '600' }}>
+                        {r.depIcao} ⇄ {r.arrIcao}
                       </Text>
-                      <View
-                        style={{ width: '70%', height: Math.max(2, h), backgroundColor: t.accent, borderRadius: 4 }}
-                      />
-                      <Text style={{ ...TYPE.badge, fontWeight: '500', fontSize: 11, color: t.textSec }}>
-                        {w.weekLabel}
+                      <Text style={{ ...TYPE.caption, color: t.textSec }}>
+                        {r.sectors} sector{r.sectors === 1 ? '' : 's'}
                       </Text>
                     </View>
-                  )
-                })}
-              </View>
-            </Card>
+                    <View
+                      style={{
+                        height: 6,
+                        borderRadius: 3,
+                        marginTop: 6,
+                        backgroundColor: t.hover,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <View style={{ width: `${pct}%`, height: 6, backgroundColor: t.accent }} />
+                    </View>
+                  </View>
+                )
+              })}
+            </Glass>
           </View>
         )}
 
-        {/* Notice */}
-        <Card t={t} padding={12} style={{ backgroundColor: t.accentSoft, borderColor: t.accent + '33' }}>
+        {/* CAAV notice */}
+        <Glass tier="soft" padding={12} style={{ borderColor: t.accent + '33' }}>
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <View style={{ marginTop: 2 }}>
               <FileText color={t.accent} size={16} />
@@ -221,21 +268,44 @@ export default function StatsTab() {
               </Text>
             </View>
           </View>
-        </Card>
+        </Glass>
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-function fmtTrend(deltaMin: number): string | undefined {
-  if (deltaMin === 0) return undefined
-  const sign = deltaMin > 0 ? '+' : '−'
-  return `${sign}${fmtBlock(Math.abs(deltaMin))}`
-}
-
-function fmtTrendPlain(delta: number): string | undefined {
-  if (delta === 0) return undefined
-  return delta > 0 ? `+${delta}` : `−${Math.abs(delta)}`
+function StatTile({
+  t,
+  label,
+  value,
+  sub,
+  spark,
+  icon,
+}: {
+  t: Theme
+  label: string
+  value: string
+  sub: string
+  spark?: number[]
+  icon?: React.ReactNode
+}) {
+  return (
+    <View style={{ width: '48.5%' }}>
+      <Glass tier="standard" padding={14}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <FieldLabel t={t} style={{ fontSize: 11 }}>
+            {label}
+          </FieldLabel>
+          {spark && <Sparkline values={spark} color={t.accent} />}
+          {icon}
+        </View>
+        <Text style={{ color: t.text, fontSize: 22, fontWeight: '700', letterSpacing: -0.5, marginTop: 4 }}>
+          {value}
+        </Text>
+        <Text style={{ ...TYPE.caption, color: t.textSec, marginTop: 2, fontSize: 12 }}>{sub}</Text>
+      </Glass>
+    </View>
+  )
 }
 
 function FdtlBar({ t, title, usedMin, limitMin }: { t: Theme; title: string; usedMin: number; limitMin: number }) {
@@ -244,7 +314,7 @@ function FdtlBar({ t, title, usedMin, limitMin }: { t: Theme; title: string; use
   if (pct >= 80) color = t.status.delayed.fg
   if (pct >= 95) color = t.status.cancelled.fg
   return (
-    <Card t={t} padding={14}>
+    <Glass tier="standard" padding={14}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
         <FieldLabel t={t}>{title}</FieldLabel>
         <View style={{ flexDirection: 'row', gap: 4, alignItems: 'baseline' }}>
@@ -257,35 +327,7 @@ function FdtlBar({ t, title, usedMin, limitMin }: { t: Theme; title: string; use
         <Text style={{ ...TYPE.caption, color: t.textTer }}>{Math.round(pct)}% used</Text>
         <Text style={{ ...TYPE.caption, color: t.textTer }}>{fmtBlock(Math.max(0, limitMin - usedMin))} remaining</Text>
       </View>
-    </Card>
-  )
-}
-
-function StatCell({ t, label, value, trend }: { t: Theme; label: string; value: string; trend?: string }) {
-  const up = trend?.startsWith('+')
-  const down = trend?.startsWith('−') || trend?.startsWith('-')
-  return (
-    <View style={{ width: '50%', padding: 5 }}>
-      <Card t={t} padding={12}>
-        <FieldLabel t={t} style={{ fontSize: 11 }}>
-          {label}
-        </FieldLabel>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 6 }}>
-          <Text style={{ color: t.text, fontWeight: '700', fontSize: 22, letterSpacing: -0.5 }}>{value}</Text>
-          {trend && (
-            <Text
-              style={{
-                ...TYPE.badge,
-                fontSize: 11,
-                color: up ? t.status.ontime.fg : down ? t.status.cancelled.fg : t.textSec,
-              }}
-            >
-              {trend}
-            </Text>
-          )}
-        </View>
-      </Card>
-    </View>
+    </Glass>
   )
 }
 

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { ChevronLeft } from 'lucide-react-native'
 import type { CrewActivityRecord } from '@skyhub/crew-db'
-import { Card, FieldLabel } from '../../src/components/primitives'
+import { FieldLabel, Glass } from '../../src/components/primitives'
 import { useTheme } from '../../src/theme/use-theme'
 import { TYPE } from '../../src/theme/tokens'
 import { useDatabase } from '../../src/providers/DatabaseProvider'
@@ -57,13 +57,13 @@ export default function ActivityDetail() {
         </Pressable>
 
         {loading || !activity ? (
-          <Card t={t} padding={20}>
+          <Glass tier="hero" padding={20}>
             <ActivityIndicator color={t.accent} />
-          </Card>
+          </Glass>
         ) : (
           <>
             {/* Hero */}
-            <Card t={t} padding={18}>
+            <Glass tier="hero" padding={18}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
                 <View
                   style={{
@@ -86,10 +86,10 @@ export default function ActivityDetail() {
                   </Text>
                 </View>
               </View>
-            </Card>
+            </Glass>
 
             {/* Times */}
-            <Card t={t} padding={14}>
+            <Glass tier="standard" padding={14}>
               <FieldLabel t={t}>Time</FieldLabel>
               <View style={{ marginTop: 10, gap: 8 }}>
                 <KV t={t} k="From" v={`${new Date(activity.startUtcMs).toLocaleString()}`} />
@@ -98,17 +98,17 @@ export default function ActivityDetail() {
                 <KV t={t} k="End" v={fmtTime(activity.endUtcMs)} />
                 <KV t={t} k="Duration" v={fmtBlock(durationMin)} />
               </View>
-            </Card>
+            </Glass>
 
             {/* Base + notes */}
-            <Card t={t} padding={14}>
+            <Glass tier="standard" padding={14}>
               <FieldLabel t={t}>Where</FieldLabel>
               <View style={{ marginTop: 10, gap: 8 }}>
                 <KV t={t} k="Base" v={profile?.base ?? '—'} />
                 {meta?.flags && meta.flags.length > 0 && <KV t={t} k="Flags" v={meta.flags.join(', ')} />}
                 {activity.notes && <KV t={t} k="Notes" v={activity.notes} />}
               </View>
-            </Card>
+            </Glass>
           </>
         )}
       </ScrollView>

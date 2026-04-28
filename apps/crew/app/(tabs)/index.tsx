@@ -3,7 +3,7 @@ import { Dimensions, FlatList, Pressable, RefreshControl, ScrollView, Text, View
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { Bell, Briefcase, Check, Coffee, Users } from 'lucide-react-native'
-import { Card, Chip, DutyDot, FieldLabel, MiniKV, Ring, Route, SectionHeader } from '../../src/components/primitives'
+import { Chip, DutyDot, FieldLabel, Glass, MiniKV, Ring, Route, SectionHeader } from '../../src/components/primitives'
 import { useTheme } from '../../src/theme/use-theme'
 import { TYPE } from '../../src/theme/tokens'
 import type { Theme } from '../../src/theme/tokens'
@@ -44,7 +44,7 @@ export default function HomeTab() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 18 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}
         showsVerticalScrollIndicator={false}
       >
@@ -64,20 +64,11 @@ export default function HomeTab() {
           </View>
 
           <Pressable onPress={() => router.push('/(tabs)/messages')} hitSlop={6}>
-            <View
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 40,
-                backgroundColor: t.card,
-                borderWidth: 0.5,
-                borderColor: t.cardBorder,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Bell color={t.text} size={18} />
-            </View>
+            <Glass tier="soft" padding={0} style={{ width: 40, height: 40, borderRadius: 40 }}>
+              <View style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+                <Bell color={t.text} size={18} />
+              </View>
+            </Glass>
             {data.unreadMessages > 0 && (
               <View
                 style={{
@@ -110,7 +101,7 @@ export default function HomeTab() {
           </Text>
         </View>
 
-        {/* Next Duty — sector pager */}
+        {/* Next Duty hero */}
         {next && next.legs.length > 0 ? (
           <NextDutyCard
             t={t}
@@ -121,30 +112,22 @@ export default function HomeTab() {
             onPress={() => router.push(`/duty/${next.assignment.id}`)}
           />
         ) : (
-          <Card t={t} padding={20}>
+          <Glass tier="hero" padding={20}>
             <View style={{ alignItems: 'center' }}>
               <Text style={{ ...TYPE.cardTitle, color: t.text, fontWeight: '600' }}>All clear</Text>
               <Text style={{ ...TYPE.caption, color: t.textSec, marginTop: 6 }}>
                 No duty scheduled in the next 7 days
               </Text>
             </View>
-          </Card>
-        )}
-
-        {/* Today's Route — sector by sector + ground time */}
-        {data.todaysLegs.length > 0 && (
-          <View style={{ gap: 10 }}>
-            <SectionHeader t={t}>Today's Route</SectionHeader>
-            <TodayRouteList t={t} legs={data.todaysLegs} />
-          </View>
+          </Glass>
         )}
 
         {/* Duty Limits */}
-        <View style={{ gap: 10 }}>
+        <View style={{ gap: 12 }}>
           <SectionHeader t={t} action="Stats →">
             Duty Limits
           </SectionHeader>
-          <Card t={t} padding={14}>
+          <Glass tier="standard" padding={14}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
               <Ring
                 t={t}
@@ -183,11 +166,11 @@ export default function HomeTab() {
                 </Text>
               </View>
             </View>
-          </Card>
+          </Glass>
         </View>
 
         {/* Quick Actions */}
-        <View style={{ gap: 10 }}>
+        <View style={{ gap: 12 }}>
           <SectionHeader t={t}>Quick Actions</SectionHeader>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
             <QuickAction
@@ -204,17 +187,17 @@ export default function HomeTab() {
         </View>
 
         {/* Notifications */}
-        <View style={{ gap: 10 }}>
+        <View style={{ gap: 12 }}>
           <SectionHeader t={t} action="See all →">
             Notifications
           </SectionHeader>
           {data.recentMessages.length === 0 && (
-            <Card t={t} padding={20}>
+            <Glass tier="soft" padding={20}>
               <Text style={{ ...TYPE.caption, color: t.textSec, textAlign: 'center' }}>No notifications</Text>
-            </Card>
+            </Glass>
           )}
           {data.recentMessages.slice(0, 2).map((m) => (
-            <Card key={m.id} t={t} padding={12} onPress={() => router.push(`/message/${m.id}`)}>
+            <Glass key={m.id} tier="soft" padding={12} onPress={() => router.push(`/message/${m.id}`)}>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <View
                   style={{
@@ -237,7 +220,7 @@ export default function HomeTab() {
                   </Text>
                 </View>
               </View>
-            </Card>
+            </Glass>
           ))}
         </View>
       </ScrollView>
@@ -245,10 +228,6 @@ export default function HomeTab() {
   )
 }
 
-/**
- * Next Duty card with horizontal sector pager. Each page = one leg of the
- * pairing. Swipe left/right to cycle. Tap → flight duty detail.
- */
 function NextDutyCard({
   t,
   pairingCode,
@@ -267,10 +246,10 @@ function NextDutyCard({
   const [pageIdx, setPageIdx] = useState(0)
   const listRef = useRef<FlatList<PairingLegRecord>>(null)
   const screenWidth = Dimensions.get('window').width
-  const cardWidth = screenWidth - 32 // matches outer 16px padding both sides
+  const cardWidth = screenWidth - 32
 
   return (
-    <Card t={t} padding={0}>
+    <Glass tier="hero" padding={0}>
       {/* Header */}
       <View
         style={{
@@ -279,7 +258,7 @@ function NextDutyCard({
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottomWidth: 0.5,
+          borderBottomWidth: 1,
           borderBottomColor: t.border,
         }}
       >
@@ -363,7 +342,7 @@ function NextDutyCard({
         </View>
       )}
 
-      {/* Footer strip */}
+      {/* Footer */}
       <View
         style={{
           paddingHorizontal: 14,
@@ -371,7 +350,7 @@ function NextDutyCard({
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderTopWidth: 0.5,
+          borderTopWidth: 1,
           borderTopColor: t.border,
           backgroundColor: t.overlay,
         }}
@@ -389,71 +368,7 @@ function NextDutyCard({
           <Text style={{ ...TYPE.caption, color: t.textSec }}>2P + 4C</Text>
         </View>
       </View>
-    </Card>
-  )
-}
-
-/**
- * Today's Route — vertical list of sector rows with "Ground Xh Ym" chip
- * between adjacent legs (turnaround at the layover airport).
- */
-function TodayRouteList({ t, legs }: { t: Theme; legs: PairingLegRecord[] }) {
-  return (
-    <View style={{ gap: 8 }}>
-      {legs.map((leg, i) => (
-        <View key={leg.id}>
-          <Card t={t} padding={14}>
-            <Route
-              t={t}
-              dep={leg.depStation}
-              arr={leg.arrStation}
-              depTime={fmtTime(leg.stdUtcMs)}
-              arrTime={fmtTime(leg.staUtcMs)}
-              accent={t.duty.flight}
-              big={false}
-            />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
-              <Text style={{ ...TYPE.caption, color: t.textSec }}>
-                <Text style={{ color: t.text, fontWeight: '600' }}>{leg.flightNumber}</Text>
-                {' · '}
-                {leg.aircraftTypeIcao ?? '—'}
-                {' · '}
-                {leg.tailNumber ?? '—'}
-              </Text>
-              <Text style={{ ...TYPE.caption, color: t.text, fontWeight: '600' }}>{fmtBlock(leg.blockMinutes)}</Text>
-            </View>
-          </Card>
-          {i < legs.length - 1 && (
-            <GroundChip t={t} fromMs={leg.staUtcMs} toMs={legs[i + 1].stdUtcMs} airport={leg.arrStation} />
-          )}
-        </View>
-      ))}
-    </View>
-  )
-}
-
-function GroundChip({ t, fromMs, toMs, airport }: { t: Theme; fromMs: number; toMs: number; airport: string }) {
-  const minutes = Math.max(0, Math.round((toMs - fromMs) / 60_000))
-  return (
-    <View style={{ alignItems: 'center', paddingVertical: 6 }}>
-      <View
-        style={{
-          paddingHorizontal: 10,
-          paddingVertical: 4,
-          borderRadius: 12,
-          backgroundColor: t.hover,
-          borderWidth: 0.5,
-          borderColor: t.cardBorder,
-          flexDirection: 'row',
-          gap: 6,
-          alignItems: 'center',
-        }}
-      >
-        <Text style={{ ...TYPE.badge, color: t.textSec }}>GROUND</Text>
-        <Text style={{ ...TYPE.caption, color: t.text, fontWeight: '600' }}>{fmtBlock(minutes)}</Text>
-        <Text style={{ ...TYPE.caption, color: t.textSec }}>at {airport}</Text>
-      </View>
-    </View>
+    </Glass>
   )
 }
 
@@ -471,35 +386,34 @@ function QuickAction({
   highlight?: boolean
 }) {
   return (
-    <View
+    <Glass
+      tier="soft"
+      padding={12}
       style={{
         flexBasis: '48%',
         flexGrow: 1,
-        backgroundColor: t.card,
-        borderWidth: 0.5,
-        borderColor: highlight ? t.accent : t.cardBorder,
-        borderRadius: 12,
-        padding: 12,
-        gap: 8,
         minHeight: 88,
+        borderColor: highlight ? t.accent : undefined,
       }}
     >
-      <View
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: 36,
-          backgroundColor: highlight ? t.accent : t.hover,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {icon}
+      <View style={{ gap: 8 }}>
+        <View
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 36,
+            backgroundColor: highlight ? t.accent : t.hover,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {icon}
+        </View>
+        <View>
+          <Text style={{ color: t.text, fontSize: 13, fontWeight: '600' }}>{title}</Text>
+          <Text style={{ color: t.textSec, fontSize: 11, marginTop: 2 }}>{sub}</Text>
+        </View>
       </View>
-      <View>
-        <Text style={{ color: t.text, fontSize: 13, fontWeight: '600' }}>{title}</Text>
-        <Text style={{ color: t.textSec, fontSize: 11, marginTop: 2 }}>{sub}</Text>
-      </View>
-    </View>
+    </Glass>
   )
 }

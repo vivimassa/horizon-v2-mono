@@ -1,9 +1,7 @@
 import { HORIZON, type Theme } from './tokens'
+import { useScheme } from '../stores/use-theme-store'
 
-/**
- * Resolved theme accessor. Phase A forces dark; Phase B will read from a
- * Zustand store wired to the user's "Appearance" preference in More.
- */
 export function useTheme(): Theme {
-  return HORIZON.dark
+  const scheme = useScheme()
+  return HORIZON[scheme]
 }

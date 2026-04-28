@@ -12,6 +12,7 @@ import { promptBiometric } from '../src/lib/biometric-gate'
 import { crewApi } from '../src/lib/api-client'
 import { registerForPush } from '../src/lib/push-register'
 import { useCrewAuthStore } from '../src/stores/use-crew-auth-store'
+import { useThemeStore } from '../src/stores/use-theme-store'
 import { syncCrewData } from '../src/sync/sync-trigger'
 
 const queryClient = new QueryClient({
@@ -47,7 +48,7 @@ function AuthGate() {
     bootstrapped.current = true
 
     void (async () => {
-      await hydrateSecureStorage()
+      await Promise.all([hydrateSecureStorage(), useThemeStore.getState().hydrate()])
       const refresh = secureTokenStorage.getRefreshToken()
       if (!refresh) {
         useCrewAuthStore.getState().setLoading(false)

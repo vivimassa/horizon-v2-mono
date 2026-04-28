@@ -1,5 +1,8 @@
 export { Card } from './Card'
 export { Chip, type ChipKind } from './Chip'
+export { Glass, type GlassTier } from './Glass'
+export { Sparkline } from './Sparkline'
+export { AreaChart } from './AreaChart'
 export { Route } from './Route'
 export { Ring } from './Ring'
 export { ProgressBar } from './ProgressBar'

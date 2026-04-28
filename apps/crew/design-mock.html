@@ -1,0 +1,1718 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SkyHub Crew — Design Mock</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  :root {
+    /* Tokens — mirrors apps/crew/src/theme/tokens.ts (dark) */
+    --page: #1a1a1a;
+    --card: #252525;
+    --hover: #303030;
+    --text: #f0f0f0;
+    --textSec: #777777;
+    --textTer: #555555;
+    --border: rgba(255,255,255,0.10);
+    --cardBorder: rgba(255,255,255,0.10);
+    --accent: #60a5fa;
+    --accentSoft: rgba(96,165,250,0.15);
+    --duty-flight: #60a5fa;
+    --duty-standby: #fbbf24;
+    --duty-rest: #a78bfa;
+    --duty-training: #4ade80;
+    --duty-ground: #94a3b8;
+    --status-ontime-fg: #4ade80;
+    --status-delayed-fg: #fbbf24;
+    --status-cancelled-fg: #f87171;
+  }
+  body {
+    background: #0b0b14;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #fff;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Phone frame — iPhone 14 Pro proportions: 390 × 844 */
+  .phone {
+    width: 390px;
+    height: 844px;
+    border-radius: 48px;
+    background: #000;
+    padding: 12px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06);
+    flex-shrink: 0;
+  }
+  .phone-screen {
+    width: 100%;
+    height: 100%;
+    border-radius: 36px;
+    overflow: hidden;
+    position: relative;
+    background: var(--page);
+  }
+  .notch {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    width: 110px; height: 28px; border-radius: 18px; background: #000; z-index: 50;
+  }
+  .scroll {
+    height: 100%;
+    overflow-y: auto;
+    padding-bottom: 90px;
+  }
+  .scroll::-webkit-scrollbar { width: 0; }
+
+  /* === STYLE A: current "solid card" === */
+  .card-solid {
+    background: var(--card);
+    border: 0.5px solid var(--cardBorder);
+    border-radius: 12px;
+  }
+
+  /* === STYLE B: VisionOS-style glass === */
+  .glass-bg-scrim {
+    /* heavier scrim over wallpaper for contrast */
+    background: linear-gradient(180deg, rgba(8,8,16,0.55) 0%, rgba(8,8,16,0.85) 100%);
+    position: absolute; inset: 0;
+  }
+  .card-glass {
+    position: relative;
+    background: rgba(20,20,30,0.45);
+    backdrop-filter: blur(28px) saturate(140%);
+    -webkit-backdrop-filter: blur(28px) saturate(140%);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 16px;
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,0.06) inset,   /* top hairline highlight */
+      0 -1px 0 0 rgba(0,0,0,0.4) inset,         /* bottom subtle dark */
+      0 8px 24px rgba(0,0,0,0.35);
+  }
+  .card-glass-strong {
+    background: rgba(28,28,40,0.55);
+    backdrop-filter: blur(40px) saturate(160%);
+    -webkit-backdrop-filter: blur(40px) saturate(160%);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 18px;
+    box-shadow:
+      0 1px 0 0 rgba(255,255,255,0.10) inset,
+      0 12px 36px rgba(0,0,0,0.45);
+  }
+
+  /* Wallpaper */
+  .wall-base {
+    position: absolute; inset: 0;
+    background-image: url('https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=900');
+    background-size: cover;
+    background-position: center;
+  }
+  .wall-blur { filter: blur(8px) saturate(80%) brightness(0.45); transform: scale(1.05); }
+
+  /* Tab bar */
+  .tabbar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 88px;
+    background: rgba(15,15,20,0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 0.5px solid rgba(255,255,255,0.08);
+    display: flex; align-items: flex-start; justify-content: space-around;
+    padding: 8px 4px 28px;
+    z-index: 40;
+  }
+  .tabbar.glass {
+    background: rgba(15,15,20,0.55);
+    border-top: 1px solid rgba(255,255,255,0.10);
+  }
+  .tab {
+    flex: 1;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    color: var(--textSec); font-size: 10px; font-weight: 500;
+    padding-top: 6px;
+  }
+  .tab.active { color: var(--accent); }
+  .tab.active .icon { background: rgba(96,165,250,0.15); border-radius: 8px; padding: 4px; }
+
+  /* Buttons */
+  .btn-primary {
+    background: #1e40af;
+    color: #fff;
+    height: 46px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 14px;
+    width: 100%;
+    box-shadow: 0 4px 16px rgba(30,64,175,0.45);
+  }
+
+  /* Misc */
+  .field-label {
+    color: rgba(255,255,255,0.45);
+    font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  }
+  .ground-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--hover); border: 0.5px solid var(--cardBorder);
+    border-radius: 12px; padding: 4px 10px;
+    font-size: 13px;
+  }
+  .duty-dot { display: inline-block; border-radius: 50%; }
+
+  .section-bar {
+    width: 3px; height: 16px; border-radius: 2px; background: var(--accent);
+    display: inline-block; margin-right: 8px;
+  }
+
+  /* Route line w/ plane glyph above */
+  .route-line {
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 0 6px;
+  }
+  .route-line .connector {
+    position: absolute; left: 22%; right: 22%; top: 50%;
+    height: 1px; background: var(--duty-flight); opacity: 0.6;
+  }
+  .route-line .connector.dotted {
+    background-image: linear-gradient(to right, var(--duty-flight) 0, var(--duty-flight) 4px, transparent 4px, transparent 8px);
+    background-size: 8px 1px; background-repeat: repeat-x; background-color: transparent;
+  }
+  .plane-glyph {
+    position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+    color: var(--duty-flight);
+  }
+
+  /* Flight card chip */
+  .chip { font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 600; }
+  .chip-scheduled { background: var(--hover); color: #999; }
+  .chip-ontime { background: rgba(22,163,74,0.15); color: var(--status-ontime-fg); }
+
+  /* Section heading row */
+  .row-section { display: flex; align-items: center; justify-content: space-between; }
+
+  /* Stats card big number */
+  .stat-big { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; color: var(--text); }
+
+  /* Calendar */
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-cell {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+    padding: 4px;
+    border: 0.5px solid transparent;
+  }
+  .cal-cell.today .num { background: var(--accent); color: #fff; }
+  .cal-cell .num {
+    width: 24px; height: 24px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 500; color: var(--text);
+  }
+  .cal-cell.selected { background: var(--hover); border-color: var(--accent); }
+
+  /* Annotation tag above each phone */
+  .phone-label {
+    text-align: center; margin-bottom: 8px; font-size: 12px; color: #aaa;
+    font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase;
+  }
+  .phone-label .style-a { color: #f87171; }
+  .phone-label .style-b { color: #4ade80; }
+
+  /* Section heading between groups */
+  h2.group {
+    grid-column: 1 / -1;
+    font-size: 22px; font-weight: 600; color: #fff;
+    margin-top: 40px; margin-bottom: 14px;
+    border-left: 4px solid var(--accent); padding-left: 12px;
+  }
+  h2.group small { color: #888; font-weight: 400; font-size: 13px; margin-left: 12px; }
+
+  .legend {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    color: #ccc; font-size: 13px; line-height: 1.6;
+    max-width: 760px;
+  }
+  .legend strong { color: #fff; }
+  .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+
+  /* Map placeholder */
+  .map-placeholder {
+    height: 220px;
+    background:
+      radial-gradient(circle at 30% 40%, rgba(96,165,250,0.08), transparent 50%),
+      linear-gradient(135deg, #1a2a3a 0%, #0d1620 100%);
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+  .map-placeholder::before {
+    content: ''; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+</style>
+</head>
+<body class="p-8">
+
+<header class="max-w-6xl mx-auto mb-10">
+  <h1 class="text-3xl font-bold tracking-tight">SkyHub Crew — Static Design Mock</h1>
+  <p class="text-gray-400 mt-2 text-sm">Static HTML rendering of the Expo/RN crew app. Pixel-accurate token mirror. Hand off to Stitch / Claude design / Figma to iterate.</p>
+  <div class="legend mt-6">
+    Two columns per screen.
+    <span class="dot" style="background:#f87171"></span><strong>A — Current (solid cards)</strong> what's on device today.
+    <span class="dot ml-3" style="background:#4ade80"></span><strong>B — VisionOS glass</strong> proposed: heavier wallpaper scrim, BlurView cards, hairline edge.
+    <br/>Phone frames are 390 × 844 (iPhone 14 Pro). Screens are scrollable inside the frame.
+  </div>
+</header>
+
+<main class="max-w-[1700px] mx-auto" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 32px; justify-items: center;">
+
+  <!-- ================== HOME ================== -->
+  <h2 class="group">Home <small>tab 1 — Next Duty pager, Today's Route, Duty Limits, Quick Actions, Notifications</small></h2>
+
+  <!-- HOME · A -->
+  <div>
+    <div class="phone-label"><span class="style-a">A · Solid cards</span></div>
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="scroll">
+          <div class="px-4 pt-14 pb-2">
+
+            <!-- Header strip -->
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-10 h-10 rounded-full bg-[color:var(--accent)] flex items-center justify-center text-white font-bold text-sm tracking-wider">VL</div>
+              <div class="w-10 h-10 rounded-full card-solid flex items-center justify-center relative">
+                <i data-lucide="bell" class="w-[18px] h-[18px]" style="color: var(--text)"></i>
+                <span class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-[color:var(--status-cancelled-fg)] px-1 text-[10px] font-bold text-white flex items-center justify-center">2</span>
+              </div>
+            </div>
+
+            <!-- Greeting -->
+            <h1 class="text-[22px] font-semibold tracking-tight text-[color:var(--text)]">Good morning, Vivi</h1>
+            <p class="text-[13px] text-[color:var(--textSec)] mt-1">Tue, 28 Apr · HAN Base · Captain</p>
+
+            <!-- Next Duty card -->
+            <div class="card-solid mt-4 overflow-hidden">
+              <div class="px-3.5 py-3 flex items-center justify-between border-b border-white/10">
+                <div class="flex items-center gap-2">
+                  <span class="duty-dot w-2 h-2" style="background: var(--duty-flight)"></span>
+                  <span class="field-label">H800 · Flight Duty</span>
+                </div>
+                <div class="text-[13px]"><span class="text-[color:var(--textSec)]">Report </span><span class="font-semibold">04:30L</span></div>
+              </div>
+
+              <div class="px-3.5 pt-4 pb-3.5">
+                <!-- Sector route line w/ plane above -->
+                <div class="route-line">
+                  <div>
+                    <div class="text-[28px] font-bold leading-tight">HAN</div>
+                    <div class="text-[13px] text-[color:var(--textSec)] mt-1">05:30</div>
+                  </div>
+                  <div class="connector"></div>
+                  <div class="plane-glyph"><i data-lucide="plane-takeoff" class="w-5 h-5"></i></div>
+                  <div class="text-right">
+                    <div class="text-[28px] font-bold leading-tight">BKK</div>
+                    <div class="text-[13px] text-[color:var(--textSec)] mt-1">07:15</div>
+                  </div>
+                </div>
+
+                <!-- KV row -->
+                <div class="grid grid-cols-4 gap-3 mt-4">
+                  <div><div class="field-label">Flight</div><div class="text-[14px] font-semibold mt-1">VJ921</div></div>
+                  <div><div class="field-label">Aircraft</div><div class="text-[14px] font-semibold mt-1">A321</div></div>
+                  <div><div class="field-label">Tail</div><div class="text-[14px] font-semibold mt-1">SK-H411</div></div>
+                  <div><div class="field-label">Block</div><div class="text-[14px] font-semibold mt-1">1h 45m</div></div>
+                </div>
+              </div>
+
+              <!-- Page indicators -->
+              <div class="flex justify-center gap-1.5 pt-1 pb-2">
+                <span class="block w-[18px] h-[6px] rounded-[3px] bg-[color:var(--accent)]"></span>
+                <span class="block w-[6px] h-[6px] rounded-[3px] bg-white/10"></span>
+              </div>
+
+              <!-- Footer -->
+              <div class="px-3.5 py-2.5 flex items-center justify-between border-t border-white/10 bg-white/5">
+                <div class="flex items-center gap-2">
+                  <span class="chip chip-ontime">On Time</span>
+                  <span class="text-[13px] text-[color:var(--textSec)]">3h 30m block · 2 sectors</span>
+                </div>
+                <div class="flex items-center gap-1 text-[13px] text-[color:var(--textSec)]">
+                  <i data-lucide="users" class="w-3 h-3"></i> 2P + 4C
+                </div>
+              </div>
+            </div>
+
+            <!-- Today's Route -->
+            <div class="mt-5">
+              <div class="row-section mb-2.5">
+                <div class="flex items-center"><span class="section-bar"></span><span class="text-[16px] font-bold">Today's Route</span></div>
+              </div>
+              <div class="space-y-2">
+                <!-- leg 1 -->
+                <div class="card-solid p-3.5">
+                  <div class="route-line" style="padding: 6px 0 0;">
+                    <div><div class="text-[20px] font-bold leading-tight">HAN</div><div class="text-[12px] text-[color:var(--textSec)]">05:30</div></div>
+                    <div class="connector" style="top:55%"></div>
+                    <div class="plane-glyph" style="top:-2px"><i data-lucide="plane-takeoff" class="w-4 h-4"></i></div>
+                    <div class="text-right"><div class="text-[20px] font-bold leading-tight">BKK</div><div class="text-[12px] text-[color:var(--textSec)]">07:15</div></div>
+                  </div>
+                  <div class="flex justify-between text-[13px] mt-3">
+                    <span class="text-[color:var(--textSec)]"><span class="text-[color:var(--text)] font-semibold">VJ921</span> · A321 · SK-H411</span>
+                    <span class="font-semibold">1h 45m</span>
+                  </div>
+                </div>
+                <!-- ground chip -->
+                <div class="text-center py-1.5"><span class="ground-chip"><span class="text-[11px] font-semibold tracking-wider text-[color:var(--textSec)]">GROUND</span><span class="font-semibold">1h 35m</span><span class="text-[color:var(--textSec)]">at BKK</span></span></div>
+                <!-- leg 2 -->
+                <div class="card-solid p-3.5">
+                  <div class="route-line" style="padding: 6px 0 0;">
+                    <div><div class="text-[20px] font-bold leading-tight">BKK</div><div class="text-[12px] text-[color:var(--textSec)]">08:50</div></div>
+                    <div class="connector" style="top:55%"></div>
+                    <div class="plane-glyph" style="top:-2px"><i data-lucide="plane-takeoff" class="w-4 h-4"></i></div>
+                    <div class="text-right"><div class="text-[20px] font-bold leading-tight">HAN</div><div class="text-[12px] text-[color:var(--textSec)]">10:35</div></div>
+                  </div>
+                  <div class="flex justify-between text-[13px] mt-3">
+                    <span class="text-[color:var(--textSec)]"><span class="text-[color:var(--text)] font-semibold">VJ922</span> · A321 · SK-H411</span>
+                    <span class="font-semibold">1h 45m</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Duty Limits -->
+            <div class="mt-5">
+              <div class="row-section mb-2.5">
+                <div class="flex items-center"><span class="section-bar"></span><span class="text-[16px] font-bold">Duty Limits</span></div>
+                <span class="text-[13px] text-[color:var(--accent)] font-medium">Stats →</span>
+              </div>
+              <div class="card-solid p-3.5 flex items-center gap-3.5">
+                <!-- ring -->
+                <svg width="62" height="62" viewBox="0 0 62 62">
+                  <circle cx="31" cy="31" r="27" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="6"/>
+                  <circle cx="31" cy="31" r="27" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round"
+                    stroke-dasharray="55 170" transform="rotate(-90 31 31)"/>
+                </svg>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-baseline gap-1.5">
+                    <span class="font-semibold text-[14px]">3h 30m</span>
+                    <span class="text-[14px] text-[color:var(--textSec)]">/ 13h FDP</span>
+                  </div>
+                  <div class="text-[13px] text-[color:var(--textSec)] mt-1">
+                    24h 12m / 60h <span class="text-[color:var(--textTer)]">· 7-day rolling</span>
+                  </div>
+                </div>
+                <div class="border-l border-white/10 pl-3.5">
+                  <div class="field-label">Next rest</div>
+                  <div class="text-[13px] font-semibold mt-1">10h min</div>
+                  <div class="text-[12px] text-[color:var(--textSec)] mt-0.5">starts 11:30</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="mt-5">
+              <div class="row-section mb-2.5"><div class="flex items-center"><span class="section-bar"></span><span class="text-[16px] font-bold">Quick Actions</span></div></div>
+              <div class="grid grid-cols-2 gap-2.5">
+                <div class="card-solid p-3 min-h-[88px]" style="border-color: var(--accent);">
+                  <div class="w-9 h-9 rounded-full bg-[color:var(--accent)] flex items-center justify-center mb-2"><i data-lucide="check" class="w-[18px] h-[18px] text-white"></i></div>
+                  <div class="text-[13px] font-semibold">Check In</div>
+                  <div class="text-[11px] text-[color:var(--textSec)] mt-0.5">Window opens 04:15</div>
+                </div>
+                <div class="card-solid p-3 min-h-[88px]">
+                  <div class="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center mb-2"><i data-lucide="briefcase" class="w-[18px] h-[18px]"></i></div>
+                  <div class="text-[13px] font-semibold">Preflight</div>
+                  <div class="text-[11px] text-[color:var(--textSec)] mt-0.5">Brief & weather</div>
+                </div>
+                <div class="card-solid p-3 min-h-[88px]">
+                  <div class="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center mb-2"><i data-lucide="users" class="w-[18px] h-[18px]"></i></div>
+                  <div class="text-[13px] font-semibold">Crew List</div>
+                  <div class="text-[11px] text-[color:var(--textSec)] mt-0.5">6 on duty</div>
+                </div>
+                <div class="card-solid p-3 min-h-[88px]">
+                  <div class="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center mb-2"><i data-lucide="coffee" class="w-[18px] h-[18px]"></i></div>
+                  <div class="text-[13px] font-semibold">Fatigue</div>
+                  <div class="text-[11px] text-[color:var(--textSec)] mt-0.5">Submit FRM</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Notifications -->
+            <div class="mt-5">
+              <div class="row-section mb-2.5">
+                <div class="flex items-center"><span class="section-bar"></span><span class="text-[16px] font-bold">Notifications</span></div>
+                <span class="text-[13px] text-[color:var(--accent)] font-medium">See all →</span>
+              </div>
+              <div class="card-solid p-3 mb-2 flex gap-2.5">
+                <div class="w-2 h-2 rounded-full bg-[color:var(--accent)] mt-1.5"></div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex justify-between gap-2"><span class="text-[13px] font-semibold truncate flex-1">Crew Control</span><span class="text-[12px] text-[color:var(--textTer)]">07:42</span></div>
+                  <div class="text-[13px] text-[color:var(--textSec)] mt-0.5 line-clamp-2">Pairing H800 confirmed for Apr 28. Report time 04:30L.</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Tab bar -->
+        <div class="tabbar">
+          <div class="tab active"><span class="icon"><i data-lucide="home" class="w-5 h-5"></i></span>Home</div>
+          <div class="tab"><i data-lucide="calendar" class="w-5 h-5"></i>Roster</div>
+          <div class="tab"><i data-lucide="plane" class="w-5 h-5"></i>Flights</div>
+          <div class="tab"><i data-lucide="bar-chart-2" class="w-5 h-5"></i>Stats</div>
+          <div class="tab"><i data-lucide="more-horizontal" class="w-5 h-5"></i>More</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- HOME · B (glass) -->
+  <div>
+    <div class="phone-label"><span class="style-b">B · VisionOS glass</span></div>
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wall-base wall-blur"></div>
+        <div class="glass-bg-scrim"></div>
+
+        <div class="scroll" style="position: relative; z-index: 1;">
+          <div class="px-4 pt-14 pb-2">
+
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-10 h-10 rounded-full bg-[color:var(--accent)] flex items-center justify-center text-white font-bold text-sm tracking-wider">VL</div>
+              <div class="w-10 h-10 rounded-full card-glass flex items-center justify-center relative">
+                <i data-lucide="bell" class="w-[18px] h-[18px]"></i>
+                <span class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-[color:var(--status-cancelled-fg)] px-1 text-[10px] font-bold text-white flex items-center justify-center">2</span>
+              </div>
+            </div>
+
+            <h1 class="text-[22px] font-semibold tracking-tight">Good morning, Vivi</h1>
+            <p class="text-[13px] text-white/55 mt-1">Tue, 28 Apr · HAN Base · Captain</p>
+
+            <!-- Next Duty -->
+            <div class="card-glass-strong mt-4 overflow-hidden">
+              <div class="px-3.5 py-3 flex items-center justify-between border-b border-white/[0.07]">
+                <div class="flex items-center gap-2">
+                  <span class="duty-dot w-2 h-2" style="background: var(--duty-flight)"></span>
+                  <span class="field-label">H800 · Flight Duty</span>
+                </div>
+                <div class="text-[13px]"><span class="text-white/55">Report </span><span class="font-semibold">04:30L</span></div>
+              </div>
+              <div class="px-3.5 pt-4 pb-3.5">
+                <div class="route-line">
+                  <div><div class="text-[28px] font-bold leading-tight">HAN</div><div class="text-[13px] text-white/55 mt-1">05:30</div></div>
+                  <div class="connector"></div>
+                  <div class="plane-glyph"><i data-lucide="plane-takeoff" class="w-5 h-5"></i></div>
+                  <div class="text-right"><div class="text-[28px] font-bold leading-tight">BKK</div><div class="text-[13px] text-white/55 mt-1">07:15</div></div>
+                </div>
+                <div class="grid grid-cols-4 gap-3 mt-4">
+                  <div><div class="field-label">Flight</div><div class="text-[14px] font-semibold mt-1">VJ921</div></div>
+                  <div><div class="field-label">Aircraft</div><div class="text-[14px] font-semibold mt-1">A321</div></div>
+                  <div><div class="field-label">Tail</div><div class="text-[14px] font-semibold mt-1">SK-H411</div></div>
+                  <div><div class="field-label">Block</div><div class="text-[14px] font-semibold mt-1">1h 45m</div></div>
+                </div>
+              </div>
+              <div class="flex justify-center gap-1.5 pt-1 pb-2">
+                <span class="block w-[18px] h-[6px] rounded-[3px] bg-[color:var(--accent)]"></span>
+                <span class="block w-[6px] h-[6px] rounded-[3px] bg-white/10"></span>
+              </div>
+              <div class="px-3.5 py-2.5 flex items-center justify-between border-t border-white/[0.07] bg-white/[0.03]">
+                <div class="flex items-center gap-2">
+                  <span class="chip chip-ontime">On Time</span>
+                  <span class="text-[13px] text-white/55">3h 30m block · 2 sectors</span>
+                </div>
+                <div class="flex items-center gap-1 text-[13px] text-white/55">
+                  <i data-lucide="users" class="w-3 h-3"></i> 2P + 4C
+                </div>
+              </div>
+            </div>
+
+            <!-- Today's Route -->
+            <div class="mt-5">
+              <div class="row-section mb-2.5"><div class="flex items-center"><span class="section-bar"></span><span class="text-[16px] font-bold">Today's Route</span></div></div>
+              <div class="space-y-2">
+                <div class="card-glass p-3.5">
+                  <div class="route-line" style="padding: 6px 0 0;">
+                    <div><div class="text-[20px] font-bold leading-tight">HAN</div><div class="text-[12px] text-white/55">05:30</div></div>
+                    <div class="connector" style="top:55%"></div>
+                    <div class="plane-glyph" style="top:-2px"><i data-lucide="plane-takeoff" class="w-4 h-4"></i></div>
+                    <div class="text-right"><div class="text-[20px] font-bold leading-tight">BKK</div><div class="text-[12px] text-white/55">07:15</div></div>
+                  </div>
+                  <div class="flex justify-between text-[13px] mt-3">
+                    <span class="text-white/55"><span class="text-white font-semibold">VJ921</span> · A321 · SK-H411</span>
+                    <span class="font-semibold">1h 45m</span>
+                  </div>
+                </div>
+                <div class="text-center py-1.5">
+                  <span class="ground-chip" style="background: rgba(255,255,255,0.08); backdrop-filter: blur(20px); border-color: rgba(255,255,255,0.10);">
+                    <span class="text-[11px] font-semibold tracking-wider text-white/55">GROUND</span>
+                    <span class="font-semibold">1h 35m</span>
+                    <span class="text-white/55">at BKK</span>
+                  </span>
+                </div>
+                <div class="card-glass p-3.5">
+                  <div class="route-line" style="padding: 6px 0 0;">
+                    <div><div class="text-[20px] font-bold leading-tight">BKK</div><div class="text-[12px] text-white/55">08:50</div></div>
+                    <div class="connector" style="top:55%"></div>
+                    <div class="plane-glyph" style="top:-2px"><i data-lucide="plane-takeoff" class="w-4 h-4"></i></div>
+                    <div class="text-right"><div class="text-[20px] font-bold leading-tight">HAN</div><div class="text-[12px] text-white/55">10:35</div></div>
+                  </div>
+                  <div class="flex justify-between text-[13px] mt-3">
+                    <span class="text-white/55"><span class="text-white font-semibold">VJ922</span> · A321 · SK-H411</span>
+                    <span class="font-semibold">1h 45m</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Duty Limits -->
+            <div class="mt-5">
+              <div class="row-section mb-2.5">
+                <div class="flex items-center"><span class="section-bar"></span><span class="text-[16px] font-bold">Duty Limits</span></div>
+                <span class="text-[13px] text-[color:var(--accent)] font-medium">Stats →</span>
+              </div>
+              <div class="card-glass p-3.5 flex items-center gap-3.5">
+                <svg width="62" height="62" viewBox="0 0 62 62">
+                  <circle cx="31" cy="31" r="27" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="6"/>
+                  <circle cx="31" cy="31" r="27" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" stroke-dasharray="55 170" transform="rotate(-90 31 31)"/>
+                </svg>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-baseline gap-1.5">
+                    <span class="font-semibold text-[14px]">3h 30m</span>
+                    <span class="text-[14px] text-white/55">/ 13h FDP</span>
+                  </div>
+                  <div class="text-[13px] text-white/55 mt-1">24h 12m / 60h <span class="text-white/35">· 7-day rolling</span></div>
+                </div>
+                <div class="border-l border-white/[0.08] pl-3.5">
+                  <div class="field-label">Next rest</div>
+                  <div class="text-[13px] font-semibold mt-1">10h min</div>
+                  <div class="text-[12px] text-white/55 mt-0.5">starts 11:30</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="mt-5">
+              <div class="row-section mb-2.5"><div class="flex items-center"><span class="section-bar"></span><span class="text-[16px] font-bold">Quick Actions</span></div></div>
+              <div class="grid grid-cols-2 gap-2.5">
+                <div class="card-glass p-3 min-h-[88px]" style="border-color: var(--accent);">
+                  <div class="w-9 h-9 rounded-full bg-[color:var(--accent)] flex items-center justify-center mb-2"><i data-lucide="check" class="w-[18px] h-[18px] text-white"></i></div>
+                  <div class="text-[13px] font-semibold">Check In</div>
+                  <div class="text-[11px] text-white/55 mt-0.5">Window opens 04:15</div>
+                </div>
+                <div class="card-glass p-3 min-h-[88px]">
+                  <div class="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center mb-2"><i data-lucide="briefcase" class="w-[18px] h-[18px]"></i></div>
+                  <div class="text-[13px] font-semibold">Preflight</div>
+                  <div class="text-[11px] text-white/55 mt-0.5">Brief & weather</div>
+                </div>
+                <div class="card-glass p-3 min-h-[88px]">
+                  <div class="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center mb-2"><i data-lucide="users" class="w-[18px] h-[18px]"></i></div>
+                  <div class="text-[13px] font-semibold">Crew List</div>
+                  <div class="text-[11px] text-white/55 mt-0.5">6 on duty</div>
+                </div>
+                <div class="card-glass p-3 min-h-[88px]">
+                  <div class="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center mb-2"><i data-lucide="coffee" class="w-[18px] h-[18px]"></i></div>
+                  <div class="text-[13px] font-semibold">Fatigue</div>
+                  <div class="text-[11px] text-white/55 mt-0.5">Submit FRM</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-5">
+              <div class="row-section mb-2.5">
+                <div class="flex items-center"><span class="section-bar"></span><span class="text-[16px] font-bold">Notifications</span></div>
+                <span class="text-[13px] text-[color:var(--accent)] font-medium">See all →</span>
+              </div>
+              <div class="card-glass p-3 mb-2 flex gap-2.5">
+                <div class="w-2 h-2 rounded-full bg-[color:var(--accent)] mt-1.5"></div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex justify-between gap-2"><span class="text-[13px] font-semibold truncate flex-1">Crew Control</span><span class="text-[12px] text-white/35">07:42</span></div>
+                  <div class="text-[13px] text-white/55 mt-0.5 line-clamp-2">Pairing H800 confirmed for Apr 28. Report time 04:30L.</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="tabbar glass">
+          <div class="tab active"><span class="icon"><i data-lucide="home" class="w-5 h-5"></i></span>Home</div>
+          <div class="tab"><i data-lucide="calendar" class="w-5 h-5"></i>Roster</div>
+          <div class="tab"><i data-lucide="plane" class="w-5 h-5"></i>Flights</div>
+          <div class="tab"><i data-lucide="bar-chart-2" class="w-5 h-5"></i>Stats</div>
+          <div class="tab"><i data-lucide="more-horizontal" class="w-5 h-5"></i>More</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ================== ROSTER ================== -->
+  <h2 class="group">Roster <small>tab 2 — month nav, calendar grid w/ duty dots, day list</small></h2>
+
+  <!-- ROSTER · A -->
+  <div>
+    <div class="phone-label"><span class="style-a">A · Solid cards</span></div>
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="scroll">
+          <div class="px-4 pt-14 pb-2">
+
+            <!-- Month nav -->
+            <div class="flex items-center justify-between">
+              <div class="w-9 h-9 rounded-[10px] card-solid flex items-center justify-center"><i data-lucide="chevron-left" class="w-4 h-4"></i></div>
+              <div class="text-center">
+                <div class="text-[22px] font-semibold tracking-tight">April 2026</div>
+                <div class="text-[13px] text-[color:var(--textSec)] mt-0.5">14 active days</div>
+              </div>
+              <div class="w-9 h-9 rounded-[10px] card-solid flex items-center justify-center"><i data-lucide="chevron-right" class="w-4 h-4"></i></div>
+            </div>
+
+            <!-- Calendar -->
+            <div class="card-solid p-2.5 mt-4">
+              <div class="grid grid-cols-7 gap-0 mb-1.5">
+                <div class="text-center text-[11px] font-semibold uppercase tracking-wider text-[color:var(--textTer)]">Mon</div>
+                <div class="text-center text-[11px] font-semibold uppercase tracking-wider text-[color:var(--textTer)]">Tue</div>
+                <div class="text-center text-[11px] font-semibold uppercase tracking-wider text-[color:var(--textTer)]">Wed</div>
+                <div class="text-center text-[11px] font-semibold uppercase tracking-wider text-[color:var(--textTer)]">Thu</div>
+                <div class="text-center text-[11px] font-semibold uppercase tracking-wider text-[color:var(--textTer)]">Fri</div>
+                <div class="text-center text-[11px] font-semibold uppercase tracking-wider text-[color:var(--textTer)]">Sat</div>
+                <div class="text-center text-[11px] font-semibold uppercase tracking-wider text-[color:var(--textTer)]">Sun</div>
+              </div>
+              <div class="cal-grid" id="cal-a"></div>
+            </div>
+
+            <!-- Legend -->
+            <div class="flex flex-wrap gap-3.5 mt-3">
+              <div class="flex items-center gap-1.5"><span class="duty-dot w-1.5 h-1.5" style="background: var(--duty-flight)"></span><span class="text-[13px] text-[color:var(--textSec)]">Flight</span></div>
+              <div class="flex items-center gap-1.5"><span class="duty-dot w-1.5 h-1.5" style="background: var(--duty-standby)"></span><span class="text-[13px] text-[color:var(--textSec)]">Standby</span></div>
+              <div class="flex items-center gap-1.5"><span class="duty-dot w-1.5 h-1.5" style="background: var(--duty-rest)"></span><span class="text-[13px] text-[color:var(--textSec)]">Rest</span></div>
+              <div class="flex items-center gap-1.5"><span class="duty-dot w-1.5 h-1.5" style="background: var(--duty-training)"></span><span class="text-[13px] text-[color:var(--textSec)]">Training</span></div>
+            </div>
+
+            <!-- Day list -->
+            <div class="mt-5 space-y-4">
+
+              <div>
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-[14px] font-bold text-[color:var(--accent)]">Tue 28 Apr</span>
+                  <span class="bg-[color:var(--accent)] text-white text-[12px] font-semibold px-1.5 py-0.5 rounded-md">Today</span>
+                </div>
+                <!-- Duty rows -->
+                <div class="card-solid p-3 pl-3.5 flex items-center gap-3 relative overflow-hidden">
+                  <div class="absolute left-0 top-0 bottom-0 w-[3px]" style="background: var(--duty-flight)"></div>
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: rgba(96,165,250,0.13);">
+                    <i data-lucide="plane" class="w-4 h-4" style="color: var(--duty-flight)"></i>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-[14px] font-semibold truncate">H800 · HAN → BKK → HAN</div>
+                    <div class="text-[13px] text-[color:var(--textSec)] mt-0.5">05:30–10:35 · 2 sectors</div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex items-center gap-2 mb-2"><span class="text-[14px] font-bold">Wed 29 Apr</span></div>
+                <div class="card-solid p-3 pl-3.5 flex items-center gap-3 relative overflow-hidden">
+                  <div class="absolute left-0 top-0 bottom-0 w-[3px]" style="background: var(--duty-rest)"></div>
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: rgba(167,139,250,0.13);">
+                    <i data-lucide="bed" class="w-4 h-4" style="color: var(--duty-rest)"></i>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-[14px] font-semibold">Day Off</div>
+                    <div class="text-[13px] text-[color:var(--textSec)] mt-0.5">Off duty</div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex items-center gap-2 mb-2"><span class="text-[14px] font-bold">Thu 30 Apr</span></div>
+                <div class="card-solid p-3 pl-3.5 flex items-center gap-3 relative overflow-hidden">
+                  <div class="absolute left-0 top-0 bottom-0 w-[3px]" style="background: var(--duty-standby)"></div>
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: rgba(251,191,36,0.13);">
+                    <i data-lucide="clock" class="w-4 h-4" style="color: var(--duty-standby)"></i>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-[14px] font-semibold">Standby — Home</div>
+                    <div class="text-[13px] text-[color:var(--textSec)] mt-0.5">06:00–14:00 · SBY</div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex items-center gap-2 mb-2"><span class="text-[14px] font-bold">Fri 1 May</span></div>
+                <div class="card-solid p-3 pl-3.5 flex items-center gap-3 relative overflow-hidden">
+                  <div class="absolute left-0 top-0 bottom-0 w-[3px]" style="background: var(--duty-training)"></div>
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: rgba(74,222,128,0.13);">
+                    <i data-lucide="graduation-cap" class="w-4 h-4" style="color: var(--duty-training)"></i>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-[14px] font-semibold">A321 SIM Recurrent</div>
+                    <div class="text-[13px] text-[color:var(--textSec)] mt-0.5">08:00–13:00 · SIM</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><i data-lucide="home" class="w-5 h-5"></i>Home</div>
+          <div class="tab active"><span class="icon"><i data-lucide="calendar" class="w-5 h-5"></i></span>Roster</div>
+          <div class="tab"><i data-lucide="plane" class="w-5 h-5"></i>Flights</div>
+          <div class="tab"><i data-lucide="bar-chart-2" class="w-5 h-5"></i>Stats</div>
+          <div class="tab"><i data-lucide="more-horizontal" class="w-5 h-5"></i>More</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROSTER · B -->
+  <div>
+    <div class="phone-label"><span class="style-b">B · VisionOS glass</span></div>
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wall-base wall-blur"></div>
+        <div class="glass-bg-scrim"></div>
+
+        <div class="scroll" style="position: relative; z-index: 1;">
+          <div class="px-4 pt-14 pb-2">
+            <div class="flex items-center justify-between">
+              <div class="w-9 h-9 rounded-[10px] card-glass flex items-center justify-center"><i data-lucide="chevron-left" class="w-4 h-4"></i></div>
+              <div class="text-center">
+                <div class="text-[22px] font-semibold tracking-tight">April 2026</div>
+                <div class="text-[13px] text-white/55 mt-0.5">14 active days</div>
+              </div>
+              <div class="w-9 h-9 rounded-[10px] card-glass flex items-center justify-center"><i data-lucide="chevron-right" class="w-4 h-4"></i></div>
+            </div>
+
+            <div class="card-glass p-2.5 mt-4">
+              <div class="grid grid-cols-7 gap-0 mb-1.5">
+                <div class="text-center text-[11px] font-semibold uppercase tracking-wider text-white/35">Mon</div>
+                <div class="text-center text-[11px] font-semibold uppercase tracking-wider text-white/35">Tue</div>
+                <div class="text-center text-[11px] font-semibold uppercase tracking-wider text-white/35">Wed</div>
+                <div class="text-center text-[11px] font-semibold uppercase tracking-wider text-white/35">Thu</div>
+                <div class="text-center text-[11px] font-semibold uppercase tracking-wider text-white/35">Fri</div>
+                <div class="text-center text-[11px] font-semibold uppercase tracking-wider text-white/35">Sat</div>
+                <div class="text-center text-[11px] font-semibold uppercase tracking-wider text-white/35">Sun</div>
+              </div>
+              <div class="cal-grid" id="cal-b"></div>
+            </div>
+
+            <div class="flex flex-wrap gap-3.5 mt-3">
+              <div class="flex items-center gap-1.5"><span class="duty-dot w-1.5 h-1.5" style="background: var(--duty-flight)"></span><span class="text-[13px] text-white/55">Flight</span></div>
+              <div class="flex items-center gap-1.5"><span class="duty-dot w-1.5 h-1.5" style="background: var(--duty-standby)"></span><span class="text-[13px] text-white/55">Standby</span></div>
+              <div class="flex items-center gap-1.5"><span class="duty-dot w-1.5 h-1.5" style="background: var(--duty-rest)"></span><span class="text-[13px] text-white/55">Rest</span></div>
+              <div class="flex items-center gap-1.5"><span class="duty-dot w-1.5 h-1.5" style="background: var(--duty-training)"></span><span class="text-[13px] text-white/55">Training</span></div>
+            </div>
+
+            <div class="mt-5 space-y-4">
+              <div>
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-[14px] font-bold text-[color:var(--accent)]">Tue 28 Apr</span>
+                  <span class="bg-[color:var(--accent)] text-white text-[12px] font-semibold px-1.5 py-0.5 rounded-md">Today</span>
+                </div>
+                <div class="card-glass p-3 pl-3.5 flex items-center gap-3 relative overflow-hidden">
+                  <div class="absolute left-0 top-0 bottom-0 w-[3px]" style="background: var(--duty-flight)"></div>
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: rgba(96,165,250,0.13);"><i data-lucide="plane" class="w-4 h-4" style="color: var(--duty-flight)"></i></div>
+                  <div class="flex-1 min-w-0"><div class="text-[14px] font-semibold truncate">H800 · HAN → BKK → HAN</div><div class="text-[13px] text-white/55 mt-0.5">05:30–10:35 · 2 sectors</div></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex items-center gap-2 mb-2"><span class="text-[14px] font-bold">Wed 29 Apr</span></div>
+                <div class="card-glass p-3 pl-3.5 flex items-center gap-3 relative overflow-hidden">
+                  <div class="absolute left-0 top-0 bottom-0 w-[3px]" style="background: var(--duty-rest)"></div>
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: rgba(167,139,250,0.13);"><i data-lucide="bed" class="w-4 h-4" style="color: var(--duty-rest)"></i></div>
+                  <div class="flex-1 min-w-0"><div class="text-[14px] font-semibold">Day Off</div><div class="text-[13px] text-white/55 mt-0.5">Off duty</div></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex items-center gap-2 mb-2"><span class="text-[14px] font-bold">Thu 30 Apr</span></div>
+                <div class="card-glass p-3 pl-3.5 flex items-center gap-3 relative overflow-hidden">
+                  <div class="absolute left-0 top-0 bottom-0 w-[3px]" style="background: var(--duty-standby)"></div>
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: rgba(251,191,36,0.13);"><i data-lucide="clock" class="w-4 h-4" style="color: var(--duty-standby)"></i></div>
+                  <div class="flex-1 min-w-0"><div class="text-[14px] font-semibold">Standby — Home</div><div class="text-[13px] text-white/55 mt-0.5">06:00–14:00 · SBY</div></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex items-center gap-2 mb-2"><span class="text-[14px] font-bold">Fri 1 May</span></div>
+                <div class="card-glass p-3 pl-3.5 flex items-center gap-3 relative overflow-hidden">
+                  <div class="absolute left-0 top-0 bottom-0 w-[3px]" style="background: var(--duty-training)"></div>
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: rgba(74,222,128,0.13);"><i data-lucide="graduation-cap" class="w-4 h-4" style="color: var(--duty-training)"></i></div>
+                  <div class="flex-1 min-w-0"><div class="text-[14px] font-semibold">A321 SIM Recurrent</div><div class="text-[13px] text-white/55 mt-0.5">08:00–13:00 · SIM</div></div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+        <div class="tabbar glass">
+          <div class="tab"><i data-lucide="home" class="w-5 h-5"></i>Home</div>
+          <div class="tab active"><span class="icon"><i data-lucide="calendar" class="w-5 h-5"></i></span>Roster</div>
+          <div class="tab"><i data-lucide="plane" class="w-5 h-5"></i>Flights</div>
+          <div class="tab"><i data-lucide="bar-chart-2" class="w-5 h-5"></i>Stats</div>
+          <div class="tab"><i data-lucide="more-horizontal" class="w-5 h-5"></i>More</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================== FLIGHTS ================== -->
+  <h2 class="group">Flights <small>tab 3 — date strip, expandable flight cards w/ METAR/crew/ops/timing</small></h2>
+
+  <!-- FLIGHTS · A -->
+  <div>
+    <div class="phone-label"><span class="style-a">A · Solid cards</span></div>
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="scroll">
+          <div class="pt-14 pb-2">
+            <div class="px-4"><h1 class="text-[22px] font-semibold tracking-tight">Flights</h1></div>
+
+            <!-- Date strip -->
+            <div class="mt-3 flex gap-2 overflow-x-auto px-4">
+              <div class="px-3.5 py-2 rounded-[10px] card-solid text-[12px] font-semibold whitespace-nowrap">Mon 27 Apr</div>
+              <div class="px-3.5 py-2 rounded-[10px] bg-[color:var(--accent)] border border-[color:var(--accent)] text-white text-[12px] font-semibold whitespace-nowrap">Tue 28 Apr · Today</div>
+              <div class="px-3.5 py-2 rounded-[10px] card-solid text-[12px] font-semibold whitespace-nowrap">Wed 29 Apr</div>
+              <div class="px-3.5 py-2 rounded-[10px] card-solid text-[12px] font-semibold whitespace-nowrap">Thu 30 Apr</div>
+            </div>
+
+            <!-- Flight cards -->
+            <div class="px-4 mt-4 space-y-2.5">
+              <div class="card-solid p-3.5">
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-[14px] font-bold">VJ921</span>
+                    <span class="text-[13px] text-[color:var(--textSec)]">· A321</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="chip chip-scheduled">Scheduled</span>
+                    <i data-lucide="chevron-down" class="w-4 h-4" style="color: var(--textTer)"></i>
+                  </div>
+                </div>
+                <div class="route-line" style="padding: 6px 0 0;">
+                  <div><div class="text-[20px] font-bold leading-tight">HAN</div><div class="text-[12px] text-[color:var(--textSec)]">05:30</div></div>
+                  <div class="connector" style="top:55%"></div>
+                  <div class="plane-glyph" style="top:-2px"><i data-lucide="plane-takeoff" class="w-4 h-4"></i></div>
+                  <div class="text-right"><div class="text-[20px] font-bold leading-tight">BKK</div><div class="text-[12px] text-[color:var(--textSec)]">07:15</div></div>
+                </div>
+                <div class="flex justify-between text-[13px] mt-3.5 text-[color:var(--textSec)]">
+                  <span>Block <span class="text-[color:var(--text)] font-semibold">1h 45m</span></span>
+                  <span>Tail <span class="text-[color:var(--text)] font-semibold">SK-H411</span></span>
+                  <span>Sector <span class="text-[color:var(--text)] font-semibold">1</span></span>
+                </div>
+              </div>
+
+              <!-- Expanded card -->
+              <div class="card-solid p-0 overflow-hidden">
+                <div class="p-3.5">
+                  <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-[14px] font-bold">VJ922</span>
+                      <span class="text-[13px] text-[color:var(--textSec)]">· A321</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="chip chip-scheduled">Scheduled</span>
+                      <i data-lucide="chevron-down" class="w-4 h-4 transform rotate-180" style="color: var(--textTer)"></i>
+                    </div>
+                  </div>
+                  <div class="route-line" style="padding: 6px 0 0;">
+                    <div><div class="text-[20px] font-bold leading-tight">BKK</div><div class="text-[12px] text-[color:var(--textSec)]">08:50</div></div>
+                    <div class="connector" style="top:55%"></div>
+                    <div class="plane-glyph" style="top:-2px"><i data-lucide="plane-takeoff" class="w-4 h-4"></i></div>
+                    <div class="text-right"><div class="text-[20px] font-bold leading-tight">HAN</div><div class="text-[12px] text-[color:var(--textSec)]">10:35</div></div>
+                  </div>
+                  <div class="flex justify-between text-[13px] mt-3.5 text-[color:var(--textSec)]">
+                    <span>Block <span class="text-[color:var(--text)] font-semibold">1h 45m</span></span>
+                    <span>Tail <span class="text-[color:var(--text)] font-semibold">SK-H411</span></span>
+                    <span>Sector <span class="text-[color:var(--text)] font-semibold">2</span></span>
+                  </div>
+                </div>
+
+                <div class="border-t border-white/10 bg-white/5">
+                  <div class="px-3.5 py-3 border-b border-white/10">
+                    <div class="field-label mb-2">Preflight</div>
+                    <div class="space-y-1.5 text-[12px]">
+                      <div class="flex justify-between gap-2"><span class="text-[color:var(--textSec)]">METAR VVNB</span><span class="font-mono text-[color:var(--text)]">281200Z 14004KT 9999 SCT020 30/24 Q1009</span></div>
+                      <div class="flex justify-between gap-2"><span class="text-[color:var(--textSec)]">METAR VTBS</span><span class="font-mono text-[color:var(--text)]">281130Z 19012KT 9999 FEW030 33/25 Q1010</span></div>
+                    </div>
+                  </div>
+                  <div class="px-3.5 py-3 border-b border-white/10">
+                    <div class="field-label mb-2">Crew</div>
+                    <div class="space-y-1.5">
+                      <div class="flex items-center gap-2.5"><span class="px-1.5 py-0.5 rounded-md text-[11px] font-semibold" style="background: rgba(96,165,250,0.13); color: var(--accent);">CPT</span><span class="text-[14px]">Vivi Lam</span></div>
+                      <div class="flex items-center gap-2.5"><span class="px-1.5 py-0.5 rounded-md text-[11px] font-semibold" style="background: rgba(96,165,250,0.13); color: var(--accent);">FO</span><span class="text-[14px]">Tran Minh Anh</span></div>
+                      <div class="flex items-center gap-2.5"><span class="px-1.5 py-0.5 rounded-md text-[11px] font-semibold" style="background: rgba(96,165,250,0.13); color: var(--accent);">SCC</span><span class="text-[14px]">Nguyen Thi Mai</span></div>
+                    </div>
+                  </div>
+                  <div class="px-3.5 py-3 border-b border-white/10">
+                    <div class="field-label mb-2">Operations</div>
+                    <div class="grid grid-cols-2 gap-y-1.5">
+                      <div><div class="text-[11px] text-[color:var(--textSec)]">Gate</div><div class="text-[13px] font-semibold">B12</div></div>
+                      <div><div class="text-[11px] text-[color:var(--textSec)]">Stand</div><div class="text-[13px] font-semibold">52</div></div>
+                      <div><div class="text-[11px] text-[color:var(--textSec)]">Pax</div><div class="text-[13px] font-semibold">186</div></div>
+                      <div><div class="text-[11px] text-[color:var(--textSec)]">Fuel</div><div class="text-[13px] font-semibold">9.2T</div></div>
+                    </div>
+                  </div>
+                  <div class="px-3.5 py-3">
+                    <div class="field-label mb-2">Timing</div>
+                    <div class="grid grid-cols-2 gap-y-1.5">
+                      <div><div class="text-[11px] text-[color:var(--textSec)]">STD</div><div class="text-[13px] font-semibold">08:50</div></div>
+                      <div><div class="text-[11px] text-[color:var(--textSec)]">STA</div><div class="text-[13px] font-semibold">10:35</div></div>
+                      <div><div class="text-[11px] text-[color:var(--textSec)]">Block</div><div class="text-[13px] font-semibold">1h 45m</div></div>
+                      <div><div class="text-[11px] text-[color:var(--textSec)]">Date</div><div class="text-[13px] font-semibold">2026-04-28</div></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Day summary -->
+              <div class="card-solid p-3 flex items-center gap-2.5 mt-2">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background: rgba(96,165,250,0.13);"><i data-lucide="clock" class="w-4 h-4" style="color: var(--accent)"></i></div>
+                <div class="flex-1">
+                  <div class="text-[13px] text-[color:var(--textSec)]">Day Summary</div>
+                  <div class="text-[13px] font-semibold mt-0.5">2 sectors · 3h 30m block</div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><i data-lucide="home" class="w-5 h-5"></i>Home</div>
+          <div class="tab"><i data-lucide="calendar" class="w-5 h-5"></i>Roster</div>
+          <div class="tab active"><span class="icon"><i data-lucide="plane" class="w-5 h-5"></i></span>Flights</div>
+          <div class="tab"><i data-lucide="bar-chart-2" class="w-5 h-5"></i>Stats</div>
+          <div class="tab"><i data-lucide="more-horizontal" class="w-5 h-5"></i>More</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLIGHTS · B -->
+  <div>
+    <div class="phone-label"><span class="style-b">B · VisionOS glass</span></div>
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wall-base wall-blur"></div>
+        <div class="glass-bg-scrim"></div>
+        <div class="scroll" style="position: relative; z-index: 1;">
+          <div class="pt-14 pb-2">
+            <div class="px-4"><h1 class="text-[22px] font-semibold tracking-tight">Flights</h1></div>
+            <div class="mt-3 flex gap-2 overflow-x-auto px-4">
+              <div class="px-3.5 py-2 rounded-[10px] card-glass text-[12px] font-semibold whitespace-nowrap">Mon 27 Apr</div>
+              <div class="px-3.5 py-2 rounded-[10px] bg-[color:var(--accent)] border border-[color:var(--accent)] text-white text-[12px] font-semibold whitespace-nowrap">Tue 28 Apr · Today</div>
+              <div class="px-3.5 py-2 rounded-[10px] card-glass text-[12px] font-semibold whitespace-nowrap">Wed 29 Apr</div>
+              <div class="px-3.5 py-2 rounded-[10px] card-glass text-[12px] font-semibold whitespace-nowrap">Thu 30 Apr</div>
+            </div>
+
+            <div class="px-4 mt-4 space-y-2.5">
+              <div class="card-glass p-3.5">
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex items-center gap-1.5"><span class="text-[14px] font-bold">VJ921</span><span class="text-[13px] text-white/55">· A321</span></div>
+                  <div class="flex items-center gap-2"><span class="chip chip-scheduled">Scheduled</span><i data-lucide="chevron-down" class="w-4 h-4 text-white/35"></i></div>
+                </div>
+                <div class="route-line" style="padding: 6px 0 0;">
+                  <div><div class="text-[20px] font-bold leading-tight">HAN</div><div class="text-[12px] text-white/55">05:30</div></div>
+                  <div class="connector" style="top:55%"></div>
+                  <div class="plane-glyph" style="top:-2px"><i data-lucide="plane-takeoff" class="w-4 h-4"></i></div>
+                  <div class="text-right"><div class="text-[20px] font-bold leading-tight">BKK</div><div class="text-[12px] text-white/55">07:15</div></div>
+                </div>
+                <div class="flex justify-between text-[13px] mt-3.5 text-white/55">
+                  <span>Block <span class="text-white font-semibold">1h 45m</span></span>
+                  <span>Tail <span class="text-white font-semibold">SK-H411</span></span>
+                  <span>Sector <span class="text-white font-semibold">1</span></span>
+                </div>
+              </div>
+
+              <div class="card-glass-strong p-0 overflow-hidden">
+                <div class="p-3.5">
+                  <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-1.5"><span class="text-[14px] font-bold">VJ922</span><span class="text-[13px] text-white/55">· A321</span></div>
+                    <div class="flex items-center gap-2"><span class="chip chip-scheduled">Scheduled</span><i data-lucide="chevron-down" class="w-4 h-4 transform rotate-180 text-white/35"></i></div>
+                  </div>
+                  <div class="route-line" style="padding: 6px 0 0;">
+                    <div><div class="text-[20px] font-bold leading-tight">BKK</div><div class="text-[12px] text-white/55">08:50</div></div>
+                    <div class="connector" style="top:55%"></div>
+                    <div class="plane-glyph" style="top:-2px"><i data-lucide="plane-takeoff" class="w-4 h-4"></i></div>
+                    <div class="text-right"><div class="text-[20px] font-bold leading-tight">HAN</div><div class="text-[12px] text-white/55">10:35</div></div>
+                  </div>
+                  <div class="flex justify-between text-[13px] mt-3.5 text-white/55">
+                    <span>Block <span class="text-white font-semibold">1h 45m</span></span>
+                    <span>Tail <span class="text-white font-semibold">SK-H411</span></span>
+                    <span>Sector <span class="text-white font-semibold">2</span></span>
+                  </div>
+                </div>
+                <div class="border-t border-white/[0.07] bg-white/[0.03]">
+                  <div class="px-3.5 py-3 border-b border-white/[0.07]">
+                    <div class="field-label mb-2">Preflight</div>
+                    <div class="space-y-1.5 text-[12px]">
+                      <div class="flex justify-between gap-2"><span class="text-white/55">METAR VVNB</span><span class="font-mono">281200Z 14004KT 9999 SCT020 30/24 Q1009</span></div>
+                      <div class="flex justify-between gap-2"><span class="text-white/55">METAR VTBS</span><span class="font-mono">281130Z 19012KT 9999 FEW030 33/25 Q1010</span></div>
+                    </div>
+                  </div>
+                  <div class="px-3.5 py-3 border-b border-white/[0.07]">
+                    <div class="field-label mb-2">Crew</div>
+                    <div class="space-y-1.5">
+                      <div class="flex items-center gap-2.5"><span class="px-1.5 py-0.5 rounded-md text-[11px] font-semibold" style="background: rgba(96,165,250,0.13); color: var(--accent);">CPT</span><span class="text-[14px]">Vivi Lam</span></div>
+                      <div class="flex items-center gap-2.5"><span class="px-1.5 py-0.5 rounded-md text-[11px] font-semibold" style="background: rgba(96,165,250,0.13); color: var(--accent);">FO</span><span class="text-[14px]">Tran Minh Anh</span></div>
+                      <div class="flex items-center gap-2.5"><span class="px-1.5 py-0.5 rounded-md text-[11px] font-semibold" style="background: rgba(96,165,250,0.13); color: var(--accent);">SCC</span><span class="text-[14px]">Nguyen Thi Mai</span></div>
+                    </div>
+                  </div>
+                  <div class="px-3.5 py-3">
+                    <div class="field-label mb-2">Timing</div>
+                    <div class="grid grid-cols-2 gap-y-1.5">
+                      <div><div class="text-[11px] text-white/55">STD</div><div class="text-[13px] font-semibold">08:50</div></div>
+                      <div><div class="text-[11px] text-white/55">STA</div><div class="text-[13px] font-semibold">10:35</div></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+        <div class="tabbar glass">
+          <div class="tab"><i data-lucide="home" class="w-5 h-5"></i>Home</div>
+          <div class="tab"><i data-lucide="calendar" class="w-5 h-5"></i>Roster</div>
+          <div class="tab active"><span class="icon"><i data-lucide="plane" class="w-5 h-5"></i></span>Flights</div>
+          <div class="tab"><i data-lucide="bar-chart-2" class="w-5 h-5"></i>Stats</div>
+          <div class="tab"><i data-lucide="more-horizontal" class="w-5 h-5"></i>More</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================== STATS ================== -->
+  <h2 class="group">Stats <small>tab 4 — period segmented, FDTL bars, 2×3 stat grid, weekly chart, CAAV notice</small></h2>
+
+  <!-- STATS · A -->
+  <div>
+    <div class="phone-label"><span class="style-a">A · Solid cards</span></div>
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="scroll">
+          <div class="px-4 pt-14 pb-2">
+            <h1 class="text-[22px] font-semibold tracking-tight">Stats</h1>
+            <p class="text-[13px] text-[color:var(--textSec)] mt-1">April 2026 · CAAV VAR 15</p>
+
+            <!-- Segmented -->
+            <div class="card-solid p-[3px] mt-4 flex gap-0.5">
+              <div class="flex-1 py-1.5 rounded-lg text-center text-[13px] font-semibold bg-[color:var(--page)] border-[0.5px] border-white/10">Month</div>
+              <div class="flex-1 py-1.5 rounded-lg text-center text-[13px] font-semibold text-[color:var(--textSec)]">28 Days</div>
+              <div class="flex-1 py-1.5 rounded-lg text-center text-[13px] font-semibold text-[color:var(--textSec)]">Year</div>
+            </div>
+
+            <!-- FDTL section -->
+            <div class="row-section mt-5 mb-2.5"><div class="flex items-center"><span class="section-bar"></span><span class="text-[16px] font-bold">FDTL Compliance</span></div></div>
+
+            <div class="card-solid p-3.5 mb-2">
+              <div class="flex justify-between items-baseline mb-2.5">
+                <div class="field-label">Today's FDP</div>
+                <div><span class="text-[17px] font-bold" style="color: var(--duty-flight)">3h 30m</span> <span class="text-[14px] text-[color:var(--textSec)]">/ 13h</span></div>
+              </div>
+              <div class="h-1.5 rounded-full bg-white/10 overflow-hidden"><div class="h-full bg-[color:var(--duty-flight)]" style="width: 26%;"></div></div>
+              <div class="flex justify-between mt-1.5 text-[12px] text-[color:var(--textTer)]"><span>26% used</span><span>9h 30m remaining</span></div>
+            </div>
+
+            <div class="card-solid p-3.5 mb-2">
+              <div class="flex justify-between items-baseline mb-2.5">
+                <div class="field-label">7-Day Rolling</div>
+                <div><span class="text-[17px] font-bold" style="color: var(--duty-flight)">24h 12m</span> <span class="text-[14px] text-[color:var(--textSec)]">/ 60h</span></div>
+              </div>
+              <div class="h-1.5 rounded-full bg-white/10 overflow-hidden"><div class="h-full bg-[color:var(--duty-flight)]" style="width: 40%;"></div></div>
+              <div class="flex justify-between mt-1.5 text-[12px] text-[color:var(--textTer)]"><span>40% used</span><span>35h 48m remaining</span></div>
+            </div>
+
+            <div class="card-solid p-3.5 mb-2">
+              <div class="flex justify-between items-baseline mb-2.5">
+                <div class="field-label">28-Day Rolling</div>
+                <div><span class="text-[17px] font-bold" style="color: var(--status-delayed-fg)">142h 30m</span> <span class="text-[14px] text-[color:var(--textSec)]">/ 190h</span></div>
+              </div>
+              <div class="h-1.5 rounded-full bg-white/10 overflow-hidden"><div class="h-full" style="width: 75%; background: var(--status-delayed-fg);"></div></div>
+              <div class="flex justify-between mt-1.5 text-[12px] text-[color:var(--textTer)]"><span>75% used</span><span>47h 30m remaining</span></div>
+            </div>
+
+            <!-- Stats grid -->
+            <div class="row-section mt-5 mb-2.5"><div class="flex items-center"><span class="section-bar"></span><span class="text-[16px] font-bold">This Month</span></div></div>
+            <div class="grid grid-cols-2 gap-2">
+              <div class="card-solid p-3"><div class="field-label" style="font-size:11px">Block</div><div class="flex items-baseline gap-1.5 mt-1.5"><span class="stat-big">42h 18m</span><span class="text-[11px] font-semibold" style="color: var(--status-ontime-fg)">+3h 12m</span></div></div>
+              <div class="card-solid p-3"><div class="field-label" style="font-size:11px">Duty</div><div class="flex items-baseline gap-1.5 mt-1.5"><span class="stat-big">68h 45m</span><span class="text-[11px] font-semibold" style="color: var(--status-ontime-fg)">+5h</span></div></div>
+              <div class="card-solid p-3"><div class="field-label" style="font-size:11px">Sectors</div><div class="flex items-baseline gap-1.5 mt-1.5"><span class="stat-big">22</span><span class="text-[11px] font-semibold" style="color: var(--status-ontime-fg)">+2</span></div></div>
+              <div class="card-solid p-3"><div class="field-label" style="font-size:11px">Night Duties</div><div class="flex items-baseline gap-1.5 mt-1.5"><span class="stat-big">3</span></div></div>
+              <div class="card-solid p-3"><div class="field-label" style="font-size:11px">Days Off</div><div class="flex items-baseline gap-1.5 mt-1.5"><span class="stat-big">8</span></div></div>
+              <div class="card-solid p-3"><div class="field-label" style="font-size:11px">Avg Block/Day</div><div class="flex items-baseline gap-1.5 mt-1.5"><span class="stat-big">1h 55m</span></div></div>
+            </div>
+
+            <!-- Weekly chart -->
+            <div class="row-section mt-5 mb-2.5"><div class="flex items-center"><span class="section-bar"></span><span class="text-[16px] font-bold">Block by Week</span></div></div>
+            <div class="card-solid p-3.5">
+              <div class="flex items-end gap-3 h-[130px]">
+                <div class="flex-1 flex flex-col items-center gap-1.5 justify-end h-full">
+                  <span class="text-[11px] font-semibold">9h 12m</span>
+                  <div class="w-[70%] rounded bg-[color:var(--accent)]" style="height: 50px"></div>
+                  <span class="text-[11px] text-[color:var(--textSec)] font-medium">W14</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1.5 justify-end h-full">
+                  <span class="text-[11px] font-semibold">12h 30m</span>
+                  <div class="w-[70%] rounded bg-[color:var(--accent)]" style="height: 75px"></div>
+                  <span class="text-[11px] text-[color:var(--textSec)] font-medium">W15</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1.5 justify-end h-full">
+                  <span class="text-[11px] font-semibold">14h 36m</span>
+                  <div class="w-[70%] rounded bg-[color:var(--accent)]" style="height: 90px"></div>
+                  <span class="text-[11px] text-[color:var(--textSec)] font-medium">W16</span>
+                </div>
+                <div class="flex-1 flex flex-col items-center gap-1.5 justify-end h-full">
+                  <span class="text-[11px] font-semibold">6h 0m</span>
+                  <div class="w-[70%] rounded bg-[color:var(--accent)]" style="height: 32px"></div>
+                  <span class="text-[11px] text-[color:var(--textSec)] font-medium">W17</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- CAAV notice -->
+            <div class="mt-4 p-3 rounded-xl flex gap-2.5" style="background: var(--accentSoft); border: 1px solid rgba(96,165,250,0.2);">
+              <i data-lucide="file-text" class="w-4 h-4 mt-0.5" style="color: var(--accent)"></i>
+              <div class="flex-1">
+                <div class="text-[13px] font-semibold">CAAV VAR 15 in effect</div>
+                <div class="text-[13px] text-[color:var(--textSec)] mt-1">Extended FDP with in-flight rest not currently active. Contact rostering for FDP extensions.</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><i data-lucide="home" class="w-5 h-5"></i>Home</div>
+          <div class="tab"><i data-lucide="calendar" class="w-5 h-5"></i>Roster</div>
+          <div class="tab"><i data-lucide="plane" class="w-5 h-5"></i>Flights</div>
+          <div class="tab active"><span class="icon"><i data-lucide="bar-chart-2" class="w-5 h-5"></i></span>Stats</div>
+          <div class="tab"><i data-lucide="more-horizontal" class="w-5 h-5"></i>More</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS · B -->
+  <div>
+    <div class="phone-label"><span class="style-b">B · VisionOS glass</span></div>
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wall-base wall-blur"></div>
+        <div class="glass-bg-scrim"></div>
+        <div class="scroll" style="position: relative; z-index: 1;">
+          <div class="px-4 pt-14 pb-2">
+            <h1 class="text-[22px] font-semibold tracking-tight">Stats</h1>
+            <p class="text-[13px] text-white/55 mt-1">April 2026 · CAAV VAR 15</p>
+
+            <div class="card-glass p-[3px] mt-4 flex gap-0.5">
+              <div class="flex-1 py-1.5 rounded-lg text-center text-[13px] font-semibold" style="background: rgba(255,255,255,0.08); border: 0.5px solid rgba(255,255,255,0.10);">Month</div>
+              <div class="flex-1 py-1.5 rounded-lg text-center text-[13px] font-semibold text-white/55">28 Days</div>
+              <div class="flex-1 py-1.5 rounded-lg text-center text-[13px] font-semibold text-white/55">Year</div>
+            </div>
+
+            <div class="row-section mt-5 mb-2.5"><div class="flex items-center"><span class="section-bar"></span><span class="text-[16px] font-bold">FDTL Compliance</span></div></div>
+
+            <div class="card-glass p-3.5 mb-2">
+              <div class="flex justify-between items-baseline mb-2.5">
+                <div class="field-label">Today's FDP</div>
+                <div><span class="text-[17px] font-bold" style="color: var(--duty-flight)">3h 30m</span> <span class="text-[14px] text-white/55">/ 13h</span></div>
+              </div>
+              <div class="h-1.5 rounded-full bg-white/10 overflow-hidden"><div class="h-full bg-[color:var(--duty-flight)]" style="width: 26%;"></div></div>
+              <div class="flex justify-between mt-1.5 text-[12px] text-white/35"><span>26% used</span><span>9h 30m remaining</span></div>
+            </div>
+            <div class="card-glass p-3.5 mb-2">
+              <div class="flex justify-between items-baseline mb-2.5">
+                <div class="field-label">7-Day Rolling</div>
+                <div><span class="text-[17px] font-bold" style="color: var(--duty-flight)">24h 12m</span> <span class="text-[14px] text-white/55">/ 60h</span></div>
+              </div>
+              <div class="h-1.5 rounded-full bg-white/10 overflow-hidden"><div class="h-full bg-[color:var(--duty-flight)]" style="width: 40%;"></div></div>
+              <div class="flex justify-between mt-1.5 text-[12px] text-white/35"><span>40% used</span><span>35h 48m remaining</span></div>
+            </div>
+            <div class="card-glass p-3.5 mb-2">
+              <div class="flex justify-between items-baseline mb-2.5">
+                <div class="field-label">28-Day Rolling</div>
+                <div><span class="text-[17px] font-bold" style="color: var(--status-delayed-fg)">142h 30m</span> <span class="text-[14px] text-white/55">/ 190h</span></div>
+              </div>
+              <div class="h-1.5 rounded-full bg-white/10 overflow-hidden"><div class="h-full" style="width: 75%; background: var(--status-delayed-fg);"></div></div>
+              <div class="flex justify-between mt-1.5 text-[12px] text-white/35"><span>75% used</span><span>47h 30m remaining</span></div>
+            </div>
+
+            <div class="row-section mt-5 mb-2.5"><div class="flex items-center"><span class="section-bar"></span><span class="text-[16px] font-bold">This Month</span></div></div>
+            <div class="grid grid-cols-2 gap-2">
+              <div class="card-glass p-3"><div class="field-label" style="font-size:11px">Block</div><div class="flex items-baseline gap-1.5 mt-1.5"><span class="stat-big">42h 18m</span><span class="text-[11px] font-semibold" style="color: var(--status-ontime-fg)">+3h 12m</span></div></div>
+              <div class="card-glass p-3"><div class="field-label" style="font-size:11px">Duty</div><div class="flex items-baseline gap-1.5 mt-1.5"><span class="stat-big">68h 45m</span><span class="text-[11px] font-semibold" style="color: var(--status-ontime-fg)">+5h</span></div></div>
+              <div class="card-glass p-3"><div class="field-label" style="font-size:11px">Sectors</div><div class="flex items-baseline gap-1.5 mt-1.5"><span class="stat-big">22</span><span class="text-[11px] font-semibold" style="color: var(--status-ontime-fg)">+2</span></div></div>
+              <div class="card-glass p-3"><div class="field-label" style="font-size:11px">Night Duties</div><div class="flex items-baseline gap-1.5 mt-1.5"><span class="stat-big">3</span></div></div>
+              <div class="card-glass p-3"><div class="field-label" style="font-size:11px">Days Off</div><div class="flex items-baseline gap-1.5 mt-1.5"><span class="stat-big">8</span></div></div>
+              <div class="card-glass p-3"><div class="field-label" style="font-size:11px">Avg Block/Day</div><div class="flex items-baseline gap-1.5 mt-1.5"><span class="stat-big">1h 55m</span></div></div>
+            </div>
+
+            <div class="row-section mt-5 mb-2.5"><div class="flex items-center"><span class="section-bar"></span><span class="text-[16px] font-bold">Block by Week</span></div></div>
+            <div class="card-glass p-3.5">
+              <div class="flex items-end gap-3 h-[130px]">
+                <div class="flex-1 flex flex-col items-center gap-1.5 justify-end h-full"><span class="text-[11px] font-semibold">9h 12m</span><div class="w-[70%] rounded bg-[color:var(--accent)]" style="height: 50px"></div><span class="text-[11px] text-white/55 font-medium">W14</span></div>
+                <div class="flex-1 flex flex-col items-center gap-1.5 justify-end h-full"><span class="text-[11px] font-semibold">12h 30m</span><div class="w-[70%] rounded bg-[color:var(--accent)]" style="height: 75px"></div><span class="text-[11px] text-white/55 font-medium">W15</span></div>
+                <div class="flex-1 flex flex-col items-center gap-1.5 justify-end h-full"><span class="text-[11px] font-semibold">14h 36m</span><div class="w-[70%] rounded bg-[color:var(--accent)]" style="height: 90px"></div><span class="text-[11px] text-white/55 font-medium">W16</span></div>
+                <div class="flex-1 flex flex-col items-center gap-1.5 justify-end h-full"><span class="text-[11px] font-semibold">6h 0m</span><div class="w-[70%] rounded bg-[color:var(--accent)]" style="height: 32px"></div><span class="text-[11px] text-white/55 font-medium">W17</span></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+        <div class="tabbar glass">
+          <div class="tab"><i data-lucide="home" class="w-5 h-5"></i>Home</div>
+          <div class="tab"><i data-lucide="calendar" class="w-5 h-5"></i>Roster</div>
+          <div class="tab"><i data-lucide="plane" class="w-5 h-5"></i>Flights</div>
+          <div class="tab active"><span class="icon"><i data-lucide="bar-chart-2" class="w-5 h-5"></i></span>Stats</div>
+          <div class="tab"><i data-lucide="more-horizontal" class="w-5 h-5"></i>More</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================== MORE ================== -->
+  <h2 class="group">More <small>tab 5 — profile, sharing toggles, documents, settings</small></h2>
+
+  <!-- MORE · A -->
+  <div>
+    <div class="phone-label"><span class="style-a">A · Solid cards</span></div>
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="scroll">
+          <div class="px-4 pt-14 pb-2">
+            <h1 class="text-[22px] font-semibold tracking-tight mb-4">More</h1>
+
+            <!-- Profile -->
+            <div class="card-solid p-4 mb-4 flex items-center gap-3.5">
+              <div class="w-14 h-14 rounded-full bg-[color:var(--accent)] flex items-center justify-center text-white text-[20px] font-bold tracking-wider">VL</div>
+              <div class="flex-1 min-w-0">
+                <div class="text-[16px] font-semibold tracking-tight truncate">Vivi Lam</div>
+                <div class="text-[13px] text-[color:var(--textSec)] mt-0.5 truncate">10178 · Captain</div>
+                <div class="flex flex-wrap gap-1.5 mt-2">
+                  <span class="px-1.5 py-0.5 rounded-md text-[12px] font-semibold bg-white/5 text-[color:var(--textSec)]">HAN Base</span>
+                  <span class="px-1.5 py-0.5 rounded-md text-[12px] font-semibold bg-white/5 text-[color:var(--textSec)]">A320</span>
+                  <span class="px-1.5 py-0.5 rounded-md text-[12px] font-semibold bg-white/5 text-[color:var(--textSec)]">A321</span>
+                </div>
+              </div>
+              <i data-lucide="chevron-right" class="w-4 h-4" style="color: var(--textTer)"></i>
+            </div>
+
+            <!-- Roster Sharing -->
+            <div class="row-section mb-2.5"><div class="flex items-center"><span class="section-bar"></span><span class="text-[16px] font-bold">Roster Sharing</span></div></div>
+            <div class="space-y-2.5">
+              <div class="card-solid p-3 flex items-center gap-3">
+                <div class="w-[34px] h-[34px] rounded-lg flex items-center justify-center" style="background: rgba(96,165,250,0.13);"><i data-lucide="share-2" class="w-[18px] h-[18px]" style="color: var(--accent)"></i></div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-[13px] font-semibold">Share with Family</div>
+                  <div class="text-[13px] text-[color:var(--textSec)] mt-0.5">Family can view your roster via web link</div>
+                </div>
+                <div class="w-[44px] h-[24px] rounded-full bg-[color:var(--accent)] flex items-center justify-end px-0.5"><div class="w-[20px] h-[20px] rounded-full bg-white"></div></div>
+              </div>
+              <div class="card-solid p-3 flex items-center gap-3">
+                <div class="w-[34px] h-[34px] rounded-lg bg-white/5 flex items-center justify-center"><i data-lucide="users" class="w-[18px] h-[18px]" style="color: var(--textSec)"></i></div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-[13px] font-semibold">Share with Crew</div>
+                  <div class="text-[13px] text-[color:var(--textSec)] mt-0.5">Colleagues see roster for trip coordination</div>
+                </div>
+                <div class="w-[44px] h-[24px] rounded-full bg-white/10 flex items-center px-0.5"><div class="w-[20px] h-[20px] rounded-full bg-white"></div></div>
+              </div>
+              <div class="card-solid p-3 flex items-center gap-3">
+                <div class="w-[34px] h-[34px] rounded-lg flex items-center justify-center" style="background: rgba(96,165,250,0.13);"><i data-lucide="calendar" class="w-[18px] h-[18px]" style="color: var(--accent)"></i></div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-[13px] font-semibold">Calendar Sync</div>
+                  <div class="text-[13px] text-[color:var(--textSec)] mt-0.5">Synced with device calendar · 2m ago</div>
+                </div>
+                <div class="w-[44px] h-[24px] rounded-full bg-[color:var(--accent)] flex items-center justify-end px-0.5"><div class="w-[20px] h-[20px] rounded-full bg-white"></div></div>
+              </div>
+            </div>
+
+            <!-- Documents -->
+            <div class="row-section mt-5 mb-2.5"><div class="flex items-center"><span class="section-bar"></span><span class="text-[16px] font-bold">Documents</span></div></div>
+            <div class="card-solid">
+              <div class="px-3.5 py-3 flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center"><i data-lucide="award" class="w-[18px] h-[18px]"></i></div>
+                <div class="flex-1"><div class="text-[14px] font-medium">Licenses & Certificates</div></div>
+                <span class="chip" style="background: rgba(245,158,11,0.15); color: var(--status-delayed-fg)">2 expiring 30d</span>
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5" style="color: var(--textTer)"></i>
+              </div>
+              <div class="border-b border-white/10 ml-[58px]"></div>
+              <div class="px-3.5 py-3 flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center"><i data-lucide="book" class="w-[18px] h-[18px]"></i></div>
+                <div class="flex-1"><div class="text-[14px] font-medium">Company Manuals</div><div class="text-[13px] text-[color:var(--textSec)] mt-0.5">Coming soon</div></div>
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5" style="color: var(--textTer)"></i>
+              </div>
+              <div class="border-b border-white/10 ml-[58px]"></div>
+              <div class="px-3.5 py-3 flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center"><i data-lucide="wallet" class="w-[18px] h-[18px]"></i></div>
+                <div class="flex-1"><div class="text-[14px] font-medium">Pay Slips</div><div class="text-[13px] text-[color:var(--textSec)] mt-0.5">Coming soon</div></div>
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5" style="color: var(--textTer)"></i>
+              </div>
+            </div>
+
+            <!-- Sign out -->
+            <button class="mt-5 w-full py-3.5 rounded-xl border border-red-500/30 card-solid flex items-center justify-center gap-2 text-[14px] font-semibold" style="color: var(--status-cancelled-fg)">
+              <i data-lucide="log-out" class="w-4 h-4"></i>Sign out
+            </button>
+
+          </div>
+        </div>
+        <div class="tabbar">
+          <div class="tab"><i data-lucide="home" class="w-5 h-5"></i>Home</div>
+          <div class="tab"><i data-lucide="calendar" class="w-5 h-5"></i>Roster</div>
+          <div class="tab"><i data-lucide="plane" class="w-5 h-5"></i>Flights</div>
+          <div class="tab"><i data-lucide="bar-chart-2" class="w-5 h-5"></i>Stats</div>
+          <div class="tab active"><span class="icon"><i data-lucide="more-horizontal" class="w-5 h-5"></i></span>More</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MORE · B -->
+  <div>
+    <div class="phone-label"><span class="style-b">B · VisionOS glass</span></div>
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wall-base wall-blur"></div>
+        <div class="glass-bg-scrim"></div>
+        <div class="scroll" style="position: relative; z-index: 1;">
+          <div class="px-4 pt-14 pb-2">
+            <h1 class="text-[22px] font-semibold tracking-tight mb-4">More</h1>
+
+            <div class="card-glass-strong p-4 mb-4 flex items-center gap-3.5">
+              <div class="w-14 h-14 rounded-full bg-[color:var(--accent)] flex items-center justify-center text-white text-[20px] font-bold tracking-wider">VL</div>
+              <div class="flex-1 min-w-0">
+                <div class="text-[16px] font-semibold tracking-tight truncate">Vivi Lam</div>
+                <div class="text-[13px] text-white/55 mt-0.5 truncate">10178 · Captain</div>
+                <div class="flex flex-wrap gap-1.5 mt-2">
+                  <span class="px-1.5 py-0.5 rounded-md text-[12px] font-semibold bg-white/[0.08] text-white/55">HAN Base</span>
+                  <span class="px-1.5 py-0.5 rounded-md text-[12px] font-semibold bg-white/[0.08] text-white/55">A320</span>
+                  <span class="px-1.5 py-0.5 rounded-md text-[12px] font-semibold bg-white/[0.08] text-white/55">A321</span>
+                </div>
+              </div>
+              <i data-lucide="chevron-right" class="w-4 h-4 text-white/35"></i>
+            </div>
+
+            <div class="row-section mb-2.5"><div class="flex items-center"><span class="section-bar"></span><span class="text-[16px] font-bold">Roster Sharing</span></div></div>
+            <div class="space-y-2.5">
+              <div class="card-glass p-3 flex items-center gap-3">
+                <div class="w-[34px] h-[34px] rounded-lg flex items-center justify-center" style="background: rgba(96,165,250,0.13);"><i data-lucide="share-2" class="w-[18px] h-[18px]" style="color: var(--accent)"></i></div>
+                <div class="flex-1 min-w-0"><div class="text-[13px] font-semibold">Share with Family</div><div class="text-[13px] text-white/55 mt-0.5">Family can view via web link</div></div>
+                <div class="w-[44px] h-[24px] rounded-full bg-[color:var(--accent)] flex items-center justify-end px-0.5"><div class="w-[20px] h-[20px] rounded-full bg-white"></div></div>
+              </div>
+              <div class="card-glass p-3 flex items-center gap-3">
+                <div class="w-[34px] h-[34px] rounded-lg bg-white/[0.06] flex items-center justify-center"><i data-lucide="users" class="w-[18px] h-[18px] text-white/55"></i></div>
+                <div class="flex-1 min-w-0"><div class="text-[13px] font-semibold">Share with Crew</div><div class="text-[13px] text-white/55 mt-0.5">Colleagues see roster</div></div>
+                <div class="w-[44px] h-[24px] rounded-full bg-white/10 flex items-center px-0.5"><div class="w-[20px] h-[20px] rounded-full bg-white"></div></div>
+              </div>
+            </div>
+
+            <div class="row-section mt-5 mb-2.5"><div class="flex items-center"><span class="section-bar"></span><span class="text-[16px] font-bold">Documents</span></div></div>
+            <div class="card-glass">
+              <div class="px-3.5 py-3 flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center"><i data-lucide="award" class="w-[18px] h-[18px]"></i></div>
+                <div class="flex-1"><div class="text-[14px] font-medium">Licenses & Certificates</div></div>
+                <span class="chip" style="background: rgba(245,158,11,0.15); color: var(--status-delayed-fg)">2 expiring</span>
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-white/35"></i>
+              </div>
+              <div class="border-b border-white/[0.08] ml-[58px]"></div>
+              <div class="px-3.5 py-3 flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center"><i data-lucide="book" class="w-[18px] h-[18px]"></i></div>
+                <div class="flex-1"><div class="text-[14px] font-medium">Company Manuals</div><div class="text-[13px] text-white/55 mt-0.5">Coming soon</div></div>
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-white/35"></i>
+              </div>
+            </div>
+
+            <button class="mt-5 w-full py-3.5 rounded-xl border border-red-500/40 card-glass flex items-center justify-center gap-2 text-[14px] font-semibold" style="color: var(--status-cancelled-fg)">
+              <i data-lucide="log-out" class="w-4 h-4"></i>Sign out
+            </button>
+
+          </div>
+        </div>
+        <div class="tabbar glass">
+          <div class="tab"><i data-lucide="home" class="w-5 h-5"></i>Home</div>
+          <div class="tab"><i data-lucide="calendar" class="w-5 h-5"></i>Roster</div>
+          <div class="tab"><i data-lucide="plane" class="w-5 h-5"></i>Flights</div>
+          <div class="tab"><i data-lucide="bar-chart-2" class="w-5 h-5"></i>Stats</div>
+          <div class="tab active"><span class="icon"><i data-lucide="more-horizontal" class="w-5 h-5"></i></span>More</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================== DUTY DETAIL ================== -->
+  <h2 class="group">Duty Detail (modal route /duty/[assignmentId]) <small>map + sector pager + pairing summary</small></h2>
+
+  <!-- DUTY · A -->
+  <div>
+    <div class="phone-label"><span class="style-a">A · Solid cards</span></div>
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="scroll" style="padding-bottom: 30px;">
+          <div class="px-4 pt-14 pb-2">
+
+            <button class="flex items-center gap-1 text-[14px] text-[color:var(--textSec)] mb-3"><i data-lucide="chevron-left" class="w-4 h-4"></i>Back</button>
+
+            <!-- Header -->
+            <div class="flex items-center gap-2 mb-1">
+              <h1 class="text-[22px] font-semibold tracking-tight">H800</h1>
+              <span class="chip chip-scheduled">Scheduled</span>
+            </div>
+            <p class="text-[13px] text-[color:var(--textSec)]">HAN Base · A321 · 2 sectors · 3h 30m block</p>
+
+            <!-- Map -->
+            <div class="card-solid mt-4 p-0 overflow-hidden">
+              <div class="map-placeholder">
+                <!-- Markers -->
+                <div class="absolute" style="top: 60%; left: 25%;"><div class="w-3 h-3 rounded-full bg-[color:var(--accent)] ring-4 ring-[color:var(--accent)]/30"></div><div class="text-[11px] mt-1 font-semibold">HAN</div></div>
+                <div class="absolute" style="top: 75%; left: 70%;"><div class="w-3 h-3 rounded-full bg-[color:var(--accent)] ring-4 ring-[color:var(--accent)]/30"></div><div class="text-[11px] mt-1 font-semibold">BKK</div></div>
+                <!-- Arc -->
+                <svg class="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <path d="M 25 60 Q 47 35 70 75" stroke="var(--accent)" stroke-width="0.5" fill="none" stroke-linecap="round"/>
+                </svg>
+              </div>
+            </div>
+
+            <!-- Sector pager -->
+            <div class="mt-4">
+              <div class="field-label mb-2">Sectors</div>
+              <div class="card-solid p-4">
+                <div class="route-line">
+                  <div><div class="text-[28px] font-bold leading-tight">HAN</div><div class="text-[12px] text-[color:var(--textSec)] mt-1">05:30</div></div>
+                  <div class="connector"></div>
+                  <div class="plane-glyph"><i data-lucide="plane-takeoff" class="w-5 h-5"></i></div>
+                  <div class="text-right"><div class="text-[28px] font-bold leading-tight">BKK</div><div class="text-[12px] text-[color:var(--textSec)] mt-1">07:15</div></div>
+                </div>
+                <div class="grid grid-cols-2 gap-y-3 mt-5">
+                  <div><div class="text-[11px] text-[color:var(--textSec)]">Flight</div><div class="text-[13px] font-semibold mt-0.5">VJ921</div></div>
+                  <div><div class="text-[11px] text-[color:var(--textSec)]">Date</div><div class="text-[13px] font-semibold mt-0.5">2026-04-28</div></div>
+                  <div><div class="text-[11px] text-[color:var(--textSec)]">Aircraft</div><div class="text-[13px] font-semibold mt-0.5">A321</div></div>
+                  <div><div class="text-[11px] text-[color:var(--textSec)]">Tail</div><div class="text-[13px] font-semibold mt-0.5">SK-H411</div></div>
+                  <div><div class="text-[11px] text-[color:var(--textSec)]">STD</div><div class="text-[13px] font-semibold mt-0.5">05:30</div></div>
+                  <div><div class="text-[11px] text-[color:var(--textSec)]">STA</div><div class="text-[13px] font-semibold mt-0.5">07:15</div></div>
+                  <div><div class="text-[11px] text-[color:var(--textSec)]">Block</div><div class="text-[13px] font-semibold mt-0.5">1h 45m</div></div>
+                  <div><div class="text-[11px] text-[color:var(--textSec)]">Sector</div><div class="text-[13px] font-semibold mt-0.5">1 of 2</div></div>
+                </div>
+              </div>
+              <div class="flex justify-center gap-1.5 mt-2"><span class="block w-[18px] h-[6px] rounded-[3px] bg-[color:var(--accent)]"></span><span class="block w-[6px] h-[6px] rounded-[3px] bg-white/10"></span></div>
+            </div>
+
+            <!-- Pairing summary -->
+            <div class="card-solid p-3.5 mt-4">
+              <div class="field-label mb-2">Pairing summary</div>
+              <div class="grid grid-cols-2 gap-y-3 mt-2">
+                <div><div class="text-[11px] text-[color:var(--textSec)]">Report</div><div class="text-[13px] font-semibold mt-0.5">04:30</div></div>
+                <div><div class="text-[11px] text-[color:var(--textSec)]">Release</div><div class="text-[13px] font-semibold mt-0.5">11:05</div></div>
+                <div><div class="text-[11px] text-[color:var(--textSec)]">Sectors</div><div class="text-[13px] font-semibold mt-0.5">2</div></div>
+                <div><div class="text-[11px] text-[color:var(--textSec)]">Block</div><div class="text-[13px] font-semibold mt-0.5">3h 30m</div></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DUTY · B -->
+  <div>
+    <div class="phone-label"><span class="style-b">B · VisionOS glass</span></div>
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="notch"></div>
+        <div class="wall-base wall-blur"></div>
+        <div class="glass-bg-scrim"></div>
+        <div class="scroll" style="position: relative; z-index: 1; padding-bottom: 30px;">
+          <div class="px-4 pt-14 pb-2">
+            <button class="flex items-center gap-1 text-[14px] text-white/55 mb-3"><i data-lucide="chevron-left" class="w-4 h-4"></i>Back</button>
+            <div class="flex items-center gap-2 mb-1">
+              <h1 class="text-[22px] font-semibold tracking-tight">H800</h1>
+              <span class="chip chip-scheduled">Scheduled</span>
+            </div>
+            <p class="text-[13px] text-white/55">HAN Base · A321 · 2 sectors · 3h 30m block</p>
+
+            <div class="card-glass mt-4 p-0 overflow-hidden">
+              <div class="map-placeholder">
+                <div class="absolute" style="top: 60%; left: 25%;"><div class="w-3 h-3 rounded-full bg-[color:var(--accent)] ring-4 ring-[color:var(--accent)]/30"></div><div class="text-[11px] mt-1 font-semibold">HAN</div></div>
+                <div class="absolute" style="top: 75%; left: 70%;"><div class="w-3 h-3 rounded-full bg-[color:var(--accent)] ring-4 ring-[color:var(--accent)]/30"></div><div class="text-[11px] mt-1 font-semibold">BKK</div></div>
+                <svg class="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <path d="M 25 60 Q 47 35 70 75" stroke="var(--accent)" stroke-width="0.5" fill="none" stroke-linecap="round"/>
+                </svg>
+              </div>
+            </div>
+
+            <div class="mt-4">
+              <div class="field-label mb-2">Sectors</div>
+              <div class="card-glass-strong p-4">
+                <div class="route-line">
+                  <div><div class="text-[28px] font-bold leading-tight">HAN</div><div class="text-[12px] text-white/55 mt-1">05:30</div></div>
+                  <div class="connector"></div>
+                  <div class="plane-glyph"><i data-lucide="plane-takeoff" class="w-5 h-5"></i></div>
+                  <div class="text-right"><div class="text-[28px] font-bold leading-tight">BKK</div><div class="text-[12px] text-white/55 mt-1">07:15</div></div>
+                </div>
+                <div class="grid grid-cols-2 gap-y-3 mt-5">
+                  <div><div class="text-[11px] text-white/55">Flight</div><div class="text-[13px] font-semibold mt-0.5">VJ921</div></div>
+                  <div><div class="text-[11px] text-white/55">Date</div><div class="text-[13px] font-semibold mt-0.5">2026-04-28</div></div>
+                  <div><div class="text-[11px] text-white/55">Aircraft</div><div class="text-[13px] font-semibold mt-0.5">A321</div></div>
+                  <div><div class="text-[11px] text-white/55">Tail</div><div class="text-[13px] font-semibold mt-0.5">SK-H411</div></div>
+                  <div><div class="text-[11px] text-white/55">STD</div><div class="text-[13px] font-semibold mt-0.5">05:30</div></div>
+                  <div><div class="text-[11px] text-white/55">STA</div><div class="text-[13px] font-semibold mt-0.5">07:15</div></div>
+                  <div><div class="text-[11px] text-white/55">Block</div><div class="text-[13px] font-semibold mt-0.5">1h 45m</div></div>
+                  <div><div class="text-[11px] text-white/55">Sector</div><div class="text-[13px] font-semibold mt-0.5">1 of 2</div></div>
+                </div>
+              </div>
+              <div class="flex justify-center gap-1.5 mt-2"><span class="block w-[18px] h-[6px] rounded-[3px] bg-[color:var(--accent)]"></span><span class="block w-[6px] h-[6px] rounded-[3px] bg-white/10"></span></div>
+            </div>
+
+            <div class="card-glass p-3.5 mt-4">
+              <div class="field-label mb-2">Pairing summary</div>
+              <div class="grid grid-cols-2 gap-y-3 mt-2">
+                <div><div class="text-[11px] text-white/55">Report</div><div class="text-[13px] font-semibold mt-0.5">04:30</div></div>
+                <div><div class="text-[11px] text-white/55">Release</div><div class="text-[13px] font-semibold mt-0.5">11:05</div></div>
+                <div><div class="text-[11px] text-white/55">Sectors</div><div class="text-[13px] font-semibold mt-0.5">2</div></div>
+                <div><div class="text-[11px] text-white/55">Block</div><div class="text-[13px] font-semibold mt-0.5">3h 30m</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================== LOGIN ================== -->
+  <h2 class="group">Login (already glass — included for reference) <small>operator picker, EID, PIN, keep-me-signed-in</small></h2>
+
+  <div style="grid-column: 1 / -1; display: flex; justify-content: center;">
+    <div>
+      <div class="phone-label"><span class="style-b">B · Glass (real screen)</span></div>
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="notch"></div>
+          <div class="wall-base"></div>
+          <div class="absolute inset-0" style="background: linear-gradient(180deg, rgba(10,10,18,0.6), rgba(10,10,18,0.85));"></div>
+          <div class="absolute inset-0 flex flex-col justify-center px-5" style="z-index: 1;">
+
+            <!-- Logo block -->
+            <div class="text-center mb-7">
+              <div class="text-white text-[34px] font-bold tracking-wider">SKY HUB</div>
+              <div class="text-white/40 text-[13px] mt-1">Crew companion</div>
+            </div>
+
+            <!-- Glass card -->
+            <div class="card-glass-strong p-5">
+              <div class="text-center mb-4">
+                <div class="text-[19px] font-semibold">Sign in</div>
+                <div class="text-[13px] text-white/40 mt-1">Enter your credentials to continue</div>
+              </div>
+
+              <div class="field-label" style="color: rgba(255,255,255,0.45); margin-bottom: 6px;">Airline</div>
+              <div class="h-[46px] rounded-[10px] border border-white/10 flex items-center justify-between px-3.5 mb-3.5" style="background: rgba(255,255,255,0.07);">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white" style="background: #c8102e;">SK</div>
+                  <span class="text-[14px] font-medium">SkyHub Aviation</span>
+                </div>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-white/55"></i>
+              </div>
+
+              <div class="field-label" style="color: rgba(255,255,255,0.45); margin-bottom: 6px;">Crew ID</div>
+              <div class="h-[46px] rounded-[10px] border border-white/10 flex items-center px-3.5 mb-3.5 text-[14px]" style="background: rgba(255,255,255,0.07);">10178</div>
+
+              <div class="field-label" style="color: rgba(255,255,255,0.45); margin-bottom: 6px;">Password</div>
+              <div class="h-[46px] rounded-[10px] border border-white/10 flex items-center justify-between px-3.5 mb-1.5" style="background: rgba(255,255,255,0.07);">
+                <span class="text-[14px] tracking-[4px]">••••••</span>
+                <i data-lucide="eye-off" class="w-4 h-4 text-white/55"></i>
+              </div>
+
+              <div class="flex items-center gap-2.5 mt-3.5 mb-1">
+                <div class="w-[18px] h-[18px] rounded border-[1.5px] flex items-center justify-center" style="background: var(--accent); border-color: var(--accent);"><i data-lucide="check" class="w-3 h-3 text-white" stroke-width="3"></i></div>
+                <span class="text-[13px]">Keep me logged in</span>
+              </div>
+
+              <button class="btn-primary mt-4">Sign in</button>
+            </div>
+
+            <p class="text-center text-white/40 text-[12px] mt-7">skyhub.aero</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer class="max-w-6xl mx-auto mt-16 pb-12 text-gray-500 text-sm border-t border-white/10 pt-8">
+  <p><strong>Stack:</strong> Expo SDK 54 · React Native 0.81 · Expo Router · WatermelonDB (offline-first) · TanStack Query · expo-blur · react-native-maps</p>
+  <p class="mt-2"><strong>Source files mirrored:</strong> <code>apps/crew/app/(tabs)/{index,roster,flights,stats,more}.tsx</code> · <code>apps/crew/app/duty/[assignmentId].tsx</code> · <code>apps/crew/app/login/eid-pin.tsx</code></p>
+  <p class="mt-2"><strong>Tokens:</strong> <code>apps/crew/src/theme/tokens.ts</code> — dark scheme. Hex values in this file are 1:1 with runtime.</p>
+  <p class="mt-2 text-gray-600">Open this file in any browser. Hand the URL or HTML to Stitch / Claude design / Figma. Iterate on the right column (B), then bring proposals back here.</p>
+</footer>
+
+<script>
+  // Build calendar grid for both rosters
+  function buildCal(id) {
+    const root = document.getElementById(id);
+    if (!root) return;
+    // April 2026 starts Wed
+    const lead = 2; // Mon=0 → Wed=2
+    const dim = 30;
+    const today = 28;
+    // duties pattern: flights on 27,28; rest on 29; standby 30; training 1 (next month — skip)
+    const duty = {};
+    duty[27] = ['flight'];
+    duty[28] = ['flight'];
+    duty[29] = ['rest'];
+    duty[30] = ['standby'];
+    duty[15] = ['flight','flight'];
+    duty[16] = ['flight'];
+    duty[17] = ['rest'];
+    duty[20] = ['training'];
+    duty[22] = ['flight'];
+    duty[23] = ['flight'];
+    duty[10] = ['standby'];
+    duty[11] = ['rest'];
+
+    const colorOf = k => ({flight:'var(--duty-flight)', rest:'var(--duty-rest)', standby:'var(--duty-standby)', training:'var(--duty-training)'})[k] || '#888';
+
+    let html = '';
+    for (let i = 0; i < lead; i++) html += `<div></div>`;
+    for (let d = 1; d <= dim; d++) {
+      const dots = (duty[d] || []).slice(0,2).map(k => `<span class="duty-dot" style="width:5px;height:5px;background:${colorOf(k)};"></span>`).join(' ');
+      const isToday = d === today;
+      html += `<div class="cal-cell ${isToday?'today selected':''}">
+        <div class="num">${d}</div>
+        <div style="display:flex;gap:2px;align-items:center;min-height:6px;">${dots}</div>
+        <div style="min-height:9px"></div>
+      </div>`;
+    }
+    root.innerHTML = html;
+  }
+  buildCal('cal-a');
+  buildCal('cal-b');
+
+  // Lucide icons
+  if (window.lucide) lucide.createIcons();
+</script>
+
+</body>
+</html>

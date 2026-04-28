@@ -3,9 +3,10 @@ import { Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { ChevronLeft, ChevronRight, Plane, Bed, Clock, GraduationCap, Briefcase, X } from 'lucide-react-native'
-import { Card, Chip, DutyDot, FieldLabel } from '../../src/components/primitives'
+import { Chip, DutyDot, Glass, SectionHeader } from '../../src/components/primitives'
 import type { DutyKind } from '../../src/components/primitives'
 import { useTheme } from '../../src/theme/use-theme'
+import { useScheme } from '../../src/stores/use-theme-store'
 import type { Theme } from '../../src/theme/tokens'
 import { TYPE } from '../../src/theme/tokens'
 import { useDatabase } from '../../src/providers/DatabaseProvider'
@@ -17,8 +18,25 @@ import { fmtBlock, fmtMonthShort, fmtMonthYear } from '../../src/data/format'
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
+const TINT_DARK: Record<DutyKind, string> = {
+  flight: 'rgba(96,165,250,0.18)',
+  standby: 'rgba(251,191,36,0.18)',
+  rest: 'rgba(167,139,250,0.18)',
+  training: 'rgba(74,222,128,0.18)',
+  ground: 'rgba(148,163,184,0.18)',
+}
+
+const TINT_LIGHT: Record<DutyKind, string> = {
+  flight: 'rgba(59,130,246,0.14)',
+  standby: 'rgba(245,158,11,0.18)',
+  rest: 'rgba(139,92,246,0.16)',
+  training: 'rgba(34,197,94,0.16)',
+  ground: 'rgba(100,116,139,0.16)',
+}
+
 export default function RosterTab() {
   const t = useTheme()
+  const scheme = useScheme()
   const router = useRouter()
   const database = useDatabase()
   const today = new Date()
@@ -36,8 +54,8 @@ export default function RosterTab() {
   const [tooltipDom, setTooltipDom] = useState<number | null>(null)
 
   const cells = useMemo(() => {
-    const firstWeekday = new Date(year, monthIdx0, 1).getDay() // 0=Sun
-    const lead = (firstWeekday + 6) % 7 // Mon=0
+    const firstWeekday = new Date(year, monthIdx0, 1).getDay()
+    const lead = (firstWeekday + 6) % 7
     const dim = new Date(year, monthIdx0 + 1, 0).getDate()
     const arr: (number | null)[] = []
     for (let i = 0; i < lead; i++) arr.push(null)
@@ -77,17 +95,18 @@ export default function RosterTab() {
 
   const tooltipDuties = tooltipDom != null ? (data.byDom[tooltipDom] ?? []) : []
   const tooltipSummary = summarizeDay(tooltipDuties)
+  const tints = scheme === 'dark' ? TINT_DARK : TINT_LIGHT
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 18 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}
         showsVerticalScrollIndicator={false}
       >
         {/* Month nav */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <NavBtn onPress={onPrev} t={t}>
+          <NavBtn onPress={onPrev}>
             <ChevronLeft color={t.text} size={16} />
           </NavBtn>
           <View style={{ alignItems: 'center' }}>
@@ -96,13 +115,13 @@ export default function RosterTab() {
               {data.days.length} active day{data.days.length === 1 ? '' : 's'}
             </Text>
           </View>
-          <NavBtn onPress={onNext} t={t}>
+          <NavBtn onPress={onNext}>
             <ChevronRight color={t.text} size={16} />
           </NavBtn>
         </View>
 
         {/* Calendar */}
-        <Card t={t} padding={10}>
+        <Glass tier="hero" padding={10}>
           <View style={{ flexDirection: 'row', marginBottom: 6 }}>
             {WEEKDAYS.map((d) => (
               <View key={d} style={{ flex: 1, alignItems: 'center' }}>
@@ -122,6 +141,7 @@ export default function RosterTab() {
                     isToday={isCurrentMonth && d === todayDom}
                     isSelected={d === selectedDom}
                     duties={data.byDom[d] ?? []}
+                    tints={tints}
                     onPress={() => {
                       setSelectedDom(d)
                       setTooltipDom(d)
@@ -131,7 +151,7 @@ export default function RosterTab() {
               </View>
             ))}
           </View>
-        </Card>
+        </Glass>
 
         {/* Legend */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
@@ -151,11 +171,11 @@ export default function RosterTab() {
         {/* Day list */}
         <View style={{ gap: 18 }}>
           {data.days.length === 0 && (
-            <Card t={t} padding={20}>
+            <Glass tier="soft" padding={20}>
               <Text style={{ ...TYPE.caption, color: t.textSec, textAlign: 'center' }}>
                 No duties this month. Pull down to sync.
               </Text>
-            </Card>
+            </Glass>
           )}
           {data.days.map((day) => {
             const isSelected = day.dom === selectedDom
@@ -176,7 +196,7 @@ export default function RosterTab() {
                 </View>
                 <View style={{ gap: 6 }}>
                   {day.duties.map((duty) => (
-                    <DutyRow key={duty.id} duty={duty} t={t} onPress={() => onDutyTap(duty)} />
+                    <DutyRow key={duty.id} duty={duty} t={t} highlight={isToday} onPress={() => onDutyTap(duty)} />
                   ))}
                 </View>
               </View>
@@ -197,46 +217,42 @@ export default function RosterTab() {
             padding: 24,
           }}
         >
-          <Pressable
-            onPress={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: t.card,
-              borderRadius: 16,
-              borderWidth: 0.5,
-              borderColor: t.cardBorder,
-              padding: 18,
-              minWidth: 260,
-              maxWidth: 320,
-            }}
-          >
-            <View
-              style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}
-            >
-              <Text style={{ ...TYPE.section, color: t.text }}>
-                {tooltipDom != null
-                  ? new Date(year, monthIdx0, tooltipDom).toLocaleDateString(undefined, {
-                      weekday: 'long',
-                      day: '2-digit',
-                      month: 'short',
-                    })
-                  : ''}
-              </Text>
-              <Pressable onPress={() => setTooltipDom(null)} hitSlop={8}>
-                <X color={t.textSec} size={18} />
-              </Pressable>
-            </View>
-            {tooltipDuties.length === 0 ? (
-              <Text style={{ ...TYPE.caption, color: t.textSec }}>No duties this day.</Text>
-            ) : (
-              <View style={{ gap: 8 }}>
-                <SummaryRow t={t} k="Flights" v={String(tooltipSummary.flightCount)} />
-                <SummaryRow t={t} k="Block hours" v={fmtBlock(tooltipSummary.blockMinutes)} />
-                <SummaryRow t={t} k="Duty hours" v={fmtBlock(tooltipSummary.dutyMinutes)} />
-                {tooltipSummary.activityNames.length > 0 && (
-                  <SummaryRow t={t} k="Activity" v={tooltipSummary.activityNames.join(', ')} />
-                )}
+          <Pressable onPress={(e) => e.stopPropagation()} style={{ minWidth: 260, maxWidth: 320 }}>
+            <Glass tier="hero" padding={18}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 10,
+                }}
+              >
+                <Text style={{ ...TYPE.section, color: t.text }}>
+                  {tooltipDom != null
+                    ? new Date(year, monthIdx0, tooltipDom).toLocaleDateString(undefined, {
+                        weekday: 'long',
+                        day: '2-digit',
+                        month: 'short',
+                      })
+                    : ''}
+                </Text>
+                <Pressable onPress={() => setTooltipDom(null)} hitSlop={8}>
+                  <X color={t.textSec} size={18} />
+                </Pressable>
               </View>
-            )}
+              {tooltipDuties.length === 0 ? (
+                <Text style={{ ...TYPE.caption, color: t.textSec }}>No duties this day.</Text>
+              ) : (
+                <View style={{ gap: 8 }}>
+                  <SummaryRow t={t} k="Flights" v={String(tooltipSummary.flightCount)} />
+                  <SummaryRow t={t} k="Block hours" v={fmtBlock(tooltipSummary.blockMinutes)} />
+                  <SummaryRow t={t} k="Duty hours" v={fmtBlock(tooltipSummary.dutyMinutes)} />
+                  {tooltipSummary.activityNames.length > 0 && (
+                    <SummaryRow t={t} k="Activity" v={tooltipSummary.activityNames.join(', ')} />
+                  )}
+                </View>
+              )}
+            </Glass>
           </Pressable>
         </Pressable>
       </Modal>
@@ -255,22 +271,12 @@ function SummaryRow({ t, k, v }: { t: Theme; k: string; v: string }) {
   )
 }
 
-function NavBtn({ onPress, children, t }: { onPress: () => void; children: React.ReactNode; t: Theme }) {
+function NavBtn({ onPress, children }: { onPress: () => void; children: React.ReactNode }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        backgroundColor: t.card,
-        borderWidth: 0.5,
-        borderColor: t.cardBorder,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      {children}
+    <Pressable onPress={onPress}>
+      <Glass tier="soft" padding={0} style={{ width: 36, height: 36, borderRadius: 18 }}>
+        <View style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>{children}</View>
+      </Glass>
     </Pressable>
   )
 }
@@ -281,6 +287,7 @@ function DayCell({
   isToday,
   isSelected,
   duties,
+  tints,
   onPress,
 }: {
   t: Theme
@@ -288,16 +295,21 @@ function DayCell({
   isToday: boolean
   isSelected: boolean
   duties: RosterDuty[]
+  tints: Record<DutyKind, string>
   onPress: () => void
 }) {
+  const primaryDuty = duties[0]?.type as DutyKind | undefined
+  const tint = primaryDuty ? tints[primaryDuty] : null
+  const dutyColor = primaryDuty ? t.duty[primaryDuty] : null
+
   return (
     <Pressable
       onPress={onPress}
       style={{
         aspectRatio: 1,
-        borderRadius: 8,
-        backgroundColor: isSelected ? t.hover : 'transparent',
-        borderWidth: 0.5,
+        borderRadius: 10,
+        backgroundColor: isSelected ? t.hover : (tint ?? 'transparent'),
+        borderWidth: 1,
         borderColor: isSelected ? t.accent : 'transparent',
         padding: 4,
         alignItems: 'center',
@@ -306,9 +318,9 @@ function DayCell({
     >
       <View
         style={{
-          width: 24,
-          height: 24,
-          borderRadius: 24,
+          width: 26,
+          height: 26,
+          borderRadius: 26,
           backgroundColor: isToday ? t.accent : 'transparent',
           alignItems: 'center',
           justifyContent: 'center',
@@ -318,17 +330,24 @@ function DayCell({
           {dom}
         </Text>
       </View>
-      <View style={{ flexDirection: 'row', gap: 2, alignItems: 'center', minHeight: 6 }}>
-        {duties.slice(0, 2).map((d, i) => (
-          <DutyDot key={i} t={t} kind={d.type} size={5} />
-        ))}
+      <View style={{ minHeight: 4, alignItems: 'center', justifyContent: 'center' }}>
+        {dutyColor && <View style={{ width: 18, height: 3, borderRadius: 2, backgroundColor: dutyColor }} />}
       </View>
-      <View style={{ minHeight: 9 }} />
     </Pressable>
   )
 }
 
-function DutyRow({ duty, t, onPress }: { duty: RosterDuty; t: Theme; onPress: () => void }) {
+function DutyRow({
+  duty,
+  t,
+  highlight,
+  onPress,
+}: {
+  duty: RosterDuty
+  t: Theme
+  highlight: boolean
+  onPress: () => void
+}) {
   const color = t.duty[duty.type as DutyKind] ?? t.duty.ground
   const Icon =
     duty.type === 'flight'
@@ -340,52 +359,53 @@ function DutyRow({ duty, t, onPress }: { duty: RosterDuty; t: Theme; onPress: ()
           : duty.type === 'training'
             ? GraduationCap
             : Briefcase
+
   return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        backgroundColor: t.card,
-        borderWidth: 0.5,
-        borderColor: t.cardBorder,
-        borderRadius: 12,
-        padding: 12,
-        paddingLeft: 14,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
-      <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: color }} />
-      <View
+    <Pressable onPress={onPress}>
+      <Glass
+        tier="standard"
+        padding={12}
         style={{
-          width: 32,
-          height: 32,
-          borderRadius: 8,
-          backgroundColor: color + '22',
-          alignItems: 'center',
-          justifyContent: 'center',
+          paddingLeft: 14,
+          borderColor: highlight ? t.accent : undefined,
+          borderWidth: highlight ? 1 : undefined,
+          shadowColor: highlight ? t.accent : undefined,
+          shadowOpacity: highlight ? 0.5 : undefined,
+          shadowRadius: highlight ? 12 : undefined,
         }}
       >
-        <Icon color={color} size={16} />
-      </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ ...TYPE.cardTitle, color: t.text, fontWeight: '600', fontSize: 14 }} numberOfLines={1}>
-          {duty.title}
-        </Text>
-        <Text style={{ ...TYPE.caption, color: t.textSec, marginTop: 2 }}>{duty.sub}</Text>
-      </View>
-      {duty.status === 'delayed' && (
-        <Chip t={t} kind="delayed">
-          Delayed
-        </Chip>
-      )}
-      {duty.status === 'cancelled' && (
-        <Chip t={t} kind="cancelled">
-          Cancelled
-        </Chip>
-      )}
+        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: color }} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              backgroundColor: color + '22',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Icon color={color} size={16} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ ...TYPE.cardTitle, color: t.text, fontWeight: '600', fontSize: 14 }} numberOfLines={1}>
+              {duty.title}
+            </Text>
+            <Text style={{ ...TYPE.caption, color: t.textSec, marginTop: 2 }}>{duty.sub}</Text>
+          </View>
+          {duty.status === 'delayed' && (
+            <Chip t={t} kind="delayed">
+              Delayed
+            </Chip>
+          )}
+          {duty.status === 'cancelled' && (
+            <Chip t={t} kind="cancelled">
+              Cancelled
+            </Chip>
+          )}
+        </View>
+      </Glass>
     </Pressable>
   )
 }

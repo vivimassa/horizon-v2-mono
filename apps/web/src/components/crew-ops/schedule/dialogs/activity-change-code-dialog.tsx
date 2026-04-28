@@ -32,8 +32,10 @@ export function ActivityChangeCodeDialog({ activityId, onClose, onAfterMutate }:
     setBusy(true)
     setError(null)
     try {
-      await api.patchCrewActivity(activityId, { activityCodeId: code._id })
-      await reconcilePeriod()
+      const patched = await api.patchCrewActivity(activityId, { activityCodeId: code._id })
+      useCrewScheduleStore.getState().mergeActivities([patched as unknown as { _id: string }])
+      const cid = (patched as { crewId?: string } | null)?.crewId ?? activity?.crewId ?? null
+      if (cid) void useCrewScheduleStore.getState().reconcileCrew([cid])
       onAfterMutate()
       onClose()
     } catch (e) {

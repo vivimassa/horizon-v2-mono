@@ -63,12 +63,15 @@ export function ActivityEditDialog({ activityId, onClose, onAfterMutate }: Props
     setBusy(true)
     setError(null)
     try {
-      await api.patchCrewActivity(activityId, {
+      const patched = await api.patchCrewActivity(activityId, {
         startUtcIso,
         endUtcIso,
         notes: notes.trim() === '' ? null : notes,
       })
-      await reconcilePeriod()
+      useCrewScheduleStore.getState().mergeActivities([patched as unknown as { _id: string }])
+      // Narrow reconcile to the activity's crew (~50ms).
+      const cid = (patched as { crewId?: string } | null)?.crewId ?? activity?.crewId ?? null
+      if (cid) void useCrewScheduleStore.getState().reconcileCrew([cid])
       onAfterMutate()
       onClose()
     } catch (e) {

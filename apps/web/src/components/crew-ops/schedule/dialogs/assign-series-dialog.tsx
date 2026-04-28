@@ -110,7 +110,9 @@ export function AssignSeriesDialog({ fromIso, toIso, crewId, onClose, onAfterMut
           notes: null,
         })),
       })
-      await reconcilePeriod()
+      useCrewScheduleStore.getState().mergeActivities(res.created as unknown as Array<{ _id: string }>)
+      // Narrow reconcile — only the affected crew, ~50ms.
+      void useCrewScheduleStore.getState().reconcileCrew([crewId])
       onAfterMutate()
       setResult({ created: res.created.length, skipped })
     } catch (e) {

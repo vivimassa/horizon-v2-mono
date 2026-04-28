@@ -122,13 +122,15 @@ export function AssignPairingDialog({ crewId, dateIso, onClose, onAfterMutate }:
     setBusy(c.pairingId)
     setError(null)
     try {
-      await api.createCrewAssignment({
+      const created = await api.createCrewAssignment({
         pairingId: c.pairingId,
         crewId,
         seatPositionId: c.seatPositionId,
         seatIndex: 0,
       })
-      await reconcilePeriod()
+      useCrewScheduleStore.getState().mergeAssignments([created as unknown as { _id: string }])
+      // Narrow reconcile only refetches this crew (~50ms vs 50s).
+      void useCrewScheduleStore.getState().reconcileCrew([crewId])
       onAfterMutate()
       onClose()
     } catch (e) {

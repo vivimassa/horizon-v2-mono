@@ -98,6 +98,7 @@ export const UncrewedDutiesTray = memo(function UncrewedDutiesTray({
 }: Props) {
   const selectPairing = useCrewScheduleStore((s) => s.selectPairing)
   const uncrewedLoading = useCrewScheduleStore((s) => s.uncrewedLoading)
+  const uncrewedTotal = useCrewScheduleStore((s) => s.uncrewedTotal)
   const selectedPairingId = useCrewScheduleStore((s) => s.selectedPairingId)
   const canvasScrollLeft = useCrewScheduleStore((s) => s.scrollLeft)
   const uncrewedFilter = useCrewScheduleStore((s) => s.uncrewedFilter)
@@ -341,7 +342,7 @@ export const UncrewedDutiesTray = memo(function UncrewedDutiesTray({
           synthetic,
         })
         try {
-          await api.createCrewAssignment({
+          const created = await api.createCrewAssignment({
             pairingId: pairing._id,
             crewId: targetCrew._id,
             seatPositionId: pickedSeat.seatPositionId,
@@ -357,7 +358,12 @@ export const UncrewedDutiesTray = memo(function UncrewedDutiesTray({
                   }))
                 : undefined,
           })
-          void storeApi.getState().reconcilePeriod()
+          // Replace optimistic synthetic with the persisted doc — bar
+          // gets its real _id so subsequent right-clicks/edits work.
+          storeApi.getState().mergeAssignments([created as unknown as { _id: string }])
+          // Narrow reconcile scoped to the target crew — ~50ms vs ~50s
+          // for the full /crew-schedule scan.
+          void storeApi.getState().reconcileCrew([targetCrew._id])
         } catch (err) {
           const apiErr = err as ApiError
           const payload = apiErr?.payload as
@@ -514,11 +520,29 @@ export const UncrewedDutiesTray = memo(function UncrewedDutiesTray({
               <span className="text-[#9A9BA8] normal-case tracking-normal text-[12px]">Loading…</span>
             </span>
           ) : filterActive && filteredUncrewed.length !== uncrewed.length ? (
-            `${filteredUncrewed.length} / ${uncrewed.length}`
+            `${filteredUncrewed.length} / ${uncrewed.length}${
+              uncrewedTotal > uncrewed.length ? ` of ${uncrewedTotal}` : ''
+            }`
+          ) : uncrewedTotal > uncrewed.length ? (
+            `${uncrewed.length} of ${uncrewedTotal}`
           ) : (
             uncrewed.length
           )}
         </div>
+        {!uncrewedLoading && uncrewedTotal > uncrewed.length && (
+          <button
+            onClick={() => void useCrewScheduleStore.getState().loadMoreUncrewed()}
+            className="ml-auto mr-3 h-7 px-3 rounded-md text-[12px] font-medium normal-case tracking-normal transition-colors"
+            style={{
+              background: 'rgba(62,123,250,0.10)',
+              border: '1px solid var(--module-accent, #3E7BFA)',
+              color: 'var(--module-accent, #3E7BFA)',
+            }}
+            title={`Load next ${Math.min(uncrewedTotal - uncrewed.length, 100)} of ${uncrewedTotal - uncrewed.length} remaining`}
+          >
+            Load more ({uncrewedTotal - uncrewed.length} left)
+          </button>
+        )}
       </div>
 
       <div className="flex flex-1 min-h-0" style={{ height: barsAreaHeight }}>

@@ -68,7 +68,7 @@ export function ActivityDuplicateDialog({ activityId, onClose, onAfterMutate }: 
     setBusy(true)
     setError(null)
     try {
-      await api.createCrewActivitiesBulk({
+      const res = await api.createCrewActivitiesBulk({
         activities: dates.map((d) => ({
           crewId: activity.crewId,
           activityCodeId: activity.activityCodeId,
@@ -76,7 +76,8 @@ export function ActivityDuplicateDialog({ activityId, onClose, onAfterMutate }: 
           notes: activity.notes ?? null,
         })),
       })
-      await reconcilePeriod()
+      useCrewScheduleStore.getState().mergeActivities(res.created as unknown as Array<{ _id: string }>)
+      void useCrewScheduleStore.getState().reconcileCrew([activity.crewId])
       onAfterMutate()
       onClose()
     } catch (e) {

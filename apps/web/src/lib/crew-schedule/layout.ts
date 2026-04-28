@@ -156,7 +156,7 @@ export interface BuildLayoutInput {
   containerWidth: number
   zoom: CrewScheduleZoom
   barLabelMode: BarLabelMode
-  filters: { baseIds: string[]; positionIds: string[]; acTypeIcaos: string[] }
+  filters: { baseIds: string[]; positionIds: string[]; acTypeIcaos: string[]; specificCrewTokens?: string[] }
   /** 0..3 — indexes into CREW_ROW_HEIGHT_LEVELS. */
   rowHeightLevel: number
   /** Crew ids hidden from the current view (AIMS §4.5 "Exclude crew"). */
@@ -300,8 +300,30 @@ export function buildCrewScheduleLayout(input: BuildLayoutInput): CrewScheduleLa
 
   // Filter crew
   const excluded = input.excludedCrewIds
+  // Specific Crew Search short-circuit: when tokens are present, the
+  // dialog is the SOLE filter — base/position/A-C-type are ignored so
+  // the planner never has to reset other filters before pasting an ID
+  // list. Tokens match employeeId exact OR substring of any name field.
+  const specificTokens = (input.filters.specificCrewTokens ?? []).map((t) => t.trim().toUpperCase()).filter(Boolean)
   let visibleCrew = input.crew.filter((c) => {
     if (excluded && excluded.has(c._id)) return false
+    if (specificTokens.length > 0) {
+      const eid = (c.employeeId ?? '').toUpperCase()
+      const first = (c.firstName ?? '').toUpperCase()
+      const last = (c.lastName ?? '').toUpperCase()
+      const fullA = `${last} ${first}`.trim()
+      const fullB = `${first} ${last}`.trim()
+      const hit = specificTokens.some(
+        (tok) =>
+          eid === tok ||
+          eid.includes(tok) ||
+          first.includes(tok) ||
+          last.includes(tok) ||
+          fullA.includes(tok) ||
+          fullB.includes(tok),
+      )
+      return hit
+    }
     if (input.filters.baseIds.length > 0 && (!c.base || !input.filters.baseIds.includes(c.base))) return false
     if (input.filters.positionIds.length > 0 && (!c.position || !input.filters.positionIds.includes(c.position)))
       return false

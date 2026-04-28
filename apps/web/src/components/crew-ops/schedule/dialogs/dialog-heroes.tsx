@@ -346,6 +346,133 @@ export function AssignPairingHero() {
   )
 }
 
+/* ── Bulk Delete — trash bin sweeping a row of duty pills ────────── */
+export function BulkDeleteHero() {
+  // A trash-can on the right; a row of three duty pills on the left
+  // shrinking as they get sucked in. Conveys "many → gone".
+  return (
+    <HeroSvg>
+      <ellipse cx="120" cy="68" rx="60" ry="2" fill={SHADOW} opacity="0.4" />
+      {/* Three duty pills, fading + shrinking toward the trash */}
+      {[
+        { x: 30, w: 50, op: 0.95 },
+        { x: 88, w: 42, op: 0.65 },
+        { x: 138, w: 32, op: 0.35 },
+      ].map((p, i) => (
+        <g key={i}>
+          <rect
+            x={p.x}
+            y={32}
+            width={p.w}
+            height={16}
+            rx={3}
+            fill={ACCENT}
+            opacity={p.op * 0.25}
+            stroke={ACCENT}
+            strokeWidth="1.2"
+          />
+          {/* Inner stripe — suggests a crew bar label */}
+          <rect
+            x={p.x + 4}
+            y={37}
+            width={Math.max(8, p.w - 12)}
+            height={2}
+            rx="1"
+            fill={ACCENT}
+            opacity={p.op * 0.85}
+          />
+          <rect
+            x={p.x + 4}
+            y={42}
+            width={Math.max(6, p.w - 18)}
+            height={2}
+            rx="1"
+            fill={ACCENT}
+            opacity={p.op * 0.55}
+          />
+        </g>
+      ))}
+      {/* Sweep arrow drawing pills toward the bin */}
+      <path
+        d="M 78 56 L 178 56"
+        stroke={ACCENT}
+        strokeWidth="1.2"
+        strokeDasharray="3 3"
+        opacity="0.6"
+        strokeLinecap="round"
+      />
+      {/* Trash bin — anchored on the right */}
+      <g transform="translate(196 36)">
+        {/* Lid */}
+        <rect x="-16" y="-12" width="32" height="4" rx="1.5" fill={ACCENT} opacity="0.85" />
+        <rect x="-6" y="-15" width="12" height="3" rx="1" fill={ACCENT} opacity="0.85" />
+        {/* Body */}
+        <path d="M -14 -7 L -12 22 L 12 22 L 14 -7 Z" fill={ACCENT} opacity="0.18" stroke={ACCENT} strokeWidth="1.6" />
+        {/* Vertical ribs */}
+        <line x1="-6" y1="-4" x2="-5" y2="18" stroke={ACCENT} strokeWidth="1.1" opacity="0.55" />
+        <line x1="0" y1="-4" x2="0" y2="18" stroke={ACCENT} strokeWidth="1.1" opacity="0.55" />
+        <line x1="6" y1="-4" x2="5" y2="18" stroke={ACCENT} strokeWidth="1.1" opacity="0.55" />
+        {/* Rim glint */}
+        <line x1="-14" y1="-7" x2="14" y2="-7" stroke={RIM} strokeWidth="0.8" opacity="0.7" />
+      </g>
+    </HeroSvg>
+  )
+}
+
+/* ── Specific Crew Search — magnifier sweeping over crew rows ────── */
+export function SpecificCrewSearchHero() {
+  // Stack of three crew rows; the middle row is "found" (accent fill),
+  // bracketed by rows fading away. Magnifier sits over the matched row
+  // with a soft halo, suggesting "isolate by lookup".
+  const rows = [
+    { y: 18, op: 0.35, fill: false },
+    { y: 36, op: 1.0, fill: true },
+    { y: 54, op: 0.35, fill: false },
+  ]
+  return (
+    <HeroSvg>
+      {/* Soft ground shadow */}
+      <ellipse cx="120" cy="68" rx="60" ry="2" fill={SHADOW} opacity="0.4" />
+      {/* Crew row pills (avatar dot + name bar) */}
+      {rows.map((r, i) => (
+        <g key={i} transform={`translate(58 ${r.y - 6})`} opacity={r.op}>
+          <circle cx="6" cy="6" r="5" fill={r.fill ? ACCENT : 'rgba(0,0,0,0.4)'} stroke={ACCENT} strokeWidth="1.1" />
+          <rect
+            x="18"
+            y="2"
+            width="74"
+            height="4"
+            rx="2"
+            fill={r.fill ? ACCENT : 'rgba(255,255,255,0.35)'}
+            opacity={r.fill ? 0.95 : 0.55}
+          />
+          <rect x="18" y="9" width="46" height="2" rx="1" fill="rgba(255,255,255,0.35)" opacity="0.5" />
+        </g>
+      ))}
+      {/* Magnifier — lens over matched row, handle pointing down-right */}
+      <g transform="translate(170 28)">
+        {/* Glow halo behind the lens */}
+        <circle r="20" fill={ACCENT} opacity="0.18" filter="blur(0.8)" />
+        {/* Lens body */}
+        <circle r="14" fill="rgba(0,0,0,0.45)" stroke={ACCENT} strokeWidth="1.8" />
+        <circle r="14" fill="none" stroke={RIM} strokeWidth="0.6" />
+        {/* Inner glint */}
+        <path d="M -8 -6 A 10 10 0 0 1 -2 -10" stroke={RIM} strokeWidth="1" fill="none" strokeLinecap="round" />
+        {/* Cross-hair */}
+        <line x1="-6" y1="0" x2="6" y2="0" stroke={ACCENT} strokeWidth="1.1" opacity="0.6" />
+        <line x1="0" y1="-6" x2="0" y2="6" stroke={ACCENT} strokeWidth="1.1" opacity="0.6" />
+        {/* Handle */}
+        <line x1="10" y1="10" x2="22" y2="22" stroke={ACCENT} strokeWidth="3" strokeLinecap="round" />
+        <line x1="10" y1="10" x2="22" y2="22" stroke={RIM} strokeWidth="1" strokeLinecap="round" />
+      </g>
+      {/* Trailing breadcrumb dots — search sweeping across the list */}
+      {[34, 50, 66].map((cx, i) => (
+        <circle key={i} cx={cx} cy="36" r="1.4" fill={ACCENT} opacity={0.25 + i * 0.15} />
+      ))}
+    </HeroSvg>
+  )
+}
+
 /* ── Assign series — calendar grid with sweep fill ─────────────────── */
 export function AssignSeriesHero() {
   // 6×3 grid. Highlight a contiguous range across two rows to suggest

@@ -660,16 +660,26 @@ function ActivityAssignTab({
       if (replaceActivityId && datesInScope.length === 1) {
         try {
           await api.deleteCrewActivity(replaceActivityId)
+          // Strip the replaced bar locally so the new one isn't drawn
+          // on top of a stale ghost while reconcile is in flight.
+          useCrewScheduleStore.setState((st) => ({
+            activities: st.activities.filter((a) => a._id !== replaceActivityId),
+          }))
         } catch (err) {
-          // If it was already gone (e.g. deleted elsewhere), proceed.
           console.warn('Replace: delete failed, continuing with create', err)
         }
       }
       if (datesInScope.length === 1) {
         const d = datesInScope[0]
-        await api.createCrewActivity({ crewId: crew._id, activityCodeId: code._id, dateIso: d, ...buildWindow(d) })
+        const created = await api.createCrewActivity({
+          crewId: crew._id,
+          activityCodeId: code._id,
+          dateIso: d,
+          ...buildWindow(d),
+        })
+        useCrewScheduleStore.getState().mergeActivities([created as unknown as { _id: string }])
       } else {
-        await api.createCrewActivitiesBulk({
+        const res = await api.createCrewActivitiesBulk({
           activities: datesInScope.map((d) => ({
             crewId: crew._id,
             activityCodeId: code._id,
@@ -677,7 +687,13 @@ function ActivityAssignTab({
             ...buildWindow(d),
           })),
         })
+        useCrewScheduleStore.getState().mergeActivities(res.created as unknown as Array<{ _id: string }>)
       }
+      // Narrow background reconcile — only refetches THIS crew (~50ms
+      // vs ~50s on a 500-crew M0 cluster). Catches any FDTL recompute
+      // or cascade the optimistic merge missed without paying the full
+      // aggregator cost.
+      void useCrewScheduleStore.getState().reconcileCrew([crew._id])
       clearReplaceActivity()
       onAssigned()
     } catch (e) {

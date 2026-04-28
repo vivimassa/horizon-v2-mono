@@ -9,8 +9,10 @@ import {
   CalendarDays,
   CalendarRange,
   ClipboardList,
+  ClipboardPaste,
   Copy,
   CopyPlus,
+  Scissors,
   Eye,
   EyeOff,
   FileText,
@@ -96,89 +98,104 @@ export function CrewScheduleContextMenu({ onAfterMutate }: Props) {
       setInspectorTab(t)
     }
 
-    const buildEmptyCellSections = (crewId: string, dateIso: string): Section[] => [
-      [
-        {
-          icon: Activity,
-          label: 'Assign activity…',
-          shortcut: 'A',
-          onClick: () => {
-            selectDateCell(crewId, dateIso)
-            openInspectorOnTab('assign')
+    const buildEmptyCellSections = (crewId: string, dateIso: string): Section[] => {
+      const clip = useCrewScheduleStore.getState().clipboardActivity
+      return [
+        [
+          {
+            icon: Activity,
+            label: 'Assign activity…',
+            shortcut: 'A',
+            onClick: () => {
+              selectDateCell(crewId, dateIso)
+              openInspectorOnTab('assign')
+            },
           },
-        },
-        {
-          icon: ClipboardList,
-          label: 'Assign pairing…',
-          shortcut: 'P',
-          onClick: () => {
-            useCrewScheduleStore.getState().openDialogFor({ kind: 'assign-pairing', crewId, dateIso })
+          {
+            icon: ClipboardList,
+            label: 'Assign pairing…',
+            shortcut: 'P',
+            onClick: () => {
+              useCrewScheduleStore.getState().openDialogFor({ kind: 'assign-pairing', crewId, dateIso })
+            },
           },
-        },
-        {
-          icon: Copy,
-          label: 'Copy previous day',
-          onClick: async () => {
-            setBusy(true)
-            try {
-              const store = useCrewScheduleStore.getState()
-              const prev = new Date(new Date(dateIso + 'T00:00:00Z').getTime() - 86_400_000).toISOString().slice(0, 10)
-              const source = store.activities.find(
-                (a) =>
-                  a.crewId === crewId &&
-                  ((a.dateIso && a.dateIso === prev) || (!a.dateIso && a.startUtcIso.slice(0, 10) === prev)),
-              )
-              if (!source) {
-                console.warn('Copy previous day: no activity found for', crewId, prev)
-                return
+          {
+            icon: ClipboardPaste,
+            label: clip ? `Paste ${clip.codeLabel}` : 'Paste',
+            shortcut: 'Ctrl+V',
+            disabled: !clip,
+            onClick: () => {
+              void useCrewScheduleStore.getState().pasteClipboardToCells([{ crewId, dateIso }])
+            },
+          },
+          {
+            icon: Copy,
+            label: 'Copy previous day',
+            onClick: async () => {
+              setBusy(true)
+              try {
+                const store = useCrewScheduleStore.getState()
+                const prev = new Date(new Date(dateIso + 'T00:00:00Z').getTime() - 86_400_000)
+                  .toISOString()
+                  .slice(0, 10)
+                const source = store.activities.find(
+                  (a) =>
+                    a.crewId === crewId &&
+                    ((a.dateIso && a.dateIso === prev) || (!a.dateIso && a.startUtcIso.slice(0, 10) === prev)),
+                )
+                if (!source) {
+                  console.warn('Copy previous day: no activity found for', crewId, prev)
+                  return
+                }
+                const created = await api.createCrewActivity({
+                  crewId,
+                  activityCodeId: source.activityCodeId,
+                  dateIso,
+                  notes: source.notes ?? null,
+                })
+                store.mergeActivities([created as unknown as { _id: string }])
+                void store.reconcileCrew([crewId])
+                onAfterMutate()
+              } finally {
+                setBusy(false)
+                closeContextMenu()
               }
-              await api.createCrewActivity({
+            },
+          },
+          {
+            icon: CalendarRange,
+            label: 'Assign series of duties…',
+            onClick: () => {
+              useCrewScheduleStore.getState().openDialogFor({
+                kind: 'assign-series',
+                fromIso: dateIso,
+                toIso: dateIso,
                 crewId,
-                activityCodeId: source.activityCodeId,
-                dateIso,
-                notes: source.notes ?? null,
               })
-              await store.reconcilePeriod()
-              onAfterMutate()
-            } finally {
-              setBusy(false)
+            },
+          },
+        ],
+        [
+          {
+            icon: StickyNote,
+            label: 'View / edit day memo',
+            shortcut: 'M',
+            onClick: () => {
+              openMemoOverlay({ scope: 'day', crewId, dateIso })
               closeContextMenu()
-            }
+            },
           },
-        },
-        {
-          icon: CalendarRange,
-          label: 'Assign series of duties…',
-          onClick: () => {
-            useCrewScheduleStore.getState().openDialogFor({
-              kind: 'assign-series',
-              fromIso: dateIso,
-              toIso: dateIso,
-              crewId,
-            })
+          {
+            icon: Scale,
+            label: 'Legality Check',
+            shortcut: 'L',
+            onClick: () => {
+              useCrewScheduleStore.getState().openLegalityCheck({ kind: 'crew', crewId })
+            },
           },
-        },
-      ],
-      [
-        {
-          icon: StickyNote,
-          label: 'View / edit day memo',
-          shortcut: 'M',
-          onClick: () => {
-            openMemoOverlay({ scope: 'day', crewId, dateIso })
-            closeContextMenu()
-          },
-        },
-        {
-          icon: Scale,
-          label: 'Legality Check',
-          shortcut: 'L',
-          onClick: () => {
-            useCrewScheduleStore.getState().openLegalityCheck({ kind: 'crew', crewId })
-          },
-        },
-      ],
-    ]
+        ],
+      ]
+    }
 
     switch (menu.kind) {
       case 'pairing':
@@ -328,6 +345,22 @@ export function CrewScheduleContextMenu({ onAfterMutate }: Props) {
               onClick: () => {
                 selectActivity(menu.targetId)
                 openInspectorOnTab('duty')
+              },
+            },
+            {
+              icon: Copy,
+              label: 'Copy',
+              shortcut: 'Ctrl+C',
+              onClick: () => {
+                useCrewScheduleStore.getState().copyActivityToClipboard(menu.targetId)
+              },
+            },
+            {
+              icon: Scissors,
+              label: 'Cut',
+              shortcut: 'Ctrl+X',
+              onClick: () => {
+                useCrewScheduleStore.getState().cutActivityToClipboard(menu.targetId)
               },
             },
             {
@@ -616,6 +649,7 @@ export function CrewScheduleContextMenu({ onAfterMutate }: Props) {
         )
         const deleteCount = inRangeActivities.length + inRangeAssignments.length
         const singleCrewId = menu.crewIds.length === 1 ? menu.crewIds[0] : null
+        const clip = store.clipboardActivity
         const topItems: MenuItem[] = [
           {
             icon: CalendarRange,
@@ -631,6 +665,24 @@ export function CrewScheduleContextMenu({ onAfterMutate }: Props) {
                 toIso: menu.toIso,
                 crewId: menu.crewIds[0],
               })
+            },
+          },
+          {
+            icon: ClipboardPaste,
+            label: clip ? `Paste ${clip.codeLabel} to selection` : 'Paste to selection',
+            shortcut: 'Ctrl+V',
+            disabled: !clip,
+            onClick: () => {
+              const cells: Array<{ crewId: string; dateIso: string }> = []
+              const fromMs = Date.parse(`${menu.fromIso}T00:00:00Z`)
+              const toMs = Date.parse(`${menu.toIso}T00:00:00Z`)
+              for (const cid of menu.crewIds) {
+                for (let ms = fromMs; ms <= toMs; ms += 86_400_000) {
+                  cells.push({ crewId: cid, dateIso: new Date(ms).toISOString().slice(0, 10) })
+                }
+              }
+              void useCrewScheduleStore.getState().pasteClipboardToCells(cells)
+              closeContextMenu()
             },
           },
         ]
@@ -717,18 +769,90 @@ export function CrewScheduleContextMenu({ onAfterMutate }: Props) {
                 deleteCount === 0
                   ? undefined
                   : async () => {
+                      // Multi-day or multi-crew → defer to the shared
+                      // confirm dialog. Single-cell range deletes
+                      // immediately, matching the keyboard handler.
+                      const dayMs = 86_400_000
+                      const fromMs = Date.parse(`${menu.fromIso}T00:00:00Z`)
+                      const toMs = Date.parse(`${menu.toIso}T00:00:00Z`)
+                      const dayCount =
+                        Number.isFinite(fromMs) && Number.isFinite(toMs) ? Math.round((toMs - fromMs) / dayMs) + 1 : 1
+                      const isBulk = dayCount > 1 || menu.crewIds.length > 1
+                      if (isBulk) {
+                        useCrewScheduleStore.setState({
+                          pendingBlockDelete: {
+                            activityIds: inRangeActivities.map((a) => a._id),
+                            assignmentIds: inRangeAssignments.map((a) => a._id),
+                            crewCount: menu.crewIds.length,
+                            dayCount,
+                          },
+                        })
+                        closeContextMenu()
+                        return
+                      }
                       setBusy(true)
                       try {
                         // allSettled so one failed delete doesn't abort the
                         // batch — user sees the remaining rows disappear on
                         // refresh, failures get logged for diagnosis.
-                        const results = await Promise.allSettled([
-                          ...inRangeActivities.map((a) => api.deleteCrewActivity(a._id)),
-                          ...inRangeAssignments.map((a) => api.deleteCrewAssignment(a._id)),
-                        ])
-                        const failures = results.filter((r) => r.status === 'rejected')
+                        const requests = [
+                          ...inRangeActivities.map((a) => ({
+                            kind: 'activity' as const,
+                            id: a._id,
+                            fn: () => api.deleteCrewActivity(a._id),
+                          })),
+                          ...inRangeAssignments.map((a) => ({
+                            kind: 'assignment' as const,
+                            id: a._id,
+                            fn: () => api.deleteCrewAssignment(a._id),
+                          })),
+                        ]
+                        const results = await Promise.allSettled(requests.map((r) => r.fn()))
+                        // Strip on BOTH outcomes that mean the bar
+                        // should be gone: fulfilled (real delete) and
+                        // rejected+404 (already gone). Without the
+                        // fulfilled branch, the first successful press
+                        // looked like a no-op until the slow reconcile
+                        // sweep caught up.
+                        const failures: Array<{
+                          kind: 'activity' | 'assignment'
+                          id: string
+                          status: number | null
+                          message: string
+                          payload: unknown
+                        }> = []
+                        const goneActivityIds = new Set<string>()
+                        const goneAssignmentIds = new Set<string>()
+                        for (let i = 0; i < results.length; i++) {
+                          const r = results[i]
+                          const req = requests[i]
+                          if (r.status === 'fulfilled') {
+                            if (req.kind === 'activity') goneActivityIds.add(req.id)
+                            else goneAssignmentIds.add(req.id)
+                            continue
+                          }
+                          const err = r.reason as { message?: string; status?: number; payload?: unknown }
+                          const status = err?.status ?? null
+                          failures.push({
+                            kind: req.kind,
+                            id: req.id,
+                            status,
+                            message: err?.message ?? String(r.reason),
+                            payload: err?.payload ?? null,
+                          })
+                          if (status === 404) {
+                            if (req.kind === 'activity') goneActivityIds.add(req.id)
+                            else goneAssignmentIds.add(req.id)
+                          }
+                        }
                         if (failures.length > 0) {
                           console.error('Block delete: %d/%d failed', failures.length, results.length, failures)
+                        }
+                        if (goneActivityIds.size > 0 || goneAssignmentIds.size > 0) {
+                          useCrewScheduleStore.setState((st) => ({
+                            activities: st.activities.filter((a) => !goneActivityIds.has(a._id)),
+                            assignments: st.assignments.filter((a) => !goneAssignmentIds.has(a._id)),
+                          }))
                         }
                         clearRangeSelection()
                         onAfterMutate()
@@ -834,11 +958,15 @@ type MenuItem = {
   destructive?: boolean
   /** When set, the item is disabled and a small phase badge is shown. */
   phase?: string
+  /** Hard-disabled state with no phase badge — used for "Paste"
+   *  entries when the clipboard is empty so the row greys out without
+   *  a phase pill. */
+  disabled?: boolean
 }
 type Section = MenuItem[]
 
 function MenuItemRow({ item, busy }: { item: MenuItem; busy: boolean }) {
-  const disabled = !!item.phase || !item.onClick
+  const disabled = !!item.phase || !!item.disabled || !item.onClick
   return (
     <button
       onClick={item.onClick}

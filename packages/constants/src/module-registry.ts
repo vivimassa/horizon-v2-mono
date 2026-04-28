@@ -1229,8 +1229,8 @@ export const MODULE_THEMES: Record<string, { accent: string; accentDark?: string
   ground: { accent: '#059669', bg: '#d1fae5', bgSubtle: '#ecfdf5' },
   // Crew Ops — Graphite Cyan. Neutral aviation-instrument feel.
   // Light: hsl(195, 55%, 42%) ≈ #308AB0 (vivid steel-cyan)
-  // Dark : hsl(195, 16%, 64%) ≈ #90AAB6 (washed cyan, 30% sat of light)
-  workforce: { accent: '#308AB0', accentDark: '#90AAB6', bg: '#bae6fd', bgSubtle: '#e0f2fe' },
+  // Dark : hsl(195, 55%, 64%) ≈ #71BCD6 (lightness-lifted, full saturation)
+  workforce: { accent: '#308AB0', accentDark: '#71BCD6', bg: '#bae6fd', bgSubtle: '#e0f2fe' },
   integration: { accent: '#0891b2', bg: '#cffafe', bgSubtle: '#ecfeff' },
   admin: { accent: '#4338ca', bg: '#e0e7ff', bgSubtle: '#eef2ff' },
   sysadmin: { accent: '#B45309', bg: '#fed7aa', bgSubtle: '#ffedd5' },

@@ -29,7 +29,10 @@ import { TemporaryBaseDialog } from './dialogs/temporary-base-dialog'
 import { FlightBookingDrawer } from '@/components/crew-ops/transport/views/flight-booking-drawer'
 import { CrewScheduleCheatsheet } from './crew-schedule-cheatsheet'
 import { CrewScheduleCommandPalette } from './crew-schedule-command-palette'
+import { CrewScheduleSearch } from './crew-schedule-search'
 import { CrewScheduleSmartFilter } from './crew-schedule-smart-filter'
+import { DialogShell } from './dialogs/dialog-shell'
+import { BulkDeleteHero } from './dialogs/dialog-heroes'
 import { CrewScheduleMemoOverlay } from './crew-schedule-memo-overlay'
 import { CrewSchedulePublishBanner } from './crew-schedule-publish-banner'
 import { UncrewedDutiesTray } from './uncrewed-duties-tray'
@@ -98,6 +101,7 @@ export function CrewScheduleShell() {
   const [cheatsheetOpen, setCheatsheetOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [smartFilterOpen, setSmartFilterOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
 
   // Track the canvas-plus-tray frame height so the resizer can clamp the
   // tray growth. Uses ResizeObserver so it tracks fullscreen toggles too.
@@ -131,23 +135,37 @@ export function CrewScheduleShell() {
   }, [loadContext])
 
   const handleGo = useCallback(async () => {
+    // Scope the calibration bucket by the filter shape — a 1-crew
+    // Specific Crew Search resolves in ~50ms whereas a full-roster
+    // load can take 30s+. Sharing one median across both makes the bar
+    // creep with a 30s shape on a 50ms request, which feels broken.
+    const f = useCrewScheduleStore.getState().filters
+    const narrowed =
+      f.baseIds.length === 1 || f.positionIds.length === 1 || f.acTypeIcaos.length === 1 || f.crewGroupIds.length === 1
+    const scope: 'specific' | 'narrow' | 'full' =
+      f.specificCrewTokens.length > 0 ? 'specific' : narrowed ? 'narrow' : 'full'
+    const expectedByScope = { specific: 1_000, narrow: 5_000, full: 30_000 } as const
     await runway.run(() => commitPeriod(), {
       loadingLabel: 'Loading crew schedule…',
       doneLabel: 'Schedule loaded',
-      // Calibrates from past loads in localStorage so the bar shape
-      // matches whatever the actual aggregator latency is for this
-      // operator + period (50s+ for big tenants, sub-2s for tiny).
-      loadKey: 'crew-schedule',
-      expectedMs: 30_000,
+      loadKey: `crew-schedule:${scope}`,
+      expectedMs: expectedByScope[scope],
     })
   }, [runway, commitPeriod])
 
-  // Post-mutation refresh — silent reconcile so the loading flag does
-  // not toggle and the canvas does not repaint from scratch. Prevents
-  // the crew-row reshuffle the user sees after assigning a duty.
+  // Post-mutation refresh — debounced full reconcile. Mutation sites
+  // that know which crew they touched already call `reconcileCrew`
+  // (narrow, ~50ms). The full reconcile is the safety net for cascade
+  // effects + any site that didn't pre-narrow. Without debounce a burst
+  // of 5 mutations would queue 5 × 51s aggregator scans on M0 Atlas.
   const reconcilePeriod = useCrewScheduleStore((s) => s.reconcilePeriod)
+  const reconcileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const handleRefresh = useCallback(() => {
-    void reconcilePeriod()
+    if (reconcileTimerRef.current) clearTimeout(reconcileTimerRef.current)
+    reconcileTimerRef.current = setTimeout(() => {
+      reconcileTimerRef.current = null
+      void reconcilePeriod()
+    }, 30_000)
   }, [reconcilePeriod])
 
   // Global shortcuts (Delete / `?` / `Ctrl+K`). Every input/textarea
@@ -173,6 +191,77 @@ export function CrewScheduleShell() {
         return
       }
 
+      // Ctrl+F / ⌘F → toggle Search panel (matches 2.1.1 Movement
+      // Control). Allowed even when typing so the field-bound input
+      // doesn't have to lose focus first.
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault()
+        setSearchOpen((v) => !v)
+        return
+      }
+
+      // Ctrl+C / ⌘C → copy selected activity into the Gantt clipboard.
+      // Skip when typing so the planner can still copy text from inputs.
+      if (!typing && (e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'c' || e.key === 'C')) {
+        const st = useCrewScheduleStore.getState()
+        if (st.selectedActivityId) {
+          e.preventDefault()
+          st.copyActivityToClipboard(st.selectedActivityId)
+        }
+        return
+      }
+
+      // Ctrl+X / ⌘X → cut. Buffers the selected activity AND deletes
+      // the source on the next successful paste. Esc cancels (source
+      // stays). Skip when typing so the planner can still cut text in
+      // inputs.
+      if (!typing && (e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'x' || e.key === 'X')) {
+        const st = useCrewScheduleStore.getState()
+        if (st.selectedActivityId) {
+          e.preventDefault()
+          st.cutActivityToClipboard(st.selectedActivityId)
+        }
+        return
+      }
+
+      // Esc → clear the Gantt clipboard. The canvas already has its own
+      // Esc handler for drag/range/swap state; that one runs first via
+      // a separate listener, so we only act when nothing else is active.
+      if (!typing && e.key === 'Escape') {
+        const st = useCrewScheduleStore.getState()
+        if (
+          st.clipboardActivity &&
+          !st.dragState &&
+          !st.swapPicker &&
+          !st.targetPickerMode &&
+          !st.rangeSelection &&
+          !st.contextMenu
+        ) {
+          st.clearClipboard()
+        }
+        return
+      }
+
+      // Ctrl+V / ⌘V → paste buffered activity onto the current
+      // selection: range > single empty cell. No-op when no clipboard
+      // or no target. Skip when typing.
+      if (!typing && (e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'v' || e.key === 'V')) {
+        const st = useCrewScheduleStore.getState()
+        if (!st.clipboardActivity) return
+        if (st.rangeSelection && st.rangeSelection.crewIds.length > 0) {
+          e.preventDefault()
+          const targets = expandRangeToCells(st.rangeSelection)
+          void st.pasteClipboardToCells(targets)
+          return
+        }
+        if (st.selectedCrewId && st.selectedDateIso) {
+          e.preventDefault()
+          void st.pasteClipboardToCells([{ crewId: st.selectedCrewId, dateIso: st.selectedDateIso }])
+          return
+        }
+        return
+      }
+
       // Ctrl+Shift+P / ⌘⇧P → toggle the "Compare to Published" overlay
       // (AIMS F10 — F10 itself is grabbed by Chromium on Linux/Win).
       if (!typing && (e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'p' || e.key === 'P')) {
@@ -181,10 +270,25 @@ export function CrewScheduleShell() {
         return
       }
 
-      // Delete / Backspace → destructive action on the current selection.
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (typing) return
+      // Delete shortcut — Delete / Backspace + Shift+Delete (explicit,
+      // browser-conflict-free). Every Ctrl+letter and Ctrl+Shift+letter
+      // combo on letter D is intercepted by Chrome/Edge for bookmark
+      // actions before the page gets the keydown — Shift+Delete is the
+      // one that survives.
+      const isDeleteShortcut =
+        !typing && (e.key === 'Delete' || e.key === 'Backspace' || (e.shiftKey && e.key === 'Delete'))
+      if (isDeleteShortcut) {
+        e.preventDefault()
         const s = useCrewScheduleStore.getState()
+        console.log('[delete] key fired', {
+          via: e.key,
+          rangeSelection: s.rangeSelection ? s.rangeSelection.crewIds.length + ' crew' : null,
+          selectedActivityId: s.selectedActivityId,
+          selectedAssignmentId: s.selectedAssignmentId,
+          selectedPairingId: s.selectedPairingId,
+          selectedCrewId: s.selectedCrewId,
+          selectedDateIso: s.selectedDateIso,
+        })
         // Optimistic IDs (client-only, never persisted) shouldn't be
         // shipped to the server — would 404 or surface "Failed to fetch"
         // in the Next.js dev overlay. Filter them out everywhere below.
@@ -218,13 +322,83 @@ export function CrewScheduleShell() {
             s.clearRangeSelection()
             return
           }
-          const results = await Promise.allSettled([
-            ...acts.map((a) => api.deleteCrewActivity(a._id)),
-            ...asgs.map((a) => api.deleteCrewAssignment(a._id)),
-          ])
-          const failures = results.filter((r) => r.status === 'rejected')
+          // Multi-day or multi-crew → confirm dialog. Single-cell
+          // ranges (1 crew × 1 day) skip the prompt and behave like a
+          // single-item delete.
+          const dayMs = 86_400_000
+          const fromMs = Date.parse(`${fromIso}T00:00:00Z`)
+          const toMs = Date.parse(`${toIso}T00:00:00Z`)
+          const dayCount =
+            Number.isFinite(fromMs) && Number.isFinite(toMs) ? Math.round((toMs - fromMs) / dayMs) + 1 : 1
+          const isBulk = dayCount > 1 || crewIds.length > 1
+          if (isBulk) {
+            useCrewScheduleStore.setState({
+              pendingBlockDelete: {
+                activityIds: acts.map((a) => a._id),
+                assignmentIds: asgs.map((a) => a._id),
+                crewCount: crewIds.length,
+                dayCount,
+              },
+            })
+            // Don't clear range yet — confirm path needs it for the
+            // post-delete safeReconcile sweep. Cancel path also leaves
+            // the range so the planner can adjust the selection.
+            return
+          }
+          const requests = [
+            ...acts.map((a) => ({ kind: 'activity' as const, id: a._id, fn: () => api.deleteCrewActivity(a._id) })),
+            ...asgs.map((a) => ({
+              kind: 'assignment' as const,
+              id: a._id,
+              fn: () => api.deleteCrewAssignment(a._id),
+            })),
+          ]
+          const results = await Promise.allSettled(requests.map((r) => r.fn()))
+          // Build the "definitely gone" set for the optimistic strip:
+          //   - status === 'fulfilled'        → server actually deleted
+          //   - status === 'rejected' + 404   → server says already gone
+          // Both outcomes mean the local bar should disappear NOW; the
+          // alternative (waiting on the 30-50s reconcile sweep) was the
+          // bug where a successful first Delete looked like a no-op.
+          const failures: Array<{
+            kind: 'activity' | 'assignment'
+            id: string
+            status: number | null
+            message: string
+            payload: unknown
+          }> = []
+          const goneActivityIds = new Set<string>()
+          const goneAssignmentIds = new Set<string>()
+          for (let i = 0; i < results.length; i++) {
+            const r = results[i]
+            const req = requests[i]
+            if (r.status === 'fulfilled') {
+              if (req.kind === 'activity') goneActivityIds.add(req.id)
+              else goneAssignmentIds.add(req.id)
+              continue
+            }
+            const err = r.reason as { message?: string; status?: number; payload?: unknown }
+            const status = err?.status ?? null
+            failures.push({
+              kind: req.kind,
+              id: req.id,
+              status,
+              message: err?.message ?? String(r.reason),
+              payload: err?.payload ?? null,
+            })
+            if (status === 404) {
+              if (req.kind === 'activity') goneActivityIds.add(req.id)
+              else goneAssignmentIds.add(req.id)
+            }
+          }
           if (failures.length > 0) {
             console.error('Block delete: %d/%d failed', failures.length, results.length, failures)
+          }
+          if (goneActivityIds.size > 0 || goneAssignmentIds.size > 0) {
+            useCrewScheduleStore.setState((st) => ({
+              activities: st.activities.filter((a) => !goneActivityIds.has(a._id)),
+              assignments: st.assignments.filter((a) => !goneAssignmentIds.has(a._id)),
+            }))
           }
           s.clearRangeSelection()
           safeReconcile()
@@ -418,6 +592,7 @@ export function CrewScheduleShell() {
               smartFilterOpen={smartFilterOpen}
               onOpenCheatsheet={() => setCheatsheetOpen(true)}
               onOpenLegalityCheck={() => useCrewScheduleStore.getState().openLegalityCheck({ kind: 'all' })}
+              onSearch={() => setSearchOpen((v) => !v)}
             />
           </div>
         )}
@@ -443,6 +618,11 @@ export function CrewScheduleShell() {
                   <CrewScheduleLeftPanel rows={computedLayout.rows} positions={positions} rowH={computedLayout.rowH} />
                   <div className="flex-1 min-w-0 relative">
                     <CrewScheduleCanvas layout={computedLayout} />
+                    <CrewScheduleSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
+                    <ClipboardPill />
+                    <PasteFlashToast />
+                    <PasteFdtlConfirmDialog />
+                    <BlockDeleteConfirmDialog />
                   </div>
                 </div>
                 {uncrewedTrayVisible && (
@@ -532,6 +712,272 @@ export function CrewScheduleShell() {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Expand a shift-drag block selection into the full set of
+ * (crewId × dateIso) cell tuples it covers. Used by the Ctrl+V handler
+ * + the context-menu paste action so a 5-crew × 4-day block pastes 20
+ * activities in one bulk POST.
+ */
+function expandRangeToCells(range: {
+  crewIds: string[]
+  fromIso: string
+  toIso: string
+}): Array<{ crewId: string; dateIso: string }> {
+  const out: Array<{ crewId: string; dateIso: string }> = []
+  const fromMs = Date.parse(`${range.fromIso}T00:00:00Z`)
+  const toMs = Date.parse(`${range.toIso}T00:00:00Z`)
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) return out
+  for (const crewId of range.crewIds) {
+    for (let ms = fromMs; ms <= toMs; ms += 86_400_000) {
+      out.push({ crewId, dateIso: new Date(ms).toISOString().slice(0, 10) })
+    }
+  }
+  return out
+}
+
+/** Small toolbar pill showing what's on the Gantt clipboard. Click ×
+ *  to clear. Cut mode renders with an amber border + dashed underline
+ *  on the code label so the planner can tell at a glance the source
+ *  bar will be deleted on paste. */
+function ClipboardPill() {
+  const clip = useCrewScheduleStore((s) => s.clipboardActivity)
+  const clear = useCrewScheduleStore((s) => s.clearClipboard)
+  if (!clip) return null
+  const isCut = clip.mode === 'cut'
+  const accent = isCut ? '#FF8800' : 'var(--module-accent)'
+  const tint = isCut ? 'rgba(255,136,0,0.10)' : 'rgba(62,123,250,0.10)'
+  return (
+    <div
+      className="absolute top-3 left-3 z-30 flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[12px] font-medium"
+      style={{
+        background: tint,
+        border: `1px solid ${accent}`,
+        color: accent,
+        backdropFilter: 'blur(8px)',
+      }}
+    >
+      <span className="opacity-70 uppercase tracking-wider text-[10px]">{isCut ? 'Cut' : 'Clipboard'}</span>
+      <span
+        className="font-mono font-semibold"
+        style={isCut ? { textDecoration: 'underline dashed', textUnderlineOffset: 3 } : undefined}
+      >
+        {clip.codeLabel}
+      </span>
+      <span className="opacity-70 font-mono">
+        {clip.startHHMM}–{clip.endHHMM}
+      </span>
+      <button
+        onClick={clear}
+        className="ml-1 w-4 h-4 rounded flex items-center justify-center hover:bg-white/10"
+        title={isCut ? 'Cancel cut' : 'Clear clipboard'}
+      >
+        ×
+      </button>
+    </div>
+  )
+}
+
+/** Confirm dialog for FDTL violations triggered by a paste. Renders
+ *  one row per (crew × date × rule) issue with severity color. Cancel
+ *  drops the pending paste; "Paste anyway" calls `confirmPendingPaste`
+ *  which fires the bulk POST + cut-source delete + reevaluate. */
+function PasteFdtlConfirmDialog() {
+  const pending = useCrewScheduleStore((s) => s.pendingPasteConfirm)
+  const confirm = useCrewScheduleStore((s) => s.confirmPendingPaste)
+  const cancel = useCrewScheduleStore((s) => s.cancelPendingPaste)
+  if (!pending) return null
+  const violations = pending.issues.filter((i) => i.severity === 'violation').length
+  const warnings = pending.issues.filter((i) => i.severity === 'warning').length
+  return (
+    <div
+      className="absolute inset-0 z-40 flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.55)' }}
+      onClick={cancel}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="rounded-2xl overflow-hidden flex flex-col max-h-[80vh] w-full max-w-[560px]"
+        style={{
+          background: 'rgba(25,25,33,0.98)',
+          border: '1px solid rgba(255,255,255,0.10)',
+          boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
+          color: '#fff',
+        }}
+      >
+        <div className="px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="text-[11px] font-bold tracking-[0.12em] uppercase mb-0.5" style={{ color: '#FF8800' }}>
+            FDTL Pre-check
+          </div>
+          <h3 className="text-[15px] font-bold tracking-tight">Paste will create FDTL issues</h3>
+          <p className="text-[12px] mt-0.5" style={{ color: 'rgba(255,255,255,0.60)' }}>
+            {pending.fresh.length} cell{pending.fresh.length === 1 ? '' : 's'} ready to paste · {violations} violation
+            {violations === 1 ? '' : 's'} · {warnings} warning{warnings === 1 ? '' : 's'}
+          </p>
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto px-5 py-3 space-y-2">
+          {pending.issues.map((iss, i) => (
+            <div
+              key={`${iss.crewId}-${iss.dateIso}-${i}`}
+              className="rounded-lg px-3 py-2 text-[12px]"
+              style={{
+                background: iss.severity === 'violation' ? 'rgba(230,53,53,0.10)' : 'rgba(255,136,0,0.10)',
+                border: `1px solid ${iss.severity === 'violation' ? '#E63535' : '#FF8800'}`,
+              }}
+            >
+              <div className="flex items-center gap-2 mb-0.5">
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wider"
+                  style={{ color: iss.severity === 'violation' ? '#E63535' : '#FF8800' }}
+                >
+                  {iss.severity}
+                </span>
+                <span className="font-semibold">{iss.crewLabel}</span>
+                <span className="opacity-60 font-mono">{iss.dateIso}</span>
+              </div>
+              <div className="font-medium">{iss.title}</div>
+              {iss.message && <div className="opacity-70 leading-snug mt-0.5">{iss.message}</div>}
+            </div>
+          ))}
+        </div>
+        <div
+          className="flex items-center justify-end gap-2 px-5 py-3"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
+        >
+          <button onClick={cancel} className="h-9 px-4 rounded-lg text-[13px] font-medium hover:bg-white/10">
+            Cancel
+          </button>
+          <button
+            onClick={() => void confirm()}
+            className="h-9 px-4 rounded-lg text-[13px] font-semibold text-white"
+            style={{ background: '#FF8800' }}
+          >
+            Paste anyway
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Confirm prompt for multi-day / multi-crew block deletes. Single-
+ *  cell deletes skip this and run immediately. Hero-style 104px header
+ *  matches every other Gantt dialog. Delete CTA auto-focuses so Enter
+ *  / Space proceed without an extra click; Esc cancels. */
+function BlockDeleteConfirmDialog() {
+  const pending = useCrewScheduleStore((s) => s.pendingBlockDelete)
+  const confirmBtnRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (pending) {
+      const id = setTimeout(() => confirmBtnRef.current?.focus(), 50)
+      return () => clearTimeout(id)
+    }
+  }, [pending])
+  if (!pending) return null
+  const total = pending.activityIds.length + pending.assignmentIds.length
+  const cancel = () => useCrewScheduleStore.setState({ pendingBlockDelete: null })
+  const confirm = async () => {
+    const { activityIds, assignmentIds } = pending
+    useCrewScheduleStore.setState({ pendingBlockDelete: null })
+    const requests = [
+      ...activityIds.map((id) => ({ kind: 'activity' as const, id, fn: () => api.deleteCrewActivity(id) })),
+      ...assignmentIds.map((id) => ({ kind: 'assignment' as const, id, fn: () => api.deleteCrewAssignment(id) })),
+    ]
+    const results = await Promise.allSettled(requests.map((r) => r.fn()))
+    const failures: Array<{ kind: 'activity' | 'assignment'; id: string; status: number | null; message: string }> = []
+    const goneActivityIds = new Set<string>()
+    const goneAssignmentIds = new Set<string>()
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i]
+      const req = requests[i]
+      if (r.status === 'fulfilled') {
+        if (req.kind === 'activity') goneActivityIds.add(req.id)
+        else goneAssignmentIds.add(req.id)
+        continue
+      }
+      const err = r.reason as { message?: string; status?: number }
+      const status = err?.status ?? null
+      failures.push({ kind: req.kind, id: req.id, status, message: err?.message ?? String(r.reason) })
+      if (status === 404) {
+        if (req.kind === 'activity') goneActivityIds.add(req.id)
+        else goneAssignmentIds.add(req.id)
+      }
+    }
+    if (failures.length > 0) {
+      console.error('Block delete: %d/%d failed', failures.length, results.length, failures)
+    }
+    if (goneActivityIds.size > 0 || goneAssignmentIds.size > 0) {
+      useCrewScheduleStore.setState((st) => ({
+        activities: st.activities.filter((a) => !goneActivityIds.has(a._id)),
+        assignments: st.assignments.filter((a) => !goneAssignmentIds.has(a._id)),
+      }))
+    }
+    useCrewScheduleStore.getState().clearRangeSelection()
+    void useCrewScheduleStore.getState().reconcilePeriod()
+  }
+  return (
+    <DialogShell
+      title={`Delete ${total} ${total === 1 ? 'duty' : 'duties'}?`}
+      heroEyebrow="Confirm bulk delete"
+      heroSubtitle="Removes a large number of ground and flight duties. This cannot be undone."
+      heroSvg={<BulkDeleteHero />}
+      onClose={cancel}
+      width={520}
+      bodyPadding={false}
+      footer={
+        <>
+          <button onClick={cancel} className="h-9 px-4 rounded-lg text-[13px] font-medium hover:bg-white/10">
+            Cancel
+          </button>
+          <button
+            ref={confirmBtnRef}
+            onClick={() => void confirm()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                void confirm()
+              }
+            }}
+            className="h-9 px-4 rounded-lg text-[13px] font-semibold text-white outline-none"
+            style={{ background: '#E63535', boxShadow: '0 0 0 2px rgba(230,53,53,0.30)' }}
+          >
+            Delete
+          </button>
+        </>
+      }
+    >
+      <div />
+    </DialogShell>
+  )
+}
+
+/** Auto-clearing flash toast for paste outcomes. Lives inside the
+ *  canvas frame so it doesn't compete with global app-level toasts. */
+function PasteFlashToast() {
+  const flash = useCrewScheduleStore((s) => s.pasteFlash)
+  const setFlash = useCrewScheduleStore((s) => s.setPasteFlash)
+  useEffect(() => {
+    if (!flash) return
+    const id = setTimeout(() => setFlash(null), 3000)
+    return () => clearTimeout(id)
+  }, [flash, setFlash])
+  if (!flash) return null
+  const accent = flash.kind === 'error' ? '#E63535' : flash.kind === 'warning' ? '#FF8800' : 'var(--module-accent)'
+  return (
+    <div
+      className="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-3 py-2 rounded-lg text-[13px] font-medium"
+      style={{
+        background: 'rgba(25,25,33,0.92)',
+        border: `1px solid ${accent}`,
+        color: '#fff',
+        backdropFilter: 'blur(8px)',
+        animation: 'bc-dropdown-in 150ms ease-out',
+      }}
+    >
+      {flash.text}
     </div>
   )
 }

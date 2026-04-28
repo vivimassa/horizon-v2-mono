@@ -13,7 +13,7 @@ import { useFilterPanelControl } from './panel'
  * ───────────────────────────────────────────────────────────── */
 export function FilterSection({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <label className="text-[13px] font-semibold uppercase tracking-wider text-hz-text-tertiary block">{label}</label>
       {children}
     </div>

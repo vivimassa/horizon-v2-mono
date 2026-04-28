@@ -681,6 +681,25 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
     draw()
   }, [draw])
 
+  // Vertical scroll-to-crew (driven by the Search panel). Centres the
+  // requested row in the viewport and consumes the request so subsequent
+  // user scrolls aren't fought. Bumps via `scrollTargetCrewTick` so
+  // re-targeting the same row still scrolls.
+  const scrollTargetCrewId = useCrewScheduleStore((s) => s.scrollTargetCrewId)
+  const scrollTargetCrewTick = useCrewScheduleStore((s) => s.scrollTargetCrewTick)
+  const consumeScrollTargetCrew = useCrewScheduleStore((s) => s.consumeScrollTargetCrew)
+  useEffect(() => {
+    if (!scrollTargetCrewId || !scrollRef.current) return
+    const idx = layout.rows.findIndex((r) => r.crewId === scrollTargetCrewId)
+    if (idx < 0) return
+    const s = scrollRef.current
+    const viewportH = s.clientHeight - HEADER_H
+    const rowTop = idx * layout.rowH
+    const target = Math.max(0, rowTop - viewportH / 2 + layout.rowH / 2)
+    s.scrollTo({ top: target, behavior: 'smooth' })
+    consumeScrollTargetCrew()
+  }, [scrollTargetCrewId, scrollTargetCrewTick, layout, consumeScrollTargetCrew])
+
   // Redraw on scroll — coalesce to one store update + one paint per frame.
   // Without throttling, 60+ scroll events per second each push a zustand
   // update, which cascades to re-rendering every subscriber (left panel,
@@ -882,20 +901,25 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
           try {
             if (mode === 'copy') {
               if (!srcAssignment) return
-              await api.createCrewAssignment({
+              const created = await api.createCrewAssignment({
                 pairingId: drag.pairingId,
                 crewId: targetCrewId,
                 seatPositionId: srcAssignment.seatPositionId,
                 seatIndex: optimisticSeatIndex,
                 status: 'planned',
               })
+              // Replace the optimistic placeholder with the real doc.
+              useCrewScheduleStore.getState().mergeAssignments([created as unknown as { _id: string }])
             } else {
-              await api.patchCrewAssignment(sourceAssignmentId, { crewId: targetCrewId })
+              const patched = await api.patchCrewAssignment(sourceAssignmentId, { crewId: targetCrewId })
+              useCrewScheduleStore.getState().mergeAssignments([patched as unknown as { _id: string }])
             }
-            // Silent reconcile — optimistic state already painted the
-            // new bar. Avoid commitPeriod() here so the runway loading
-            // overlay doesn't flash on successful drops.
-            void useCrewScheduleStore.getState().reconcilePeriod()
+            // Narrow reconcile — refetch only the source + target crew
+            // (~50ms) so FDTL recompute lands without paying the full
+            // 50s aggregator scan. Source set covers the move case
+            // where the bar leaves the original crew row.
+            const ids = mode === 'move' && srcAssignment ? [targetCrewId, srcAssignment.crewId] : [targetCrewId]
+            void useCrewScheduleStore.getState().reconcileCrew(ids)
           } catch (err) {
             // Capacity-exceeded: structured payload from the server drives
             // a friendly dialog instead of surfacing the raw API message.

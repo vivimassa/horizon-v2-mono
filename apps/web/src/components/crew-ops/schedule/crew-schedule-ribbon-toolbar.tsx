@@ -16,6 +16,7 @@ import {
   PanelRightClose,
   RefreshCw,
   Filter,
+  Search,
   ShieldAlert,
   UserRoundX,
 } from 'lucide-react'
@@ -36,6 +37,7 @@ interface Props {
   smartFilterOpen?: boolean
   onOpenCheatsheet?: () => void
   onOpenLegalityCheck?: () => void
+  onSearch?: () => void
 }
 
 /** Zoom progression for the Format popover's Range stepper. */
@@ -58,6 +60,7 @@ export function CrewScheduleRibbonToolbar({
   smartFilterOpen,
   onOpenCheatsheet,
   onOpenLegalityCheck,
+  onSearch,
 }: Props) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -182,6 +185,7 @@ export function CrewScheduleRibbonToolbar({
                 active: isFullscreen,
               })}
               {cb(CalendarCheck, 'Today', goToToday)}
+              {cb(Search, 'Search (Ctrl+F)', onSearch)}
               {cb(RefreshCw, 'Refresh', onRefresh, { disabled: loading })}
               {/* Help */}
               {cb(HelpCircle, 'Shortcuts', onOpenCheatsheet)}
@@ -300,6 +304,15 @@ export function CrewScheduleRibbonToolbar({
               hoverBg={hoverBg}
               activeBg={activeBg}
               tooltip="Center timeline on today"
+            />
+            <RibbonBtn
+              icon={Search}
+              label="Search"
+              onClick={onSearch}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Search crew by ID or name (Ctrl+F)"
             />
             <RibbonBtn
               icon={RefreshCw}

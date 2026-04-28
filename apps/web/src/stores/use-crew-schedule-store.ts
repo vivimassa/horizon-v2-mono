@@ -20,6 +20,7 @@ import { checkSoftRules, type SoftRuleViolation } from '@skyhub/logic'
 import type { BarLabelMode, CrewScheduleZoom } from '@/lib/crew-schedule/layout'
 import { sortCrewRoster } from '@/lib/crew-schedule/layout'
 import { useOperatorStore } from '@/stores/use-operator-store'
+import { buildScheduleDuties, validateCrewAssignment, categorizeActivityFlags, type ScheduleDuty } from '@skyhub/logic'
 
 /**
  * Store for 4.1.6 Crew Schedule. Mirrors `useGanttStore` shape:
@@ -37,6 +38,12 @@ interface Filters {
   positionIds: string[]
   acTypeIcaos: string[]
   crewGroupIds: string[]
+  /** Bulk crew lookup: each token is matched (case-insensitive) against
+   *  `employeeId` exact OR substring of `firstName`/`lastName`/full name.
+   *  When non-empty, all other left-panel filters are ignored — the
+   *  Specific Crew Search dialog is the single source of truth for which
+   *  crew load on the next Go. */
+  specificCrewTokens: string[]
 }
 
 export interface UncrewedFilterState {
@@ -358,9 +365,70 @@ interface State extends Data {
    *  Drives the tray's loading skeleton — the main Gantt remains
    *  interactive throughout. */
   uncrewedLoading: boolean
+  /** Total uncrewed pairings the server has for the current scope.
+   *  `uncrewed.length` is the loaded slice; `uncrewedTotal` is what's
+   *  available so the tray can render "X of Y · Load more". */
+  uncrewedTotal: number
+  /** Page size used for /crew-schedule/uncrewed paging. */
+  uncrewedPageSize: number
   /** Date-scoped crew grouping (AIMS §4.4 "Group crew together"). When
    *  set, the layout's crew sort is replaced by the grouping algorithm. */
   crewGrouping: CrewGroupingState | null
+
+  /** Gantt-scoped activity clipboard (separate from the OS clipboard).
+   *  Set by Ctrl+C / Ctrl+X / right-click → Copy/Cut on a selected
+   *  activity bar. Read by Ctrl+V / right-click → Paste on an empty
+   *  cell or a shift-drag block. Times are stored as operator-local
+   *  HH:MM so a REST 22:00-08:00 anchored on Apr 03 pastes as
+   *  22:00-08:00 on Apr 17. Source activity may span midnight; the
+   *  paste rebuilds end-side to next local day when endHHMM <= startHHMM.
+   *
+   *  When `mode === 'cut'`, `sourceActivityId` references the activity
+   *  that should be deleted after the FIRST successful paste (matches
+   *  OS Cut semantics — the source moves to the destination once, not
+   *  every paste). Esc cancels the cut without touching the source. */
+  clipboardActivity: {
+    activityCodeId: string
+    /** Display label like "OFF", "SBY" — shown in the toolbar pill. */
+    codeLabel: string
+    startHHMM: string
+    endHHMM: string
+    notes: string | null
+    mode: 'copy' | 'cut'
+    sourceActivityId: string | null
+  } | null
+  /** Ephemeral feedback for paste outcomes. Auto-clears after 3s.
+   *  Drives a small accent-bordered toast near the canvas top. */
+  pasteFlash: { kind: 'success' | 'warning' | 'error'; text: string; ts: number } | null
+  /** Multi-day block delete confirmation. Set by the Delete handlers
+   *  when the planner targets >1 cell. Drives a small confirm dialog;
+   *  shell consumes by reading the activity/assignment id arrays and
+   *  dispatching the actual deletes when the user confirms. Cleared
+   *  on either outcome. */
+  pendingBlockDelete: {
+    activityIds: string[]
+    assignmentIds: string[]
+    crewCount: number
+    dayCount: number
+  } | null
+  /** Pre-paste FDTL pre-check tripped the validator. Holds the
+   *  surviving target set + the per-crew issue summary so the shell
+   *  can render a confirm dialog ("Pasting will create FDTL issues —
+   *  proceed anyway?"). User confirms → the buffered targets POST as
+   *  normal; cancels → state clears, no DB write. */
+  pendingPasteConfirm: {
+    fresh: Array<{ crewId: string; dateIso: string; startUtcIso: string; endUtcIso: string }>
+    skipped: number
+    illegal: number
+    issues: Array<{
+      crewId: string
+      dateIso: string
+      crewLabel: string
+      severity: 'warning' | 'violation'
+      title: string
+      message: string
+    }>
+  } | null
 
   /** Swap-picker mode. When the user clicks "Swap with…" in a pairing
    *  context menu, the canvas enters this mode: the cursor hints at a
@@ -465,6 +533,13 @@ interface State extends Data {
   scrollLeft: number
   scrollTop: number
   scrollTargetMs: number | null
+  /** Crew row currently requested by Search to be scrolled vertically
+   *  into view. Cleared by the canvas via `consumeScrollTargetCrew`. */
+  scrollTargetCrewId: string | null
+  /** Monotonic counter — bumped every time `scrollToCrew` is called so
+   *  the canvas effect re-fires even when the same crewId is targeted
+   *  twice in a row (eg. Next/Prev landing back on the same match). */
+  scrollTargetCrewTick: number
 
   // ── UI ──
   rightPanelOpen: boolean
@@ -485,6 +560,13 @@ interface State extends Data {
    *  global `loading` flag. Used after optimistic mutations so the
    *  runway overlay doesn't flash after a drop. */
   reconcilePeriod: () => Promise<void>
+  /** Narrow background reconcile scoped to one or more crew. Sends
+   *  `crewSearch=<id>` so the server returns ONLY that crew's
+   *  pairings/assignments/activities — ~50ms vs ~50s on a 500-crew
+   *  M0 cluster. Merges into the local store without wiping unrelated
+   *  rows. Use this after every mutation whose blast radius is known
+   *  to be a small set of crew (single-crew assign, drag-copy, etc.). */
+  reconcileCrew: (crewIds: string[]) => Promise<void>
   loadContext: () => Promise<void>
 
   // ── Actions: view ──
@@ -495,6 +577,38 @@ interface State extends Data {
   zoomRowIn: () => void
   zoomRowOut: () => void
   setRefreshIntervalMins: (mins: number) => void
+
+  // ── Actions: clipboard ──
+  /** Read a selected activity into the in-memory Gantt clipboard. */
+  copyActivityToClipboard: (activityId: string) => void
+  /** Same as `copyActivityToClipboard` but flags the buffer as a Cut.
+   *  The source activity is deleted on the first successful paste. */
+  cutActivityToClipboard: (activityId: string) => void
+  /** Drop the clipboard contents — clears the toolbar pill. Cut: leaves
+   *  the source bar in place (cancels the move). */
+  clearClipboard: () => void
+  /** Paste the buffered activity onto each (crewId × dateIso) target.
+   *  Cells that already contain an activity for that date are skipped.
+   *  Returns the outcome counts so the caller can render a toast.
+   *  Optimistic merge + narrow reconcile on the touched crew set. */
+  pasteClipboardToCells: (
+    targets: Array<{ crewId: string; dateIso: string }>,
+  ) => Promise<{ pasted: number; skipped: number; failed: number }>
+  /** Programmatically show / clear the paste-feedback toast. */
+  setPasteFlash: (flash: NonNullable<State['pasteFlash']> | null) => void
+  /** Continue the paste held by the FDTL confirm dialog. */
+  confirmPendingPaste: () => Promise<void>
+  /** Drop the pending paste — neither the bulk POST nor the source
+   *  delete (cut) fires. */
+  cancelPendingPaste: () => void
+
+  // ── Actions: optimistic local-merge ──
+  /** Merge new/updated activities into the local store by `_id`. Used
+   *  by mutation handlers so the UI reflects the change immediately
+   *  without waiting for the 30-50s reconcile fetch. */
+  mergeActivities: (docs: Array<{ _id: string } & Record<string, unknown>>) => void
+  /** Same shape as `mergeActivities` but for assignments. */
+  mergeAssignments: (docs: Array<{ _id: string } & Record<string, unknown>>) => void
 
   // ── Actions: selection / hover ──
   selectCrew: (id: string | null) => void
@@ -568,6 +682,9 @@ interface State extends Data {
   /** Lazy fetch of /crew-schedule/uncrewed — populates the Uncrewed
    *  Duties tray + appends uncrewed pairings into the pairings store. */
   loadUncrewed: () => Promise<void>
+  /** Append the next page of uncrewed pairings (page size = `uncrewedPageSize`).
+   *  No-op when nothing more is available. */
+  loadMoreUncrewed: () => Promise<void>
   setCrewGrouping: (g: CrewGroupingState | null) => void
   openMemoOverlay: (o: NonNullable<State['memoOverlay']>) => void
   closeMemoOverlay: () => void
@@ -608,6 +725,11 @@ interface State extends Data {
   setScroll: (left: number, top: number) => void
   setScrollTarget: (ms: number | null) => void
   goToToday: () => void
+  /** Crew row to scroll into vertical view. Bumps `scrollTargetCrewTick`
+   *  so repeated requests (Next/Prev in search) re-trigger the scroll
+   *  even when the same crewId is asked for twice. */
+  scrollToCrew: (crewId: string) => void
+  consumeScrollTargetCrew: () => void
 
   // ── Actions: UI ──
   setRightPanelOpen: (open: boolean) => void
@@ -830,7 +952,7 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     // Committed view state
     periodFromIso: from,
     periodToIso: to,
-    filters: { baseIds: [], positionIds: [], acTypeIcaos: [], crewGroupIds: [] },
+    filters: { baseIds: [], positionIds: [], acTypeIcaos: [], crewGroupIds: [], specificCrewTokens: [] },
 
     // View state
     zoom: 'M',
@@ -877,8 +999,14 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     uncrewedFilterSheetOpen: false,
     uncrewedTrayHeight: hydrateUncrewedTrayHeight(),
     uncrewedLoading: false,
+    uncrewedTotal: 0,
+    uncrewedPageSize: 100,
     uncrewedTrayVisible: hydrateUncrewedTrayVisible(),
     crewGrouping: hydrateGrouping(),
+    clipboardActivity: null,
+    pasteFlash: null,
+    pendingPasteConfirm: null,
+    pendingBlockDelete: null,
     tempBaseDialog: null,
     tempBases: [],
     flightBookings: [],
@@ -889,6 +1017,8 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     scrollLeft: 0,
     scrollTop: 0,
     scrollTargetMs: null,
+    scrollTargetCrewId: null,
+    scrollTargetCrewTick: 0,
 
     // UI
     rightPanelOpen: true,
@@ -916,6 +1046,7 @@ export const useCrewScheduleStore = create<State>((set, get) => {
           position: s.filters.positionIds.length === 1 ? s.filters.positionIds[0] : undefined,
           acType: s.filters.acTypeIcaos.length === 1 ? s.filters.acTypeIcaos[0] : undefined,
           crewGroup: s.filters.crewGroupIds.length === 1 ? s.filters.crewGroupIds[0] : undefined,
+          crewSearch: s.filters.specificCrewTokens.length > 0 ? s.filters.specificCrewTokens : undefined,
         })
         const sortedCrew = sortCrewRoster({
           crew: res.crew,
@@ -944,21 +1075,29 @@ export const useCrewScheduleStore = create<State>((set, get) => {
           periodCommitted: true,
           loading: false,
           error: null,
+          // Tray always starts collapsed on a fresh Go — planner opens
+          // it on demand. Prevents an "open empty tray" flash on narrow
+          // filters (eg. Specific Crew Search returning 0 uncrewed).
+          uncrewedTrayVisible: false,
         })
+        if (typeof window !== 'undefined') {
+          try {
+            window.localStorage.setItem('horizon.crewSchedule.uncrewedTrayVisible.v2', '0')
+          } catch {
+            /* localStorage unavailable — non-fatal */
+          }
+        }
         // Load scheduling config + compute soft violations in background.
         void loadSchedulingConfigAndViolations(get, set, s.periodFromIso, s.periodToIso)
         // Pull positioning + deadhead bookings for the visible window so the
         // canvas can paint POS chips on temp-base flanking days. Cheap call;
         // failures are silent (stored as []).
         void get().loadFlightBookings()
-        // Background prefetch — always run after the main aggregator
-        // resolves so the tray is ready (or close to ready) by the time
-        // the user clicks. Sequential (after `set(...)` above) so it
-        // doesn't fight the main aggregator for TCP bandwidth on M0
-        // Atlas. The 60s server-side response cache makes the actual
-        // tray-click idempotent if the user does click within the TTL.
-        // Generation guard inside `loadUncrewed` discards results if
-        // the user re-clicks Go before this finishes.
+        // Background prefetch — runs after the main aggregator resolves
+        // so the tray is warm by the time the planner clicks. Generation
+        // guard inside `loadUncrewed` discards results if Go is clicked
+        // again before this finishes. Tray itself stays hidden on every
+        // commit (forced below) — prefetch is data-only.
         void get().loadUncrewed()
         // Roster-FDTL sweep is now on-demand — triggered by the Legality
         // Check dialog, not by page load. Avoids mid-view flicker from a
@@ -982,6 +1121,7 @@ export const useCrewScheduleStore = create<State>((set, get) => {
           position: s.filters.positionIds.length === 1 ? s.filters.positionIds[0] : undefined,
           acType: s.filters.acTypeIcaos.length === 1 ? s.filters.acTypeIcaos[0] : undefined,
           crewGroup: s.filters.crewGroupIds.length === 1 ? s.filters.crewGroupIds[0] : undefined,
+          crewSearch: s.filters.specificCrewTokens.length > 0 ? s.filters.specificCrewTokens : undefined,
         })
         // Preserve the row order of the last commit so optimistic
         // mutations (assign / delete / swap) never reshuffle the Gantt.
@@ -1029,6 +1169,7 @@ export const useCrewScheduleStore = create<State>((set, get) => {
                   base: s.filters.baseIds.length === 1 ? s.filters.baseIds[0] : undefined,
                   position: s.filters.positionIds.length === 1 ? s.filters.positionIds[0] : undefined,
                   acType: s.filters.acTypeIcaos.length === 1 ? s.filters.acTypeIcaos[0] : undefined,
+                  crewSearch: s.filters.specificCrewTokens.length > 0 ? s.filters.specificCrewTokens : undefined,
                 })
                 set({ crewIssues: fresh.crewIssues ?? [] })
               })
@@ -1040,6 +1181,64 @@ export const useCrewScheduleStore = create<State>((set, get) => {
       } catch {
         // Silent — caller already painted optimistic state. Next natural
         // refresh (period change, Go, etc.) will re-sync.
+      }
+    },
+
+    reconcileCrew: async (crewIds) => {
+      if (!crewIds.length) return
+      const s = get()
+      try {
+        // crewSearch tokens accept _id (server's resolver matches
+        // employeeId exact OR regex on names — _id passes through the
+        // employeeId-exact branch as a no-op miss, but we add an
+        // additional clause via the regex over `_id` is unnecessary; we
+        // already added _id matching by widening the resolver below).
+        const res = await api.getCrewSchedule({
+          from: s.periodFromIso,
+          to: s.periodToIso,
+          crewSearch: crewIds,
+        })
+        // Targeted merge — only touch the rows for the crew we asked
+        // for. Wiping the full activities/assignments arrays here would
+        // blow away every OTHER crew's bars (the server returned only
+        // the narrow set), so we splice by `crewId` instead.
+        const touched = new Set(crewIds)
+        const mergeById = <T extends { _id: string; crewId?: string }>(prev: T[], next: T[]): T[] => {
+          const nextById = new Map(next.map((d) => [d._id, d]))
+          const out: T[] = []
+          for (const p of prev) {
+            // Drop a touched-crew row if the server didn't return it
+            // (means it was deleted server-side); keep all other crew.
+            if (p.crewId && touched.has(p.crewId)) {
+              const fresh = nextById.get(p._id)
+              if (fresh) {
+                out.push(fresh)
+                nextById.delete(p._id)
+              }
+              continue
+            }
+            out.push(p)
+          }
+          // Append any new docs the server returned that we hadn't seen.
+          for (const fresh of nextById.values()) out.push(fresh)
+          return out
+        }
+        set({
+          activities: mergeById(get().activities, res.activities),
+          assignments: mergeById(get().assignments, res.assignments),
+          // Pairings + crew don't go through the touched-crew filter —
+          // pairings can shift seat counts via assignments to OTHER
+          // crew, and crew docs themselves don't change on assignment.
+          // We refresh pairings by id to pick up crewCounts updates.
+          pairings: (() => {
+            const byId = new Map(res.pairings.map((p) => [p._id, p]))
+            const out = get().pairings.map((p) => byId.get(p._id) ?? p)
+            for (const p of res.pairings) if (!out.find((x) => x._id === p._id)) out.push(p)
+            return out
+          })(),
+        })
+      } catch {
+        // Silent — fall back to next full reconcile / commit.
       }
     },
 
@@ -1090,6 +1289,390 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     setRefreshIntervalMins: (mins) => set({ refreshIntervalMins: Math.max(5, Math.min(59, mins)) }),
 
     // ── Selection / hover ──
+    copyActivityToClipboard: (activityId) => {
+      const s = get()
+      const act = s.activities.find((a) => a._id === activityId)
+      if (!act) return
+      const code = s.activityCodes.find((c) => c._id === act.activityCodeId)
+      const codeLabel = code?.code ?? '?'
+      const offsetH = s.displayOffsetHours
+      const toLocalHHMM = (utcIso: string): string => {
+        const ms = new Date(utcIso).getTime() + offsetH * 3_600_000
+        const d = new Date(ms)
+        return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+      }
+      set({
+        clipboardActivity: {
+          activityCodeId: act.activityCodeId,
+          codeLabel,
+          startHHMM: toLocalHHMM(act.startUtcIso),
+          endHHMM: toLocalHHMM(act.endUtcIso),
+          notes: act.notes ?? null,
+          mode: 'copy',
+          sourceActivityId: null,
+        },
+        pasteFlash: { kind: 'success', text: `Copied ${codeLabel} — paste with Ctrl+V`, ts: Date.now() },
+      })
+    },
+    cutActivityToClipboard: (activityId) => {
+      const s = get()
+      const act = s.activities.find((a) => a._id === activityId)
+      if (!act) return
+      const code = s.activityCodes.find((c) => c._id === act.activityCodeId)
+      const codeLabel = code?.code ?? '?'
+      const offsetH = s.displayOffsetHours
+      const toLocalHHMM = (utcIso: string): string => {
+        const ms = new Date(utcIso).getTime() + offsetH * 3_600_000
+        const d = new Date(ms)
+        return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+      }
+      set({
+        clipboardActivity: {
+          activityCodeId: act.activityCodeId,
+          codeLabel,
+          startHHMM: toLocalHHMM(act.startUtcIso),
+          endHHMM: toLocalHHMM(act.endUtcIso),
+          notes: act.notes ?? null,
+          mode: 'cut',
+          sourceActivityId: act._id,
+        },
+        pasteFlash: { kind: 'success', text: `Cut ${codeLabel} — paste with Ctrl+V`, ts: Date.now() },
+      })
+    },
+    clearClipboard: () => set({ clipboardActivity: null }),
+    setPasteFlash: (flash) => set({ pasteFlash: flash }),
+    pasteClipboardToCells: async (targets) => {
+      const s = get()
+      const clip = s.clipboardActivity
+      if (!clip || targets.length === 0) return { pasted: 0, skipped: 0, failed: 0 }
+      // Anchor source HH:MM to each target local date. Same wrap-past-
+      // midnight rule as the server: end <= start → push to next day.
+      const offsetH = s.displayOffsetHours
+      const localDateAndTimeToUtcIso = (dateIso: string, hhmm: string): string => {
+        const [hh, mm] = hhmm.split(':').map((n) => parseInt(n, 10))
+        const localMidnightUtcMs = Date.parse(`${dateIso}T00:00:00Z`) - offsetH * 3_600_000
+        return new Date(localMidnightUtcMs + (hh * 60 + mm) * 60_000).toISOString()
+      }
+      const buildWindow = (dateIso: string): { startUtcIso: string; endUtcIso: string } => {
+        const startUtcIso = localDateAndTimeToUtcIso(dateIso, clip.startHHMM)
+        let endUtcIso = localDateAndTimeToUtcIso(dateIso, clip.endHHMM)
+        if (new Date(endUtcIso).getTime() <= new Date(startUtcIso).getTime()) {
+          const nextDay = new Date(Date.parse(`${dateIso}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10)
+          endUtcIso = localDateAndTimeToUtcIso(nextDay, clip.endHHMM)
+        }
+        return { startUtcIso, endUtcIso }
+      }
+      // Pre-paste legality:
+      //   1. Skip cells that already hold an activity on the target date
+      //      (same as before — silently absorb the no-op).
+      //   2. REJECT cells whose target window overlaps an existing
+      //      pairing assignment for that crew. Pasting REST/SBY/OFF on
+      //      top of a flying duty is illegal; the planner has to clear
+      //      the pairing first, otherwise the bar would visually
+      //      sit on a duty the crew is still rostered to operate.
+      //   3. Always trim duplicate (crewId, dateIso) pairs in the
+      //      caller's target list.
+      const occupied = new Set<string>()
+      for (const a of s.activities) {
+        const day = a.dateIso ?? a.startUtcIso.slice(0, 10)
+        occupied.add(`${a.crewId}|${day}`)
+      }
+      const assignmentsByCrew = new Map<string, Array<{ startMs: number; endMs: number }>>()
+      for (const a of s.assignments) {
+        const arr = assignmentsByCrew.get(a.crewId) ?? []
+        arr.push({ startMs: new Date(a.startUtcIso).getTime(), endMs: new Date(a.endUtcIso).getTime() })
+        assignmentsByCrew.set(a.crewId, arr)
+      }
+      const dedupe = new Set<string>()
+      const fresh: Array<{ crewId: string; dateIso: string; startUtcIso: string; endUtcIso: string }> = []
+      let skipped = 0
+      let illegal = 0
+      for (const t of targets) {
+        const key = `${t.crewId}|${t.dateIso}`
+        if (dedupe.has(key)) continue
+        dedupe.add(key)
+        if (occupied.has(key)) {
+          skipped += 1
+          continue
+        }
+        const win = buildWindow(t.dateIso)
+        const startMs = new Date(win.startUtcIso).getTime()
+        const endMs = new Date(win.endUtcIso).getTime()
+        const overlaps = assignmentsByCrew.get(t.crewId)?.some((a) => a.startMs < endMs && a.endMs > startMs)
+        if (overlaps) {
+          illegal += 1
+          continue
+        }
+        fresh.push({ ...t, ...win })
+      }
+      if (fresh.length === 0) {
+        const parts: string[] = []
+        if (skipped) parts.push(`${skipped} had activity`)
+        if (illegal) parts.push(`${illegal} would conflict with a pairing`)
+        set({
+          pasteFlash: {
+            kind: 'warning',
+            text: `Nothing pasted — ${parts.join(' · ') || 'no eligible cells'}`,
+            ts: Date.now(),
+          },
+        })
+        return { pasted: 0, skipped: skipped + illegal, failed: 0 }
+      }
+      // FDTL pre-check — for each fresh target, build a candidate
+      // ScheduleDuty (rest vs duty per the activity code's flags) and
+      // run `validateCrewAssignment` against the crew's existing
+      // duties (assignments + activities). Any violation/warning →
+      // park the targets in `pendingPasteConfirm` and let the shell
+      // render the confirm dialog. Hard-block severity isn't possible
+      // for activities under the current rule set.
+      const ruleSet = s.ruleSet
+      const issues: NonNullable<State['pendingPasteConfirm']>['issues'] = []
+      if (ruleSet) {
+        const pairingsById = new Map(s.pairings.map((p) => [p._id, p]))
+        const activityCodesById = new Map(s.activityCodes.map((c) => [c._id, { flags: c.flags ?? [] }]))
+        const code = s.activityCodes.find((c) => c._id === clip.activityCodeId)
+        const cat = code
+          ? categorizeActivityFlags(code.flags ?? [])
+          : { category: 'rest' as const, countsDuty: false, countsBlock: false, countsFdp: false }
+        const crewById = new Map(s.crew.map((c) => [c._id, c]))
+        const dutiesByCrew = new Map<string, ScheduleDuty[]>()
+        const homeBaseByCrew = new Map<string, string>()
+        for (const t of fresh) {
+          if (!dutiesByCrew.has(t.crewId)) {
+            dutiesByCrew.set(
+              t.crewId,
+              buildScheduleDuties({
+                crewId: t.crewId,
+                assignments: s.assignments,
+                activities: s.activities,
+                pairingsById,
+                activityCodesById,
+                bookings: s.flightBookings,
+              }),
+            )
+            homeBaseByCrew.set(t.crewId, (crewById.get(t.crewId)?.baseLabel ?? '').toUpperCase())
+          }
+        }
+        for (const t of fresh) {
+          const startMs = new Date(t.startUtcIso).getTime()
+          const endMs = new Date(t.endUtcIso).getTime()
+          const durMin = Math.max(0, (endMs - startMs) / 60_000)
+          const candidate: ScheduleDuty = {
+            id: `__paste_${t.crewId}_${t.dateIso}`,
+            kind: cat.category === 'rest' ? 'rest' : 'activity',
+            startUtcMs: startMs,
+            endUtcMs: endMs,
+            dutyMinutes: cat.category === 'duty' && cat.countsDuty ? durMin : 0,
+            blockMinutes: cat.category === 'duty' && cat.countsBlock ? durMin : 0,
+            fdpMinutes: cat.category === 'duty' && cat.countsFdp ? durMin : 0,
+            landings: 0,
+            departureStation: null,
+            arrivalStation: null,
+            isAugmented: false,
+            label: clip.codeLabel,
+          }
+          const result = validateCrewAssignment({
+            candidate,
+            existing: dutiesByCrew.get(t.crewId) ?? [],
+            homeBase: homeBaseByCrew.get(t.crewId) ?? '',
+            ruleSet: ruleSet as Parameters<typeof validateCrewAssignment>[0]['ruleSet'],
+          })
+          for (const chk of result.checks) {
+            if (chk.status !== 'violation' && chk.status !== 'warning') continue
+            const m = crewById.get(t.crewId)
+            issues.push({
+              crewId: t.crewId,
+              dateIso: t.dateIso,
+              crewLabel: m ? `${m.lastName ?? ''} ${m.firstName ?? ''}`.trim() : t.crewId,
+              severity: chk.status,
+              title: chk.label ?? chk.ruleCode ?? 'FDTL rule',
+              message: `${chk.shortReason ?? ''}${chk.legalReference ? ` — ${chk.legalReference}` : ''}`.trim(),
+            })
+          }
+        }
+      }
+      if (issues.length > 0) {
+        set({
+          pendingPasteConfirm: { fresh, skipped, illegal, issues },
+        })
+        return { pasted: 0, skipped: skipped + illegal, failed: 0 }
+      }
+      try {
+        const res = await api.createCrewActivitiesBulk({
+          activities: fresh.map((t) => ({
+            crewId: t.crewId,
+            activityCodeId: clip.activityCodeId,
+            dateIso: t.dateIso,
+            startUtcIso: t.startUtcIso,
+            endUtcIso: t.endUtcIso,
+            notes: clip.notes,
+          })),
+        })
+        get().mergeActivities(res.created as unknown as Array<{ _id: string }>)
+        const touchedCrewIds = new Set(fresh.map((t) => t.crewId))
+        // Cut semantics: delete the source on the first successful
+        // paste, then clear the buffer so further Ctrl+V is a no-op.
+        // If the source is one of the targets we just pasted into
+        // (planner cut and pasted onto the same cell), skip the
+        // delete — would wipe the brand-new bar.
+        if (clip.mode === 'cut' && clip.sourceActivityId && res.created.length > 0) {
+          const sourceId = clip.sourceActivityId
+          const sourceAct = s.activities.find((a) => a._id === sourceId)
+          const sourceWasOverwritten =
+            sourceAct &&
+            res.created.some(
+              (c) =>
+                (c as unknown as { crewId: string }).crewId === sourceAct.crewId &&
+                ((c as unknown as { dateIso?: string | null }).dateIso ?? '') ===
+                  (sourceAct.dateIso ?? sourceAct.startUtcIso.slice(0, 10)),
+            )
+          if (!sourceWasOverwritten) {
+            try {
+              await api.deleteCrewActivity(sourceId)
+              set((st) => ({ activities: st.activities.filter((a) => a._id !== sourceId) }))
+              if (sourceAct) touchedCrewIds.add(sourceAct.crewId)
+            } catch {
+              // Source delete failed — leave the planner with both bars
+              // visible rather than silently swallowing. They can retry
+              // via right-click → Delete.
+            }
+          }
+          set({ clipboardActivity: null })
+        }
+        void get().reconcileCrew([...touchedCrewIds])
+        // Fire-and-forget FDTL re-eval for the period — surfaces any
+        // rest / cumulative violations the paste introduced (28-day OFF
+        // shortfall, weekly rest dent, etc.) on the next reconcile via
+        // `crewIssues`. Server is idempotent under spam.
+        const opId = useOperatorStore.getState().operator?._id
+        if (opId) {
+          void api.reevaluateCrewRoster({ operatorId: opId, from: s.periodFromIso, to: s.periodToIso }).catch(() => {
+            /* silent — next natural refresh re-evaluates */
+          })
+        }
+        const failed = res.failed ?? 0
+        const pasted = res.created.length
+        const reasons: string[] = []
+        if (skipped) reasons.push(`${skipped} skipped (had activity)`)
+        if (illegal) reasons.push(`${illegal} illegal (pairing conflict)`)
+        if (failed) reasons.push(`${failed} failed`)
+        set({
+          pasteFlash: {
+            kind: failed > 0 || skipped > 0 || illegal > 0 ? 'warning' : 'success',
+            text: `Pasted ${pasted} ${clip.codeLabel}` + (reasons.length ? ` · ${reasons.join(' · ')}` : ''),
+            ts: Date.now(),
+          },
+        })
+        return { pasted, skipped: skipped + illegal, failed }
+      } catch (e) {
+        set({
+          pasteFlash: {
+            kind: 'error',
+            text: `Paste failed: ${(e as Error).message ?? 'unknown error'}`,
+            ts: Date.now(),
+          },
+        })
+        return { pasted: 0, skipped: skipped + illegal, failed: fresh.length }
+      }
+    },
+    cancelPendingPaste: () => set({ pendingPasteConfirm: null }),
+    confirmPendingPaste: async () => {
+      const s = get()
+      const pending = s.pendingPasteConfirm
+      const clip = s.clipboardActivity
+      if (!pending || !clip) {
+        set({ pendingPasteConfirm: null })
+        return
+      }
+      const { fresh, skipped, illegal } = pending
+      // Clear the dialog state immediately so the user can't double-fire
+      // the bulk POST by spamming the confirm button.
+      set({ pendingPasteConfirm: null })
+      try {
+        const res = await api.createCrewActivitiesBulk({
+          activities: fresh.map((t) => ({
+            crewId: t.crewId,
+            activityCodeId: clip.activityCodeId,
+            dateIso: t.dateIso,
+            startUtcIso: t.startUtcIso,
+            endUtcIso: t.endUtcIso,
+            notes: clip.notes,
+          })),
+        })
+        get().mergeActivities(res.created as unknown as Array<{ _id: string }>)
+        const touchedCrewIds = new Set(fresh.map((t) => t.crewId))
+        if (clip.mode === 'cut' && clip.sourceActivityId && res.created.length > 0) {
+          const sourceId = clip.sourceActivityId
+          const sourceAct = s.activities.find((a) => a._id === sourceId)
+          const sourceWasOverwritten =
+            sourceAct &&
+            res.created.some(
+              (c) =>
+                (c as unknown as { crewId: string }).crewId === sourceAct.crewId &&
+                ((c as unknown as { dateIso?: string | null }).dateIso ?? '') ===
+                  (sourceAct.dateIso ?? sourceAct.startUtcIso.slice(0, 10)),
+            )
+          if (!sourceWasOverwritten) {
+            try {
+              await api.deleteCrewActivity(sourceId)
+              set((st) => ({ activities: st.activities.filter((a) => a._id !== sourceId) }))
+              if (sourceAct) touchedCrewIds.add(sourceAct.crewId)
+            } catch {
+              // Source delete best-effort.
+            }
+          }
+          set({ clipboardActivity: null })
+        }
+        void get().reconcileCrew([...touchedCrewIds])
+        const opId = useOperatorStore.getState().operator?._id
+        if (opId) {
+          void api.reevaluateCrewRoster({ operatorId: opId, from: s.periodFromIso, to: s.periodToIso }).catch(() => {})
+        }
+        const failed = res.failed ?? 0
+        const pasted = res.created.length
+        const reasons: string[] = []
+        if (skipped) reasons.push(`${skipped} skipped (had activity)`)
+        if (illegal) reasons.push(`${illegal} illegal (pairing conflict)`)
+        if (failed) reasons.push(`${failed} failed`)
+        set({
+          pasteFlash: {
+            kind: 'warning',
+            text:
+              `Pasted ${pasted} ${clip.codeLabel} with FDTL warnings` +
+              (reasons.length ? ` · ${reasons.join(' · ')}` : ''),
+            ts: Date.now(),
+          },
+        })
+      } catch (e) {
+        set({
+          pasteFlash: {
+            kind: 'error',
+            text: `Paste failed: ${(e as Error).message ?? 'unknown error'}`,
+            ts: Date.now(),
+          },
+        })
+      }
+    },
+    mergeActivities: (docs) => {
+      if (!docs.length) return
+      const byId = new Map(docs.map((d) => [d._id, d]))
+      const next = get().activities.map((a) => (byId.has(a._id) ? ({ ...a, ...byId.get(a._id)! } as typeof a) : a))
+      const seen = new Set(get().activities.map((a) => a._id))
+      for (const d of docs) {
+        if (!seen.has(d._id)) next.push(d as unknown as (typeof next)[number])
+      }
+      set({ activities: next })
+    },
+    mergeAssignments: (docs) => {
+      if (!docs.length) return
+      const byId = new Map(docs.map((d) => [d._id, d]))
+      const next = get().assignments.map((a) => (byId.has(a._id) ? ({ ...a, ...byId.get(a._id)! } as typeof a) : a))
+      const seen = new Set(get().assignments.map((a) => a._id))
+      for (const d of docs) {
+        if (!seen.has(d._id)) next.push(d as unknown as (typeof next)[number])
+      }
+      set({ assignments: next })
+    },
     selectCrew: (id) => set({ selectedCrewId: id }),
     selectPairing: (id) => {
       // Picking a pairing clears any pending date-cell selection so the
@@ -1275,6 +1858,9 @@ export const useCrewScheduleStore = create<State>((set, get) => {
           position: s.filters.positionIds.length === 1 ? s.filters.positionIds[0] : undefined,
           acType: s.filters.acTypeIcaos.length === 1 ? s.filters.acTypeIcaos[0] : undefined,
           crewGroup: s.filters.crewGroupIds.length === 1 ? s.filters.crewGroupIds[0] : undefined,
+          crewSearch: s.filters.specificCrewTokens.length > 0 ? s.filters.specificCrewTokens : undefined,
+          offset: 0,
+          limit: s.uncrewedPageSize,
         })
         if (gen !== uncrewedFetchGen) return // newer call superseded us
         // Merge uncrewed pairings into the existing pairings list,
@@ -1284,6 +1870,7 @@ export const useCrewScheduleStore = create<State>((set, get) => {
         const newOnes = res.pairings.filter((p) => !existing.has(p._id))
         set({
           uncrewed: res.uncrewed,
+          uncrewedTotal: res.total,
           pairings: newOnes.length > 0 ? [...get().pairings, ...newOnes] : get().pairings,
         })
       } catch {
@@ -1292,6 +1879,40 @@ export const useCrewScheduleStore = create<State>((set, get) => {
         // Only the latest call clears the loading flag; otherwise an
         // earlier prefetch landing late would race a newer one and
         // flicker the spinner off prematurely.
+        if (gen === uncrewedFetchGen) set({ uncrewedLoading: false })
+      }
+    },
+    loadMoreUncrewed: async () => {
+      const s = get()
+      if (s.uncrewedLoading) return
+      if (s.uncrewed.length >= s.uncrewedTotal) return
+      const gen = ++uncrewedFetchGen
+      try {
+        set({ uncrewedLoading: true })
+        const res = await api.getCrewScheduleUncrewed({
+          from: s.periodFromIso,
+          to: s.periodToIso,
+          base: s.filters.baseIds.length === 1 ? s.filters.baseIds[0] : undefined,
+          position: s.filters.positionIds.length === 1 ? s.filters.positionIds[0] : undefined,
+          acType: s.filters.acTypeIcaos.length === 1 ? s.filters.acTypeIcaos[0] : undefined,
+          crewGroup: s.filters.crewGroupIds.length === 1 ? s.filters.crewGroupIds[0] : undefined,
+          crewSearch: s.filters.specificCrewTokens.length > 0 ? s.filters.specificCrewTokens : undefined,
+          offset: s.uncrewed.length,
+          limit: s.uncrewedPageSize,
+        })
+        if (gen !== uncrewedFetchGen) return
+        const existingPairings = new Set(get().pairings.map((p) => p._id))
+        const newPairings = res.pairings.filter((p) => !existingPairings.has(p._id))
+        const existingUncrewed = new Set(get().uncrewed.map((u) => u.pairingId))
+        const newUncrewed = res.uncrewed.filter((u) => !existingUncrewed.has(u.pairingId))
+        set({
+          uncrewed: newUncrewed.length > 0 ? [...get().uncrewed, ...newUncrewed] : get().uncrewed,
+          uncrewedTotal: res.total,
+          pairings: newPairings.length > 0 ? [...get().pairings, ...newPairings] : get().pairings,
+        })
+      } catch {
+        // Silent — next user attempt re-fires.
+      } finally {
         if (gen === uncrewedFetchGen) set({ uncrewedLoading: false })
       }
     },
@@ -1378,6 +1999,9 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     },
     setScroll: (left, top) => set({ scrollLeft: left, scrollTop: top }),
     setScrollTarget: (ms) => set({ scrollTargetMs: ms }),
+    scrollToCrew: (crewId) =>
+      set((s) => ({ scrollTargetCrewId: crewId, scrollTargetCrewTick: s.scrollTargetCrewTick + 1 })),
+    consumeScrollTargetCrew: () => set({ scrollTargetCrewId: null }),
     goToToday: () => set({ scrollTargetMs: Date.now() }),
 
     // ── UI ──

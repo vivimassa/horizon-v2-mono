@@ -6,10 +6,9 @@ import {
   Play,
   Square,
   Settings as SettingsIcon,
-  Clock,
-  Bell,
   FileText,
   Plus,
+  Search,
   Trash2,
   Copy,
   RotateCcw,
@@ -28,10 +27,9 @@ export type ToolbarAction =
   | 'refresh'
   | 'runNow'
   | 'cancel'
-  | 'settings'
-  | 'schedule'
-  | 'notifications'
+  | 'configure'
   | 'viewLog'
+  | 'search'
   | 'newTask'
   | 'delete'
   | 'clone'
@@ -42,6 +40,7 @@ export type ToolbarAction =
 interface Props {
   selected: ScheduledTaskRef | null
   loading: boolean
+  searchActive?: boolean
   onAction: (action: ToolbarAction) => void
 }
 
@@ -55,7 +54,7 @@ interface Props {
  * View Log. Stubbed (no-op): New Task, Delete, Clone, Restore, Clear, Help —
  * user will wire these next.
  */
-export function TaskSchedulerToolbar({ selected, loading, onAction }: Props) {
+export function TaskSchedulerToolbar({ selected, loading, searchActive, onAction }: Props) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const palette = isDark ? colors.dark : colors.light
@@ -108,10 +107,9 @@ export function TaskSchedulerToolbar({ selected, loading, onAction }: Props) {
           {cb(RefreshCw, 'Refresh list', 'refresh')}
           {cb(Play, 'Run now', 'runNow', { disabled: !hasSelection || isRunning })}
           {cb(Square, 'Cancel running', 'cancel', { disabled: !isRunning })}
-          {cb(SettingsIcon, 'Settings', 'settings', { disabled: !hasSelection })}
-          {cb(Clock, 'Schedule', 'schedule', { disabled: !hasSelection })}
-          {cb(Bell, 'Notifications', 'notifications', { disabled: !hasSelection })}
           {cb(FileText, 'View log', 'viewLog', { disabled: !hasSelection })}
+          {cb(SettingsIcon, 'Configure', 'configure', { disabled: !hasSelection })}
+          {cb(Search, 'Search tasks', 'search', { active: searchActive })}
           {cb(Plus, 'New task', 'newTask', { disabled: true })}
           {cb(Trash2, 'Delete', 'delete', { disabled: true })}
           {cb(Copy, 'Clone', 'clone', { disabled: true })}
@@ -172,41 +170,6 @@ export function TaskSchedulerToolbar({ selected, loading, onAction }: Props) {
           </RibbonSection>
           <Divider isDark={isDark} />
 
-          {/* ── Configure ── */}
-          <RibbonSection label="Configure">
-            <RibbonBtn
-              icon={SettingsIcon}
-              label="Settings"
-              onClick={() => onAction('settings')}
-              isDark={isDark}
-              hoverBg={hoverBg}
-              activeBg={activeBg}
-              tooltip="Open task configuration"
-              disabled={!hasSelection}
-            />
-            <RibbonBtn
-              icon={Clock}
-              label="Schedule"
-              onClick={() => onAction('schedule')}
-              isDark={isDark}
-              hoverBg={hoverBg}
-              activeBg={activeBg}
-              tooltip="Edit cron schedule (frequency, times, timezone)"
-              disabled={!hasSelection}
-            />
-            <RibbonBtn
-              icon={Bell}
-              label="Alerts"
-              onClick={() => onAction('notifications')}
-              isDark={isDark}
-              hoverBg={hoverBg}
-              activeBg={activeBg}
-              tooltip="Edit notification recipients & triggers"
-              disabled={!hasSelection}
-            />
-          </RibbonSection>
-          <Divider isDark={isDark} />
-
           {/* ── History ── */}
           <RibbonSection label="History">
             <RibbonBtn
@@ -222,8 +185,28 @@ export function TaskSchedulerToolbar({ selected, loading, onAction }: Props) {
           </RibbonSection>
           <Divider isDark={isDark} />
 
-          {/* ── Manage (stubbed) ── */}
+          {/* ── Manage ── */}
           <RibbonSection label="Manage">
+            <RibbonBtn
+              icon={SettingsIcon}
+              label="Configure"
+              onClick={() => onAction('configure')}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Open task configuration (description, schedule, alerts)"
+              disabled={!hasSelection}
+            />
+            <RibbonBtn
+              icon={Search}
+              label="Search"
+              onClick={() => onAction('search')}
+              active={searchActive}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Search tasks by name"
+            />
             <RibbonBtn
               icon={Plus}
               label="New"

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, type ScheduledTaskRef, type ScheduledTaskRunRef } from '@skyhub/api'
 import { Text } from '@/components/ui'
+import { useTheme } from '@/components/theme-provider'
 import { X, Play, RefreshCw, Square } from 'lucide-react'
 
 interface RunHistoryModalProps {
@@ -12,6 +13,8 @@ interface RunHistoryModalProps {
 }
 
 export function RunHistoryModal({ task, onClose, onRequestRefresh }: RunHistoryModalProps) {
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
   const [runs, setRuns] = useState<ScheduledTaskRunRef[]>([])
   const [selected, setSelected] = useState<ScheduledTaskRunRef | null>(null)
   const [loading, setLoading] = useState(true)
@@ -87,17 +90,16 @@ export function RunHistoryModal({ task, onClose, onRequestRefresh }: RunHistoryM
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-[960px] max-w-full max-h-[90vh] bg-hz-card border border-hz-border rounded-2xl shadow-2xl flex flex-col">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="relative w-[960px] max-w-full max-h-[90vh] border border-hz-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        style={{ background: isDark ? '#191921' : '#FFFFFF' }}
+      >
         {/* Header */}
-        <div className="shrink-0 px-4 py-3 border-b border-hz-border flex items-start gap-3">
+        <div className="shrink-0 px-4 py-2.5 border-b border-hz-border flex items-center gap-3">
           <div className="min-w-0 flex-1">
-            <Text variant="pageTitle" as="div">
-              Run History — {task.title}
-            </Text>
-            <Text variant="secondary" muted as="div">
-              Last 50 executions
-            </Text>
+            <div className="text-[15px] font-semibold leading-tight truncate">Run History — {task.title}</div>
+            <div className="text-[11px] text-hz-text-secondary mt-0.5">Last 50 executions</div>
           </div>
           <button
             type="button"

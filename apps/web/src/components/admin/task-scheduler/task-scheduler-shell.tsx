@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { api, type ScheduledTaskRef } from '@skyhub/api'
-import { ListScreenHeader, TextInput, Text, ToggleSwitch } from '@/components/ui'
+import { ListScreenHeader, Text, ToggleSwitch } from '@/components/ui'
 import { Clock, ChevronRight } from 'lucide-react'
 import { TaskConfigDrawer, type DrawerTab } from './task-config-drawer'
 import { RunHistoryModal } from './run-history-modal'
 import { TaskSchedulerToolbar, type ToolbarAction } from './task-scheduler-toolbar'
+import { TaskSchedulerSearch } from './task-scheduler-search'
 
 /**
  * 7.1.6 Task Scheduler Management — admin shell.
@@ -24,17 +25,29 @@ export function TaskSchedulerShell() {
   const [drawerTab, setDrawerTab] = useState<DrawerTab>('description')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [historyTask, setHistoryTask] = useState<ScheduledTaskRef | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
 
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  /**
+   * Two refresh modes — `loud` flips the spinner/disabled state on the
+   * Refresh toolbar button (user-triggered + cold load). `silent` is for
+   * background polls so the button doesn't blink every 5 seconds.
+   */
+  const refresh = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const res = await api.listScheduledTasks()
       setTasks(res.tasks)
+      setError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      console.warn('[task-scheduler] refresh failed:', e)
+      setTasks((prev) => {
+        if (prev.length === 0) {
+          setError(e instanceof Error ? e.message : String(e))
+        }
+        return prev
+      })
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
@@ -42,11 +55,11 @@ export function TaskSchedulerShell() {
     void refresh()
   }, [refresh])
 
-  // Light polling so live runs surface progress without manual refresh.
+  // Background poll — silent so the Refresh button stays still.
   useEffect(() => {
     const id = setInterval(() => {
       if (tasks.some((t) => t.lastRunStatus === 'running' || t.lastRunStatus === 'queued')) {
-        void refresh()
+        void refresh(true)
       }
     }, 5_000)
     return () => clearInterval(id)
@@ -101,26 +114,17 @@ export function TaskSchedulerShell() {
         case 'cancel':
           if (selected) void cancelRunning(selected)
           return
-        case 'settings':
+        case 'configure':
           if (selected) {
             setDrawerTab('description')
             setDrawerOpen(true)
           }
           return
-        case 'schedule':
-          if (selected) {
-            setDrawerTab('schedule')
-            setDrawerOpen(true)
-          }
-          return
-        case 'notifications':
-          if (selected) {
-            setDrawerTab('notifications')
-            setDrawerOpen(true)
-          }
-          return
         case 'viewLog':
           if (selected) setHistoryTask(selected)
+          return
+        case 'search':
+          setSearchOpen((v) => !v)
           return
         // Stubbed actions — wired later
         case 'newTask':
@@ -137,7 +141,7 @@ export function TaskSchedulerShell() {
 
   return (
     <div className="flex flex-col h-full bg-hz-bg">
-      {/* Header — title + count + search */}
+      {/* Header — title + count */}
       <div className="border-b border-hz-border shrink-0">
         <ListScreenHeader
           icon={Clock}
@@ -146,13 +150,25 @@ export function TaskSchedulerShell() {
           filteredCount={filtered.length}
           countLabel="task"
         />
-        <div className="px-4 pb-3">
-          <TextInput placeholder="Search application…" value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
       </div>
 
       {/* Top ribbon toolbar */}
-      <TaskSchedulerToolbar selected={selected} loading={loading} onAction={handleToolbarAction} />
+      <div className="relative">
+        <TaskSchedulerToolbar
+          selected={selected}
+          loading={loading}
+          searchActive={searchOpen}
+          onAction={handleToolbarAction}
+        />
+        <TaskSchedulerSearch
+          open={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          query={search}
+          onQueryChange={setSearch}
+          matchCount={filtered.length}
+          totalCount={tasks.length}
+        />
+      </div>
 
       {error ? (
         <div className="m-4 rounded-lg border border-status-error/30 bg-status-error/5 px-3 py-2">

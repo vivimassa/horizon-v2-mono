@@ -237,12 +237,18 @@ async function main(): Promise<void> {
     for (const op of operators) await ensureManpowerBasePlan(op._id as string)
     console.log(`✓ Ensured manpower base plans for ${operators.length} operator(s)`)
     let seededTasks = 0
+    let syncedTasks = 0
     for (const op of operators) {
       const tz = (op as { timezone?: string }).timezone ?? 'UTC'
-      const { created } = await seedScheduledTasksForOperator(op._id as string, tz)
+      const { created, updated } = await seedScheduledTasksForOperator(op._id as string, tz)
       seededTasks += created
+      syncedTasks += updated
     }
-    if (seededTasks > 0) console.log(`✓ Seeded ${seededTasks} scheduled task(s) across ${operators.length} operator(s)`)
+    if (seededTasks > 0 || syncedTasks > 0) {
+      console.log(
+        `✓ Scheduled tasks — ${seededTasks} seeded, ${syncedTasks} synced across ${operators.length} operator(s)`,
+      )
+    }
   } catch (e) {
     console.error('  ensureSystemFolders bootstrap error:', (e as Error).message)
   }

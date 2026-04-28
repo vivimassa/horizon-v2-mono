@@ -36,6 +36,7 @@ registry.set('daily-crew-activity-log', async (ctx) => {
     ctx.operatorId,
     ctx.params as DailyCrewActivityLogParams,
     ctx.log,
+    ctx.cancelled,
   )
   return stats as unknown as Record<string, unknown>
 })

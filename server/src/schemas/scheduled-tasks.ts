@@ -35,6 +35,8 @@ export const runScheduledTaskSchema = z
     fromIso: isoDate,
     toIso: isoDate,
     crewIds: z.array(z.string()).optional(),
+    /** Force the slow full-recompute path; bypasses incremental fast-path. */
+    fullRecompute: z.boolean().optional(),
   })
   .partial()
 

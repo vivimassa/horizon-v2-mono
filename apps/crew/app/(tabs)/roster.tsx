@@ -1,20 +1,25 @@
 import { useMemo, useState } from 'react'
-import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
+import { Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { ChevronLeft, ChevronRight, Plane, Bed, Clock, GraduationCap, Briefcase } from 'lucide-react-native'
-import { Card, Chip, DutyDot, FieldLabel, SectionHeader } from '../../src/components/primitives'
+import { useRouter } from 'expo-router'
+import { ChevronLeft, ChevronRight, Plane, Bed, Clock, GraduationCap, Briefcase, X } from 'lucide-react-native'
+import { Card, Chip, DutyDot, FieldLabel } from '../../src/components/primitives'
 import type { DutyKind } from '../../src/components/primitives'
 import { useTheme } from '../../src/theme/use-theme'
+import type { Theme } from '../../src/theme/tokens'
 import { TYPE } from '../../src/theme/tokens'
 import { useDatabase } from '../../src/providers/DatabaseProvider'
 import { syncCrewData } from '../../src/sync/sync-trigger'
 import { type RosterDuty, useRosterMonth } from '../../src/data/use-roster-month'
-import { fmtMonthShort, fmtMonthYear } from '../../src/data/format'
+import { useActivityCodes } from '../../src/data/use-activity-codes'
+import { summarizeDay } from '../../src/data/use-day-summary'
+import { fmtBlock, fmtMonthShort, fmtMonthYear } from '../../src/data/format'
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 export default function RosterTab() {
   const t = useTheme()
+  const router = useRouter()
   const database = useDatabase()
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
@@ -22,14 +27,15 @@ export default function RosterTab() {
   const [refreshing, setRefreshing] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
-  const data = useRosterMonth(database, year, monthIdx0, refreshKey)
+  const codesQ = useActivityCodes()
+  const data = useRosterMonth(database, year, monthIdx0, codesQ.byId, refreshKey)
 
   const isCurrentMonth = today.getFullYear() === year && today.getMonth() === monthIdx0
   const todayDom = today.getDate()
   const [selectedDom, setSelectedDom] = useState(isCurrentMonth ? todayDom : 1)
+  const [tooltipDom, setTooltipDom] = useState<number | null>(null)
 
   const cells = useMemo(() => {
-    // grid layout: Mon-first; pad leading blanks
     const firstWeekday = new Date(year, monthIdx0, 1).getDay() // 0=Sun
     const lead = (firstWeekday + 6) % 7 // Mon=0
     const dim = new Date(year, monthIdx0 + 1, 0).getDate()
@@ -64,8 +70,16 @@ export default function RosterTab() {
     setRefreshing(false)
   }
 
+  const onDutyTap = (duty: RosterDuty) => {
+    if (duty.kind === 'flight') router.push(`/duty/${duty.id}`)
+    else router.push(`/activity/${duty.id}`)
+  }
+
+  const tooltipDuties = tooltipDom != null ? (data.byDom[tooltipDom] ?? []) : []
+  const tooltipSummary = summarizeDay(tooltipDuties)
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: t.page }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}
@@ -92,7 +106,7 @@ export default function RosterTab() {
           <View style={{ flexDirection: 'row', marginBottom: 6 }}>
             {WEEKDAYS.map((d) => (
               <View key={d} style={{ flex: 1, alignItems: 'center' }}>
-                <Text style={{ ...TYPE.field, fontSize: 10, color: t.textTer }}>{d}</Text>
+                <Text style={{ ...TYPE.field, fontSize: 11, color: t.textTer }}>{d}</Text>
               </View>
             ))}
           </View>
@@ -108,7 +122,10 @@ export default function RosterTab() {
                     isToday={isCurrentMonth && d === todayDom}
                     isSelected={d === selectedDom}
                     duties={data.byDom[d] ?? []}
-                    onPress={() => setSelectedDom(d)}
+                    onPress={() => {
+                      setSelectedDom(d)
+                      setTooltipDom(d)
+                    }}
                   />
                 )}
               </View>
@@ -131,7 +148,7 @@ export default function RosterTab() {
           ))}
         </View>
 
-        {/* Day list — show selected day first, then upcoming */}
+        {/* Day list */}
         <View style={{ gap: 18 }}>
           {data.days.length === 0 && (
             <Card t={t} padding={20}>
@@ -146,7 +163,7 @@ export default function RosterTab() {
             return (
               <View key={day.iso}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <Text style={{ ...TYPE.section, color: isSelected ? t.accent : t.text, fontSize: 13 }}>
+                  <Text style={{ ...TYPE.section, color: isSelected ? t.accent : t.text, fontSize: 14 }}>
                     {day.dayOfWeek} {day.dom} {fmtMonthShort(monthIdx0)}
                   </Text>
                   {isToday && (
@@ -158,8 +175,8 @@ export default function RosterTab() {
                   )}
                 </View>
                 <View style={{ gap: 6 }}>
-                  {day.duties.map((duty, i) => (
-                    <DutyRow key={i} duty={duty} t={t} />
+                  {day.duties.map((duty) => (
+                    <DutyRow key={duty.id} duty={duty} t={t} onPress={() => onDutyTap(duty)} />
                   ))}
                 </View>
               </View>
@@ -167,19 +184,78 @@ export default function RosterTab() {
           })}
         </View>
       </ScrollView>
+
+      {/* Day tooltip modal */}
+      <Modal visible={tooltipDom != null} transparent animationType="fade" onRequestClose={() => setTooltipDom(null)}>
+        <Pressable
+          onPress={() => setTooltipDom(null)}
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.55)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+          }}
+        >
+          <Pressable
+            onPress={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: t.card,
+              borderRadius: 16,
+              borderWidth: 0.5,
+              borderColor: t.cardBorder,
+              padding: 18,
+              minWidth: 260,
+              maxWidth: 320,
+            }}
+          >
+            <View
+              style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}
+            >
+              <Text style={{ ...TYPE.section, color: t.text }}>
+                {tooltipDom != null
+                  ? new Date(year, monthIdx0, tooltipDom).toLocaleDateString(undefined, {
+                      weekday: 'long',
+                      day: '2-digit',
+                      month: 'short',
+                    })
+                  : ''}
+              </Text>
+              <Pressable onPress={() => setTooltipDom(null)} hitSlop={8}>
+                <X color={t.textSec} size={18} />
+              </Pressable>
+            </View>
+            {tooltipDuties.length === 0 ? (
+              <Text style={{ ...TYPE.caption, color: t.textSec }}>No duties this day.</Text>
+            ) : (
+              <View style={{ gap: 8 }}>
+                <SummaryRow t={t} k="Flights" v={String(tooltipSummary.flightCount)} />
+                <SummaryRow t={t} k="Block hours" v={fmtBlock(tooltipSummary.blockMinutes)} />
+                <SummaryRow t={t} k="Duty hours" v={fmtBlock(tooltipSummary.dutyMinutes)} />
+                {tooltipSummary.activityNames.length > 0 && (
+                  <SummaryRow t={t} k="Activity" v={tooltipSummary.activityNames.join(', ')} />
+                )}
+              </View>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   )
 }
 
-function NavBtn({
-  onPress,
-  children,
-  t,
-}: {
-  onPress: () => void
-  children: React.ReactNode
-  t: ReturnType<typeof useTheme>
-}) {
+function SummaryRow({ t, k, v }: { t: Theme; k: string; v: string }) {
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+      <Text style={{ ...TYPE.caption, color: t.textSec }}>{k}</Text>
+      <Text style={{ color: t.text, fontWeight: '600', fontSize: 14, textAlign: 'right', flex: 1 }} numberOfLines={2}>
+        {v}
+      </Text>
+    </View>
+  )
+}
+
+function NavBtn({ onPress, children, t }: { onPress: () => void; children: React.ReactNode; t: Theme }) {
   return (
     <Pressable
       onPress={onPress}
@@ -207,7 +283,7 @@ function DayCell({
   duties,
   onPress,
 }: {
-  t: ReturnType<typeof useTheme>
+  t: Theme
   dom: number
   isToday: boolean
   isSelected: boolean
@@ -230,15 +306,15 @@ function DayCell({
     >
       <View
         style={{
-          width: 22,
-          height: 22,
-          borderRadius: 22,
+          width: 24,
+          height: 24,
+          borderRadius: 24,
           backgroundColor: isToday ? t.accent : 'transparent',
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <Text style={{ color: isToday ? '#fff' : t.text, fontSize: 12, fontWeight: isToday ? '700' : '500' }}>
+        <Text style={{ color: isToday ? '#fff' : t.text, fontSize: 13, fontWeight: isToday ? '700' : '500' }}>
           {dom}
         </Text>
       </View>
@@ -252,7 +328,7 @@ function DayCell({
   )
 }
 
-function DutyRow({ duty, t }: { duty: RosterDuty; t: ReturnType<typeof useTheme> }) {
+function DutyRow({ duty, t, onPress }: { duty: RosterDuty; t: Theme; onPress: () => void }) {
   const color = t.duty[duty.type as DutyKind] ?? t.duty.ground
   const Icon =
     duty.type === 'flight'
@@ -265,7 +341,8 @@ function DutyRow({ duty, t }: { duty: RosterDuty; t: ReturnType<typeof useTheme>
             ? GraduationCap
             : Briefcase
   return (
-    <View
+    <Pressable
+      onPress={onPress}
       style={{
         backgroundColor: t.card,
         borderWidth: 0.5,
@@ -294,7 +371,7 @@ function DutyRow({ duty, t }: { duty: RosterDuty; t: ReturnType<typeof useTheme>
         <Icon color={color} size={16} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ ...TYPE.cardTitle, color: t.text, fontWeight: '600', fontSize: 13 }} numberOfLines={1}>
+        <Text style={{ ...TYPE.cardTitle, color: t.text, fontWeight: '600', fontSize: 14 }} numberOfLines={1}>
           {duty.title}
         </Text>
         <Text style={{ ...TYPE.caption, color: t.textSec, marginTop: 2 }}>{duty.sub}</Text>
@@ -309,6 +386,6 @@ function DutyRow({ duty, t }: { duty: RosterDuty; t: ReturnType<typeof useTheme>
           Cancelled
         </Chip>
       )}
-    </View>
+    </Pressable>
   )
 }

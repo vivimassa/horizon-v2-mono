@@ -218,6 +218,15 @@ export interface LegWx {
   fetchedAtMs: number
 }
 
+export interface ActivityCodeMeta {
+  id: string
+  code: string
+  name: string
+  shortLabel: string | null
+  color: string | null
+  flags: string[]
+}
+
 export const crewApi = {
   listOperators: () => request<{ operators: OperatorOption[] }>('/crew-app/auth/operators', { auth: false }),
 
@@ -246,6 +255,8 @@ export const crewApi = {
 
   legWx: (dep: string, arr: string) =>
     request<LegWx>(`/crew-app/wx?dep=${encodeURIComponent(dep)}&arr=${encodeURIComponent(arr)}`),
+
+  activityCodes: () => request<{ codes: ActivityCodeMeta[] }>('/crew-app/activity-codes'),
 
   setPin: (operatorId: string, employeeId: string, tempPin: string, newPin: string) =>
     request<AuthResponse>('/crew-app/auth/set-pin', {

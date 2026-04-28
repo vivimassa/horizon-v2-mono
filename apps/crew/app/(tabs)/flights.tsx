@@ -54,7 +54,7 @@ export default function FlightsTab() {
   const dayBlock = data.legs.reduce((s, l) => s + (l.blockMinutes ?? 0), 0)
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: t.page }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <ScrollView
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 40, gap: 16 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}

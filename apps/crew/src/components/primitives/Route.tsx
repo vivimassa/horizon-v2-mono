@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native'
-import { Plane } from 'lucide-react-native'
+import { PlaneTakeoff } from 'lucide-react-native'
 import { TYPE, type Theme } from '../../theme/tokens'
 
 interface Props {
@@ -58,6 +58,17 @@ export function Route({
           minWidth: 40,
         }}
       >
+        {/* Plane glyph centered above the connector line */}
+        <View
+          style={{
+            position: 'absolute',
+            top: codeSize / 2 - 22,
+            alignSelf: 'center',
+            zIndex: 1,
+          }}
+        >
+          <PlaneTakeoff color={lineColor} size={20} />
+        </View>
         <View
           style={{
             width: '100%',
@@ -90,16 +101,6 @@ export function Route({
               backgroundColor: lineColor,
             }}
           />
-          <View
-            style={{
-              position: 'absolute',
-              left: '50%',
-              top: -10,
-              transform: [{ translateX: -10 }, { rotate: '90deg' }],
-            }}
-          >
-            <Plane color={lineColor} size={20} />
-          </View>
         </View>
       </View>
 

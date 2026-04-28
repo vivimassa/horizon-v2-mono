@@ -104,7 +104,7 @@ export default function MoreTab() {
   const fullName = [profile?.firstName, profile?.lastName].filter(Boolean).join(' ') || 'Crew Member'
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: t.page }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }}
         showsVerticalScrollIndicator={false}

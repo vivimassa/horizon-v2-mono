@@ -15,6 +15,11 @@ import type { ExpoConfig } from 'expo/config'
 
 const googleServicesPath = process.env.GOOGLE_SERVICES_JSON ?? './google-services.json'
 
+// Google Maps Android API key — provide via EAS secret env when ready.
+// Until set, react-native-maps on Android renders a blank gray box (it
+// still loads; just no tiles). iOS uses Apple Maps with no key.
+const googleMapsAndroidKey = process.env.GOOGLE_MAPS_ANDROID_KEY ?? ''
+
 const config: ExpoConfig = {
   name: 'SkyHub Crew',
   slug: 'skyhub-crew',
@@ -45,6 +50,7 @@ const config: ExpoConfig = {
     package: 'com.skyhub.crew',
     googleServicesFile: googleServicesPath,
     permissions: ['android.permission.USE_BIOMETRIC', 'android.permission.USE_FINGERPRINT'],
+    config: googleMapsAndroidKey ? { googleMaps: { apiKey: googleMapsAndroidKey } } : undefined,
   },
   scheme: 'skyhubcrew',
   plugins: [

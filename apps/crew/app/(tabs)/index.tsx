@@ -1,17 +1,19 @@
-import { useState } from 'react'
-import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
+import { useRef, useState } from 'react'
+import { Dimensions, FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { Bell, Briefcase, Check, Coffee, Users } from 'lucide-react-native'
 import { Card, Chip, DutyDot, FieldLabel, MiniKV, Ring, Route, SectionHeader } from '../../src/components/primitives'
 import { useTheme } from '../../src/theme/use-theme'
 import { TYPE } from '../../src/theme/tokens'
+import type { Theme } from '../../src/theme/tokens'
 import { useDatabase } from '../../src/providers/DatabaseProvider'
 import { syncCrewData } from '../../src/sync/sync-trigger'
 import { useCrewAuthStore } from '../../src/stores/use-crew-auth-store'
 import { useTodayData } from '../../src/data/use-today'
 import { useFdtl } from '../../src/data/use-fdtl'
 import { fmtBlock, fmtTime, greeting, initials } from '../../src/data/format'
+import type { PairingLegRecord } from '@skyhub/crew-db'
 
 export default function HomeTab() {
   const t = useTheme()
@@ -36,10 +38,11 @@ export default function HomeTab() {
   const position = profile?.position ?? '—'
 
   const next = data.nextDuty
-  const nextLeg = next?.legs[0]
+  const totalBlock = next?.legs.reduce((s, l) => s + (l.blockMinutes ?? 0), 0) ?? 0
+  const reportMs = next?.pairing?.reportTimeUtcMs ?? next?.assignment.startUtcMs ?? null
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: t.page }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accent} />}
@@ -107,86 +110,16 @@ export default function HomeTab() {
           </Text>
         </View>
 
-        {/* Next Duty */}
-        {next && nextLeg ? (
-          <Card t={t} padding={0}>
-            <View
-              style={{
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                borderBottomWidth: 0.5,
-                borderBottomColor: t.border,
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <DutyDot t={t} kind="flight" size={8} />
-                <FieldLabel t={t}>Flight Duty</FieldLabel>
-              </View>
-              <View style={{ flexDirection: 'row', gap: 4 }}>
-                <Text style={{ ...TYPE.caption, color: t.textSec }}>Report </Text>
-                <Text style={{ ...TYPE.caption, color: t.text, fontWeight: '600' }}>
-                  {fmtTime(next.pairing?.reportTimeUtcMs ?? next.assignment.startUtcMs)}L
-                </Text>
-              </View>
-            </View>
-
-            <Pressable
-              onPress={() => router.push('/(tabs)/flights')}
-              style={{ paddingHorizontal: 14, paddingTop: 18, paddingBottom: 14 }}
-            >
-              <Route
-                t={t}
-                dep={nextLeg.depStation}
-                arr={next.legs[next.legs.length - 1]?.arrStation ?? nextLeg.arrStation}
-                depTime={fmtTime(nextLeg.stdUtcMs)}
-                arrTime={fmtTime(next.legs[next.legs.length - 1]?.staUtcMs ?? nextLeg.staUtcMs)}
-                accent={t.duty.flight}
-              />
-              <View style={{ flexDirection: 'row', gap: 12, marginTop: 18 }}>
-                <View style={{ flex: 1 }}>
-                  <MiniKV t={t} label="Flight" value={nextLeg.flightNumber} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <MiniKV t={t} label="Aircraft" value={nextLeg.aircraftTypeIcao ?? '—'} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <MiniKV t={t} label="Tail" value={nextLeg.tailNumber ?? '—'} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <MiniKV t={t} label="Sectors" value={String(next.legs.length)} />
-                </View>
-              </View>
-            </Pressable>
-
-            <View
-              style={{
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                borderTopWidth: 0.5,
-                borderTopColor: t.border,
-                backgroundColor: t.overlay,
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Chip t={t} kind="ontime">
-                  On Time
-                </Chip>
-                <Text style={{ ...TYPE.caption, color: t.textSec }}>
-                  {fmtBlock(next.legs.reduce((s, l) => s + (l.blockMinutes ?? 0), 0))} block
-                </Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Users color={t.textSec} size={12} />
-                <Text style={{ ...TYPE.caption, color: t.textSec }}>2P + 4C</Text>
-              </View>
-            </View>
-          </Card>
+        {/* Next Duty — sector pager */}
+        {next && next.legs.length > 0 ? (
+          <NextDutyCard
+            t={t}
+            pairingCode={next.pairing?.pairingCode ?? '—'}
+            legs={next.legs}
+            reportMs={reportMs}
+            totalBlock={totalBlock}
+            onPress={() => router.push(`/duty/${next.assignment.id}`)}
+          />
         ) : (
           <Card t={t} padding={20}>
             <View style={{ alignItems: 'center' }}>
@@ -198,15 +131,11 @@ export default function HomeTab() {
           </Card>
         )}
 
-        {/* Today's Route */}
+        {/* Today's Route — sector by sector + ground time */}
         {data.todaysLegs.length > 0 && (
           <View style={{ gap: 10 }}>
-            <SectionHeader t={t} action="View all">
-              Today's Route
-            </SectionHeader>
-            <Card t={t} padding={14}>
-              <RouteStrip legs={data.todaysLegs} />
-            </Card>
+            <SectionHeader t={t}>Today's Route</SectionHeader>
+            <TodayRouteList t={t} legs={data.todaysLegs} />
           </View>
         )}
 
@@ -238,6 +167,11 @@ export default function HomeTab() {
                   {fdtlQ.data ? fmtBlock(fdtlQ.data.duty7DayLimitMinutes) : '—'}{' '}
                   <Text style={{ color: t.textTer }}>· 7-day rolling</Text>
                 </Text>
+                {fdtlQ.data && fdtlQ.data.fdpUsedMinutes === 0 && (
+                  <Text style={{ ...TYPE.caption, color: t.textTer, marginTop: 4, fontStyle: 'italic' }}>
+                    No active duty today
+                  </Text>
+                )}
               </View>
               <View style={{ borderLeftWidth: 0.5, borderLeftColor: t.border, paddingLeft: 14, maxWidth: 140 }}>
                 <FieldLabel t={t}>Next rest</FieldLabel>
@@ -311,6 +245,218 @@ export default function HomeTab() {
   )
 }
 
+/**
+ * Next Duty card with horizontal sector pager. Each page = one leg of the
+ * pairing. Swipe left/right to cycle. Tap → flight duty detail.
+ */
+function NextDutyCard({
+  t,
+  pairingCode,
+  legs,
+  reportMs,
+  totalBlock,
+  onPress,
+}: {
+  t: Theme
+  pairingCode: string
+  legs: PairingLegRecord[]
+  reportMs: number | null
+  totalBlock: number
+  onPress: () => void
+}) {
+  const [pageIdx, setPageIdx] = useState(0)
+  const listRef = useRef<FlatList<PairingLegRecord>>(null)
+  const screenWidth = Dimensions.get('window').width
+  const cardWidth = screenWidth - 32 // matches outer 16px padding both sides
+
+  return (
+    <Card t={t} padding={0}>
+      {/* Header */}
+      <View
+        style={{
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottomWidth: 0.5,
+          borderBottomColor: t.border,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <DutyDot t={t} kind="flight" size={8} />
+          <FieldLabel t={t}>{pairingCode} · Flight Duty</FieldLabel>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 4 }}>
+          <Text style={{ ...TYPE.caption, color: t.textSec }}>Report </Text>
+          <Text style={{ ...TYPE.caption, color: t.text, fontWeight: '600' }}>
+            {reportMs ? fmtTime(reportMs) : '—'}L
+          </Text>
+        </View>
+      </View>
+
+      {/* Sector pager */}
+      <Pressable onPress={onPress}>
+        <FlatList
+          ref={listRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          data={legs}
+          keyExtractor={(l) => l.id}
+          onMomentumScrollEnd={(e) => {
+            const idx = Math.round(e.nativeEvent.contentOffset.x / cardWidth)
+            setPageIdx(idx)
+          }}
+          getItemLayout={(_, i) => ({ length: cardWidth, offset: cardWidth * i, index: i })}
+          renderItem={({ item: leg }) => (
+            <View style={{ width: cardWidth, paddingHorizontal: 14, paddingTop: 18, paddingBottom: 14 }}>
+              <Route
+                t={t}
+                dep={leg.depStation}
+                arr={leg.arrStation}
+                depTime={fmtTime(leg.stdUtcMs)}
+                arrTime={fmtTime(leg.staUtcMs)}
+                accent={t.duty.flight}
+              />
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 18 }}>
+                <View style={{ flex: 1 }}>
+                  <MiniKV t={t} label="Flight" value={leg.flightNumber} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <MiniKV t={t} label="Aircraft" value={leg.aircraftTypeIcao ?? '—'} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <MiniKV t={t} label="Tail" value={leg.tailNumber ?? '—'} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <MiniKV t={t} label="Block" value={fmtBlock(leg.blockMinutes)} />
+                </View>
+              </View>
+            </View>
+          )}
+        />
+      </Pressable>
+
+      {/* Page indicators */}
+      {legs.length > 1 && (
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'center',
+            gap: 6,
+            paddingTop: 4,
+            paddingBottom: 8,
+          }}
+        >
+          {legs.map((_, i) => (
+            <View
+              key={i}
+              style={{
+                width: i === pageIdx ? 18 : 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: i === pageIdx ? t.accent : t.border,
+              }}
+            />
+          ))}
+        </View>
+      )}
+
+      {/* Footer strip */}
+      <View
+        style={{
+          paddingHorizontal: 14,
+          paddingVertical: 10,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderTopWidth: 0.5,
+          borderTopColor: t.border,
+          backgroundColor: t.overlay,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Chip t={t} kind="ontime">
+            On Time
+          </Chip>
+          <Text style={{ ...TYPE.caption, color: t.textSec }}>
+            {fmtBlock(totalBlock)} block · {legs.length} sector{legs.length === 1 ? '' : 's'}
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Users color={t.textSec} size={12} />
+          <Text style={{ ...TYPE.caption, color: t.textSec }}>2P + 4C</Text>
+        </View>
+      </View>
+    </Card>
+  )
+}
+
+/**
+ * Today's Route — vertical list of sector rows with "Ground Xh Ym" chip
+ * between adjacent legs (turnaround at the layover airport).
+ */
+function TodayRouteList({ t, legs }: { t: Theme; legs: PairingLegRecord[] }) {
+  return (
+    <View style={{ gap: 8 }}>
+      {legs.map((leg, i) => (
+        <View key={leg.id}>
+          <Card t={t} padding={14}>
+            <Route
+              t={t}
+              dep={leg.depStation}
+              arr={leg.arrStation}
+              depTime={fmtTime(leg.stdUtcMs)}
+              arrTime={fmtTime(leg.staUtcMs)}
+              accent={t.duty.flight}
+              big={false}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
+              <Text style={{ ...TYPE.caption, color: t.textSec }}>
+                <Text style={{ color: t.text, fontWeight: '600' }}>{leg.flightNumber}</Text>
+                {' · '}
+                {leg.aircraftTypeIcao ?? '—'}
+                {' · '}
+                {leg.tailNumber ?? '—'}
+              </Text>
+              <Text style={{ ...TYPE.caption, color: t.text, fontWeight: '600' }}>{fmtBlock(leg.blockMinutes)}</Text>
+            </View>
+          </Card>
+          {i < legs.length - 1 && (
+            <GroundChip t={t} fromMs={leg.staUtcMs} toMs={legs[i + 1].stdUtcMs} airport={leg.arrStation} />
+          )}
+        </View>
+      ))}
+    </View>
+  )
+}
+
+function GroundChip({ t, fromMs, toMs, airport }: { t: Theme; fromMs: number; toMs: number; airport: string }) {
+  const minutes = Math.max(0, Math.round((toMs - fromMs) / 60_000))
+  return (
+    <View style={{ alignItems: 'center', paddingVertical: 6 }}>
+      <View
+        style={{
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          borderRadius: 12,
+          backgroundColor: t.hover,
+          borderWidth: 0.5,
+          borderColor: t.cardBorder,
+          flexDirection: 'row',
+          gap: 6,
+          alignItems: 'center',
+        }}
+      >
+        <Text style={{ ...TYPE.badge, color: t.textSec }}>GROUND</Text>
+        <Text style={{ ...TYPE.caption, color: t.text, fontWeight: '600' }}>{fmtBlock(minutes)}</Text>
+        <Text style={{ ...TYPE.caption, color: t.textSec }}>at {airport}</Text>
+      </View>
+    </View>
+  )
+}
+
 function QuickAction({
   t,
   icon,
@@ -318,7 +464,7 @@ function QuickAction({
   sub,
   highlight,
 }: {
-  t: ReturnType<typeof useTheme>
+  t: Theme
   icon: React.ReactNode
   title: string
   sub: string
@@ -353,87 +499,6 @@ function QuickAction({
       <View>
         <Text style={{ color: t.text, fontSize: 13, fontWeight: '600' }}>{title}</Text>
         <Text style={{ color: t.textSec, fontSize: 11, marginTop: 2 }}>{sub}</Text>
-      </View>
-    </View>
-  )
-}
-
-function RouteStrip({ legs }: { legs: ReturnType<typeof useTodayData>['todaysLegs'] }) {
-  const t = useTheme()
-  if (!legs.length) return null
-  // Build airport node sequence from legs (dep[0], arr[0]=dep[1], arr[1], …)
-  const nodes: { code: string; time: string }[] = []
-  legs.forEach((l, i) => {
-    if (i === 0) nodes.push({ code: l.depStation, time: fmtTime(l.stdUtcMs) })
-    nodes.push({ code: l.arrStation, time: fmtTime(l.staUtcMs) })
-  })
-  const flightLabels = legs.map((l) => l.flightNumber)
-  const now = Date.now()
-  const currentIdx = legs.findIndex((l) => l.staUtcMs > now)
-
-  return (
-    <View style={{ paddingVertical: 8 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {nodes.map((n, i) => (
-          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', flex: i === nodes.length - 1 ? 0 : 1 }}>
-            <View style={{ alignItems: 'center', gap: 6 }}>
-              <View
-                style={{
-                  paddingHorizontal: 8,
-                  paddingVertical: 4,
-                  borderRadius: 6,
-                  backgroundColor: i === 0 ? t.accent : t.card,
-                  borderWidth: 0.5,
-                  borderColor: i === 0 ? t.accent : t.border,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: '700',
-                    letterSpacing: 0.3,
-                    color: i === 0 ? '#fff' : t.text,
-                  }}
-                >
-                  {n.code}
-                </Text>
-              </View>
-              <Text style={{ ...TYPE.badge, fontWeight: '400', fontSize: 10, color: t.textSec }}>{n.time}</Text>
-            </View>
-            {i < nodes.length - 1 && (
-              <View style={{ flex: 1, height: 22, position: 'relative', justifyContent: 'center' }}>
-                <View
-                  style={{
-                    height: 2,
-                    borderRadius: 2,
-                    backgroundColor: i === currentIdx ? t.accent : t.border,
-                    opacity: i < currentIdx ? 0.4 : 1,
-                  }}
-                />
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: -10,
-                    alignSelf: 'center',
-                    backgroundColor: t.card,
-                    paddingHorizontal: 4,
-                  }}
-                >
-                  <Text
-                    style={{
-                      ...TYPE.badge,
-                      fontSize: 10,
-                      fontWeight: '600',
-                      color: i === currentIdx ? t.accent : t.textSec,
-                    }}
-                  >
-                    {flightLabels[i]}
-                  </Text>
-                </View>
-              </View>
-            )}
-          </View>
-        ))}
       </View>
     </View>
   )

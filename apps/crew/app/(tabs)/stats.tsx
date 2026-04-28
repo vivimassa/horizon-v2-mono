@@ -27,7 +27,7 @@ export default function StatsTab() {
   const fdtl = fdtlQ.data
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: t.page }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }}
         showsVerticalScrollIndicator={false}
@@ -139,6 +139,12 @@ export default function StatsTab() {
           {statsQ.isLoading ? (
             <Card t={t} padding={20}>
               <ActivityIndicator color={t.accent} />
+            </Card>
+          ) : stats && stats.blockMinutes === 0 && stats.dutyMinutes === 0 ? (
+            <Card t={t} padding={20}>
+              <Text style={{ ...TYPE.caption, color: t.textSec, textAlign: 'center' }}>
+                No completed duty in this period yet.
+              </Text>
             </Card>
           ) : stats ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>

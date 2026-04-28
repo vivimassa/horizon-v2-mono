@@ -19,6 +19,7 @@ import { crewAppPushTokenRoutes } from './routes/crew-app-push-tokens.js'
 import { crewAppProfileRoutes } from './routes/crew-app-profile.js'
 import { crewAppFdtlRoutes } from './routes/crew-app-fdtl.js'
 import { crewAppStatsRoutes } from './routes/crew-app-stats.js'
+import { crewAppStatsTopRoutesRoutes } from './routes/crew-app-stats-routes.js'
 import { crewAppPairingRoutes } from './routes/crew-app-pairing.js'
 import { crewAppWxRoutes } from './routes/crew-app-wx.js'
 import { crewAppActivityCodesRoutes } from './routes/crew-app-activity-codes.js'
@@ -79,6 +80,9 @@ import { startAutoTransmitScheduler } from './jobs/mvt-auto-transmit.js'
 import { startAsmSsmDeliveryScheduler } from './jobs/asm-ssm-deliver.js'
 import { startHotelEmailDeliveryScheduler } from './jobs/hotel-email-deliver.js'
 import { startTransportEmailDeliveryScheduler } from './jobs/transport-email-deliver.js'
+import { startTaskScheduler } from './jobs/task-scheduler.js'
+import { scheduledTaskRoutes } from './routes/scheduled-tasks.js'
+import { seedScheduledTasksForOperator } from './seed-scheduled-tasks.js'
 import { loadOurAirportsData, startAutoRefresh } from './data/ourairports-cache.js'
 
 const port = env.PORT
@@ -162,6 +166,7 @@ async function main(): Promise<void> {
   await app.register(crewAppProfileRoutes)
   await app.register(crewAppFdtlRoutes)
   await app.register(crewAppStatsRoutes)
+  await app.register(crewAppStatsTopRoutesRoutes)
   await app.register(crewAppPairingRoutes)
   await app.register(crewAppWxRoutes)
   await app.register(crewAppActivityCodesRoutes)
@@ -219,17 +224,25 @@ async function main(): Promise<void> {
   await app.register(crewTransportTripRoutes)
   await app.register(transportEmailRoutes)
   await app.register(crewFlightBookingRoutes)
+  await app.register(scheduledTaskRoutes)
 
   // ── Bootstrap: ensure every active operator has the 4 system document
   // folders (Crew Photos / Passports & Licenses / Medical Certificates /
   // Training Documents). Idempotent; safe to run on every boot.
   try {
     const { Operator: Op } = await import('./models/Operator.js')
-    const operators = await Op.find({ isActive: { $ne: false } }, { _id: 1 }).lean()
+    const operators = await Op.find({ isActive: { $ne: false } }, { _id: 1, timezone: 1 }).lean()
     for (const op of operators) await ensureSystemFolders(op._id as string)
     console.log(`✓ Ensured system document folders for ${operators.length} operator(s)`)
     for (const op of operators) await ensureManpowerBasePlan(op._id as string)
     console.log(`✓ Ensured manpower base plans for ${operators.length} operator(s)`)
+    let seededTasks = 0
+    for (const op of operators) {
+      const tz = (op as { timezone?: string }).timezone ?? 'UTC'
+      const { created } = await seedScheduledTasksForOperator(op._id as string, tz)
+      seededTasks += created
+    }
+    if (seededTasks > 0) console.log(`✓ Seeded ${seededTasks} scheduled task(s) across ${operators.length} operator(s)`)
   } catch (e) {
     console.error('  ensureSystemFolders bootstrap error:', (e as Error).message)
   }
@@ -300,6 +313,10 @@ async function main(): Promise<void> {
   startAsmSsmDeliveryScheduler()
   startHotelEmailDeliveryScheduler()
   startTransportEmailDeliveryScheduler()
+
+  // 7.1.6 Task Scheduler Management — dispatcher loop. Picks up active+auto
+  // ScheduledTask rows on a 60s tick. Disable with ENABLE_TASK_SCHEDULER=false.
+  startTaskScheduler()
 
   // ── OOOI Simulation — seed actual times on startup + every 15 minutes ──
   const OOOI_SIM_INTERVAL = 15 * 60_000 // 15 minutes

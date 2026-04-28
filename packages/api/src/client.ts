@@ -3904,6 +3904,111 @@ export const api = {
     request<{ success: boolean }>(`/crew-schedule/temp-bases/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     }),
+
+  // ── 7.1.6 Task Scheduler Management ──
+  listScheduledTasks: () => request<{ tasks: ScheduledTaskRef[] }>(`/scheduled-tasks`),
+
+  getScheduledTask: (taskId: string) =>
+    request<{ task: ScheduledTaskRef }>(`/scheduled-tasks/${encodeURIComponent(taskId)}`),
+
+  updateScheduledTask: (taskId: string, patch: ScheduledTaskUpdate) =>
+    request<{ task: ScheduledTaskRef }>(`/scheduled-tasks/${encodeURIComponent(taskId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+
+  runScheduledTask: (taskId: string, params?: ScheduledTaskRunParams) =>
+    request<{ runId: string }>(`/scheduled-tasks/${encodeURIComponent(taskId)}/run`, {
+      method: 'POST',
+      body: JSON.stringify(params ?? {}),
+    }),
+
+  cancelScheduledTaskRun: (taskId: string, runId: string) =>
+    request<{ ok: true }>(`/scheduled-tasks/${encodeURIComponent(taskId)}/runs/${encodeURIComponent(runId)}/cancel`, {
+      method: 'POST',
+    }),
+
+  listScheduledTaskRuns: (taskId: string, limit = 50) =>
+    request<{ runs: ScheduledTaskRunRef[] }>(`/scheduled-tasks/${encodeURIComponent(taskId)}/runs?limit=${limit}`),
+
+  getScheduledTaskRun: (taskId: string, runId: string) =>
+    request<{ run: ScheduledTaskRunRef }>(
+      `/scheduled-tasks/${encodeURIComponent(taskId)}/runs/${encodeURIComponent(runId)}`,
+    ),
+}
+
+// ── 7.1.6 Task Scheduler types ──
+export type ScheduleFrequency = 'daily' | 'weekly' | 'monthly'
+export interface SchedulePolicyRef {
+  frequency: ScheduleFrequency
+  daysOfWeek?: number[]
+  dayOfMonth?: number | null
+  timesOfDayLocal: string[]
+  timezone: string
+}
+export interface ScheduledTaskNotifications {
+  onMissedStart: boolean
+  onTerminated: boolean
+  onError: boolean
+  userIds: string[]
+}
+export interface ScheduledTaskRef {
+  _id: string
+  operatorId: string
+  taskKey: string
+  title: string
+  description: string | null
+  displayNumber: number
+  active: boolean
+  auto: boolean
+  schedule: SchedulePolicyRef
+  scheduleSummary: string
+  notifications: ScheduledTaskNotifications
+  params: Record<string, unknown>
+  lastRunAt: string | null
+  nextRunAt: string | null
+  lastRunStatus: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | null
+  lastRunId: string | null
+  createdAt: string
+  updatedAt: string
+}
+export interface ScheduledTaskUpdate {
+  active?: boolean
+  auto?: boolean
+  schedule?: SchedulePolicyRef
+  notifications?: ScheduledTaskNotifications
+  params?: Record<string, unknown>
+}
+export interface ScheduledTaskRunParams {
+  fromIso?: string
+  toIso?: string
+  crewIds?: string[]
+}
+export interface ScheduledTaskRunLog {
+  tsUtc: string
+  level: 'info' | 'warn' | 'error'
+  message: string
+}
+export interface ScheduledTaskRunRef {
+  _id: string
+  operatorId: string
+  taskKey: string
+  taskId: string
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
+  triggeredBy: 'cron' | 'manual'
+  triggeredByUserId: string | null
+  triggeredByUserName: string | null
+  startedAt: string | null
+  completedAt: string | null
+  lastProgressAt: string | null
+  lastProgressPct: number
+  lastProgressMessage: string | null
+  params: Record<string, unknown>
+  stats: Record<string, unknown> | null
+  error: string | null
+  logs?: ScheduledTaskRunLog[]
+  createdAt: string
+  updatedAt: string
 }
 
 // ── 4.1.6 Crew Schedule types ──

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Database, ShieldCheck, ArrowLeftRight, Building2, ChevronRight } from 'lucide-react'
+import { Database, ShieldCheck, ArrowLeftRight, Building2, Clock, ChevronRight } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { accentTint, type Palette as PaletteType } from '@skyhub/ui/theme'
 import { useDisplay } from '@/components/display-provider'
@@ -48,6 +48,13 @@ export function AdminSection({ palette, isDark, accent }: AdminSectionProps) {
       title: 'Operator Config',
       subtitle: 'Airline settings, base airports, fleet configuration',
       href: '/settings/admin/operator-config',
+    },
+    {
+      icon: Clock,
+      iconColor: '#0ea5e9',
+      title: 'Task Scheduler Management',
+      subtitle: 'Background jobs, cron schedules, execution logs',
+      href: '/settings/admin/task-scheduler',
     },
   ]
 

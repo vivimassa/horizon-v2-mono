@@ -179,6 +179,10 @@ Dynamic per-tenant via `useTheme().accentColor`. Default `#1e40af`. Must appear 
 
 Complex interactive components from Gluestack v3 at `packages/ui/src/gluestack/`. Screen files import ONLY from `@horizon/ui` barrel.
 
+### 18. Task Scheduler — Reuse Canonical Forms
+
+Every cron / scheduled-task UI MUST compose `<SchedulePolicyForm>` and `<NotificationsPolicyForm>` from `@/components/scheduling`. Never roll your own time / timezone picker — use `<TimeOfDayPicker>` and `<TimezoneDropdown>`. Native `<input type="time">` is banned in scheduler dialogs. Full rules: `apps/web/src/components/scheduling/CLAUDE.md`. Server-side: register runners via `taskRegistry.set(...)` in `server/src/jobs/task-registry.ts` — never write a custom `setInterval` cron loop.
+
 ## Navigation — 6 Tabs
 
 ```

@@ -307,6 +307,15 @@ export type {
   DayBreakdown,
   PeriodBreakdown,
   AutoRosterFilterOptions,
+  // 7.1.6 Task Scheduler
+  ScheduleFrequency,
+  SchedulePolicyRef,
+  ScheduledTaskNotifications,
+  ScheduledTaskRef,
+  ScheduledTaskUpdate,
+  ScheduledTaskRunParams,
+  ScheduledTaskRunLog,
+  ScheduledTaskRunRef,
   // 5.4.10 Crew Hotels
   CrewHotelRef,
   HotelContact,

@@ -1149,6 +1149,16 @@ export const MODULE_REGISTRY: ModuleEntry[] = [
     module: 'sysadmin',
     level: 3,
   },
+  {
+    code: '7.1.6',
+    name: 'Task Scheduler Management',
+    description: 'Background jobs, cron schedules and execution logs',
+    icon: 'Clock',
+    route: '/settings/admin/task-scheduler',
+    parent_code: '7.1',
+    module: 'sysadmin',
+    level: 2,
+  },
 ]
 
 // ─── Index maps for fast lookup ────────────────

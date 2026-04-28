@@ -17,7 +17,7 @@
     "typecheck": "turbo typecheck",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\" --ignore-path .gitignore",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\" --ignore-path .gitignore",
-    "prepare": "husky",
+    "prepare": "husky || true",
     "dev:server": "turbo dev --filter=server",
     "dev:web": "turbo dev --filter=web",
     "dev:mobile": "turbo dev --filter=@skyhub/mobile"

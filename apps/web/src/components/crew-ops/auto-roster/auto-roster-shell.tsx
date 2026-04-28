@@ -13,6 +13,7 @@ import {
   ChevronUp,
   Clock,
   ExternalLink,
+  Gauge,
   GraduationCap,
   GripVertical,
   HelpCircle,
@@ -49,6 +50,7 @@ import { useTheme } from '@/components/theme-provider'
 import { useOperatorStore } from '@/stores/use-operator-store'
 import { useAutoRosterFilterStore } from '@/stores/use-auto-roster-filter-store'
 import { useCrewScheduleStore } from '@/stores/use-crew-schedule-store'
+import { useDateFormat } from '@/hooks/use-date-format'
 import { NumberStepper } from '@/components/admin/_shared/form-primitives'
 import { Tooltip } from '@/components/ui/tooltip'
 import { Dropdown } from '@/components/ui/dropdown'
@@ -117,6 +119,11 @@ export function AutoRosterShell() {
 
   const [mode, setMode] = useState<AssignmentMode>('general')
   const [longDutiesMinDays, setLongDutiesMinDays] = useState(2)
+  // Solver acceptance gap. 0.05 = Quality (default — closest to optimum
+  // fairness), 0.10 = Balanced (~30% faster, slight spread loosening),
+  // 0.20 = Performance (~2× faster, looser spread). Coverage + legality
+  // unaffected by any value.
+  const [solverGapLimit, setSolverGapLimit] = useState<number>(0.05)
 
   // Days-Off-Only: planner picks which activity code to stamp (any code
   // carrying the `is_day_off` flag). General mode hard-codes SYS 'OFF' and
@@ -409,12 +416,23 @@ export function AutoRosterShell() {
     setRunStartedAt(Date.now())
     try {
       if (mode === 'clear') {
+        const oneOrUndef = (arr: string[]) => (arr.length === 1 ? arr[0] : undefined)
+        const manyOrUndef = (arr: string[]) => (arr.length > 0 ? arr : undefined)
+        // Forward the active workgroup filter set so the server scopes
+        // the wipe to crew the planner can see. Without these the server
+        // historically deleted every crew in the operator regardless of
+        // the visible filter — e.g. clearing inside a HAN-FO view also
+        // erased prior HAN-CP rosters.
         const res = await api.bulkClearSchedule({
           periodFrom,
           periodTo,
           retainPreAssigned: clearRetainPreAssigned,
           retainDayOff: clearRetainDayOff,
           retainStandby: clearRetainStandby,
+          base: oneOrUndef(filterBase),
+          position: oneOrUndef(filterPosition),
+          acType: manyOrUndef(filterAcType),
+          crewGroup: manyOrUndef(filterCrewGroup),
         })
         setPhase('completed')
         setProgress({
@@ -433,6 +451,9 @@ export function AutoRosterShell() {
         mode,
         longDutiesMinDays: mode === 'longDuties' ? longDutiesMinDays : undefined,
         daysOffActivityCodeId: mode === 'daysOff' ? dayOffCodeId : undefined,
+        // Solver acceptance gap only matters for solver-driven modes.
+        // Days-off-only and clear pass through deterministic placement.
+        relativeGapLimit: mode === 'general' || mode === 'longDuties' ? solverGapLimit : undefined,
         base: oneOrUndef(filterBase),
         position: oneOrUndef(filterPosition),
         acType: manyOrUndef(filterAcType),
@@ -470,6 +491,7 @@ export function AutoRosterShell() {
     mode,
     longDutiesMinDays,
     dayOffCodeId,
+    solverGapLimit,
     clearRetainPreAssigned,
     clearRetainDayOff,
     clearRetainStandby,
@@ -578,6 +600,8 @@ export function AutoRosterShell() {
             onClearRetainDayOffChange={setClearRetainDayOff}
             clearRetainStandby={clearRetainStandby}
             onClearRetainStandbyChange={setClearRetainStandby}
+            solverGapLimit={solverGapLimit}
+            onSolverGapLimitChange={setSolverGapLimit}
             filterBase={filterBase}
             filterPosition={filterPosition}
             filterAcType={filterAcType}
@@ -728,6 +752,8 @@ function Center({
   onClearRetainDayOffChange,
   clearRetainStandby,
   onClearRetainStandbyChange,
+  solverGapLimit,
+  onSolverGapLimitChange,
   filterBase,
   filterPosition,
   filterAcType,
@@ -776,6 +802,8 @@ function Center({
   onClearRetainDayOffChange: (v: boolean) => void
   clearRetainStandby: boolean
   onClearRetainStandbyChange: (v: boolean) => void
+  solverGapLimit: number
+  onSolverGapLimitChange: (v: number) => void
   filterBase: string[]
   filterPosition: string[]
   filterAcType: string[]
@@ -822,6 +850,17 @@ function Center({
           caption={sectionDesc}
           accent={accent}
           isDark={isDark}
+          scopeLine={
+            isHistory ? undefined : (
+              <WorkgroupScopeLine
+                filterBase={filterBase}
+                filterPosition={filterPosition}
+                filterAcType={filterAcType}
+                filterCrewGroup={filterCrewGroup}
+                accent={accent}
+              />
+            )
+          }
           trailing={
             isHistory ? (
               <div className="flex items-center gap-2">
@@ -914,10 +953,16 @@ function Center({
             onClearRetainDayOffChange={onClearRetainDayOffChange}
             clearRetainStandby={clearRetainStandby}
             onClearRetainStandbyChange={onClearRetainStandbyChange}
+            solverGapLimit={solverGapLimit}
+            onSolverGapLimitChange={onSolverGapLimitChange}
             phase={phase}
             progress={progress}
             startedAt={runStartedAt}
             lock={lock}
+            filterBase={filterBase}
+            filterPosition={filterPosition}
+            filterAcType={filterAcType}
+            filterCrewGroup={filterCrewGroup}
             onRun={onRun}
             onCancel={onCancel}
             onNavigate={onNavigate}
@@ -961,6 +1006,7 @@ function SectionHero({
   accent,
   isDark,
   trailing,
+  scopeLine,
 }: {
   variant: HeroKey
   eyebrow: string
@@ -969,6 +1015,10 @@ function SectionHero({
   accent: string
   isDark: boolean
   trailing?: React.ReactNode
+  /** Optional scope line shown below the caption (e.g. workgroup filter
+   *  summary). When present the hero auto-grows to fit it without crowding
+   *  the title block. */
+  scopeLine?: React.ReactNode
 }) {
   const HERO_HEIGHT = 132
   return (
@@ -1013,8 +1063,9 @@ function SectionHero({
       {/* Trailing actions (top-right) */}
       {trailing && <div className="absolute top-3 right-4 z-10">{trailing}</div>}
 
-      {/* Title block */}
-      <div className="absolute left-6 top-1/2 -translate-y-1/2 max-w-[55%]">
+      {/* Title block — vertically centered via flex so the optional scope
+          line can extend the stack without breaking centering. */}
+      <div className="absolute left-6 inset-y-0 flex flex-col justify-center max-w-[55%]">
         <div className="text-[13px] font-bold tracking-[0.12em] uppercase mb-1.5" style={{ color: accent }}>
           {eyebrow}
         </div>
@@ -1030,6 +1081,7 @@ function SectionHero({
         >
           {caption}
         </p>
+        {scopeLine && <div className="mt-2">{scopeLine}</div>}
       </div>
     </div>
   )
@@ -1778,20 +1830,23 @@ function StatisticsDialog({
                     </span>
                   </div>
                 </td>
-                {data.days.map((day) => (
-                  <td
-                    key={day.date}
-                    style={{
-                      padding: '6px 4px',
-                      textAlign: 'center',
-                      color: textMuted,
-                      fontFamily: 'ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace',
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
-                  >
-                    {data.crewTotal}
-                  </td>
-                ))}
+                {data.days.map((day) => {
+                  const qualified = Math.max(0, data.crewTotal - (day.onTempBase ?? 0))
+                  return (
+                    <td
+                      key={day.date}
+                      style={{
+                        padding: '6px 4px',
+                        textAlign: 'center',
+                        color: textMuted,
+                        fontFamily: 'ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
+                      {qualified}
+                    </td>
+                  )
+                })}
               </tr>
             </tbody>
           </table>
@@ -2032,25 +2087,61 @@ function ManpowerChart({
 
         <line x1={PL} y1={PT + plotH} x2={W - PR} y2={PT + plotH} stroke={axisColor} strokeWidth={1} />
 
-        {/* Qualified-crew reference line — drawn last so it sits on top of bars. */}
+        {/* Qualified-crew reference line — per-day step path. Drops below
+            crewTotal on days when crew are on temp-base (or its bracketing
+            POS days), since those crew are operationally detached from
+            home base and don't count toward home-base manpower. */}
         {data.crewTotal > 0 &&
+          data.days.length > 0 &&
           (() => {
-            const y = toY(data.crewTotal)
+            const qualifiedFor = (d: (typeof data.days)[number]) => Math.max(0, data.crewTotal - (d.onTempBase ?? 0))
+            const minQualified = data.days.reduce((m, d) => Math.min(m, qualifiedFor(d)), data.crewTotal)
+            const hasShortage = minQualified < data.crewTotal
+            // Build a step path: horizontal segment across each day's slot,
+            // vertical jumps at slot boundaries when the value changes.
+            const segments: string[] = []
+            for (let i = 0; i < data.days.length; i++) {
+              const xL = PL + i * slotW
+              const xR = PL + (i + 1) * slotW
+              const y = toY(qualifiedFor(data.days[i]))
+              if (i === 0) segments.push(`M ${xL} ${y}`)
+              else segments.push(`L ${xL} ${y}`)
+              segments.push(`L ${xR} ${y}`)
+            }
+            const stepPath = segments.join(' ')
+            // Anchor badge to the value on the last day so it tracks the
+            // current visible end of the line. Pin BELOW the line when too
+            // close to the chart top.
+            const lastQualified = qualifiedFor(data.days[data.days.length - 1])
+            const yBadge = toY(lastQualified)
             const borderColor = isDark ? '#0E0E14' : 'rgba(15,23,42,0.85)'
-            // Pin badge BELOW the line when too close to the chart top
-            // (PT) — otherwise the rect clips above the plot area and
-            // "Total N" overflows the panel border.
-            const badgeAbove = y - 26 >= PT
-            const rectY = badgeAbove ? y - 26 : y + 4
-            const textY = badgeAbove ? y - 11 : y + 19
+            const badgeAbove = yBadge - 26 >= PT
+            const rectY = badgeAbove ? yBadge - 26 : yBadge + 4
+            const textY = badgeAbove ? yBadge - 11 : yBadge + 19
+            const badgeLabel = hasShortage ? `${lastQualified} of ${data.crewTotal}` : `Total ${data.crewTotal}`
+            const badgeWidth = Math.max(104, badgeLabel.length * 8 + 24)
             return (
               <g style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.45))' }}>
-                <line x1={PL} y1={y} x2={W - PR} y2={y} stroke={borderColor} strokeWidth={6} strokeLinecap="round" />
-                <line x1={PL} y1={y} x2={W - PR} y2={y} stroke="#FDDD48" strokeWidth={3} strokeLinecap="round" />
+                <path
+                  d={stepPath}
+                  fill="none"
+                  stroke={borderColor}
+                  strokeWidth={6}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d={stepPath}
+                  fill="none"
+                  stroke="#FDDD48"
+                  strokeWidth={3}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
                 <g>
-                  <rect x={W - PR - 108} y={rectY} width={104} height={22} rx={4} fill={borderColor} />
+                  <rect x={W - PR - badgeWidth} y={rectY} width={badgeWidth} height={22} rx={4} fill={borderColor} />
                   <text
-                    x={W - PR - 56}
+                    x={W - PR - badgeWidth / 2}
                     y={textY}
                     textAnchor="middle"
                     fontSize={14}
@@ -2058,7 +2149,7 @@ function ManpowerChart({
                     fontFamily="'Inter', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif"
                     fill="#FDDD48"
                   >
-                    Total {data.crewTotal}
+                    {badgeLabel}
                   </text>
                 </g>
               </g>
@@ -2737,6 +2828,38 @@ const MODE_CARDS: ModeCardDef[] = [
   },
 ]
 
+// CP-SAT solver acceptance gap. Lower = closer to optimum (tighter BH-spread,
+// idle, QoL fairness) but slower. Coverage and FDTL legality are unaffected
+// by this knob — they're hard constraints. Numeric gap values intentionally
+// hidden from the UI: planners think in "Quality / Balanced / Performance",
+// not in optimization-gap percentages.
+interface SolverQualityOption {
+  key: 'quality' | 'balanced' | 'performance'
+  value: number
+  title: string
+  desc: string
+}
+const SOLVER_QUALITY_OPTIONS: SolverQualityOption[] = [
+  {
+    key: 'quality',
+    value: 0.05,
+    title: 'Quality',
+    desc: 'Maximum precision. Crew workload distributed with the finest care.',
+  },
+  {
+    key: 'balanced',
+    value: 0.1,
+    title: 'Balanced',
+    desc: 'Refined rosters, accelerated turnaround. Recommended for routine planning.',
+  },
+  {
+    key: 'performance',
+    value: 0.2,
+    title: 'Performance',
+    desc: 'Engineered for speed. Rapid turnaround for time-critical planning windows.',
+  },
+]
+
 function RetainCheckbox({
   label,
   hint,
@@ -2933,6 +3056,57 @@ function SolverPhaseList({
   )
 }
 
+// ── Workgroup Scope Line ──────────────────────────────────────────────────────
+// Shared header strip showing the active filter scope (Base · Position · A/C
+// Type · Crew Group). Renders the SkyHub section-accent-bar pattern: 3px
+// vertical accent bar + uppercase label + dot-separated value line.
+function WorkgroupScopeLine({
+  filterBase,
+  filterPosition,
+  filterAcType,
+  filterCrewGroup,
+  accent,
+}: {
+  filterBase: string[]
+  filterPosition: string[]
+  filterAcType: string[]
+  filterCrewGroup: string[]
+  accent: string
+}) {
+  const context = useCrewScheduleStore((s) => s.context)
+  const positions = useCrewScheduleStore((s) => s.positions)
+
+  const formatList = (selected: string[], options: Array<{ key: string; label: string }>, allLabel: string): string => {
+    if (selected.length === 0) return allLabel
+    const labels = selected.map((id) => options.find((o) => o.key === id)?.label ?? id).filter(Boolean)
+    if (labels.length <= 3) return labels.join(', ')
+    return `${labels.slice(0, 2).join(', ')}, +${labels.length - 2}`
+  }
+
+  const baseOptions = context.bases.map((b) => ({ key: b._id, label: b.iataCode ?? b.name }))
+  const positionOptions = positions.filter((p) => p.isActive).map((p) => ({ key: p._id, label: p.code }))
+  const acTypeOptions = context.acTypes.map((t) => ({ key: t, label: t }))
+  const crewGroupOptions = context.crewGroups.map((g) => ({ key: g._id, label: g.name }))
+
+  const segments = [
+    formatList(filterBase, baseOptions, 'All Bases'),
+    formatList(filterPosition, positionOptions, 'All Positions'),
+    formatList(filterAcType, acTypeOptions, 'All Types'),
+    formatList(filterCrewGroup, crewGroupOptions, 'All Groups'),
+  ]
+  const fullValue = segments.join(' · ')
+
+  return (
+    <div className="flex items-center gap-2 min-w-0" title={fullValue}>
+      <span className="w-[3px] h-4 rounded-sm shrink-0" style={{ background: accent }} aria-hidden="true" />
+      <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-hz-text-tertiary shrink-0">
+        Workgroup
+      </span>
+      <span className="text-[13px] font-semibold text-hz-text truncate min-w-0">{fullValue}</span>
+    </div>
+  )
+}
+
 function GenerateBody({
   mode,
   onModeChange,
@@ -2947,10 +3121,16 @@ function GenerateBody({
   onClearRetainDayOffChange,
   clearRetainStandby,
   onClearRetainStandbyChange,
+  solverGapLimit,
+  onSolverGapLimitChange,
   phase,
   progress,
   startedAt,
   lock,
+  filterBase,
+  filterPosition,
+  filterAcType,
+  filterCrewGroup,
   onRun,
   onCancel,
   onNavigate,
@@ -2971,6 +3151,8 @@ function GenerateBody({
   onClearRetainDayOffChange: (v: boolean) => void
   clearRetainStandby: boolean
   onClearRetainStandbyChange: (v: boolean) => void
+  solverGapLimit: number
+  onSolverGapLimitChange: (v: number) => void
   phase: RunPhase
   progress: { pct: number; message: string }
   startedAt: number | null
@@ -2982,6 +3164,10 @@ function GenerateBody({
     pct: number
     message: string | null
   } | null
+  filterBase: string[]
+  filterPosition: string[]
+  filterAcType: string[]
+  filterCrewGroup: string[]
   onRun: () => void
   onCancel: () => void
   onNavigate: (to: ActiveKey) => void
@@ -3205,6 +3391,34 @@ function GenerateBody({
         </FormSection>
       )}
 
+      {(mode === 'general' || mode === 'longDuties') && (
+        <FormSection title="Solver Quality" icon={Gauge}>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            {SOLVER_QUALITY_OPTIONS.map((opt) => {
+              const isActive = solverGapLimit === opt.value
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => onSolverGapLimitChange(opt.value)}
+                  disabled={isRunning || isLocked}
+                  className="relative text-left rounded-xl px-4 py-3 border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    borderColor: isActive ? accent : cardBorder,
+                    background: isActive ? accentTint(accent, isDark ? 0.12 : 0.08) : subtle,
+                  }}
+                >
+                  <div className="text-[13px] font-semibold mb-1" style={{ color: isActive ? accent : palette.text }}>
+                    {opt.title}
+                  </div>
+                  <p className="text-[13px] text-hz-text-tertiary leading-snug">{opt.desc}</p>
+                </button>
+              )
+            })}
+          </div>
+        </FormSection>
+      )}
+
       {mode === 'clear' && (
         <FormSection title="Clear Options" icon={Trash2}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -3261,7 +3475,15 @@ function GenerateBody({
         </FormSection>
       )}
 
-      <div className="flex justify-end items-center">
+      {/* CTA footer pinned to bottom of GenerateBody. `mt-auto` consumes any
+          remaining vertical slack so the button stays in the same place
+          across mode changes — switching between General / Days Off Only /
+          Long Pairings / Clear Crew Schedule no longer makes the button
+          jump up or down by the height of the per-mode option section. */}
+      <div
+        className="mt-auto flex justify-end items-center pt-3 shrink-0"
+        style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` }}
+      >
         <div className="flex items-center gap-2">
           {isRunning && (
             <button
@@ -3325,6 +3547,8 @@ function ReviewBody({
   accent: string
   palette: PaletteType
 }) {
+  const fmtDay = useDateFormat()
+  const periodLabel = `${fmtDay(periodFrom)} → ${fmtDay(periodTo)}`
   const [loading, setLoading] = useState(false)
   const [scheduleData, setScheduleData] = useState<CrewScheduleResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -3564,7 +3788,7 @@ function ReviewBody({
       label: 'Gap-Fill',
       value: gapFillCode ? `${gapFillTotal.toLocaleString()} × ${gapFillCode}` : '—',
     },
-    { label: 'Period', value: `${periodFrom} → ${periodTo}` },
+    { label: 'Period', value: periodLabel },
   ]
 
   const qualityRows: Array<{ label: string; value: string; tone?: string }> = review
@@ -3868,7 +4092,7 @@ function FocusedModeReview({
         <ReviewKpi
           label="Crew Touched"
           value={crewTouched.toLocaleString()}
-          sub={`${periodFrom} → ${periodTo}`}
+          sub={periodLabel}
           accentColor="#06C270"
           isDark={isDark}
         />
@@ -4958,6 +5182,7 @@ function HistoryBody({
   isDark: boolean
   accent: string
 }) {
+  const fmtDay = useDateFormat()
   if (loading)
     return (
       <div className="flex items-center justify-center py-16">
@@ -4999,7 +5224,7 @@ function HistoryBody({
                 {fmtDate(run.startedAt)}
               </td>
               <td className="px-3 py-2.5 text-[13px] font-mono tabular-nums text-hz-text">
-                {run.periodFrom} → {run.periodTo}
+                {fmtDay(run.periodFrom)} → {fmtDay(run.periodTo)}
               </td>
               <td className="px-3 py-2.5">
                 <StatusChip status={run.status} />

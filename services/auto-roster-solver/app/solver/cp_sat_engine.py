@@ -410,7 +410,31 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
         if request.coverage_weight_default is not None and request.coverage_weight_default > 0
         else 1_000_000
     )
-    BH_FAIRNESS_WEIGHT = 100
+    # BH-fairness encoding — convex piecewise penalty on |bh_i - mean|.
+    # L1 sum-of-deviations (the prior version) was symmetry-invariant under
+    # crew-to-crew pairing reassignment: shifting 6h from a crew at the mean
+    # to a crew far from the mean costs the same on both sides, so the
+    # solver had no gradient to fix outliers — left tail stayed long.
+    # Convex piecewise penalty makes outlier crew strictly more expensive
+    # per unit of deviation: lifting a crew from 25h toward the mean now
+    # SAVES more obj points than dropping a near-mean crew by the same
+    # amount loses, creating the gradient that pulls the distribution
+    # closer to a normal shape.
+    #
+    # Bands (in minutes):
+    #   0-10h  — base rate
+    #   10-20h — 3× base
+    #   20-30h — 8× base
+    #   >30h   — 20× base + spread-cap soft hinge
+    FAIRNESS_BASE_WEIGHT = 50
+    FAIRNESS_BAND_WEIGHTS = [
+        (10 * 60, 50),  # bucket 0-10h: weight 50/min
+        (10 * 60, 150),  # bucket 10-20h: ADDITIONAL 150/min above 10h
+        (10 * 60, 400),  # bucket 20-30h: ADDITIONAL 400/min above 20h
+        (None, 1000),  # bucket 30h+: ADDITIONAL 1000/min above 30h
+    ]
+    SPREAD_HARD_PENALTY_WEIGHT = 100_000
+    SPREAD_TARGET_MIN = 25 * 60  # 25h, in minutes — soft hinge above this
     GENDER_WEIGHT_SCALE = request.config.gender_balance_weight  # 0-100
 
     # Block hours per crew (scaled to integers — multiply by 1 since bh_min already int)
@@ -430,20 +454,66 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
                 model.add(bh == 0)
             bh_per_crew.append(bh)
 
-        # BH variance proxy: sum of (bh_i - mean)^2 is non-linear.
-        # Use sum of |bh_i - bh_j| linearized via max - min instead.
+        # Sum-of-absolute-deviations from the period mean.
+        # `mean_int` = floor(total_bh / n_crew). Total_bh varies with the
+        # solver's coverage decisions (slack=1 → that pairing's bh excluded);
+        # the mean adapts accordingly. Each `dev_i = |bh_i - mean_int|`.
+        total_bh = model.new_int_var(0, 100_000 * n_crew, "total_bh")
+        model.add(total_bh == sum(bh_per_crew))
+        mean_int = model.new_int_var(0, 100_000, "bh_mean_int")
+        # mean_int * n_crew <= total_bh < (mean_int + 1) * n_crew
+        # Encode floor division as two non-strict integer inequalities
+        # (CP-SAT doesn't support strict <). The +1/-1 shifts re-express
+        # `<` and `>` as `<=` and `>=`.
+        model.add(mean_int * n_crew <= total_bh)
+        model.add((mean_int + 1) * n_crew >= total_bh + 1)
+
+        # Per-crew band slack vars. Each band captures the deviation that
+        # spills past the previous band's ceiling. Their sum equals dev_i,
+        # but each band is weighted independently in the objective — band
+        # k's weight is the *additional* per-minute cost above band k-1.
+        # Effect: marginal cost of being far from the mean grows with how
+        # far you already are, so the solver always prefers to fix the
+        # furthest crew first.
+        weighted_dev_terms: list = []
+        for ci in range(n_crew):
+            dev = model.new_int_var(0, 100_000, f"bh_dev_{ci}")
+            model.add(dev >= bh_per_crew[ci] - mean_int)
+            model.add(dev >= mean_int - bh_per_crew[ci])
+
+            # Build band slack vars: b1 = max(0, dev - 0), b2 = max(0, dev - 10h),
+            # b3 = max(0, dev - 20h), b4 = max(0, dev - 30h). Each weighted by
+            # its band's *additional* per-minute weight.
+            cumulative = 0
+            for band_idx, (band_size_min, band_weight) in enumerate(FAIRNESS_BAND_WEIGHTS):
+                band_var = model.new_int_var(0, 100_000, f"bh_dev_band{band_idx}_{ci}")
+                model.add(band_var >= dev - cumulative)
+                weighted_dev_terms.append(band_var * band_weight)
+                if band_size_min is None:
+                    break
+                cumulative += band_size_min
+
+        # Soft cap on the max-min spread above SPREAD_TARGET_MIN. Bigger
+        # than any single band weight so the solver REALLY hates blowing
+        # past the cap. Doesn't force infeasibility — structural outliers
+        # (recent-qual / returning-from-leave crew that genuinely can't
+        # match peers) still pay the cost but the model stays solvable.
         bh_max = model.new_int_var(0, 100_000, "bh_max")
         bh_min_var = model.new_int_var(0, 100_000, "bh_min")
         model.add_max_equality(bh_max, bh_per_crew)
         model.add_min_equality(bh_min_var, bh_per_crew)
-        bh_spread = model.new_int_var(0, 100_000, "bh_spread")
-        model.add(bh_spread == bh_max - bh_min_var)
+        spread_excess = model.new_int_var(0, 100_000, "bh_spread_excess")
+        model.add(spread_excess >= (bh_max - bh_min_var) - SPREAD_TARGET_MIN)
     else:
-        bh_spread = model.new_constant(0)
+        weighted_dev_terms = []
+        spread_excess = model.new_constant(0)
 
-    # Objective: minimise (unassigned * COVERAGE_WEIGHT) + (bh_spread * BH_FAIRNESS_WEIGHT)
+    # Objective: coverage >> spread-excess soft cap >> banded deviations.
     obj_terms = [s * COVERAGE_WEIGHT for s in slack]
-    obj_terms.append(bh_spread * BH_FAIRNESS_WEIGHT)
+    obj_terms.append(spread_excess * SPREAD_HARD_PENALTY_WEIGHT)
+    obj_terms.extend(weighted_dev_terms)
+    # Reference base weight to avoid lint complaints about unused name.
+    _ = FAIRNESS_BASE_WEIGHT
 
     # Planner-defined soft consecutive-duty penalties.
     for excess_var, w in soft_excess_terms:
@@ -614,20 +684,20 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
     # ── Solve with SSE progress callbacks ──────────────────────────────────
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = float(request.time_limit_sec)
-    # Cap at 8 workers. CP-SAT scaling is sublinear past ~8 (diminishing
-    # returns from portfolio search) AND the 24-worker config destabilised
-    # ortools 9.15 on Windows + Python 3.14 — native crash mid-run with
-    # no Python traceback (sub-second silent termination after Roster #N).
-    # 8 is the proven sweet spot per ortools docs.
-    solver.parameters.num_workers = min(8, os.cpu_count() or 8)
-    # Accept solutions within 2% of optimal — CP-SAT spends most of its time
+    # Worker cap. CP-SAT scaling is sublinear past ~8 (portfolio search hits
+    # diminishing returns); 24 workers destabilised ortools 9.15 on Windows +
+    # Python 3.14 (native crash mid-run, no Python traceback). 16 is the
+    # current ceiling — empirically faster than 8 on cockpit-scale problems
+    # while staying under the silent-crash threshold.
+    solver.parameters.num_workers = min(16, os.cpu_count() or 8)
+    # Accept solutions within 5% of optimal — CP-SAT spends most of its time
     # chasing the last 1-2% with no operational benefit (rosters are equivalent
-    # for crew). Pairs with the 30s no-improvement early stop below; first one
-    # to fire wins. Cabin runs may override (e.g. 0.05) for huge problems.
+    # for crew). Pairs with the 20s no-improvement early stop below; first one
+    # to fire wins. Cabin runs may override per request.
     solver.parameters.relative_gap_limit = (
         float(request.relative_gap_limit_override)
         if request.relative_gap_limit_override is not None and request.relative_gap_limit_override > 0
-        else 0.02
+        else 0.05
     )
     # Toggle verbose CP-SAT search log via env for diagnostics. Off by default
     # to keep server logs clean.
@@ -683,11 +753,17 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
             self.last_pct = pct
             self.last_covered = covered
             self.solution_count += 1
+            if pct >= 100:
+                phase_label = "Polishing"
+            elif pct >= 80:
+                phase_label = "Refining"
+            else:
+                phase_label = "Building"
             event = {
                 "event": "progress",
                 "data": {
                     "pct": pct,
-                    "message": f"Roster #{self.solution_count}: {covered}/{len(pairing_ids)} positions filled ({pct}%)",
+                    "message": f"{phase_label} · roster #{self.solution_count} improved · {covered}/{len(pairing_ids)} assigned ({pct}%)",
                     "best_obj": obj,
                 },
             }
@@ -722,13 +798,13 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
     # heartbeats the SSE stream looks dead to the client.
     # Early stop: if no improvement for NO_IMPROVEMENT_STOP_SEC, abort search.
     # Scale cutoff with problem size — a 142×2130 cockpit run needs more time
-    # to escape local optima than a 30×400 toy run. Floor 30s, ceiling 180s.
+    # to escape local optima than a 30×400 toy run. Floor 20s, ceiling 180s.
     problem_size = len(crew_ids) * len(pairing_ids)
-    NO_IMPROVEMENT_STOP_SEC = float(max(30, min(180, problem_size // 2000)))
+    NO_IMPROVEMENT_STOP_SEC = float(max(20, min(180, problem_size // 2000)))
     # Once 100% coverage reached, secondary terms (BH spread / idle / QoL)
     # produce only microscopic objective gains. Cap post-coverage grind to
     # this many seconds total — beyond that the roster is good enough.
-    POST_COVERAGE_GRIND_SEC = 30.0
+    POST_COVERAGE_GRIND_SEC = 15.0
     heartbeat_interval = 2.0
     next_heartbeat = time.monotonic() + heartbeat_interval
     early_stopped = False
@@ -753,7 +829,7 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
                 "event": "progress",
                 "data": {
                     "pct": cb.last_pct,
-                    "message": f"100% coverage reached — accepting roster after {int(POST_COVERAGE_GRIND_SEC)}s fairness polish",
+                    "message": f"Locking in best roster · full coverage · fairness polish complete ({int(POST_COVERAGE_GRIND_SEC)}s)",
                     "best_obj": cb._best,
                 },
             }
@@ -769,7 +845,7 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
                 "event": "progress",
                 "data": {
                     "pct": cb.last_pct,
-                    "message": f"No further improvement — accepting best roster ({cb.last_pct}% filled)",
+                    "message": f"Locking in best roster · {cb.last_pct}% coverage · stalled {int(NO_IMPROVEMENT_STOP_SEC)}s without gains",
                     "best_obj": cb._best,
                 },
             }
@@ -777,12 +853,34 @@ async def solve(request: SolveRequest) -> AsyncIterator[dict]:
             elapsed = int(now - start_ts)
             if cb.solution_count > 0:
                 stagnant = int(now - cb.last_improvement_ts)
-                msg = (
-                    f"Optimizing — best {cb.last_pct}% filled "
-                    f"({cb.last_covered}/{len(pairing_ids)}), {stagnant}s since last improvement"
-                )
+                if cb.full_coverage_ts is not None:
+                    polish_idle = int(now - cb.full_coverage_ts)
+                    msg = (
+                        f"Polishing fairness · full coverage "
+                        f"({cb.last_covered}/{len(pairing_ids)}) · "
+                        f"{polish_idle}s of {int(POST_COVERAGE_GRIND_SEC)}s budget"
+                    )
+                elif cb.last_pct < 80:
+                    msg = (
+                        f"Building roster · {cb.last_covered}/{len(pairing_ids)} assigned "
+                        f"({cb.last_pct}%) · last gain {stagnant}s ago"
+                    )
+                elif cb.last_pct < 100:
+                    open_pos = len(pairing_ids) - cb.last_covered
+                    duty_word = "duty" if open_pos == 1 else "duties"
+                    msg = (
+                        f"Refining · {cb.last_covered}/{len(pairing_ids)} assigned "
+                        f"({cb.last_pct}%) · {open_pos} {duty_word} open · "
+                        f"last gain {stagnant}s ago"
+                    )
+                else:
+                    msg = (
+                        f"Optimising cost · full coverage "
+                        f"({cb.last_covered}/{len(pairing_ids)}) · "
+                        f"last gain {stagnant}s ago"
+                    )
             else:
-                msg = f"Searching for first legal roster — {elapsed}s / {request.time_limit_sec}s"
+                msg = f"Searching for first legal roster · {len(pairing_ids)} positions · {elapsed}s of {request.time_limit_sec}s"
             yield {
                 "event": "progress",
                 "data": {

@@ -21,6 +21,13 @@ import { loadSerializedRuleSet } from './fdtl-rule-set.js'
 import { setRosterRunPayload } from './roster-run-cache.js'
 import { buildCrewSchedulePayload, type CrewScheduleQuery } from '../routes/crew-schedule.js'
 import { localDayWindowUtc } from '../utils/local-day-window.js'
+import { buildTempBlockedDates } from './auto-roster-temp-block.js'
+import {
+  buildDepHistograms,
+  buildSbyCandidates as buildSbyCandidatesShared,
+  type DepHistEntry,
+  type SbyCandidate,
+} from './auto-roster-sby-windows.js'
 
 /**
  * Pre-build the /crew-schedule aggregator payload and cache it under the
@@ -58,7 +65,10 @@ export type AutoRosterFilters = {
   crewGroupIds?: string[] | null
 }
 
-async function resolveCrewIdsForFilters(operatorId: string, filters: AutoRosterFilters): Promise<string[] | null> {
+export async function resolveCrewIdsForFilters(
+  operatorId: string,
+  filters: AutoRosterFilters,
+): Promise<string[] | null> {
   const sets: string[][] = []
   if (filters.acTypes && filters.acTypes.length > 0) {
     const quals = await CrewQualification.find(
@@ -254,6 +264,10 @@ export async function runAutoRoster(
   longDutiesMinDays: number = 2,
   filters: AutoRosterFilters = {},
   daysOffActivityCodeId: string | null = null,
+  /** Planner-selected solver acceptance gap. 0.05/0.10/0.20 from UI. When
+   *  unset the solver applies its built-in default (0.05 cockpit, 0.05 cabin
+   *  scale-tuning override). Always wins over the cabin default when set. */
+  relativeGapLimit: number | undefined = undefined,
 ): Promise<void> {
   const now = () => new Date().toISOString()
 
@@ -559,8 +573,20 @@ export async function runAutoRoster(
 
     // Temp-base POSITIONING-day hard block. POS day = no other duty.
     // Operating a duty + positioning flight on the same day is too
-    // tiring; hard-coded per planner direction. Index POS dates per
-    // crew from the already-fetched `adaptedBookings`.
+    // tiring; hard-coded per planner direction. Sources:
+    //   1. Actual `temp-base-positioning` flight bookings (`adaptedBookings`).
+    //   2. Synthesised ±1-day brackets around each TEMP block (`fromIso-1`
+    //      and `toIso+1`). Hybrid rule per planner spec: even when no
+    //      positioning flight is booked yet, the day immediately before
+    //      and after a TEMP window must remain unassigned so the planner
+    //      can drop POS legs in later. Without #2 the pairing pre-filter
+    //      passed pairings on the bracket day → solver assigned a flight
+    //      → the visible POS marker overlapped a real duty.
+    const SHIFT_MS = 86_400_000
+    const shiftDate = (dateIso: string, deltaDays: number): string => {
+      const t = Date.UTC(Number(dateIso.slice(0, 4)), Number(dateIso.slice(5, 7)) - 1, Number(dateIso.slice(8, 10)))
+      return new Date(t + deltaDays * SHIFT_MS).toISOString().slice(0, 10)
+    }
     const posDatesByCrew = new Map<string, Set<string>>()
     for (const b of adaptedBookings) {
       if (b.purpose !== 'temp-base-positioning') continue
@@ -570,6 +596,15 @@ export async function runAutoRoster(
         set.add(b.flightDate)
         posDatesByCrew.set(cid, set)
       }
+    }
+    // Synthesise ±1-day POS brackets for every active temp-base window.
+    for (const [cid, blocks] of tempBasesByCrew) {
+      const set = posDatesByCrew.get(cid) ?? new Set<string>()
+      for (const tb of blocks) {
+        if (tb.fromIso) set.add(shiftDate(tb.fromIso, -1))
+        if (tb.toIso) set.add(shiftDate(tb.toIso, +1))
+      }
+      if (set.size > 0) posDatesByCrew.set(cid, set)
     }
     let posDaySkipped = 0
 
@@ -820,6 +855,35 @@ export async function runAutoRoster(
     // matching seat code so the solver gets ~Nx fewer positions to chew on.
     const filterSeatCode = filters.position ? (positionIdToCode.get(filters.position) ?? null) : null
 
+    // Pre-existing seat occupancy. Any non-cancelled CrewAssignment already
+    // pointing at one of these pairings is consuming a real seat slot. The
+    // CP-SAT model has no concept of "this seat is already filled" — it
+    // sees only the virtual pairings we emit. If we re-emit a slot that's
+    // already taken, the solver will happily assign a NEW crew to it; the
+    // commit-time uniqueness check then rejects with "seat already taken
+    // (race)". Pre-subtracting used indices here is what closes that race.
+    const usedSeatsByPairing = new Map<string, Map<string, Set<number>>>()
+    for (const a of historyAssignments) {
+      if ((a.status ?? '') === 'cancelled') continue
+      const seatId = (a as unknown as { seatPositionId?: string | null }).seatPositionId
+      const seatIdx = (a as unknown as { seatIndex?: number }).seatIndex ?? 0
+      if (!seatId) continue
+      const seatCode = positionIdToCode.get(seatId)
+      if (!seatCode) continue
+      let pmap = usedSeatsByPairing.get(a.pairingId)
+      if (!pmap) {
+        pmap = new Map()
+        usedSeatsByPairing.set(a.pairingId, pmap)
+      }
+      let set = pmap.get(seatCode)
+      if (!set) {
+        set = new Set()
+        pmap.set(seatCode, set)
+      }
+      set.add(seatIdx)
+    }
+    let preFilledSeatsSkipped = 0
+
     const virtualPairings: VirtualPairing[] = []
     const virtualByParent = new Map<string, VirtualPairing[]>()
     for (const p of pairings) {
@@ -870,9 +934,19 @@ export async function runAutoRoster(
         virtualPairings.push(v)
         siblings.push(v)
       } else {
+        const usedForParent = usedSeatsByPairing.get(parentId) ?? null
         for (const [seatCode, n] of seatEntries) {
           const count = Math.max(1, Math.floor(n))
+          const usedSet = usedForParent?.get(seatCode) ?? null
           for (let i = 0; i < count; i++) {
+            // Skip pre-filled slot — re-emitting would let the solver
+            // propose a duplicate crew for the same physical seat, which
+            // commit-time uniqueness then has to reject as "seat already
+            // taken (race)". Pre-subtraction is the clean fix.
+            if (usedSet && usedSet.has(i)) {
+              preFilledSeatsSkipped++
+              continue
+            }
             const v: VirtualPairing = {
               id: `${parentId}__${seatCode}__${i}`,
               parent_pairing_id: parentId,
@@ -1015,7 +1089,13 @@ export async function runAutoRoster(
       event: 'progress',
       data: {
         pct: 16,
-        message: `Expanded ${pairings.length} pairings → ${virtualPairings.length} open positions (${totalVirtualLegalPairs.toLocaleString()} legal crew×position combinations)`,
+        message:
+          `Expanded ${pairings.length} pairings → ${virtualPairings.length} open positions ` +
+          `(${totalVirtualLegalPairs.toLocaleString()} legal crew×position combinations` +
+          (preFilledSeatsSkipped > 0
+            ? `, ${preFilledSeatsSkipped.toLocaleString()} seats pre-filled and skipped`
+            : '') +
+          `)`,
         best_obj: null,
       },
     })
@@ -1064,7 +1144,9 @@ export async function runAutoRoster(
       time_limit_sec: timeLimitSec,
       // Cabin-scale knobs (cockpit runs leave these off — solver defaults apply).
       coverage_weight_default: isCabinScale ? 500_000 : undefined,
-      relative_gap_limit_override: isCabinScale ? 0.05 : undefined,
+      // Planner-selected gap wins over cabin default; cabin default wins
+      // over solver built-in default (0.05). Order: explicit UI > cabin > solver.
+      relative_gap_limit_override: relativeGapLimit !== undefined ? relativeGapLimit : isCabinScale ? 0.05 : undefined,
       lns_only: useLns,
     }
     if (isCabinScale) {
@@ -1901,49 +1983,91 @@ async function runDaysOffAssignment(
     if (filters.position) crewQuery.position = filters.position
     if (filterCrewIds) crewQuery._id = { $in: filterCrewIds }
 
-    const [crew, assignments, activities, schedulingConfig, activityCodes, pairingsForDemand, complementDocs] =
-      await Promise.all([
-        CrewMember.find(crewQuery).lean(),
-        CrewAssignment.find({
+    const [
+      crew,
+      assignments,
+      activities,
+      schedulingConfig,
+      activityCodes,
+      pairingsForDemand,
+      complementDocs,
+      tempBaseDocsForOff,
+      posBookingsForOff,
+    ] = await Promise.all([
+      CrewMember.find(crewQuery).lean(),
+      CrewAssignment.find({
+        operatorId,
+        scenarioId: scenarioFilter,
+        status: { $ne: 'cancelled' },
+        startUtcIso: { $lte: `${periodTo}T23:59:59.999Z` },
+        endUtcIso: { $gte: `${periodFrom}T00:00:00.000Z` },
+      }).lean(),
+      CrewActivity.find({
+        operatorId,
+        scenarioId: scenarioFilter,
+        startUtcIso: { $lte: `${periodTo}T23:59:59.999Z` },
+        endUtcIso: { $gte: `${periodFrom}T00:00:00.000Z` },
+      }).lean(),
+      (async () => {
+        if (userId) {
+          const userDoc = await OperatorSchedulingConfig.findOne({ operatorId, userId }).lean()
+          if (userDoc) return userDoc
+        }
+        return OperatorSchedulingConfig.findOne({ operatorId, userId: null }).lean()
+      })(),
+      ActivityCode.find({ operatorId }, { _id: 1, flags: 1 }).lean(),
+      Pairing.find(
+        {
           operatorId,
           scenarioId: scenarioFilter,
-          status: { $ne: 'cancelled' },
-          startUtcIso: { $lte: `${periodTo}T23:59:59.999Z` },
-          endUtcIso: { $gte: `${periodFrom}T00:00:00.000Z` },
-        }).lean(),
-        CrewActivity.find({
-          operatorId,
-          scenarioId: scenarioFilter,
-          startUtcIso: { $lte: `${periodTo}T23:59:59.999Z` },
-          endUtcIso: { $gte: `${periodFrom}T00:00:00.000Z` },
-        }).lean(),
-        (async () => {
-          if (userId) {
-            const userDoc = await OperatorSchedulingConfig.findOne({ operatorId, userId }).lean()
-            if (userDoc) return userDoc
-          }
-          return OperatorSchedulingConfig.findOne({ operatorId, userId: null }).lean()
-        })(),
-        ActivityCode.find({ operatorId }, { _id: 1, flags: 1 }).lean(),
-        Pairing.find(
-          {
-            operatorId,
-            scenarioId: scenarioFilter,
-            endDate: { $gte: periodFrom },
-            startDate: { $lte: periodTo },
-          },
-          {
-            startDate: 1,
-            endDate: 1,
-            crewCounts: 1,
-            aircraftTypeIcao: 1,
-            complementKey: 1,
-          },
-        ).lean(),
-        CrewComplement.find({ operatorId, isActive: true }).lean(),
-      ])
+          endDate: { $gte: periodFrom },
+          startDate: { $lte: periodTo },
+        },
+        {
+          startDate: 1,
+          endDate: 1,
+          crewCounts: 1,
+          aircraftTypeIcao: 1,
+          complementKey: 1,
+        },
+      ).lean(),
+      CrewComplement.find({ operatorId, isActive: true }).lean(),
+      // Temp-base + positioning windows are widened by ±1 day (bracket POS)
+      // so a temp block ending on periodFrom still synthesises a POS day on
+      // periodFrom, and one starting on periodTo still synthesises POS on
+      // periodTo. Underlying enumerator clips to the actual TEMP boundary.
+      CrewTempBase.find({
+        operatorId,
+        fromIso: { $lte: periodTo },
+        toIso: { $gte: periodFrom },
+      }).lean(),
+      CrewFlightBooking.find({
+        operatorId,
+        purpose: 'temp-base-positioning',
+        status: { $ne: 'cancelled' },
+        flightDate: { $gte: periodFrom, $lte: periodTo, $ne: null },
+      }).lean(),
+    ])
 
     if (signal?.aborted) return
+
+    // Hard-block dates per crew where they're on temp-base or transiting
+    // (POS day before/after, plus any actual positioning bookings). OFF
+    // must NOT land on these days — crew is operationally detached from
+    // home base and any home-base activity placement is invalid.
+    const tempBlockedByCrewOff = buildTempBlockedDates(
+      tempBaseDocsForOff.map((tb) => ({
+        crewId: tb.crewId as string,
+        fromIso: tb.fromIso as string,
+        toIso: tb.toIso as string,
+      })),
+      posBookingsForOff.map((b) => ({
+        crewIds: (b.crewIds ?? []) as string[],
+        flightDate: ((b as { flightDate?: string | null }).flightDate ?? null) as string | null,
+        purpose: ((b as { purpose?: string | null }).purpose ?? null) as string | null,
+      })),
+    )
+    let dayOffTempBlockSkipped = 0
 
     // Crew base UUID → utcOffsetHours, so OFF windows can be anchored to
     // base-local midnight (rule #8). Without this, OFF for SGN crew (UTC+7)
@@ -2262,9 +2386,14 @@ async function runDaysOffAssignment(
         // placing a day that would extend an existing chain beyond the limit.
         type Candidate = { day: string; slack: number; pos: number }
         const candidates: Candidate[] = []
+        const crewTempBlocked = tempBlockedByCrewOff.get(crewId) ?? null
         for (let pos = 0; pos < periodDays.length; pos++) {
           const d = periodDays[pos]
           if (busy.has(d)) continue
+          if (crewTempBlocked && crewTempBlocked.has(d)) {
+            dayOffTempBlockSkipped++
+            continue
+          }
           if (!canPlaceDayOff(crewId, d)) continue
           if (projectedOffStreak(crewId, d) > maxConsecOff) continue
           const availability = totalCrew - busyByDay[d].size
@@ -2473,7 +2602,16 @@ async function runStandbyAssignment(
     const queryStartIso = new Date(new Date(`${periodFrom}T00:00:00.000Z`).getTime() - minRestMsForQuery).toISOString()
     const queryEndIso = new Date(new Date(`${periodTo}T23:59:59.999Z`).getTime() + minRestMsForQuery).toISOString()
 
-    const [crew, assignments, activities, schedulingConfig, activityCodes, pairingsForDep] = await Promise.all([
+    const [
+      crew,
+      assignments,
+      activities,
+      schedulingConfig,
+      activityCodes,
+      pairingsForDep,
+      tempBaseDocsForSby,
+      posBookingsForSby,
+    ] = await Promise.all([
       CrewMember.find(crewQuery).lean(),
       CrewAssignment.find({
         operatorId,
@@ -2505,9 +2643,77 @@ async function runStandbyAssignment(
         },
         { baseAirport: 1, legs: 1, startDate: 1, endDate: 1 },
       ).lean(),
+      CrewTempBase.find({
+        operatorId,
+        fromIso: { $lte: periodTo },
+        toIso: { $gte: periodFrom },
+      }).lean(),
+      CrewFlightBooking.find({
+        operatorId,
+        purpose: 'temp-base-positioning',
+        status: { $ne: 'cancelled' },
+        flightDate: { $gte: periodFrom, $lte: periodTo, $ne: null },
+      }).lean(),
     ])
 
     if (signal?.aborted) return
+
+    // FDTL validation needs full pairing data (totalDuty/Block, legs,
+    // complementKey) for every pairing that any of these crew already touch
+    // — the in-period and surrounding 168h-back assignments. Schedule-duty
+    // builder reads these fields to produce ScheduleDuty[] for the validator.
+    const fdtlPairingIds = [...new Set(assignments.map((a) => a.pairingId).filter(Boolean))]
+    const fdtlPairings = fdtlPairingIds.length
+      ? await Pairing.find(
+          { _id: { $in: fdtlPairingIds } },
+          {
+            _id: 1,
+            pairingCode: 1,
+            totalDutyMinutes: 1,
+            totalBlockMinutes: 1,
+            complementKey: 1,
+            legs: 1,
+          },
+        ).lean()
+      : []
+    const sbyPairingsById = new Map<string, PairingLike>(
+      fdtlPairings.map((p) => [p._id as string, p as unknown as PairingLike]),
+    )
+    const sbyActivityCodesById = new Map<string, { flags: string[] }>(
+      activityCodes.map((c) => [c._id as string, { flags: (c.flags ?? []) as string[] }]),
+    )
+    // Widened FDTL booking window — 168h-back + period + 168h-forward so
+    // a positioning booking adjacent to the period still feeds the rolling
+    // weekly-rest evaluator.
+    const fdtlBookingFromIso = new Date(new Date(`${periodFrom}T00:00:00.000Z`).getTime() - 168 * 3600_000)
+      .toISOString()
+      .slice(0, 10)
+    const fdtlBookingToIso = new Date(new Date(`${periodTo}T23:59:59.999Z`).getTime() + 168 * 3600_000)
+      .toISOString()
+      .slice(0, 10)
+    const fdtlBookings = await CrewFlightBooking.find({
+      operatorId,
+      status: { $ne: 'cancelled' },
+      flightDate: { $gte: fdtlBookingFromIso, $lte: fdtlBookingToIso, $ne: null },
+    }).lean()
+
+    // Hard-block dates per crew where they're on temp-base or transiting
+    // (POS day before/after, plus any actual positioning bookings). SBY
+    // must NOT land on these days — crew is operationally detached from
+    // home base.
+    const tempBlockedByCrewSby = buildTempBlockedDates(
+      tempBaseDocsForSby.map((tb) => ({
+        crewId: tb.crewId as string,
+        fromIso: tb.fromIso as string,
+        toIso: tb.toIso as string,
+      })),
+      posBookingsForSby.map((b) => ({
+        crewIds: (b.crewIds ?? []) as string[],
+        flightDate: ((b as { flightDate?: string | null }).flightDate ?? null) as string | null,
+        purpose: ((b as { purpose?: string | null }).purpose ?? null) as string | null,
+      })),
+    )
+    let sbyTempBlockSkipped = 0
 
     // Prefer the SYS 'SBY' code for both home & airport standby. Legacy
     // operators may split home/airport into separate flagged codes —
@@ -2541,37 +2747,67 @@ async function runStandbyAssignment(
     const maxDurationMin = standbyCfg?.maxDurationMin ?? 600
     const durationMin = Math.min(maxDurationMin, Math.max(minDurationMin, minDurationMin))
 
-    // Build index: base IATA + day → earliest leg STD UTC (ms). Standby start
-    // computed auto: firstDep - autoLeadMin. No leg that day → skip auto and
-    // fall through to fixed or default.
-    const firstDepMsByBaseDay = new Map<string, number>()
+    // Build per-base, per-base-local-day departure histogram for peak-driven
+    // SBY window selection. The histogram replaces the old "earliest leg
+    // wins" rule which over-fit to outliers (one 03:00 cargo flight pulled
+    // SBY to 01:00 even when the actual passenger peak was 07:00). Top
+    // density windows become candidate SBY start times (peak − leadMin).
+    const sbyBaseIatas = [
+      ...new Set(
+        pairingsForDep.map((p) => ((p as { baseAirport?: string }).baseAirport ?? '').toUpperCase()).filter(Boolean),
+      ),
+    ]
+    const sbyBaseIataToOffset = new Map<string, number>()
+    if (sbyBaseIatas.length > 0) {
+      const docs = await Airport.find({ iataCode: { $in: sbyBaseIatas } }, { iataCode: 1, utcOffsetHours: 1 }).lean()
+      for (const d of docs) {
+        const code = ((d.iataCode ?? '') as string).toUpperCase()
+        const off = (d as { utcOffsetHours?: number | null }).utcOffsetHours
+        if (code && typeof off === 'number') sbyBaseIataToOffset.set(code, off)
+      }
+    }
+    const sbyHistEntries: DepHistEntry[] = []
     for (const p of pairingsForDep) {
       const base = ((p as { baseAirport?: string }).baseAirport ?? '').toUpperCase()
       if (!base) continue
       const legs = (p as { legs?: Array<{ stdUtcIso?: string | null; depStation?: string | null }> }).legs ?? []
+      const baseOffsetHours = sbyBaseIataToOffset.get(base) ?? 0
+      const baseOffsetMs = baseOffsetHours * 3600_000
       for (const leg of legs) {
         if (!leg.stdUtcIso) continue
         const depStation = ((leg.depStation ?? '') as string).toUpperCase()
-        // A leg departs from the base when its depStation matches the pairing's base.
         if (depStation && depStation !== base) continue
         const ms = new Date(leg.stdUtcIso).getTime()
         if (!Number.isFinite(ms)) continue
-        const day = new Date(ms).toISOString().slice(0, 10)
-        const key = `${base}|${day}`
-        const prev = firstDepMsByBaseDay.get(key)
-        if (prev === undefined || ms < prev) firstDepMsByBaseDay.set(key, ms)
+        const localTotalMs = ms + baseOffsetMs
+        const localDay = new Date(localTotalMs).toISOString().slice(0, 10)
+        const localMidnightUtc =
+          Date.UTC(Number(localDay.slice(0, 4)), Number(localDay.slice(5, 7)) - 1, Number(localDay.slice(8, 10))) -
+          baseOffsetMs
+        const localMinOfDay = Math.max(0, Math.min(1439, Math.floor((ms - localMidnightUtc) / 60_000)))
+        sbyHistEntries.push({ baseIata: base, localDay, localMinOfDay })
       }
     }
+    const sbyHistByBaseDay = buildDepHistograms(sbyHistEntries)
 
-    // Resolve crew.base (airport _id) → IATA for dep lookup.
+    // Resolve crew.base (airport _id) → IATA for dep lookup. Also fetch
+    // utcOffsetHours so the fixed-time fallback can anchor to base-local
+    // midnight rather than UTC midnight.
     const crewBaseIds = [
       ...new Set(crew.map((c) => (c as { base?: string | null }).base).filter((v): v is string => !!v)),
     ]
     const crewBaseDocs =
-      crewBaseIds.length > 0 ? await Airport.find({ _id: { $in: crewBaseIds } }, { _id: 1, iataCode: 1 }).lean() : []
+      crewBaseIds.length > 0
+        ? await Airport.find({ _id: { $in: crewBaseIds } }, { _id: 1, iataCode: 1, utcOffsetHours: 1 }).lean()
+        : []
     const baseIdToIata = new Map(
       crewBaseDocs.map((a) => [a._id as string, ((a.iataCode as string | null) ?? '').toUpperCase()]),
     )
+    const baseIdToUtcOffset = new Map<string, number>()
+    for (const a of crewBaseDocs) {
+      const off = (a as { utcOffsetHours?: number | null }).utcOffsetHours
+      if (typeof off === 'number') baseIdToUtcOffset.set(a._id as string, off)
+    }
 
     // Inter-pairing rest buffer — standby must NOT be placed within min-rest
     // minutes of the crew's adjacent pairing/activity. Day-level "is crew busy
@@ -2621,28 +2857,25 @@ async function runStandbyAssignment(
       return true
     }
 
-    const resolveStandbyWindow = (crewBase: string, dayIso: string): { startIso: string; endIso: string } => {
-      // Auto mode: relative to first departure.
-      if (startTimeMode === 'auto' && crewBase) {
-        const key = `${crewBase}|${dayIso}`
-        const firstDepMs = firstDepMsByBaseDay.get(key)
-        if (firstDepMs !== undefined) {
-          const startMs = firstDepMs - autoLeadMin * 60_000
-          const endMs = startMs + durationMin * 60_000
-          return { startIso: new Date(startMs).toISOString(), endIso: new Date(endMs).toISOString() }
-        }
-      }
-      // Fixed mode (or auto fallback): first HH:MM in fixedStartTimes
-      // interpreted as UTC. A timezone-aware implementation is future work.
-      const fallbackTime = fixedStartTimes[0] ?? '08:00'
-      const hm = /^(\d{1,2}):(\d{2})$/.exec(fallbackTime.trim())
-      const hh = hm ? Math.min(23, parseInt(hm[1], 10)) : 8
-      const mm = hm ? Math.min(59, parseInt(hm[2], 10)) : 0
-      const startMs = new Date(
-        `${dayIso}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00.000Z`,
-      ).getTime()
-      const endMs = startMs + durationMin * 60_000
-      return { startIso: new Date(startMs).toISOString(), endIso: new Date(endMs).toISOString() }
+    // Per-pass effective fixed times. In Auto mode the operator's fixed
+    // times shouldn't be the primary candidate set — but they remain useful
+    // as supplemental fallbacks ahead of the canonical 07/14/18 peaks (an
+    // operator may know a non-aviation-typical peak time at their base).
+    // In Fixed mode, the operator opts out of histogram-driven selection
+    // entirely; only their entries + canonical fallbacks should be tried.
+    const effectiveFixedTimes = startTimeMode === 'fixed' ? fixedStartTimes : fixedStartTimes
+    const buildSbyCandidatesForCrew = (crewBase: string, crewBaseId: string, dayIso: string): SbyCandidate[] => {
+      const offsetHours = baseIdToUtcOffset.get(crewBaseId) ?? 0
+      const hist = startTimeMode === 'auto' && crewBase ? sbyHistByBaseDay.get(`${crewBase}|${dayIso}`) : undefined
+      return buildSbyCandidatesShared({
+        baseIata: crewBase,
+        dayIso,
+        baseOffsetHours: offsetHours,
+        hist,
+        fixedTimes: effectiveFixedTimes,
+        leadMin: autoLeadMin,
+        durationMin,
+      })
     }
 
     const periodDays = enumerateDays(periodFrom, periodTo)
@@ -2694,6 +2927,57 @@ async function runStandbyAssignment(
         if (isStandby) standbyByDay[day].add(a.crewId)
       })
     }
+
+    // Baseline ScheduleDuty[] per crew — built once from existing
+    // assignments/activities/bookings + reused across every candidate. We
+    // append placed-this-run SBYs to this baseline before each validator
+    // call so subsequent placements respect the running roster, not the
+    // stale snapshot. Without per-candidate FDTL validation, SBY/OFF can
+    // land inside a 41h continuous-rest gap and silently break CAAV VAR 15
+    // weekly-rest (regulator violation).
+    const stbyAssignmentsLike = assignments.map((a) => ({
+      _id: a._id as string,
+      crewId: a.crewId as string,
+      pairingId: a.pairingId as string,
+      seatPositionId: (a as unknown as { seatPositionId?: string }).seatPositionId,
+      startUtcIso: a.startUtcIso as string,
+      endUtcIso: a.endUtcIso as string,
+      status: (a.status ?? 'planned') as string,
+    }))
+    const stbyActivitiesLike = activities.map((a) => ({
+      _id: a._id as string,
+      crewId: a.crewId as string,
+      startUtcIso: a.startUtcIso as string,
+      endUtcIso: a.endUtcIso as string,
+      activityCodeId: (a as unknown as { activityCodeId?: string | null }).activityCodeId ?? null,
+    }))
+    const stbyBookingsLike = fdtlBookings.map((b) => ({
+      _id: b._id as string,
+      crewIds: ((b as unknown as { crewIds?: string[] }).crewIds ?? []) as string[],
+      status: ((b as unknown as { status?: string }).status ?? 'planned') as string,
+      purpose: ((b as unknown as { purpose?: string | null }).purpose ?? null) as string | null,
+      flightDate: ((b as unknown as { flightDate?: string | null }).flightDate ?? null) as string | null,
+      stdUtcMs: ((b as unknown as { stdUtcMs?: number | null }).stdUtcMs ?? null) as number | null,
+      staUtcMs: ((b as unknown as { staUtcMs?: number | null }).staUtcMs ?? null) as number | null,
+    }))
+    const baselineDutiesByCrew = new Map<string, ReturnType<typeof buildScheduleDuties>>()
+    for (const c of crew) {
+      const cid = c._id as string
+      baselineDutiesByCrew.set(
+        cid,
+        buildScheduleDuties({
+          crewId: cid,
+          assignments: stbyAssignmentsLike,
+          activities: stbyActivitiesLike,
+          pairingsById: sbyPairingsById,
+          activityCodesById: sbyActivityCodesById,
+          bookings: stbyBookingsLike,
+        }),
+      )
+    }
+    // Per-crew SBY duties placed in THIS run. Appended to the baseline at
+    // each validator call so the running roster is always consistent.
+    const placedDutiesByCrew = new Map<string, ReturnType<typeof buildScheduleDuties>>()
 
     let inserted = 0
     let homeAssigned = 0
@@ -2781,15 +3065,81 @@ async function runStandbyAssignment(
         if (picks.length >= need) break
         const crewId = c._id as string
         if (busyByDay[day].has(crewId)) continue
-        const crewBase = baseIdToIata.get((c as { base?: string | null }).base ?? '') ?? ''
-        const { startIso, endIso } = resolveStandbyWindow(crewBase, day)
-        const startMs = new Date(startIso).getTime()
-        const endMs = new Date(endIso).getTime()
-        if (!canPlaceStandby(crewId, startMs, endMs)) {
+        const crewTempBlocked = tempBlockedByCrewSby.get(crewId)
+        if (crewTempBlocked && crewTempBlocked.has(day)) {
+          sbyTempBlockSkipped++
+          continue
+        }
+        const crewBaseId = (c as { base?: string | null }).base ?? ''
+        const crewBase = baseIdToIata.get(crewBaseId) ?? ''
+        const homeBaseIata = baseIdToIata.get(crewBaseId) || 'XXXX'
+        const candidates = buildSbyCandidatesForCrew(crewBase, crewBaseId, day)
+        const baseline = baselineDutiesByCrew.get(crewId) ?? []
+        const placed = placedDutiesByCrew.get(crewId) ?? []
+        const existingDuties = placed.length > 0 ? [...baseline, ...placed] : baseline
+        let chosen: SbyCandidate | null = null
+        for (const cand of candidates) {
+          // Cheap interval-overlap pre-check — a candidate that hard-overlaps
+          // an existing duty is always invalid, no need to fire the full
+          // evaluator suite for it.
+          if (!canPlaceStandby(crewId, cand.startMs, cand.endMs)) continue
+          // Authoritative legality — full FDTL validator. Catches CAAV VAR 15
+          // 36h-continuous-rest, MIN_REST_BETWEEN_DUTIES, MAX_DUTY_HOURS_*,
+          // and every other rule in the operator's ruleset. This is the gate
+          // that stops SBY placement from breaking weekly rest.
+          const candidateDuty = {
+            id: 'sby-cand',
+            kind: 'activity' as const,
+            startUtcMs: cand.startMs,
+            endUtcMs: cand.endMs,
+            dutyMinutes: durationMin,
+            blockMinutes: 0,
+            fdpMinutes: 0,
+            landings: 0,
+            departureStation: null,
+            arrivalStation: null,
+            isAugmented: false,
+            label: 'standby',
+          }
+          const result = validateCrewAssignment({
+            candidate: candidateDuty,
+            existing: existingDuties,
+            homeBase: homeBaseIata,
+            ruleSet: ruleSetForStbyRest,
+          })
+          if (result.overall === 'violation') continue
+          chosen = cand
+          break
+        }
+        if (!chosen) {
           stbyRestRejects++
           continue
         }
-        picks.push({ c, startMs, endMs, startIso, endIso })
+        picks.push({
+          c,
+          startMs: chosen.startMs,
+          endMs: chosen.endMs,
+          startIso: new Date(chosen.startMs).toISOString(),
+          endIso: new Date(chosen.endMs).toISOString(),
+        })
+        // Append the just-chosen SBY to placed-this-run so subsequent
+        // candidates for this crew see the full running roster.
+        const placedList = placedDutiesByCrew.get(crewId) ?? []
+        placedList.push({
+          id: `sby-placed-${day}`,
+          kind: 'activity',
+          startUtcMs: chosen.startMs,
+          endUtcMs: chosen.endMs,
+          dutyMinutes: durationMin,
+          blockMinutes: 0,
+          fdpMinutes: 0,
+          landings: 0,
+          departureStation: null,
+          arrivalStation: null,
+          isAugmented: false,
+          label: 'standby',
+        })
+        placedDutiesByCrew.set(crewId, placedList)
       }
       if (picks.length === 0) continue
 
@@ -2947,7 +3297,16 @@ async function runGapFillPass(
   const queryStartIso = new Date(new Date(`${periodFrom}T00:00:00.000Z`).getTime() - minRestMs).toISOString()
   const queryEndIso = new Date(new Date(`${periodTo}T23:59:59.999Z`).getTime() + minRestMs).toISOString()
 
-  const [crew, assignments, activities, schedulingConfig, activityCodes, pairingsForDep] = await Promise.all([
+  const [
+    crew,
+    assignments,
+    activities,
+    schedulingConfig,
+    activityCodes,
+    pairingsForDep,
+    tempBaseDocsForGap,
+    posBookingsForGap,
+  ] = await Promise.all([
     CrewMember.find(crewQuery).lean(),
     CrewAssignment.find({
       operatorId,
@@ -2973,7 +3332,70 @@ async function runGapFillPass(
       },
       { baseAirport: 1, legs: 1, startDate: 1, endDate: 1 },
     ).lean(),
+    CrewTempBase.find({
+      operatorId,
+      fromIso: { $lte: periodTo },
+      toIso: { $gte: periodFrom },
+    }).lean(),
+    CrewFlightBooking.find({
+      operatorId,
+      purpose: 'temp-base-positioning',
+      status: { $ne: 'cancelled' },
+      flightDate: { $gte: periodFrom, $lte: periodTo, $ne: null },
+    }).lean(),
   ])
+
+  // FDTL validation needs full Pairing data + a wider booking window
+  // covering 168h on each side of the period (so a positioning booking
+  // touching the period edge still feeds the rolling weekly-rest check).
+  const gapFdtlPairingIds = [...new Set(assignments.map((a) => a.pairingId).filter(Boolean))]
+  const gapFdtlPairings = gapFdtlPairingIds.length
+    ? await Pairing.find(
+        { _id: { $in: gapFdtlPairingIds } },
+        {
+          _id: 1,
+          pairingCode: 1,
+          totalDutyMinutes: 1,
+          totalBlockMinutes: 1,
+          complementKey: 1,
+          legs: 1,
+        },
+      ).lean()
+    : []
+  const gapPairingsById = new Map<string, PairingLike>(
+    gapFdtlPairings.map((p) => [p._id as string, p as unknown as PairingLike]),
+  )
+  const gapActivityCodesById = new Map<string, { flags: string[] }>(
+    activityCodes.map((c) => [c._id as string, { flags: (c.flags ?? []) as string[] }]),
+  )
+  const gapFdtlBookingFromIso = new Date(new Date(`${periodFrom}T00:00:00.000Z`).getTime() - 168 * 3600_000)
+    .toISOString()
+    .slice(0, 10)
+  const gapFdtlBookingToIso = new Date(new Date(`${periodTo}T23:59:59.999Z`).getTime() + 168 * 3600_000)
+    .toISOString()
+    .slice(0, 10)
+  const gapFdtlBookings = await CrewFlightBooking.find({
+    operatorId,
+    status: { $ne: 'cancelled' },
+    flightDate: { $gte: gapFdtlBookingFromIso, $lte: gapFdtlBookingToIso, $ne: null },
+  }).lean()
+
+  // Hard-block dates for crew on temp-base or transiting (POS day before/
+  // after, plus actual positioning bookings). Gap-fill must skip these days
+  // — placing OFF/SBY here would partially fill a block that should stay
+  // entirely vacant.
+  const tempBlockedByCrewGap = buildTempBlockedDates(
+    tempBaseDocsForGap.map((tb) => ({
+      crewId: tb.crewId as string,
+      fromIso: tb.fromIso as string,
+      toIso: tb.toIso as string,
+    })),
+    posBookingsForGap.map((b) => ({
+      crewIds: (b.crewIds ?? []) as string[],
+      flightDate: ((b as { flightDate?: string | null }).flightDate ?? null) as string | null,
+      purpose: ((b as { purpose?: string | null }).purpose ?? null) as string | null,
+    })),
+  )
 
   // Standby window resolution for SBY fills. Honours scheduling-config
   // (min/max duration, start mode, lead time, fixed times) AND the FDTL
@@ -2997,24 +3419,46 @@ async function runGapFillPass(
   }
   const stbyDurationMin = Math.min(stbyMaxDur, Math.max(stbyMinDur, stbyMinDur), fdtlStbyCapMin)
 
-  // base IATA + day → earliest leg STD UTC ms
-  const firstDepMsByBaseDay = new Map<string, number>()
+  // Build per-base, per-base-local-day departure histogram for peak-driven
+  // SBY window selection (matches standby pass logic). Top density windows
+  // become candidate SBY start times via `buildSbyCandidatesShared`.
+  const gapBaseIatas = [
+    ...new Set(
+      pairingsForDep.map((p) => ((p as { baseAirport?: string }).baseAirport ?? '').toUpperCase()).filter(Boolean),
+    ),
+  ]
+  const gapBaseIataToOffset = new Map<string, number>()
+  if (gapBaseIatas.length > 0) {
+    const docs = await Airport.find({ iataCode: { $in: gapBaseIatas } }, { iataCode: 1, utcOffsetHours: 1 }).lean()
+    for (const d of docs) {
+      const code = ((d.iataCode ?? '') as string).toUpperCase()
+      const off = (d as { utcOffsetHours?: number | null }).utcOffsetHours
+      if (code && typeof off === 'number') gapBaseIataToOffset.set(code, off)
+    }
+  }
+  const gapHistEntries: DepHistEntry[] = []
   for (const p of pairingsForDep) {
     const base = ((p as { baseAirport?: string }).baseAirport ?? '').toUpperCase()
     if (!base) continue
     const legs = (p as { legs?: Array<{ stdUtcIso?: string | null; depStation?: string | null }> }).legs ?? []
+    const baseOffsetHours = gapBaseIataToOffset.get(base) ?? 0
+    const baseOffsetMs = baseOffsetHours * 3600_000
     for (const leg of legs) {
       if (!leg.stdUtcIso) continue
       const depStation = ((leg.depStation ?? '') as string).toUpperCase()
       if (depStation && depStation !== base) continue
       const ms = new Date(leg.stdUtcIso).getTime()
       if (!Number.isFinite(ms)) continue
-      const day = new Date(ms).toISOString().slice(0, 10)
-      const key = `${base}|${day}`
-      const prev = firstDepMsByBaseDay.get(key)
-      if (prev === undefined || ms < prev) firstDepMsByBaseDay.set(key, ms)
+      const localTotalMs = ms + baseOffsetMs
+      const localDay = new Date(localTotalMs).toISOString().slice(0, 10)
+      const localMidnightUtc =
+        Date.UTC(Number(localDay.slice(0, 4)), Number(localDay.slice(5, 7)) - 1, Number(localDay.slice(8, 10))) -
+        baseOffsetMs
+      const localMinOfDay = Math.max(0, Math.min(1439, Math.floor((ms - localMidnightUtc) / 60_000)))
+      gapHistEntries.push({ baseIata: base, localDay, localMinOfDay })
     }
   }
+  const gapHistByBaseDay = buildDepHistograms(gapHistEntries)
   // Crew base (_id) → IATA for dep lookup, plus utcOffsetHours so OFF /
   // SBY→OFF fallback windows can be anchored to base-local midnight.
   const crewBaseIds = [
@@ -3039,38 +3483,82 @@ async function runGapFillPass(
     crewIdToUtcOffset.set(c._id as string, baseIdToUtcOffset.get(baseId) ?? 0)
   }
 
-  const resolveFillWindow = (
-    crewBase: string,
-    crewId: string,
-    dayIso: string,
-  ): { startIso: string; endIso: string } => {
-    if (fillTarget === 'OFF') {
-      // Day-off = base-local 00:00 → 23:59. Legacy carriers treat this as
-      // a paid off day; anchored to crew base TZ so a 03:00-local flight
-      // on the OFF date is correctly seen as overlapping the OFF window.
-      const w = localDayWindowUtc(crewIdToUtcOffset.get(crewId) ?? 0, dayIso)
-      return { startIso: w.startUtcIso, endIso: w.endUtcIso }
-    }
-    // SBY: compute using scheduling-config rules.
-    let startMs: number | null = null
-    if (stbyStartMode === 'auto' && crewBase) {
-      const firstDepMs = firstDepMsByBaseDay.get(`${crewBase}|${dayIso}`)
-      if (firstDepMs !== undefined) startMs = firstDepMs - stbyAutoLeadMin * 60_000
-    }
-    if (startMs == null) {
-      const t = stbyFixedTimes[0] ?? '08:00'
-      const hm = /^(\d{1,2}):(\d{2})$/.exec(t.trim())
-      const hh = hm ? Math.min(23, parseInt(hm[1], 10)) : 8
-      const mm = hm ? Math.min(59, parseInt(hm[2], 10)) : 0
-      startMs = new Date(`${dayIso}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00.000Z`).getTime()
-    }
-    const endMs = startMs + stbyDurationMin * 60_000
-    return { startIso: new Date(startMs).toISOString(), endIso: new Date(endMs).toISOString() }
+  const resolveOffWindow = (crewId: string, dayIso: string): { startIso: string; endIso: string } => {
+    // Day-off = base-local 00:00 → 23:59. Legacy carriers treat this as
+    // a paid off day; anchored to crew base TZ so a 03:00-local flight
+    // on the OFF date is correctly seen as overlapping the OFF window.
+    const w = localDayWindowUtc(crewIdToUtcOffset.get(crewId) ?? 0, dayIso)
+    return { startIso: w.startUtcIso, endIso: w.endUtcIso }
+  }
+
+  // Gap-fill SBY candidate builder — delegates to the shared peak-aware
+  // helper used by both the standby pass and gap-fill. Top density peaks
+  // are tried first (each peak − leadMin, whole-hour rounded down), then
+  // operator-configured fixed times, then canonical 07/14/18-local peaks.
+  const buildSbyCandidatesForGap = (crewBase: string, crewId: string, dayIso: string): SbyCandidate[] => {
+    const offsetHours = crewIdToUtcOffset.get(crewId) ?? 0
+    const hist = stbyStartMode === 'auto' && crewBase ? gapHistByBaseDay.get(`${crewBase}|${dayIso}`) : undefined
+    return buildSbyCandidatesShared({
+      baseIata: crewBase,
+      dayIso,
+      baseOffsetHours: offsetHours,
+      hist,
+      fixedTimes: stbyFixedTimes,
+      leadMin: stbyAutoLeadMin,
+      durationMin: stbyDurationMin,
+    })
   }
 
   const periodDays = enumerateDays(periodFrom, periodTo)
   const totalCrew = crew.length
   emitProgress(4, `Gap-fill with ${fillTarget} (${carrierMode}) — ${totalCrew} crew × ${periodDays.length} days`)
+
+  // Baseline ScheduleDuty[] per crew + per-run placed list. Mirrors the
+  // standby pass setup so each gap-fill candidate can be FDTL-validated
+  // against a consistent running roster.
+  const gapAssignmentsLike = assignments.map((a) => ({
+    _id: a._id as string,
+    crewId: a.crewId as string,
+    pairingId: a.pairingId as string,
+    seatPositionId: (a as unknown as { seatPositionId?: string }).seatPositionId,
+    startUtcIso: a.startUtcIso as string,
+    endUtcIso: a.endUtcIso as string,
+    status: (a.status ?? 'planned') as string,
+  }))
+  const gapActivitiesLike = activities.map((a) => ({
+    _id: a._id as string,
+    crewId: a.crewId as string,
+    startUtcIso: a.startUtcIso as string,
+    endUtcIso: a.endUtcIso as string,
+    activityCodeId: (a as unknown as { activityCodeId?: string | null }).activityCodeId ?? null,
+  }))
+  const gapBookingsLike = gapFdtlBookings.map((b) => ({
+    _id: b._id as string,
+    crewIds: ((b as unknown as { crewIds?: string[] }).crewIds ?? []) as string[],
+    status: ((b as unknown as { status?: string }).status ?? 'planned') as string,
+    purpose: ((b as unknown as { purpose?: string | null }).purpose ?? null) as string | null,
+    flightDate: ((b as unknown as { flightDate?: string | null }).flightDate ?? null) as string | null,
+    stdUtcMs: ((b as unknown as { stdUtcMs?: number | null }).stdUtcMs ?? null) as number | null,
+    staUtcMs: ((b as unknown as { staUtcMs?: number | null }).staUtcMs ?? null) as number | null,
+  }))
+  const gapBaselineDutiesByCrew = new Map<string, ReturnType<typeof buildScheduleDuties>>()
+  for (const c of crew) {
+    const cid = c._id as string
+    gapBaselineDutiesByCrew.set(
+      cid,
+      buildScheduleDuties({
+        crewId: cid,
+        assignments: gapAssignmentsLike,
+        activities: gapActivitiesLike,
+        pairingsById: gapPairingsById,
+        activityCodesById: gapActivityCodesById,
+        bookings: gapBookingsLike,
+      }),
+    )
+  }
+  const gapPlacedDutiesByCrew = new Map<string, ReturnType<typeof buildScheduleDuties>>()
+  const gapRuleSet = ruleSet
+  let fdtlGapRejects = 0
 
   const crewIntervals = new Map<string, Array<{ startMs: number; endMs: number }>>()
   const offDaysByCrew = new Map<string, Set<string>>()
@@ -3201,72 +3689,208 @@ async function runGapFillPass(
 
   let inserted = 0
   let offFallbacks = 0
+  let softOverCapOffs = 0
+  // Per-crew counter of soft over-cap OFFs taken in this run. At most ONE
+  // is allowed per crew so we don't recreate the cap problem the operator
+  // configured the cap to avoid.
+  const softOverCapByCrew = new Map<string, number>()
+  // Telemetry — count blank-day causes so the planner can tune config
+  // (rest buffer, OFF cap) based on real data instead of guessing.
+  const rejectStats = {
+    sbyAllWindowsBlocked: 0,
+    sbyOffFallbackTaken: 0,
+    sbySoftOverCapTaken: 0,
+    sbyTrulyBlank: 0,
+    altWindowUsed: 0,
+    crewWithBlanks: new Set<string>(),
+  }
   const crewOrdered = [...crew].sort((a, b) => String(a._id).localeCompare(String(b._id)))
   for (let i = 0; i < crewOrdered.length; i++) {
     if (signal?.aborted) break
     const c = crewOrdered[i]
     const crewId = c._id as string
     const crewBase = baseIdToIata.get((c as { base?: string | null }).base ?? '') ?? ''
+    const crewTempBlocked = tempBlockedByCrewGap.get(crewId) ?? null
     for (const day of periodDays) {
-      // Resolve the SBY window first so the rest-buffer check inside
-      // canFillDay knows the actual proposed time range. OFF doesn't
-      // need this (OFF is rest, no buffer required).
-      const { startIso, endIso } = resolveFillWindow(crewBase, crewId, day)
-      const startMs = new Date(startIso).getTime()
-      const endMs = new Date(endIso).getTime()
-      const sbyWindow =
-        fillTarget === 'SBY' && Number.isFinite(startMs) && Number.isFinite(endMs) ? { startMs, endMs } : undefined
-      if (!canFillDay(crewId, day, sbyWindow)) {
-        // SBY→OFF fallback: SBY rejected on this day. The most common cause
-        // is the FDTL min-rest buffer extending from an adjacent flight
-        // duty. OFF doesn't need that buffer (OFF *is* rest), so retry the
-        // overlap check with no sbyWindow. If clean and crew is below
-        // maxDaysOff, drop OFF here instead of leaving the day blank.
-        if (
-          fillTarget === 'SBY' &&
-          offFallbackCode &&
-          canFillDay(crewId, day) &&
-          (offDaysByCrew.get(crewId)?.size ?? 0) < maxDaysOffForFallback
-        ) {
-          // OFF window is base-local 00:00 → 23:59 (rule #8). Hardcoded UTC
-          // midnights only happen to be correct for UTC+0 bases.
-          const offWin = localDayWindowUtc(crewIdToUtcOffset.get(crewId) ?? 0, day)
-          buf.push({
-            updateOne: {
-              filter: { operatorId, crewId, dateIso: day, activityCodeId: offFallbackCode._id },
-              update: {
-                $setOnInsert: {
-                  _id: crypto.randomUUID(),
-                  operatorId,
-                  scenarioId: null,
-                  crewId,
-                  activityCodeId: offFallbackCode._id,
-                  startUtcIso: offWin.startUtcIso,
-                  endUtcIso: offWin.endUtcIso,
-                  dateIso: day,
-                  notes: `auto-roster:${runId}:sby-off-fallback`,
-                  sourceRunId: runId,
-                  assignedByUserId: userId ?? null,
-                  createdAt: now(),
-                },
-                $set: { updatedAt: now() },
-              },
-              upsert: true,
-            },
-          })
-          offFallbacks++
-          inserted++
-          addInterval(crewId, offWin.startUtcMs, offWin.endUtcMs)
-          const offSet = offDaysByCrew.get(crewId) ?? new Set<string>()
-          offSet.add(day)
-          offDaysByCrew.set(crewId, offSet)
-          const busy = busyByCrewDay.get(crewId) ?? new Set<string>()
-          busy.add(day)
-          busyByCrewDay.set(crewId, busy)
-          console.log(`[auto-roster] ${runId} SBY→OFF fallback: crew=${crewId} day=${day} reason=insufficient_rest`)
-          if (buf.length >= FLUSH) await flush()
+      // Hard temp-base / POS-day skip — vacate the entire block plus its
+      // bracketing positioning days. Crew is operationally detached from
+      // home base, so neither OFF nor SBY may fill the gap.
+      if (crewTempBlocked && crewTempBlocked.has(day)) continue
+
+      let chosenStartMs: number
+      let chosenEndMs: number
+      let chosenStartIso: string
+      let chosenEndIso: string
+      let placedCandidateLabel: string | null = null
+
+      const homeBaseIata = baseIdToIata.get((c as { base?: string | null }).base ?? '') || 'XXXX'
+      const baseline = gapBaselineDutiesByCrew.get(crewId) ?? []
+      const placed = gapPlacedDutiesByCrew.get(crewId) ?? []
+      const existingDuties = placed.length > 0 ? [...baseline, ...placed] : baseline
+      const fdtlValidate = (candDuty: {
+        startUtcMs: number
+        endUtcMs: number
+        kind: 'rest' | 'activity'
+        dutyMinutes: number
+      }): boolean => {
+        const result = validateCrewAssignment({
+          candidate: {
+            id: 'gap-cand',
+            kind: candDuty.kind,
+            startUtcMs: candDuty.startUtcMs,
+            endUtcMs: candDuty.endUtcMs,
+            dutyMinutes: candDuty.dutyMinutes,
+            blockMinutes: 0,
+            fdpMinutes: 0,
+            landings: 0,
+            departureStation: null,
+            arrivalStation: null,
+            isAugmented: false,
+            label: candDuty.kind === 'rest' ? 'off' : 'standby',
+          },
+          existing: existingDuties,
+          homeBase: homeBaseIata,
+          ruleSet: gapRuleSet,
+        })
+        return result.overall !== 'violation'
+      }
+
+      if (fillTarget === 'OFF') {
+        const offWin = resolveOffWindow(crewId, day)
+        const sMs = new Date(offWin.startIso).getTime()
+        const eMs = new Date(offWin.endIso).getTime()
+        if (!canFillDay(crewId, day)) continue
+        // FDTL validate the OFF candidate. OFF is rest (counters=0); the
+        // validator still checks max-OFF-streak and other rest-specific rules.
+        if (!fdtlValidate({ startUtcMs: sMs, endUtcMs: eMs, kind: 'rest', dutyMinutes: 0 })) {
+          fdtlGapRejects++
+          continue
         }
-        continue
+        chosenStartMs = sMs
+        chosenEndMs = eMs
+        chosenStartIso = offWin.startIso
+        chosenEndIso = offWin.endIso
+        placedCandidateLabel = 'off'
+      } else {
+        // SBY fill — try each candidate window in order. First one that
+        // clears overlap + rest-buffer wins, then FDTL validates.
+        const candidates = buildSbyCandidatesForGap(crewBase, crewId, day)
+        let pickedIdx = -1
+        for (let k = 0; k < candidates.length; k++) {
+          const cand = candidates[k]
+          if (!canFillDay(crewId, day, { startMs: cand.startMs, endMs: cand.endMs })) continue
+          if (
+            !fdtlValidate({
+              startUtcMs: cand.startMs,
+              endUtcMs: cand.endMs,
+              kind: 'activity',
+              dutyMinutes: stbyDurationMin,
+            })
+          ) {
+            fdtlGapRejects++
+            continue
+          }
+          pickedIdx = k
+          break
+        }
+        if (pickedIdx === -1) {
+          // All SBY windows rejected. Try fallbacks in priority order:
+          //   (a) SBY→OFF when OFF window clean AND crew under max OFF cap
+          //   (b) Soft +1 OFF over-cap when OFF window clean AND crew at cap
+          //       (allow at most ONE over-cap OFF per crew per run — beyond
+          //       that we'd be re-creating the cap problem the operator
+          //       configured the cap to avoid).
+          rejectStats.sbyAllWindowsBlocked++
+          if (offFallbackCode && canFillDay(crewId, day)) {
+            const offSetSize = offDaysByCrew.get(crewId)?.size ?? 0
+            const isUnderCap = offSetSize < maxDaysOffForFallback
+            const isAtCap = offSetSize === maxDaysOffForFallback
+            const crewSoftCount = softOverCapByCrew.get(crewId) ?? 0
+            const allowSoftOver = isAtCap && crewSoftCount < 1
+            const offWin = localDayWindowUtc(crewIdToUtcOffset.get(crewId) ?? 0, day)
+            // FDTL validate the OFF fallback. SBY all-windows-rejected
+            // doesn't guarantee OFF is legal — the OFF window itself may
+            // violate (rare, e.g. activity-streak rules).
+            const offLegal = fdtlValidate({
+              startUtcMs: offWin.startUtcMs,
+              endUtcMs: offWin.endUtcMs,
+              kind: 'rest',
+              dutyMinutes: 0,
+            })
+            if ((isUnderCap || allowSoftOver) && offLegal) {
+              buf.push({
+                updateOne: {
+                  filter: { operatorId, crewId, dateIso: day, activityCodeId: offFallbackCode._id },
+                  update: {
+                    $setOnInsert: {
+                      _id: crypto.randomUUID(),
+                      operatorId,
+                      scenarioId: null,
+                      crewId,
+                      activityCodeId: offFallbackCode._id,
+                      startUtcIso: offWin.startUtcIso,
+                      endUtcIso: offWin.endUtcIso,
+                      dateIso: day,
+                      notes: allowSoftOver
+                        ? `auto-roster:${runId}:sby-off-soft-overcap`
+                        : `auto-roster:${runId}:sby-off-fallback`,
+                      sourceRunId: runId,
+                      assignedByUserId: userId ?? null,
+                      createdAt: now(),
+                    },
+                    $set: { updatedAt: now() },
+                  },
+                  upsert: true,
+                },
+              })
+              offFallbacks++
+              inserted++
+              if (allowSoftOver) {
+                softOverCapOffs++
+                softOverCapByCrew.set(crewId, crewSoftCount + 1)
+                rejectStats.sbySoftOverCapTaken++
+              } else {
+                rejectStats.sbyOffFallbackTaken++
+              }
+              addInterval(crewId, offWin.startUtcMs, offWin.endUtcMs)
+              const offSet = offDaysByCrew.get(crewId) ?? new Set<string>()
+              offSet.add(day)
+              offDaysByCrew.set(crewId, offSet)
+              const busy = busyByCrewDay.get(crewId) ?? new Set<string>()
+              busy.add(day)
+              busyByCrewDay.set(crewId, busy)
+              const placedList = gapPlacedDutiesByCrew.get(crewId) ?? []
+              placedList.push({
+                id: `gap-off-fallback-${day}`,
+                kind: 'rest',
+                startUtcMs: offWin.startUtcMs,
+                endUtcMs: offWin.endUtcMs,
+                dutyMinutes: 0,
+                blockMinutes: 0,
+                fdpMinutes: 0,
+                landings: 0,
+                departureStation: null,
+                arrivalStation: null,
+                isAugmented: false,
+                label: 'off',
+              })
+              gapPlacedDutiesByCrew.set(crewId, placedList)
+              if (buf.length >= FLUSH) await flush()
+              continue
+            }
+          }
+          // No SBY, no OFF fallback, no soft over-cap → genuinely blank.
+          rejectStats.sbyTrulyBlank++
+          rejectStats.crewWithBlanks.add(crewId)
+          continue
+        }
+        const cand = candidates[pickedIdx]
+        chosenStartMs = cand.startMs
+        chosenEndMs = cand.endMs
+        chosenStartIso = new Date(cand.startMs).toISOString()
+        chosenEndIso = new Date(cand.endMs).toISOString()
+        placedCandidateLabel = cand.label
+        if (pickedIdx > 0) rejectStats.altWindowUsed++
       }
       // Gap-fill intentionally ignores the max-consecutive-OFF cap. The cap
       // applies to the targeted day-off quota pass (shapes the spread of
@@ -3288,10 +3912,10 @@ async function runGapFillPass(
               scenarioId: null,
               crewId,
               activityCodeId: targetCode._id,
-              startUtcIso: startIso,
-              endUtcIso: endIso,
+              startUtcIso: chosenStartIso,
+              endUtcIso: chosenEndIso,
               dateIso: day,
-              notes: `auto-roster:${runId}:gap-fill`,
+              notes: `auto-roster:${runId}:gap-fill${placedCandidateLabel ? `:${placedCandidateLabel}` : ''}`,
               sourceRunId: runId,
               assignedByUserId: userId ?? null,
               createdAt: now(),
@@ -3302,10 +3926,29 @@ async function runGapFillPass(
         },
       })
       inserted++
-      addInterval(crewId, startMs, endMs)
+      addInterval(crewId, chosenStartMs, chosenEndMs)
       const busy = busyByCrewDay.get(crewId) ?? new Set<string>()
       busy.add(day)
       busyByCrewDay.set(crewId, busy)
+      // Append placed duty so subsequent candidates for this crew see the
+      // running roster — without this, two adjacent SBYs could each pass
+      // their own validation but together still violate weekly rest.
+      const placedList = gapPlacedDutiesByCrew.get(crewId) ?? []
+      placedList.push({
+        id: `gap-placed-${day}`,
+        kind: fillTarget === 'OFF' ? 'rest' : 'activity',
+        startUtcMs: chosenStartMs,
+        endUtcMs: chosenEndMs,
+        dutyMinutes: fillTarget === 'OFF' ? 0 : stbyDurationMin,
+        blockMinutes: 0,
+        fdpMinutes: 0,
+        landings: 0,
+        departureStation: null,
+        arrivalStation: null,
+        isAugmented: false,
+        label: fillTarget === 'OFF' ? 'off' : 'standby',
+      })
+      gapPlacedDutiesByCrew.set(crewId, placedList)
     }
     if (buf.length >= FLUSH) await flush()
     if (i % 100 === 0) {
@@ -3314,10 +3957,17 @@ async function runGapFillPass(
     }
   }
   await flush()
-  const fallbackSuffix = offFallbacks > 0 ? ` (incl. ${offFallbacks.toLocaleString()} SBY→OFF fallbacks)` : ''
+  const softSuffix = softOverCapOffs > 0 ? ` (+${softOverCapOffs} soft over-cap)` : ''
+  const fallbackSuffix =
+    offFallbacks > 0 ? ` (incl. ${offFallbacks.toLocaleString()} SBY→OFF fallbacks${softSuffix})` : ''
   emitProgress(
     100,
     `Gap-fill done — ${inserted.toLocaleString()} ${fillTarget} placed (${carrierMode})${fallbackSuffix}`,
+  )
+  console.log(
+    `[auto-roster] ${runId} gap-fill telemetry — placed=${inserted} altWindowUsed=${rejectStats.altWindowUsed} ` +
+      `sbyOffFallback=${rejectStats.sbyOffFallbackTaken} softOverCap=${rejectStats.sbySoftOverCapTaken} ` +
+      `fdtlRejects=${fdtlGapRejects} trulyBlank=${rejectStats.sbyTrulyBlank} crewWithBlanks=${rejectStats.crewWithBlanks.size}`,
   )
   return { inserted, code: targetCode.code, offFallbacks }
 }

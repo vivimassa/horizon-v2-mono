@@ -561,6 +561,20 @@ export function runAllEvaluators(ctx: EvaluatorContext): ScheduleLegalityCheck[]
   // every operator regardless of framework.
   out.push(...evaluateBaseContinuity(ctx))
 
+  // Kind-aware skip predicates — short-circuit evaluators that are
+  // structurally guaranteed to pass for the given candidate kind. Speeds
+  // up SBY/OFF candidate validation in auto-roster (called per-candidate
+  // in tight loops) without weakening any safety check. ONLY skip when
+  // the evaluator can't possibly fire for this candidate type — never
+  // skip rules that might hold the regulator-required guard.
+  const cand = ctx.candidate
+  const candIsRest = cand.kind === 'rest'
+  const candCountsDuty = cand.dutyMinutes > 0
+  const candCountsBlock = cand.blockMinutes > 0
+  const candCountsFdp = cand.fdpMinutes > 0
+  const candHasLandings = cand.landings > 0
+  const candCommanderDiscretion = cand.commanderDiscretion === true
+
   for (const rule of ctx.ruleSet.rules) {
     const resolved = resolveRule(rule)
     if (!resolved) continue
@@ -572,18 +586,31 @@ export function runAllEvaluators(ctx: EvaluatorContext): ScheduleLegalityCheck[]
         out.push(...evaluateMinRestBetween(resolved, ctx))
         break
       case 'min_rest_after_augmented':
+        // Only fires when the augmented duty is ADJACENT to the candidate
+        // and rest before candidate is short. Rest candidates aren't duty
+        // endpoints — augmented-rest rule semantically can't apply.
+        if (candIsRest) break
         out.push(...evaluateMinRestAfterAugmented(resolved, ctx))
         break
       case 'min_rest_in_window':
         out.push(...evaluateMinRestInWindow(resolved, ctx))
         break
       case 'per_duty_limit':
+        // Per-duty caps (FDP duration, max landings per FDP) measure the
+        // candidate's OWN duty values. Rest candidates contribute 0 to
+        // every measured field; rule cannot fire.
+        if (candIsRest) break
+        if (!candCountsDuty && !candCountsBlock && !candCountsFdp && !candHasLandings) break
         out.push(...evaluatePerDutyLimit(resolved, ctx))
         break
       case 'consecutive_count':
         out.push(...evaluateConsecutiveCount(resolved, ctx))
         break
       case 'commander_discretion_cap':
+        // Only triggers when the candidate (or an existing duty) carries
+        // the commander-discretion flag. Auto-placed SBY/OFF never carry
+        // the flag; rule cannot fire on the candidate side.
+        if (!candCommanderDiscretion) break
         out.push(...evaluateCommanderDiscretionCap(resolved, ctx))
         break
       case 'custom':

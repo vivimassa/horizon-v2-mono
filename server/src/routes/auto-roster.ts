@@ -13,7 +13,10 @@ import { CrewActivity } from '../models/CrewActivity.js'
 import { ActivityCode } from '../models/ActivityCode.js'
 import { CrewComplement } from '../models/CrewComplement.js'
 import { OperatorSchedulingConfig } from '../models/OperatorSchedulingConfig.js'
+import { CrewTempBase } from '../models/CrewTempBase.js'
+import { CrewFlightBooking } from '../models/CrewFlightBooking.js'
 import { runAutoRoster, type AutoRosterEvent } from '../services/auto-roster-orchestrator.js'
+import { buildTempBlockedDates } from '../services/auto-roster-temp-block.js'
 
 const LEAVE_FLAGS = ['is_annual_leave', 'is_sick_leave', 'is_medical']
 const DAYOFF_FLAGS = ['is_day_off', 'is_rest_period']
@@ -264,7 +267,20 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
 
     // Phase 2: fetch all data in period
     const activityCrewFilter = filteredCrewIds ? { crewId: { $in: filteredCrewIds } } : {}
-    const [activities, assignments, pairingDocs] = await Promise.all([
+    const tempBaseQuery: Record<string, unknown> = {
+      operatorId,
+      fromIso: { $lte: periodTo },
+      toIso: { $gte: periodFrom },
+    }
+    if (filteredCrewIds) tempBaseQuery.crewId = { $in: filteredCrewIds }
+    const posBookingQuery: Record<string, unknown> = {
+      operatorId,
+      purpose: 'temp-base-positioning',
+      status: { $ne: 'cancelled' },
+      flightDate: { $gte: periodFrom, $lte: periodTo, $ne: null },
+    }
+    if (filteredCrewIds) posBookingQuery.crewIds = { $in: filteredCrewIds }
+    const [activities, assignments, pairingDocs, tempBaseDocs, posBookingDocs] = await Promise.all([
       allCodeIds.length > 0
         ? CrewActivity.find({
             operatorId,
@@ -303,7 +319,33 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
           .select('_id startDate endDate workflowStatus totalBlockMinutes aircraftTypeIcao complementKey crewCounts')
           .lean()
       })(),
+      CrewTempBase.find(tempBaseQuery).select('crewId fromIso toIso').lean(),
+      CrewFlightBooking.find(posBookingQuery).select('crewIds flightDate purpose').lean(),
     ])
+
+    // Per-crew blocked-date map covering temp-base block + ±1 day POS
+    // synthesis + actual positioning bookings. Crew on these days must NOT
+    // count toward the qualified/available-crew line in Step 1's manpower
+    // projection — they are operationally detached from home base and
+    // unavailable for any home-base activity.
+    const tempBlockedByCrew = buildTempBlockedDates(
+      (tempBaseDocs as Array<{ crewId: string; fromIso: string; toIso: string }>).map((tb) => ({
+        crewId: tb.crewId,
+        fromIso: tb.fromIso,
+        toIso: tb.toIso,
+      })),
+      (
+        posBookingDocs as Array<{
+          crewIds?: string[]
+          flightDate?: string | null
+          purpose?: string | null
+        }>
+      ).map((b) => ({
+        crewIds: (b.crewIds ?? []) as string[],
+        flightDate: (b.flightDate ?? null) as string | null,
+        purpose: (b.purpose ?? null) as string | null,
+      })),
+    )
 
     // Load complements once (needed for seat counts + optional position narrow).
     const complements = await CrewComplement.find({ operatorId, isActive: true })
@@ -397,6 +439,10 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
       const standbyAirportCrew = new Set<string>()
       const trainingCrew = new Set<string>()
       const groundDutyCrew = new Set<string>()
+      const tempBaseCrew = new Set<string>()
+      for (const [crewId, blockedDays] of tempBlockedByCrew) {
+        if (blockedDays.has(day)) tempBaseCrew.add(crewId)
+      }
 
       for (const a of assignments as Assignment[]) {
         if (a.startUtcIso.slice(0, 10) <= day && a.endUtcIso.slice(0, 10) >= day) assignedCrew.add(String(a.crewId))
@@ -434,7 +480,7 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
       const standbyActual = standbyHomeCrew.size + standbyAirportCrew.size
       const poolAvailableDay = Math.max(
         0,
-        crewTotal - leaveCrew.size - trainingCrew.size - groundDutyCrew.size - dayOffEffective,
+        crewTotal - leaveCrew.size - trainingCrew.size - groundDutyCrew.size - dayOffEffective - tempBaseCrew.size,
       )
       const standbyProjected = standbyUsePct
         ? seatsDemandDay > 0
@@ -446,11 +492,14 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
       const standbyHomeEffective = standbyActual > 0 ? standbyHomeCrew.size : Math.round(standbyTotal * homeRatio)
       const standbyAirportEffective = standbyActual > 0 ? standbyAirportCrew.size : standbyTotal - standbyHomeEffective
 
-      // Operating pool = crew not on leave/training/day-off/ground-duty.
-      // Standby is drawn from this pool and can't fly regular pairings.
+      // Operating pool = crew not on leave/training/day-off/ground-duty/
+      // temp-base. Crew on temp-base (or its bracketing POS days) are
+      // operationally detached from home base — they don't count toward
+      // home-base manpower for this day. Standby is drawn from the
+      // remaining pool.
       const operatingCrew = Math.max(
         0,
-        crewTotal - leaveCrew.size - trainingCrew.size - groundDutyCrew.size - dayOffEffective,
+        crewTotal - leaveCrew.size - trainingCrew.size - groundDutyCrew.size - dayOffEffective - tempBaseCrew.size,
       )
       const availableCrewDay = Math.max(0, operatingCrew - standbyTotal)
       return {
@@ -464,6 +513,7 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
         onStandbyAirport: standbyAirportEffective,
         inTraining: trainingCrew.size,
         onGroundDuty: groundDutyCrew.size,
+        onTempBase: tempBaseCrew.size,
         pairingsDemand: dayPairings.length,
         pairingsUnassigned: dayPairings.filter((p) => !assignedPairingIds.has(String(p._id))).length,
         seatsDemand: seatsDemandDay,
@@ -604,6 +654,7 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
       mode?: 'general' | 'daysOff' | 'standby' | 'longDuties' | 'training'
       longDutiesMinDays?: number
       daysOffActivityCodeId?: string | null
+      relativeGapLimit?: number
       base?: string | null
       position?: string | null
       acType?: string | string[] | null
@@ -627,6 +678,12 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(501).send({ error: 'Training assignment mode not yet implemented' })
     }
     const longDutiesMinDays = Math.min(14, Math.max(1, body.longDutiesMinDays ?? 2))
+
+    // Solver acceptance gap. UI exposes 0.05 / 0.10 / 0.20 (Quality / Balanced
+    // / Performance). Clamp to a sane band so a misformed body can't push
+    // CP-SAT into accept-anything territory or stall it on near-zero gaps.
+    const relativeGapLimit =
+      body.relativeGapLimit != null ? Math.min(0.5, Math.max(0.01, body.relativeGapLimit)) : undefined
 
     const timeLimitSec = Math.min(7200, Math.max(10, body.timeLimitSec ?? 1800))
     const runId = crypto.randomUUID()
@@ -731,6 +788,7 @@ export async function autoRosterRoutes(app: FastifyInstance): Promise<void> {
         crewGroupIds: toArr(body.crewGroup),
       },
       body.daysOffActivityCodeId ?? null,
+      relativeGapLimit,
     ).finally(() => activeRuns.delete(runId))
 
     return reply.code(202).send({ runId })

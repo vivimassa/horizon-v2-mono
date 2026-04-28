@@ -25,6 +25,7 @@ import { loadSerializedRuleSet } from '../services/fdtl-rule-set.js'
 import { evaluateCrewRoster } from '../services/evaluate-crew-roster.js'
 import { CrewLegalityIssue } from '../models/CrewLegalityIssue.js'
 import { getRosterRunPayload } from '../services/roster-run-cache.js'
+import { resolveCrewIdsForFilters } from '../services/auto-roster-orchestrator.js'
 
 /** Resolve the operator's base UTC offset (hours) — IANA tz first, then
  *  Airport.utcOffsetHours fallback. Used by the GCS aggregator AND every
@@ -286,6 +287,12 @@ export type CrewScheduleQuery = {
   position?: string
   baseAirport?: string
   crewGroup?: string
+  /** Comma-separated free-text tokens (employee IDs or name fragments).
+   *  Resolved server-side to a crew _id whitelist that narrows crew /
+   *  assignments / activities to that set. Sent by the Specific Crew
+   *  Search dialog so a 1-crew lookup costs ~50ms instead of fetching
+   *  the operator's entire roster. */
+  crewSearch?: string
   /** When 'true' (default), the aggregator scopes pairings to those with
    *  at least one assignment in the period. Drops the uncrewed-pairing
    *  set from the initial load (10× fewer docs on typical operators) and
@@ -361,6 +368,29 @@ export async function buildCrewSchedulePayload(
     })) as string[]
     crewIdSets.push(qualCrewIds)
   }
+
+  // Specific Crew Search — resolve free-text tokens to a crew _id
+  // whitelist BEFORE the parallel fetch so crew/assignments/activities
+  // all use the narrow set. Token can be an employeeId (exact) or a
+  // case-insensitive substring of firstName/lastName. Anchoring with a
+  // small lookup keeps cost ~50ms even on 5000-crew rosters.
+  const crewSearchList = parseList(q.crewSearch)
+  if (crewSearchList.length > 0) {
+    // Escape regex metacharacters in user input.
+    const escape = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const ors: Record<string, unknown>[] = []
+    for (const tok of crewSearchList) {
+      const re = new RegExp(escape(tok), 'i')
+      // `_id` exact match lets internal callers (eg. the narrow
+      // post-mutation reconcile) pass crew _ids directly without paying
+      // for a name lookup.
+      ors.push({ _id: tok }, { employeeId: tok }, { employeeId: re }, { firstName: re }, { lastName: re })
+    }
+    const matched = (await CrewMember.find({ operatorId, $or: ors }, { _id: 1 }).lean()) as Array<{ _id: string }>
+    const matchedIds = matched.map((m) => m._id)
+    crewIdSets.push(matchedIds.length > 0 ? matchedIds : ['__no_match__'])
+  }
+
   if (crewIdSets.length > 0) {
     const intersected = crewIdSets.reduce((acc, arr) => {
       const s = new Set(arr)
@@ -369,6 +399,19 @@ export async function buildCrewSchedulePayload(
     crewFilter._id = { $in: intersected.length > 0 ? intersected : ['__no_match__'] }
   }
 
+  // Narrow assignments + activities to the crew whitelist when one is
+  // active. Without this, a 1-crew Specific Crew Search still pays for
+  // a full-roster activities/assignments scan. The `_id.$in` shape on
+  // crewFilter mirrors the same set.
+  const crewIdWhitelist =
+    (crewFilter._id as { $in?: string[] } | undefined)?.$in &&
+    !(
+      (crewFilter._id as { $in: string[] }).$in.length === 1 &&
+      (crewFilter._id as { $in: string[] }).$in[0] === '__no_match__'
+    )
+      ? (crewFilter._id as { $in: string[] }).$in
+      : null
+
   const assignmentFilter: Record<string, unknown> = {
     operatorId,
     scenarioId: scenarioFilter,
@@ -376,6 +419,7 @@ export async function buildCrewSchedulePayload(
     startUtcIso: { $lte: `${q.to}T23:59:59.999Z` },
     endUtcIso: { $gte: `${q.from}T00:00:00.000Z` },
   }
+  if (crewIdWhitelist) assignmentFilter.crewId = { $in: crewIdWhitelist }
 
   const activityFilter: Record<string, unknown> = {
     operatorId,
@@ -383,6 +427,7 @@ export async function buildCrewSchedulePayload(
     startUtcIso: { $lte: `${q.to}T23:59:59.999Z` },
     endUtcIso: { $gte: `${q.from}T00:00:00.000Z` },
   }
+  if (crewIdWhitelist) activityFilter.crewId = { $in: crewIdWhitelist }
 
   // Memo filter — pull every memo the period could touch:
   //   - pairing-scope memos whose pairing is in the loaded list (filtered post-fetch)
@@ -811,7 +856,39 @@ const aggCacheGet = async (key: string, factory: () => Promise<Record<string, un
   return promise
 }
 
+/**
+ * Drop every cached aggregator entry that belongs to `operatorId`.
+ * Call after any mutation on /crew-schedule/* — without this, the
+ * client's reconcilePeriod after an assign/copy/activity write hits a
+ * stale 60s payload and the planner sees "nothing changed" until the
+ * TTL expires (or the server restarts). Linear scan is fine — the map
+ * is bounded at AGG_MAX_ENTRIES (32).
+ */
+function aggCacheInvalidateOperator(operatorId: string): void {
+  const prefix = `${operatorId}|`
+  for (const k of aggCache.keys()) {
+    if (k.startsWith(prefix)) aggCache.delete(k)
+  }
+}
+
 export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
+  // Bust the per-operator aggregator cache on every successful mutation
+  // routed through this plugin. Without this, the in-process 60s TTL
+  // serves a pre-mutation payload to the very next reconcile fired by
+  // the client (immediately after assigning, copying, or saving an
+  // activity), which the planner sees as "nothing happened" — survives
+  // hard refresh because the cache lives on the server, not the
+  // browser. Wired on `onSend` (not `onResponse`) so the cache is
+  // cleared BEFORE the success payload leaves the server — no race
+  // between hook completion and the client's follow-up reconcile GET.
+  app.addHook('onSend', async (req, reply, payload) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS' && reply.statusCode < 400) {
+      const opId = (req as unknown as { operatorId?: string }).operatorId
+      if (opId) aggCacheInvalidateOperator(opId)
+    }
+    return payload
+  })
+
   // ── GET /crew-schedule — aggregator for a period ─────────────────────
   // Thin wrapper around buildCrewSchedulePayload so the orchestrator can
   // reuse the same assembly path to pre-warm the roster-run cache.
@@ -845,6 +922,16 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
     // "missing" so the tray matches whatever scope the auto-roster run
     // was actually given.
     const positionIdList = parseList(q.position)
+    // Specific Crew Search tokens. When present, the tray is scoped to
+    // pairings that AT LEAST ONE selected crew could potentially fill
+    // (qualification + position match). Wiped of base-match check so
+    // out-of-base flying that would temp-base the crew still surfaces.
+    const crewSearchList = parseList(q.crewSearch)
+    // Pagination — 0-indexed offset, server caps `limit` at 500 to
+    // protect M0 wire bandwidth. Tray loads first page eagerly and
+    // pages the rest on user demand.
+    const limit = Math.min(500, Math.max(1, parseInt(q.limit ?? '100', 10) || 100))
+    const offset = Math.max(0, parseInt(q.offset ?? '0', 10) || 0)
 
     // Pairing.startDate/endDate are stored as YYYY-MM-DD UTC date strings.
     // For non-UTC operators this slices off any pairing whose UTC date
@@ -879,6 +966,45 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       CrewComplement.find({ operatorId, isActive: true }).lean(),
     ])
     csTimeEnd('cs:uncrewed-fetch')
+
+    // Resolve the Specific Crew Search whitelist → set of
+    //   { acTypes: Set<icao>, seatCodes: Set<code> }
+    // pre-aggregated across all selected crew. A pairing survives the
+    // filter when its aircraftTypeIcao intersects acTypes AND at least
+    // one missing seat code intersects seatCodes.
+    let crewFilterSet: { acTypes: Set<string>; seatCodes: Set<string> } | null = null
+    if (crewSearchList.length > 0) {
+      const escape = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const ors: Record<string, unknown>[] = []
+      for (const tok of crewSearchList) {
+        const re = new RegExp(escape(tok), 'i')
+        ors.push({ employeeId: tok }, { employeeId: re }, { firstName: re }, { lastName: re })
+      }
+      const matched = (await CrewMember.find(
+        { operatorId, $or: ors },
+        { _id: 1, position: 1, acTypes: 1 },
+      ).lean()) as Array<{ _id: string; position?: string | null; acTypes?: string[] | null }>
+      const matchedIds = matched.map((m) => m._id)
+      const acTypes = new Set<string>()
+      for (const m of matched) for (const t of m.acTypes ?? []) if (t) acTypes.add(t)
+      // CrewQualification is the authoritative source for type ratings.
+      // Prefer it over the denormalised `crew.acTypes` field when present.
+      if (matchedIds.length > 0) {
+        const quals = (await CrewQualification.find(
+          { operatorId, crewId: { $in: matchedIds } },
+          { aircraftType: 1 },
+        ).lean()) as Array<{ aircraftType: string }>
+        for (const q2 of quals) if (q2.aircraftType) acTypes.add(q2.aircraftType)
+      }
+      // Position → seat code mapping. Selected crew can fill a pairing
+      // seat whose code matches their assigned position's code.
+      const positionIds = new Set(matched.map((m) => m.position).filter((p): p is string => !!p))
+      const seatCodes = new Set<string>()
+      for (const p of positions) {
+        if (positionIds.has(p._id as string)) seatCodes.add(p.code)
+      }
+      crewFilterSet = { acTypes, seatCodes }
+    }
 
     // Same complement resolution + uncrewed-shortfall logic as the main
     // aggregator — duplicated here so this endpoint is self-contained.
@@ -917,16 +1043,21 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
     )
     const positionScoped = positionScopeSeatCodes.size > 0
 
-    const uncrewed: Array<{
+    const uncrewedAll: Array<{
       pairingId: string
       pairingCode?: string
       startDate: string
       missing: Array<{ seatPositionId: string; seatCode: string; count: number }>
     }> = []
-    const uncrewedPairingIds = new Set<string>()
     for (const p of pairings) {
       const counts = (p.crewCounts ?? {}) as Record<string, number>
       if (!counts || Object.keys(counts).length === 0) continue
+      // Specific Crew Search — drop pairings the selected crew can't fly
+      // (wrong aircraft type) before any seat-level work.
+      if (crewFilterSet) {
+        const acIcao = (p as unknown as { aircraftTypeIcao?: string | null }).aircraftTypeIcao
+        if (!acIcao || !crewFilterSet.acTypes.has(acIcao)) continue
+      }
       const taken = assignmentsByPairing.get(p._id as string) ?? []
       const takenBySeatPos = new Map<string, number>()
       for (const t of taken) takenBySeatPos.set(t.seatPositionId, (takenBySeatPos.get(t.seatPositionId) ?? 0) + 1)
@@ -940,22 +1071,35 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
         if (gap > 0) missing.push({ seatPositionId: seat._id as string, seatCode, count: gap })
       }
       if (missing.length > 0) {
-        uncrewed.push({
+        // Specific Crew Search seat-level keep — at least one missing
+        // seat must be in the selected-crew seat-code set. Otherwise the
+        // pairing is qualifiable but the missing seat is for a different
+        // rank, so the planner can't action it from this scope.
+        if (crewFilterSet) {
+          const fillable = missing.some((m) => crewFilterSet!.seatCodes.has(m.seatCode))
+          if (!fillable) continue
+        }
+        uncrewedAll.push({
           pairingId: p._id as string,
           pairingCode: (p as unknown as { pairingCode?: string }).pairingCode,
           startDate: p.startDate,
           missing,
         })
-        uncrewedPairingIds.add(p._id as string)
       }
     }
 
-    // Return the pairings the tray actually renders (uncrewed ones) so
-    // the client can merge them into its pairings store. Fully crewed
-    // pairings already live in the main aggregator response.
+    // Sort by start date so pagination is stable + chronological.
+    uncrewedAll.sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0))
+    const total = uncrewedAll.length
+    const uncrewed = uncrewedAll.slice(offset, offset + limit)
+    const uncrewedPairingIds = new Set(uncrewed.map((u) => u.pairingId))
+
+    // Return only pairings referenced by the current page slice — keeps
+    // the wire payload bounded by `limit` rather than the full uncrewed
+    // set. Fully-crewed pairings already live in the main aggregator.
     const uncrewedPairings = pairings.filter((p) => uncrewedPairingIds.has(p._id as string))
 
-    return { uncrewed, pairings: uncrewedPairings }
+    return { uncrewed, pairings: uncrewedPairings, total, offset, limit }
   })
 
   // ── GET /crew-schedule/from-run/:runId ──────────────────────────────
@@ -2022,6 +2166,13 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
               crewId: z.string().min(1),
               activityCodeId: z.string().min(1),
               dateIso: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+              /** Optional explicit UTC window. When provided, overrides
+               *  the activity code's default start/end times for THIS
+               *  entry only. Used by the Gantt copy/paste flow to
+               *  preserve a source bar's HH:MM (e.g. REST 22:00-08:00
+               *  pasted onto a different date). */
+              startUtcIso: z.string().optional(),
+              endUtcIso: z.string().optional(),
               notes: z.string().nullable().optional(),
             })
             .strict(),
@@ -2054,15 +2205,25 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       .map((it) => {
         const code = codeById.get(it.activityCodeId)
         if (!code) return null
-        const start = code.defaultStartTime ?? '00:00'
-        const end = code.defaultEndTime ?? '23:59'
-        const startUtcIso = localTimeToUtcIso(it.dateIso, start, offsetH)
-        let endUtcIso = localTimeToUtcIso(it.dateIso, end, offsetH)
-        if (new Date(endUtcIso).getTime() <= new Date(startUtcIso).getTime()) {
-          const nextDay = new Date(new Date(it.dateIso + 'T00:00:00Z').getTime() + 86_400_000)
-            .toISOString()
-            .slice(0, 10)
-          endUtcIso = localTimeToUtcIso(nextDay, end, offsetH)
+        // Caller may pass explicit UTC window (paste preserves source
+        // HH:MM). Trust those when both sides are present; otherwise
+        // anchor the activity code's defaults to the dateIso.
+        let startUtcIso: string
+        let endUtcIso: string
+        if (it.startUtcIso && it.endUtcIso) {
+          startUtcIso = it.startUtcIso
+          endUtcIso = it.endUtcIso
+        } else {
+          const start = code.defaultStartTime ?? '00:00'
+          const end = code.defaultEndTime ?? '23:59'
+          startUtcIso = localTimeToUtcIso(it.dateIso, start, offsetH)
+          endUtcIso = localTimeToUtcIso(it.dateIso, end, offsetH)
+          if (new Date(endUtcIso).getTime() <= new Date(startUtcIso).getTime()) {
+            const nextDay = new Date(new Date(it.dateIso + 'T00:00:00Z').getTime() + 86_400_000)
+              .toISOString()
+              .slice(0, 10)
+            endUtcIso = localTimeToUtcIso(nextDay, end, offsetH)
+          }
         }
         return {
           _id: crypto.randomUUID(),
@@ -2302,7 +2463,8 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
   //    a period before an auto-roster run. Scoped to operatorId from JWT so
   //    cross-tenant deletion is impossible. Requires ops role. ──
   app.delete('/crew-schedule/assignments/bulk', { preHandler: requireOpsRole }, async (req, reply) => {
-    const q = req.query as Record<string, string>
+    const rawQ = req.query as Record<string, string | string[] | undefined>
+    const q = rawQ as Record<string, string>
     if (!q.periodFrom || !q.periodTo) {
       return reply.code(400).send({ error: 'periodFrom and periodTo are required (ISO date YYYY-MM-DD)' })
     }
@@ -2310,11 +2472,39 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: 'periodFrom and periodTo must be YYYY-MM-DD' })
     }
     const operatorId = req.operatorId
-    const res = await CrewAssignment.deleteMany({
+    // Crew scope filter — see /bulk-clear note. Same wipe-everything bug
+    // historically lived here; constrain by filter when present.
+    const asArray = (v: string | string[] | undefined): string[] => {
+      if (v == null) return []
+      return Array.isArray(v) ? v.filter(Boolean) : v ? [v] : []
+    }
+    const filterBase = (rawQ.base as string | undefined) ?? null
+    const filterPosition = (rawQ.position as string | undefined) ?? null
+    const filterAcTypes = asArray(rawQ.acType)
+    const filterCrewGroupIds = asArray(rawQ.crewGroup)
+    const anyFilter = !!filterBase || !!filterPosition || filterAcTypes.length > 0 || filterCrewGroupIds.length > 0
+    let scopedCrewIds: string[] | null = null
+    if (anyFilter) {
+      const baseCrewQuery: Record<string, unknown> = { operatorId, status: { $in: ['active', 'suspended'] } }
+      if (filterBase) baseCrewQuery.base = filterBase
+      if (filterPosition) baseCrewQuery.position = filterPosition
+      const acGroupAllow = await resolveCrewIdsForFilters(operatorId, {
+        acTypes: filterAcTypes.length > 0 ? filterAcTypes : null,
+        crewGroupIds: filterCrewGroupIds.length > 0 ? filterCrewGroupIds : null,
+      })
+      if (acGroupAllow != null) baseCrewQuery._id = { $in: acGroupAllow }
+      scopedCrewIds = (await CrewMember.distinct('_id', baseCrewQuery)) as string[]
+      if (scopedCrewIds.length === 0) {
+        return { success: true, deletedCount: 0, deletedLegalityIssues: 0, scopedToFilters: true }
+      }
+    }
+    const deleteFilter: Record<string, unknown> = {
       operatorId,
       startUtcIso: { $lte: `${q.periodTo}T23:59:59.999Z` },
       endUtcIso: { $gte: `${q.periodFrom}T00:00:00.000Z` },
-    })
+    }
+    if (scopedCrewIds) deleteFilter.crewId = { $in: scopedCrewIds }
+    const res = await CrewAssignment.deleteMany(deleteFilter)
     // Purge cached roster-legality issues for any window that overlaps the
     // cleared period. Otherwise the Gantt shields stay red against an empty
     // roster until the nightly sweep rewrites them.
@@ -2335,7 +2525,8 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
   //    narrows to activities tagged with `notes: 'auto-roster:*'` so manually
   //    created activities are preserved. ──
   app.delete('/crew-schedule/activities/bulk', { preHandler: requireOpsRole }, async (req, reply) => {
-    const q = req.query as Record<string, string>
+    const rawQ = req.query as Record<string, string | string[] | undefined>
+    const q = rawQ as Record<string, string>
     if (!q.periodFrom || !q.periodTo) {
       return reply.code(400).send({ error: 'periodFrom and periodTo are required (ISO date YYYY-MM-DD)' })
     }
@@ -2343,6 +2534,31 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: 'periodFrom and periodTo must be YYYY-MM-DD' })
     }
     const operatorId = req.operatorId
+    // Same crew scope filter as bulk-clear / assignments/bulk.
+    const asArray = (v: string | string[] | undefined): string[] => {
+      if (v == null) return []
+      return Array.isArray(v) ? v.filter(Boolean) : v ? [v] : []
+    }
+    const filterBase = (rawQ.base as string | undefined) ?? null
+    const filterPosition = (rawQ.position as string | undefined) ?? null
+    const filterAcTypes = asArray(rawQ.acType)
+    const filterCrewGroupIds = asArray(rawQ.crewGroup)
+    const anyFilter = !!filterBase || !!filterPosition || filterAcTypes.length > 0 || filterCrewGroupIds.length > 0
+    let scopedCrewIds: string[] | null = null
+    if (anyFilter) {
+      const baseCrewQuery: Record<string, unknown> = { operatorId, status: { $in: ['active', 'suspended'] } }
+      if (filterBase) baseCrewQuery.base = filterBase
+      if (filterPosition) baseCrewQuery.position = filterPosition
+      const acGroupAllow = await resolveCrewIdsForFilters(operatorId, {
+        acTypes: filterAcTypes.length > 0 ? filterAcTypes : null,
+        crewGroupIds: filterCrewGroupIds.length > 0 ? filterCrewGroupIds : null,
+      })
+      if (acGroupAllow != null) baseCrewQuery._id = { $in: acGroupAllow }
+      scopedCrewIds = (await CrewMember.distinct('_id', baseCrewQuery)) as string[]
+      if (scopedCrewIds.length === 0) {
+        return { success: true, deletedCount: 0, scopedToFilters: true }
+      }
+    }
     const filter: Record<string, unknown> = {
       operatorId,
       startUtcIso: { $lte: `${q.periodTo}T23:59:59.999Z` },
@@ -2351,6 +2567,7 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
     if (q.source === 'auto-roster') {
       filter.notes = { $regex: '^auto-roster:' }
     }
+    if (scopedCrewIds) filter.crewId = { $in: scopedCrewIds }
     const res = await CrewActivity.deleteMany(filter)
     return { success: true, deletedCount: res.deletedCount ?? 0 }
   })
@@ -2368,7 +2585,8 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
   //    manual leaves are always preserved. Only pairings + OFF + SBY are in
   //    scope for this endpoint.
   app.delete('/crew-schedule/bulk-clear', { preHandler: requireOpsRole }, async (req, reply) => {
-    const q = req.query as Record<string, string>
+    const rawQ = req.query as Record<string, string | string[] | undefined>
+    const q = rawQ as Record<string, string>
     if (!q.periodFrom || !q.periodTo) {
       return reply.code(400).send({ error: 'periodFrom and periodTo are required (ISO date YYYY-MM-DD)' })
     }
@@ -2382,6 +2600,46 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
     const retainDayOff = parseFlag(q.retainDayOff, true)
     const retainStandby = parseFlag(q.retainStandby, true)
 
+    // Crew scope filter — same shape as auto-roster /run. Without this the
+    // endpoint historically wiped every crew in the operator regardless of
+    // the planner's active workgroup filter, taking out unrelated rosters
+    // (e.g. running a HAN-FO clear inside an FO-filtered UI silently
+    // erased the prior HAN-CP roster). Now: when ANY filter is set we
+    // resolve a crewId allowlist and constrain every delete by it.
+    const asArray = (v: string | string[] | undefined): string[] => {
+      if (v == null) return []
+      return Array.isArray(v) ? v.filter(Boolean) : v ? [v] : []
+    }
+    const filterBase = (rawQ.base as string | undefined) ?? null
+    const filterPosition = (rawQ.position as string | undefined) ?? null
+    const filterAcTypes = asArray(rawQ.acType)
+    const filterCrewGroupIds = asArray(rawQ.crewGroup)
+    const anyFilter = !!filterBase || !!filterPosition || filterAcTypes.length > 0 || filterCrewGroupIds.length > 0
+    let scopedCrewIds: string[] | null = null
+    if (anyFilter) {
+      const baseCrewQuery: Record<string, unknown> = { operatorId, status: { $in: ['active', 'suspended'] } }
+      if (filterBase) baseCrewQuery.base = filterBase
+      if (filterPosition) baseCrewQuery.position = filterPosition
+      const acGroupAllow = await resolveCrewIdsForFilters(operatorId, {
+        acTypes: filterAcTypes.length > 0 ? filterAcTypes : null,
+        crewGroupIds: filterCrewGroupIds.length > 0 ? filterCrewGroupIds : null,
+      })
+      if (acGroupAllow != null) baseCrewQuery._id = { $in: acGroupAllow }
+      scopedCrewIds = (await CrewMember.distinct('_id', baseCrewQuery)) as string[]
+      // No crew matched the filters → nothing to delete. Return early
+      // instead of executing an unfiltered $in:[] which Mongo would refuse.
+      if (scopedCrewIds.length === 0) {
+        return {
+          success: true,
+          deletedAssignments: 0,
+          deletedActivities: 0,
+          deletedLegalityIssues: 0,
+          retention: { retainPreAssigned, retainDayOff, retainStandby },
+          scopedToFilters: true,
+        }
+      }
+    }
+
     // ── Pairings (CrewAssignment) ────────────────────────────────────────
     const assignFilter: Record<string, unknown> = {
       operatorId,
@@ -2392,6 +2650,7 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       // Only rows marked with a sourceRunId belong to prior auto-roster runs.
       assignFilter.sourceRunId = { $exists: true, $ne: null }
     }
+    if (scopedCrewIds) assignFilter.crewId = { $in: scopedCrewIds }
     const assignRes = await CrewAssignment.deleteMany(assignFilter)
 
     // ── Activities — resolve codes to delete ──────────────────────────────
@@ -2442,12 +2701,14 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
     }
     let activityDeleted = 0
     if (deleteCodeIds.length > 0) {
-      const activityRes = await CrewActivity.deleteMany({
+      const activityFilter: Record<string, unknown> = {
         operatorId,
         activityCodeId: { $in: deleteCodeIds },
         startUtcIso: { $lte: `${q.periodTo}T23:59:59.999Z` },
         endUtcIso: { $gte: `${q.periodFrom}T00:00:00.000Z` },
-      })
+      }
+      if (scopedCrewIds) activityFilter.crewId = { $in: scopedCrewIds }
+      const activityRes = await CrewActivity.deleteMany(activityFilter)
       activityDeleted = activityRes.deletedCount ?? 0
     }
 

@@ -3142,6 +3142,15 @@ export const api = {
     retainPreAssigned?: boolean
     retainDayOff?: boolean
     retainStandby?: boolean
+    /** Crew scope filters — same set as auto-roster run. When provided, the
+     *  endpoint deletes ONLY records whose crew matches the filter. Without
+     *  these the server defaults to wiping all crew in the operator (the
+     *  legacy behaviour); the UI should always pass the active filter set
+     *  to avoid wiping crew the planner can't see. */
+    base?: string | null
+    position?: string | null
+    acType?: string | string[] | null
+    crewGroup?: string | string[] | null
   }) => {
     const qs = new URLSearchParams({
       periodFrom: params.periodFrom,
@@ -3150,6 +3159,15 @@ export const api = {
       retainDayOff: String(params.retainDayOff ?? true),
       retainStandby: String(params.retainStandby ?? true),
     })
+    if (params.base) qs.set('base', params.base)
+    if (params.position) qs.set('position', params.position)
+    const appendList = (key: string, v: string | string[] | null | undefined) => {
+      if (!v) return
+      if (Array.isArray(v)) for (const x of v) qs.append(key, x)
+      else qs.append(key, v)
+    }
+    appendList('acType', params.acType)
+    appendList('crewGroup', params.crewGroup)
     return request<{
       success: true
       deletedAssignments: number
@@ -3621,6 +3639,11 @@ export const api = {
     /** ICAO type code(s) — comma-joined when multiple. */
     acType?: string | string[]
     crewGroup?: string | string[]
+    /** Free-text crew tokens (employee IDs or name fragments) — server
+     *  resolves to a crew _id whitelist that scopes crew/assignments/
+     *  activities, so a 1-crew lookup costs ~50ms instead of fetching
+     *  the operator's full roster. */
+    crewSearch?: string[]
   }) => {
     const qs = new URLSearchParams({ from: params.from, to: params.to })
     const join = (v: string | string[] | undefined): string | null => {
@@ -3632,10 +3655,12 @@ export const api = {
     const p = join(params.position)
     const a = join(params.acType)
     const g = join(params.crewGroup)
+    const cs = join(params.crewSearch)
     if (b) qs.set('base', b)
     if (p) qs.set('position', p)
     if (a) qs.set('acType', a)
     if (g) qs.set('crewGroup', g)
+    if (cs) qs.set('crewSearch', cs)
     return request<CrewScheduleResponse>(`/crew-schedule?${qs.toString()}`)
   },
 
@@ -3652,6 +3677,11 @@ export const api = {
     acType?: string | string[]
     crewGroup?: string | string[]
     baseAirport?: string
+    crewSearch?: string[]
+    /** 0-indexed page offset (default 0). */
+    offset?: number
+    /** Max pairings to return (default 100, server cap 500). */
+    limit?: number
   }) => {
     const qs = new URLSearchParams({ from: params.from, to: params.to })
     const join = (v: string | string[] | undefined): string | null => {
@@ -3663,14 +3693,21 @@ export const api = {
     const p = join(params.position)
     const a = join(params.acType)
     const g = join(params.crewGroup)
+    const cs = join(params.crewSearch)
     if (b) qs.set('base', b)
     if (p) qs.set('position', p)
     if (a) qs.set('acType', a)
     if (g) qs.set('crewGroup', g)
+    if (cs) qs.set('crewSearch', cs)
     if (params.baseAirport) qs.set('baseAirport', params.baseAirport)
+    if (params.offset !== undefined) qs.set('offset', String(params.offset))
+    if (params.limit !== undefined) qs.set('limit', String(params.limit))
     return request<{
       uncrewed: CrewScheduleResponse['uncrewed']
       pairings: CrewScheduleResponse['pairings']
+      total: number
+      offset: number
+      limit: number
     }>(`/crew-schedule/uncrewed?${qs.toString()}`)
   },
 
@@ -5402,6 +5439,10 @@ export interface StartAutoRosterParams {
   /** Activity code id to stamp for mode === 'daysOff'. When omitted, server
    *  picks first active code with is_day_off flag (SYSTEM default). */
   daysOffActivityCodeId?: string | null
+  /** CP-SAT solver acceptance gap. 0.05 (Quality, default) | 0.10 (Balanced) |
+   *  0.20 (Performance). Higher = solver stops sooner with looser fairness;
+   *  legality + coverage unaffected. Range: [0.01, 0.50]. */
+  relativeGapLimit?: number
   base?: string
   position?: string
   acType?: string | string[]
@@ -5447,6 +5488,8 @@ export interface DayBreakdown {
   inTraining: number
   /** Crew on ground duty (activity flagged `is_ground_duty`). */
   onGroundDuty?: number
+  /** Crew on temp-base assignment, or its bracketing POS days. Excluded from `availableCrew`. */
+  onTempBase?: number
   pairingsDemand: number
   pairingsUnassigned: number
   /** Seats required by pairings active this day (respects position filter). */

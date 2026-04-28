@@ -210,6 +210,15 @@ const createAssignmentSchema = z
   })
   .strict()
 
+/** Auto-roster stamps activities/assignments with `notes: 'auto-roster:<runId>'`
+ *  in addition to the structured `sourceRunId` field. Frontend tooltip
+ *  treats either as "AUTO". When the user mutates a row we strip both —
+ *  this helper turns the marker into null so user edits read as
+ *  ASSIGNED BY USER even on legacy rows that only had the notes marker. */
+function isAutoRosterNote(notes: string | null | undefined): boolean {
+  return !!notes && /^auto-roster:/.test(notes)
+}
+
 const patchAssignmentSchema = z
   .object({
     status: z.enum(['planned', 'confirmed', 'rostered', 'cancelled']).optional(),
@@ -1497,6 +1506,9 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const now = new Date().toISOString()
+    // Drop auto-roster: marker if a client carried it over (e.g. drag-drop
+    // copy/move from an AUTO bar) — this is a user-driven create.
+    const cleanNotes = isAutoRosterNote(body.notes ?? null) ? null : (body.notes ?? null)
     const doc = await CrewActivity.create({
       _id: crypto.randomUUID(),
       operatorId,
@@ -1506,7 +1518,7 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       startUtcIso,
       endUtcIso,
       dateIso: body.dateIso ?? null,
-      notes: body.notes ?? null,
+      notes: cleanNotes,
       assignedByUserId: req.userId || null,
       assignedAtUtc: now,
       createdAt: now,
@@ -1539,11 +1551,11 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       if (!code) return reply.code(404).send({ error: 'Activity code not found' })
     }
 
-    // Window validation: if either side is being edited, ensure end > start
-    // against the merged document (new field or existing value).
+    // Always read existing — needed for window validation AND for the
+    // legacy auto-roster: notes-marker strip below.
+    const existing = await CrewActivity.findOne({ _id: id, operatorId }).lean()
+    if (!existing) return reply.code(404).send({ error: 'Activity not found' })
     if (body.startUtcIso || body.endUtcIso) {
-      const existing = await CrewActivity.findOne({ _id: id, operatorId }).lean()
-      if (!existing) return reply.code(404).send({ error: 'Activity not found' })
       const start = body.startUtcIso ?? existing.startUtcIso
       const end = body.endUtcIso ?? existing.endUtcIso
       if (new Date(end).getTime() <= new Date(start).getTime()) {
@@ -1551,7 +1563,20 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    const patch: Record<string, unknown> = { ...body, updatedAt: new Date().toISOString() }
+    // Any user edit strips AUTO provenance — clear the structured field
+    // AND the legacy notes marker so the tooltip's `isAuto` check reads
+    // ASSIGNED BY USER on the next render.
+    const patch: Record<string, unknown> = {
+      ...body,
+      sourceRunId: null,
+      assignedByUserId: req.userId ?? null,
+      updatedAt: new Date().toISOString(),
+    }
+    if (body.notes === undefined && isAutoRosterNote(existing.notes ?? null)) {
+      patch.notes = null
+    } else if (body.notes !== undefined && isAutoRosterNote(body.notes ?? null)) {
+      patch.notes = null
+    }
     const updated = await CrewActivity.findOneAndUpdate({ _id: id, operatorId }, { $set: patch }, { new: true }).lean()
     if (!updated) return reply.code(404).send({ error: 'Activity not found' })
     return updated
@@ -1783,7 +1808,23 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    const patch: Record<string, unknown> = { ...body, updatedAt: new Date().toISOString() }
+    // Any user-driven mutation strips AUTO provenance — the row no longer
+    // matches the auto-roster snapshot, so the AUTO badge would be stale.
+    // Stamping `assignedByUserId` records who made the change. Also clear
+    // the legacy `auto-roster:<runId>` notes marker so the tooltip's
+    // notes-fallback flag flips off.
+    const existing = await CrewAssignment.findOne({ _id: id, operatorId }, { notes: 1 }).lean()
+    const patch: Record<string, unknown> = {
+      ...body,
+      sourceRunId: null,
+      assignedByUserId: req.userId ?? null,
+      updatedAt: new Date().toISOString(),
+    }
+    if (body.notes === undefined && existing && isAutoRosterNote(existing.notes ?? null)) {
+      patch.notes = null
+    } else if (body.notes !== undefined && isAutoRosterNote(body.notes ?? null)) {
+      patch.notes = null
+    }
     try {
       const updated = await CrewAssignment.findOneAndUpdate(
         { _id: id, operatorId },
@@ -1948,10 +1989,18 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
     // two assignments happen to be on the same pairing.
     const now = new Date().toISOString()
     const tempCrew = `__swap__${assignmentAId}__${Date.now()}`
+    // Swap is a user action — both rows lose AUTO provenance.
+    const userStamp = { sourceRunId: null, assignedByUserId: req.userId ?? null }
     try {
       await CrewAssignment.updateOne({ _id: assignmentAId, operatorId }, { $set: { crewId: tempCrew, updatedAt: now } })
-      await CrewAssignment.updateOne({ _id: assignmentBId, operatorId }, { $set: { crewId: a.crewId, updatedAt: now } })
-      await CrewAssignment.updateOne({ _id: assignmentAId, operatorId }, { $set: { crewId: b.crewId, updatedAt: now } })
+      await CrewAssignment.updateOne(
+        { _id: assignmentBId, operatorId },
+        { $set: { crewId: a.crewId, updatedAt: now, ...userStamp } },
+      )
+      await CrewAssignment.updateOne(
+        { _id: assignmentAId, operatorId },
+        { $set: { crewId: b.crewId, updatedAt: now, ...userStamp } },
+      )
     } catch (err) {
       // Best-effort rollback: try to restore the original crewIds.
       await CrewAssignment.updateOne(
@@ -1967,6 +2016,13 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
       }
       throw err
     }
+
+    // Strip legacy auto-roster: notes on the swapped rows so the tooltip's
+    // notes-based fallback flips from AUTO → ASSIGNED BY USER.
+    await CrewAssignment.updateMany(
+      { _id: { $in: [assignmentAId, assignmentBId] }, operatorId, notes: { $regex: '^auto-roster:' } },
+      { $set: { notes: null } },
+    ).catch(() => {})
 
     return { success: true, swappedAssignmentIds: [assignmentAId, assignmentBId] }
   })
@@ -2109,16 +2165,19 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
           { $set: { crewId: tempTgt, updatedAt: now } },
         )
       }
+      // Final repoint — also strips AUTO provenance (block swap is a user
+      // action). Stamping userId records who triggered the swap.
+      const userStamp = { sourceRunId: null, assignedByUserId: req.userId ?? null }
       if (sourceIds.length > 0) {
         await CrewAssignment.updateMany(
           { _id: { $in: sourceIds }, operatorId },
-          { $set: { crewId: targetCrewId, updatedAt: now } },
+          { $set: { crewId: targetCrewId, updatedAt: now, ...userStamp } },
         )
       }
       if (targetIds.length > 0) {
         await CrewAssignment.updateMany(
           { _id: { $in: targetIds }, operatorId },
-          { $set: { crewId: sourceCrewId, updatedAt: now } },
+          { $set: { crewId: sourceCrewId, updatedAt: now, ...userStamp } },
         )
       }
     } catch (err) {
@@ -2135,6 +2194,15 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(409).send({ error: 'Swap block conflicts with an existing seat assignment' })
       }
       throw err
+    }
+
+    // Strip legacy auto-roster: notes — see /swap for rationale.
+    const allSwappedIds = [...sourceIds, ...targetIds]
+    if (allSwappedIds.length > 0) {
+      await CrewAssignment.updateMany(
+        { _id: { $in: allSwappedIds }, operatorId, notes: { $regex: '^auto-roster:' } },
+        { $set: { notes: null } },
+      ).catch(() => {})
     }
 
     return {
@@ -2234,7 +2302,7 @@ export async function crewScheduleRoutes(app: FastifyInstance): Promise<void> {
           startUtcIso,
           endUtcIso,
           dateIso: it.dateIso,
-          notes: it.notes ?? null,
+          notes: isAutoRosterNote(it.notes ?? null) ? null : (it.notes ?? null),
           assignedByUserId: req.userId || null,
           assignedAtUtc: now,
           createdAt: now,

@@ -35,6 +35,15 @@ interface Props {
   clientY: number
 }
 
+/** Trim a long user id like `SKYHUB-ADMIN-001` down to a tooltip-friendly
+ *  number. Falls back to the raw id when no trailing digits exist. */
+function shortUserId(id: string): string {
+  const m = id.match(/(\d+)$/)
+  if (!m) return id
+  const n = parseInt(m[1], 10)
+  return Number.isFinite(n) ? String(n) : m[1]
+}
+
 function fmtMinutes(min: number): string {
   if (!Number.isFinite(min) || min < 0) return '--:--'
   const h = Math.floor(min / 60)
@@ -160,7 +169,7 @@ export const PairingHoverTooltip = memo(function PairingHoverTooltip({
     ? assignment.sourceRunId
       ? 'AUTO'
       : assignment.assignedByUserId
-        ? `ASSIGNED BY USER ${assignment.assignedByUserId}`
+        ? `ASSIGNED BY USER ${shortUserId(assignment.assignedByUserId)}`
         : 'MANUAL'
     : pairing.workflowStatus === 'committed'
       ? 'COMMITTED'
@@ -182,103 +191,109 @@ export const PairingHoverTooltip = memo(function PairingHoverTooltip({
         visibility: 'hidden',
         zIndex: 9999,
         pointerEvents: 'none',
-        minWidth: 380,
       }}
     >
       <div
-        className="rounded-xl p-4 space-y-2.5 text-[13px]"
+        className="rounded-xl px-3 py-2.5 text-[13px]"
         style={{
           background: bg,
           backdropFilter: 'blur(20px) saturate(180%)',
           WebkitBackdropFilter: 'blur(20px) saturate(180%)',
           border: `1px solid ${border}`,
           boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)',
+          minWidth: 280,
+          maxWidth: 360,
         }}
       >
-        <div className="flex items-center gap-3">
+        {/* Header — code pill + source */}
+        <div className="flex items-center gap-2">
           <span
-            className="font-bold text-[14px] px-2 py-0.5 rounded shrink-0"
+            className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded shrink-0"
             style={{ background: status.bg, color: status.color }}
           >
             {pairing.pairingCode}
           </span>
-          {pairing.routeChain && (
-            <span
-              className="font-mono text-[13px] truncate flex-1"
-              style={{ color: heading }}
-              title={pairing.routeChain}
-            >
-              {pairing.routeChain}
-            </span>
-          )}
-          <span className="text-[11px] font-medium tracking-wider uppercase shrink-0" style={{ color: muted }}>
+          <span className="flex-1" />
+          <span className="text-[11px] font-semibold uppercase tracking-wider shrink-0" style={{ color: muted }}>
             {sourceLabel}
           </span>
         </div>
-        <div className="text-[11px] font-medium" style={{ color: muted }}>
-          {pairing.legs.length} {pairing.legs.length === 1 ? 'leg' : 'legs'}
+
+        {pairing.routeChain && (
+          <div
+            className="mt-1 font-semibold tabular-nums truncate"
+            style={{ color: heading }}
+            title={pairing.routeChain}
+          >
+            {pairing.routeChain}
+          </div>
+        )}
+
+        {/* Compact 2-col stat grid — same row pattern as the POS tooltip's
+            STD/STA block: uppercase label + heading-colour value inline. */}
+        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] tabular-nums">
+          <span style={{ color: muted }}>
+            <span className="uppercase tracking-wider mr-1">Block</span>
+            <span style={{ color: heading }}>{fmtMinutes(pairing.totalBlockMinutes)}</span>
+          </span>
+          <span style={{ color: muted }}>
+            <span className="uppercase tracking-wider mr-1">Duty</span>
+            <span style={{ color: heading }}>{fmtMinutes(pairing.totalDutyMinutes)}</span>
+          </span>
+          <span style={{ color: muted }}>
+            <span className="uppercase tracking-wider mr-1">Days</span>
+            <span style={{ color: heading }}>{pairing.pairingDays}</span>
+          </span>
+          <span style={{ color: muted }}>
+            <span className="uppercase tracking-wider mr-1">Base</span>
+            <span style={{ color: heading }}>{pairing.baseAirport}</span>
+          </span>
+          {(() => {
+            // Mixed-fleet pairing — distinct non-null AC types across legs.
+            // Pairing's top-level `aircraftTypeIcao` is the dominant type;
+            // legs can still differ (e.g. A320 leg + A321 leg).
+            const distinct = new Set<string>()
+            for (const l of pairing.legs) {
+              if (l.aircraftTypeIcao) distinct.add(l.aircraftTypeIcao)
+            }
+            if (pairing.aircraftTypeIcao) distinct.add(pairing.aircraftTypeIcao)
+            if (distinct.size === 0) return null
+            const label = distinct.size > 1 ? 'MULTI' : (pairing.aircraftTypeIcao ?? [...distinct][0])
+            return (
+              <span style={{ color: muted }}>
+                <span className="uppercase tracking-wider mr-1">AC</span>
+                <span style={{ color: heading }}>{label}</span>
+              </span>
+            )
+          })()}
+          {fdpDisplay && (
+            <span style={{ color: muted }}>
+              <span className="uppercase tracking-wider mr-1">FDP</span>
+              <span style={{ color: heading }}>{fdpDisplay}</span>
+            </span>
+          )}
         </div>
 
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[13px]">
-          <div className="flex justify-between">
-            <span style={{ color: muted }}>Block</span>
-            <span className="tabular-nums font-normal" style={{ color: heading }}>
-              {fmtMinutes(pairing.totalBlockMinutes)}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span style={{ color: muted }}>Duty</span>
-            <span className="tabular-nums font-normal" style={{ color: heading }}>
-              {fmtMinutes(pairing.totalDutyMinutes)}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span style={{ color: muted }}>Days</span>
-            <span className="tabular-nums" style={{ color: body }}>
-              {pairing.pairingDays}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span style={{ color: muted }}>Base</span>
-            <span className="tabular-nums font-medium" style={{ color: heading }}>
-              {pairing.baseAirport}
-            </span>
-          </div>
-          {fdpDisplay && (
-            <div className="flex justify-between">
-              <span style={{ color: muted }}>FDP</span>
-              <span className="tabular-nums font-normal" style={{ color: heading }}>
-                {fdpDisplay}
-              </span>
-            </div>
-          )}
-          {pairing.aircraftTypeIcao && (
-            <div className="flex justify-between">
-              <span style={{ color: muted }}>AC Type</span>
-              <span className="tabular-nums" style={{ color: body }}>
-                {pairing.aircraftTypeIcao}
-              </span>
-            </div>
-          )}
-          <div className="col-span-2 flex items-start justify-between gap-3">
-            <span style={{ color: muted }}>Complement</span>
-            <span className="tabular-nums text-right flex flex-wrap justify-end gap-x-2 gap-y-0.5">
-              {complementParts.length === 0 ? (
-                <span style={{ color: body }}>{pairing.complementKey || '—'}</span>
-              ) : (
-                complementParts.map((p) => {
-                  // Colour code: shortage red, surplus orange, exact neutral.
-                  const color = p.delta < 0 ? '#FF3B3B' : p.delta > 0 ? '#FF8800' : body
-                  const num = p.delta === 0 ? String(p.required) : p.delta > 0 ? `+${p.delta}` : String(p.delta) // already has leading minus
-                  return (
-                    <span key={p.code} style={{ color }}>
-                      {num} {p.code}
-                    </span>
-                  )
-                })
-              )}
-            </span>
-          </div>
+        {/* Complement — single line, label left, parts right. */}
+        <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[11px] tabular-nums">
+          <span className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: muted }}>
+            Complement
+          </span>
+          <span className="text-right flex flex-wrap justify-end gap-x-2 gap-y-0.5">
+            {complementParts.length === 0 ? (
+              <span style={{ color: body }}>{pairing.complementKey || '—'}</span>
+            ) : (
+              complementParts.map((p) => {
+                const color = p.delta < 0 ? '#FF3B3B' : p.delta > 0 ? '#FF8800' : heading
+                const num = p.delta === 0 ? String(p.required) : p.delta > 0 ? `+${p.delta}` : String(p.delta)
+                return (
+                  <span key={p.code} style={{ color }}>
+                    {num} {p.code}
+                  </span>
+                )
+              })
+            )}
+          </span>
         </div>
       </div>
     </div>,

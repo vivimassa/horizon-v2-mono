@@ -158,6 +158,10 @@ interface State extends Data {
   /** Auto-refresh cadence in minutes. 5..59; 15 by default. Pages that
    *  don't wire an interval loop still expose this via the Format popover. */
   refreshIntervalMins: number
+  /** Master toggle driving time display in the activity hover-tooltip
+   *  and the right-panel timing fields. NOT applied to Pairing Details
+   *  (it owns its own UTC/Local toggle). */
+  timeMode: 'utc' | 'local'
 
   // ── Selection / hover ──
   selectedCrewId: string | null
@@ -528,6 +532,31 @@ interface State extends Data {
     sourceMissingSeats?: Array<{ seatPositionId: string; seatCode: string; count: number }>
   } | null
 
+  /** Drag-to-reassign for an activity bar (OFF / SBY / REST etc.).
+   *  Plain drag = move, Ctrl/Cmd-drag = copy. Lighter than `dragState`:
+   *  no FDTL legality preview during the drag — just a target-cell
+   *  highlight and the ghost. The drop handler runs the same overlap
+   *  guards as Paste (existing activity / pairing conflict). */
+  activityDragState: {
+    sourceActivityId: string
+    sourceCrewId: string
+    sourceDateIso: string
+    activityCodeId: string
+    /** Code label rendered inside the ghost (e.g. "OFF"). */
+    ghostLabel: string
+    /** Activity-code fill colour so the ghost matches the bar. */
+    ghostColor: string
+    cursorX: number
+    cursorY: number
+    dropCrewId: string | null
+    dropDateIso: string | null
+    /** 'legal' = drop allowed; 'illegal' = target occupied / pairing
+     *  conflict / same cell on move. Drives cursor + ghost tint. */
+    dropLegality: 'legal' | 'illegal' | null
+    dropReason: string
+    mode: 'move' | 'copy'
+  } | null
+
   // ── Scroll / container ──
   containerWidth: number
   scrollLeft: number
@@ -573,6 +602,8 @@ interface State extends Data {
   setZoom: (z: CrewScheduleZoom) => void
   cycleLabelMode: () => void
   setLabelMode: (m: BarLabelMode) => void
+  toggleTimeMode: () => void
+  setTimeMode: (m: 'utc' | 'local') => void
   setRowHeightLevel: (level: number) => void
   zoomRowIn: () => void
   zoomRowOut: () => void
@@ -635,6 +666,21 @@ interface State extends Data {
   clearRangeSelection: () => void
   setDragState: (d: State['dragState']) => void
   clearDragState: () => void
+  setActivityDragState: (d: State['activityDragState']) => void
+  clearActivityDragState: () => void
+  /** Drop handler for an activity drag (OFF / SBY / REST etc.). Move =
+   *  create at target + delete source; Copy = create at target only.
+   *  No-ops if the target cell already has an activity, the target
+   *  window overlaps a pairing assignment, or move targets the source
+   *  cell. Mirrors the Paste path's pre-checks but takes a single
+   *  cell instead of a list — no FDTL confirm dialog (matches V1
+   *  drag UX where the planner accepts the legality risk implicitly). */
+  dropActivityToCell: (args: {
+    sourceActivityId: string
+    targetCrewId: string
+    targetDateIso: string
+    mode: 'move' | 'copy'
+  }) => Promise<void>
   /** Optimistic local patch — bar jumps immediately on drop while the
    *  API round-trip + `commitPeriod()` reconcile in the background.
    *  `move` reassigns an existing row; `copy` appends a synthetic row
@@ -957,6 +1003,7 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     // View state
     zoom: 'M',
     barLabelMode: 'pairing',
+    timeMode: 'local',
     rowHeightLevel: 1,
     refreshIntervalMins: 15,
 
@@ -975,6 +1022,7 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     excludedCrewIds: new Set<string>(),
     rangeSelection: null,
     dragState: null,
+    activityDragState: null,
     swapPicker: null,
     targetPickerMode: null,
     crewOnPairingDialog: null,
@@ -1280,6 +1328,8 @@ export const useCrewScheduleStore = create<State>((set, get) => {
       set({ barLabelMode: LABEL_MODES[(idx + 1) % LABEL_MODES.length] })
     },
     setLabelMode: (m) => set({ barLabelMode: m }),
+    toggleTimeMode: () => set({ timeMode: get().timeMode === 'utc' ? 'local' : 'utc' }),
+    setTimeMode: (m) => set({ timeMode: m }),
     setRowHeightLevel: (level) => {
       const clamped = Math.max(0, Math.min(3, level))
       set({ rowHeightLevel: clamped })
@@ -1728,6 +1778,109 @@ export const useCrewScheduleStore = create<State>((set, get) => {
     clearRangeSelection: () => set({ rangeSelection: null }),
     setDragState: (d) => set({ dragState: d }),
     clearDragState: () => set({ dragState: null }),
+    setActivityDragState: (d) => set({ activityDragState: d }),
+    clearActivityDragState: () => set({ activityDragState: null }),
+    dropActivityToCell: async ({ sourceActivityId, targetCrewId, targetDateIso, mode }) => {
+      const s = get()
+      const src = s.activities.find((a) => a._id === sourceActivityId)
+      if (!src) return
+      const sourceDateIso = src.dateIso ?? src.startUtcIso.slice(0, 10)
+      // Move onto the same cell = no-op. Copy onto the same cell would
+      // collide with the existing bar — surface as a skip.
+      if (mode === 'move' && targetCrewId === src.crewId && targetDateIso === sourceDateIso) return
+
+      // Target-cell occupancy: any other activity on (crew, date) blocks
+      // the drop. The source itself is excluded so a same-day re-anchor
+      // (e.g. drag onto its own cell with copy held) reads correctly.
+      const targetOccupied = s.activities.some((a) => {
+        if (a._id === sourceActivityId) return false
+        const day = a.dateIso ?? a.startUtcIso.slice(0, 10)
+        return a.crewId === targetCrewId && day === targetDateIso
+      })
+      if (targetOccupied) {
+        set({
+          pasteFlash: { kind: 'warning', text: `Cell already has an activity — ${mode} skipped`, ts: Date.now() },
+        })
+        return
+      }
+
+      // Re-anchor source HH:MM to target dateIso. Same wrap-past-midnight
+      // rule the paste path uses, so an OFF that ran 22:00 → 06:00 keeps
+      // its 8h length on the target day.
+      const offsetH = s.displayOffsetHours
+      const toLocalHHMM = (utcIso: string): string => {
+        const ms = new Date(utcIso).getTime() + offsetH * 3_600_000
+        const d = new Date(ms)
+        return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+      }
+      const localDateAndTimeToUtcIso = (dateIso: string, hhmm: string): string => {
+        const [hh, mm] = hhmm.split(':').map((n) => parseInt(n, 10))
+        const localMidnightUtcMs = Date.parse(`${dateIso}T00:00:00Z`) - offsetH * 3_600_000
+        return new Date(localMidnightUtcMs + (hh * 60 + mm) * 60_000).toISOString()
+      }
+      const startHHMM = toLocalHHMM(src.startUtcIso)
+      const endHHMM = toLocalHHMM(src.endUtcIso)
+      const startUtcIso = localDateAndTimeToUtcIso(targetDateIso, startHHMM)
+      let endUtcIso = localDateAndTimeToUtcIso(targetDateIso, endHHMM)
+      if (new Date(endUtcIso).getTime() <= new Date(startUtcIso).getTime()) {
+        const nextDay = new Date(Date.parse(`${targetDateIso}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10)
+        endUtcIso = localDateAndTimeToUtcIso(nextDay, endHHMM)
+      }
+
+      // Pairing-conflict guard: REST/OFF/SBY pasted on top of a flying
+      // duty would visually sit on a pairing the crew is still rostered
+      // to operate. Reject (same as the paste path).
+      const startMs = new Date(startUtcIso).getTime()
+      const endMs = new Date(endUtcIso).getTime()
+      const overlaps = s.assignments.some((a) => {
+        if (a.crewId !== targetCrewId) return false
+        return new Date(a.startUtcIso).getTime() < endMs && new Date(a.endUtcIso).getTime() > startMs
+      })
+      if (overlaps) {
+        set({
+          pasteFlash: { kind: 'warning', text: `Conflicts with a pairing on target — ${mode} skipped`, ts: Date.now() },
+        })
+        return
+      }
+
+      const touchedCrewIds = new Set<string>([targetCrewId])
+      if (mode === 'move') touchedCrewIds.add(src.crewId)
+
+      try {
+        const created = await api.createCrewActivity({
+          crewId: targetCrewId,
+          activityCodeId: src.activityCodeId,
+          dateIso: targetDateIso,
+          startUtcIso,
+          endUtcIso,
+          notes: src.notes,
+        })
+        get().mergeActivities([created as unknown as { _id: string }])
+
+        if (mode === 'move') {
+          try {
+            await api.deleteCrewActivity(sourceActivityId)
+            set((st) => ({ activities: st.activities.filter((a) => a._id !== sourceActivityId) }))
+          } catch {
+            // Source delete best-effort; reconcile will reveal the truth.
+          }
+        }
+
+        void get().reconcileCrew([...touchedCrewIds])
+        const opId = useOperatorStore.getState().operator?._id
+        if (opId) {
+          void api.reevaluateCrewRoster({ operatorId: opId, from: s.periodFromIso, to: s.periodToIso }).catch(() => {})
+        }
+      } catch (e) {
+        set({
+          pasteFlash: {
+            kind: 'error',
+            text: `${mode === 'copy' ? 'Copy' : 'Move'} failed: ${(e as Error).message ?? 'unknown error'}`,
+            ts: Date.now(),
+          },
+        })
+      }
+    },
     applyOptimisticReassign: (op) => {
       const list = get().assignments
       if (op.kind === 'move') {

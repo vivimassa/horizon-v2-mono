@@ -307,9 +307,25 @@ function DutyTab({ pairing, positions }: { pairing: PairingRef | null; positions
  *  Narrow-column layout tuned for the right inspector (~380–420px). STD/STA rendered in UTC
  *  HH:MM; Block from the stored leg minutes. Header is sticky-looking via a thin divider. */
 function LegsMiniTable({ legs }: { legs: PairingRef['legs'] }) {
+  const timeMode = useCrewScheduleStore((s) => s.timeMode)
+  const operatorTz = useOperatorStore((s) => s.operator?.timezone ?? 'UTC')
   if (legs.length === 0) {
     return <div className="text-[13px] text-hz-text-tertiary">No legs.</div>
   }
+  const fmtTime = (iso: string) => {
+    if (timeMode === 'utc') return iso.slice(11, 16)
+    try {
+      return new Intl.DateTimeFormat('en-GB', {
+        timeZone: operatorTz,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(new Date(iso))
+    } catch {
+      return iso.slice(11, 16)
+    }
+  }
+  const tzSuffix = timeMode === 'utc' ? 'Z' : 'L'
   // Compact single-row table at 10px — exception to the 13px floor, approved
   // for this inspector because 8 columns (Date, Flt, DEP, ARR, STD, STA, Blk,
   // Tail) can't fit legibly at a larger size in a ~360px panel. Flight number
@@ -333,10 +349,10 @@ function LegsMiniTable({ legs }: { legs: PairingRef['legs'] }) {
               Arr
             </th>
             <th className="text-right px-1 py-1 text-[11px] font-semibold uppercase tracking-wider text-hz-text-tertiary">
-              Std
+              Std ({tzSuffix})
             </th>
             <th className="text-right px-1 py-1 text-[11px] font-semibold uppercase tracking-wider text-hz-text-tertiary">
-              Sta
+              Sta ({tzSuffix})
             </th>
             <th className="text-left px-1.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-hz-text-tertiary">
               Tail
@@ -384,8 +400,8 @@ function LegsMiniTable({ legs }: { legs: PairingRef['legs'] }) {
                   </td>
                   <td className="px-1 py-1 text-hz-text">{leg.depStation}</td>
                   <td className="px-1 py-1 text-hz-text">{leg.arrStation}</td>
-                  <td className="px-1 py-1 text-right text-hz-text whitespace-nowrap">{leg.stdUtcIso.slice(11, 16)}</td>
-                  <td className="px-1 py-1 text-right text-hz-text whitespace-nowrap">{leg.staUtcIso.slice(11, 16)}</td>
+                  <td className="px-1 py-1 text-right text-hz-text whitespace-nowrap">{fmtTime(leg.stdUtcIso)}</td>
+                  <td className="px-1 py-1 text-right text-hz-text whitespace-nowrap">{fmtTime(leg.staUtcIso)}</td>
                   <td className="px-1.5 py-1 text-hz-text-tertiary truncate max-w-[60px]">{leg.tailNumber ?? '—'}</td>
                 </tr>
               </Fragment>

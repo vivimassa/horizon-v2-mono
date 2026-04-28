@@ -5,12 +5,22 @@ import { createPortal } from 'react-dom'
 import type { ActivityCodeRef, CrewActivityRef } from '@skyhub/api'
 import { useTheme } from '@/components/theme-provider'
 import { useOperatorStore } from '@/stores/use-operator-store'
+import { useCrewScheduleStore } from '@/stores/use-crew-schedule-store'
 
 interface Props {
   activity: CrewActivityRef
   code: ActivityCodeRef | null
   clientX: number
   clientY: number
+}
+
+/** Trim a long user id like `SKYHUB-ADMIN-001` down to a tooltip-friendly
+ *  number. Falls back to the raw id when no trailing digits exist. */
+function shortUserId(id: string): string {
+  const m = id.match(/(\d+)$/)
+  if (!m) return id
+  const n = parseInt(m[1], 10)
+  return Number.isFinite(n) ? String(n) : m[1]
 }
 
 function formatTimeInTz(iso: string, tz: string): string {
@@ -24,6 +34,10 @@ function formatTimeInTz(iso: string, tz: string): string {
   } catch {
     return iso.slice(11, 16)
   }
+}
+
+function formatTimeUtc(iso: string): string {
+  return iso.slice(11, 16)
 }
 
 function useFollowCursor(initialClientX: number, initialClientY: number) {
@@ -62,6 +76,7 @@ export const ActivityHoverTooltip = memo(function ActivityHoverTooltip({ activit
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const operatorTz = useOperatorStore((s) => s.operator?.timezone ?? 'UTC')
+  const timeMode = useCrewScheduleStore((s) => s.timeMode)
   const ref = useFollowCursor(clientX, clientY)
 
   if (typeof document === 'undefined') return null
@@ -78,8 +93,10 @@ export const ActivityHoverTooltip = memo(function ActivityHoverTooltip({ activit
   // Standby always shows its time window — min/max duration is policy, not
   // an all-day block. Other timed codes still gated by `requiresTime`.
   const hasWindow = (isStandby || code?.requiresTime) && !!activity.startUtcIso && !!activity.endUtcIso
-  const from = hasWindow ? formatTimeInTz(activity.startUtcIso, operatorTz) : null
-  const to = hasWindow ? formatTimeInTz(activity.endUtcIso, operatorTz) : null
+  const fmt = (iso: string) => (timeMode === 'utc' ? formatTimeUtc(iso) : formatTimeInTz(iso, operatorTz))
+  const tzSuffix = timeMode === 'utc' ? 'Z' : 'L'
+  const from = hasWindow ? fmt(activity.startUtcIso) : null
+  const to = hasWindow ? fmt(activity.endUtcIso) : null
 
   // Source label — prefer the structured `sourceRunId` field; fall back to
   // the legacy `notes: 'auto-roster:<runId>'` convention for rows written
@@ -90,7 +107,7 @@ export const ActivityHoverTooltip = memo(function ActivityHoverTooltip({ activit
   const sourceLabel = isAuto
     ? 'AUTO'
     : activity.assignedByUserId
-      ? `ASSIGNED BY USER ${activity.assignedByUserId}`
+      ? `ASSIGNED BY USER ${shortUserId(activity.assignedByUserId)}`
       : null
 
   const bg = isDark ? 'rgba(244,244,245,0.92)' : 'rgba(24,24,27,0.88)'
@@ -129,25 +146,31 @@ export const ActivityHoverTooltip = memo(function ActivityHoverTooltip({ activit
           >
             {label}
           </span>
-          <span className="font-medium truncate" style={{ color: heading }}>
+          <span className="font-medium truncate flex-1" style={{ color: heading }}>
             {name}
           </span>
+          {sourceLabel && (
+            <span className="text-[11px] font-semibold uppercase tracking-wider shrink-0" style={{ color: muted }}>
+              {sourceLabel}
+            </span>
+          )}
         </div>
         {hasWindow && (
           <div className="mt-1.5 flex items-center gap-3 text-[12px] tabular-nums" style={{ color: muted }}>
             <span>
               <span className="uppercase tracking-wider text-[10px] font-semibold mr-1">From</span>
-              <span style={{ color: heading }}>{from}</span>
+              <span style={{ color: heading }}>
+                {from}
+                {tzSuffix}
+              </span>
             </span>
             <span>
               <span className="uppercase tracking-wider text-[10px] font-semibold mr-1">To</span>
-              <span style={{ color: heading }}>{to}</span>
+              <span style={{ color: heading }}>
+                {to}
+                {tzSuffix}
+              </span>
             </span>
-          </div>
-        )}
-        {sourceLabel && (
-          <div className="mt-1.5 text-[11px] font-medium tracking-wider uppercase" style={{ color: muted }}>
-            {sourceLabel}
           </div>
         )}
       </div>

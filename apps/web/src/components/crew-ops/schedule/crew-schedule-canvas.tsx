@@ -74,6 +74,19 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
     startX: number
     startY: number
   } | null>(null)
+  /** Pending activity-bar drag — same pattern as `pendingBarDragRef` but
+   *  for OFF / SBY / REST etc. Promoted to `activityDragState` once the
+   *  cursor crosses the threshold. */
+  const pendingActivityDragRef = useRef<{
+    activityId: string
+    crewId: string
+    activityCodeId: string
+    dateIso: string
+    label: string
+    color: string
+    startX: number
+    startY: number
+  } | null>(null)
   const DRAG_THRESHOLD_PX = 5
 
   /** rAF-coalesce store writes during an active bar drag. High-Hz mice
@@ -161,6 +174,9 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
   const clearRangeSelection = useCrewScheduleStore((s) => s.clearRangeSelection)
   const setDragState = useCrewScheduleStore((s) => s.setDragState)
   const clearDragState = useCrewScheduleStore((s) => s.clearDragState)
+  const activityDragState = useCrewScheduleStore((s) => s.activityDragState)
+  const setActivityDragState = useCrewScheduleStore((s) => s.setActivityDragState)
+  const clearActivityDragState = useCrewScheduleStore((s) => s.clearActivityDragState)
   const setExportCanvasRef = useCrewScheduleStore((s) => s.setExportCanvasRef)
 
   // Register the canvas element with the store so Export (P4.3) can
@@ -189,6 +205,11 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
         clearDragState()
         return
       }
+      if (s.activityDragState) {
+        pendingActivityDragRef.current = null
+        clearActivityDragState()
+        return
+      }
       if (s.swapPicker) {
         s.clearSwapPicker()
         return
@@ -201,7 +222,7 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [clearRangeSelection, clearDragState])
+  }, [clearRangeSelection, clearDragState, clearActivityDragState])
 
   // Window-level mouseup catches releases outside the canvas bounds. If
   // we don't do this, a user who drags off the viewport is stranded with
@@ -220,13 +241,17 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
         legalityCacheRef.current.clear()
         clearDragState()
       }
+      if (s.activityDragState) {
+        pendingActivityDragRef.current = null
+        clearActivityDragState()
+      }
       if (dragSelectRef.current?.active) {
         dragSelectRef.current = null
       }
     }
     window.addEventListener('mouseup', onUp)
     return () => window.removeEventListener('mouseup', onUp)
-  }, [clearDragState])
+  }, [clearDragState, clearActivityDragState])
 
   // Track container width via ResizeObserver.
   useLayoutEffect(() => {
@@ -247,13 +272,12 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
     pc.height = 12
     const pctx = pc.getContext('2d')
     if (!pctx) return
-    // Prominent zebra so the mandatory-rest strip reads clearly on both
-    // themes. Base fill is a muted neutral tint; diagonal stripes are
-    // strong enough to survive against the dark page bg.
-    pctx.fillStyle = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(110,110,130,0.14)'
+    // Subtle zebra — mandatory-rest strip should read as background
+    // texture, not compete with the duty bars sitting next to it.
+    pctx.fillStyle = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(110,110,130,0.08)'
     pctx.fillRect(0, 0, 12, 12)
-    pctx.strokeStyle = isDark ? 'rgba(255,255,255,0.38)' : 'rgba(90,90,110,0.55)'
-    pctx.lineWidth = 1.6
+    pctx.strokeStyle = isDark ? 'rgba(255,255,255,0.20)' : 'rgba(90,90,110,0.28)'
+    pctx.lineWidth = 1.2
     pctx.beginPath()
     for (let i = -12; i <= 24; i += 6) {
       pctx.moveTo(i, 12)
@@ -488,7 +512,7 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
     // not a separate floating pill. Border painted on the top / right /
     // bottom only — the left side butts flush against the duty pill.
     if (stripePatternRef.current) {
-      const restBorder = isDark ? 'rgba(255,255,255,0.22)' : 'rgba(90,90,110,0.40)'
+      const restBorder = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(90,90,110,0.22)'
       const R = 5
       for (const rs of layout.restStrips) {
         const x = rs.x - sx
@@ -781,6 +805,28 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
           startX: e.clientX,
           startY: e.clientY,
         }
+        return
+      }
+
+      // Priority 3: plain mousedown on an activity bar → pending activity
+      // drag. Same threshold gate as pairing drag so a single click still
+      // selects the activity normally.
+      const activityHit = hitTestActivityBar(layout.activityBars, p.x, p.y)
+      if (activityHit) {
+        const store = useCrewScheduleStore.getState()
+        const act = store.activities.find((a) => a._id === activityHit.activityId)
+        if (act) {
+          pendingActivityDragRef.current = {
+            activityId: activityHit.activityId,
+            crewId: activityHit.crewId,
+            activityCodeId: activityHit.activityCodeId,
+            dateIso: act.dateIso ?? act.startUtcIso.slice(0, 10),
+            label: activityHit.label,
+            color: activityHit.color,
+            startX: e.clientX,
+            startY: e.clientY,
+          }
+        }
       }
     },
     [layout, pointerToContent, resolveCellAt, setRangeSelection],
@@ -788,6 +834,40 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
 
   const onMouseUp = useCallback(
     (e: ReactMouseEvent) => {
+      // ── Activity drag drop (if active) ──
+      const actDrag = useCrewScheduleStore.getState().activityDragState
+      if (actDrag) {
+        const targetCrewId = actDrag.dropCrewId
+        const targetDateIso = actDrag.dropDateIso
+        const legality = actDrag.dropLegality
+        const sourceActivityId = actDrag.sourceActivityId
+        const mode = actDrag.mode
+        // Suppress the click that fires after mouseup so the activity bar
+        // doesn't end up selected (or unselected) by the trailing onClick.
+        justFinishedDragRef.current = true
+        setTimeout(() => {
+          justFinishedDragRef.current = false
+        }, 0)
+        pendingActivityDragRef.current = null
+        clearActivityDragState()
+        if (!targetCrewId || !targetDateIso) return
+        if (legality === 'illegal') {
+          useCrewScheduleStore.getState().setPasteFlash({
+            kind: 'warning',
+            text: actDrag.dropReason || 'Drop rejected',
+            ts: Date.now(),
+          })
+          return
+        }
+        void useCrewScheduleStore.getState().dropActivityToCell({
+          sourceActivityId,
+          targetCrewId,
+          targetDateIso,
+          mode,
+        })
+        return
+      }
+
       // ── Bar drag drop (if active) ──
       const drag = useCrewScheduleStore.getState().dragState
       if (drag) {
@@ -818,10 +898,10 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
         clearDragState()
 
         if (!targetCrewId) return
-        // Hard block only. FDTL violations are overridable — let them through
-        // to the optimistic update + API, which records an override audit
-        // row. Drag-ghost already showed the Legality Check inline.
-        if (level === 'violation' && !drag.dropOverridable) {
+        // Hard block on any violation — FDTL, AC type, eligibility. Drag-
+        // ghost already showed the Legality Check panel inline; the toast
+        // surfaces the headline reason.
+        if (level === 'violation') {
           useCrewScheduleStore
             .getState()
             .setDropRejection(drag.dropReason ? `Drop rejected — ${drag.dropReason}` : 'Drop rejected')
@@ -970,9 +1050,10 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
 
       // Mousedown-without-drag → clear pending state so the click can select.
       pendingBarDragRef.current = null
+      pendingActivityDragRef.current = null
       void e
     },
-    [clearDragState],
+    [clearDragState, clearActivityDragState],
   )
 
   // Hit-test on hover — pairing bars win over activity bars on overlap
@@ -1002,6 +1083,98 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
         const crewIds = layout.rows.slice(a, b + 1).map((r) => r.crewId)
         setRangeSelection({ crewIds, fromIso: from, toIso: to })
         container.style.cursor = 'crosshair'
+        return
+      }
+
+      // Activity drag — start from pending once threshold is crossed,
+      // then track the cursor and resolve the drop cell on every move.
+      // Lighter than pairing drag: no FDTL legality preview, just a
+      // target-cell resolve + occupancy/pairing-overlap check.
+      const pendingAct = pendingActivityDragRef.current
+      const currentActDrag = useCrewScheduleStore.getState().activityDragState
+      if (pendingAct && !currentActDrag) {
+        const dx = e.clientX - pendingAct.startX
+        const dy = e.clientY - pendingAct.startY
+        if (dx * dx + dy * dy >= DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) {
+          setActivityDragState({
+            sourceActivityId: pendingAct.activityId,
+            sourceCrewId: pendingAct.crewId,
+            sourceDateIso: pendingAct.dateIso,
+            activityCodeId: pendingAct.activityCodeId,
+            ghostLabel: pendingAct.label,
+            ghostColor: pendingAct.color,
+            cursorX: e.clientX,
+            cursorY: e.clientY,
+            dropCrewId: null,
+            dropDateIso: null,
+            dropLegality: null,
+            dropReason: '',
+            mode: e.ctrlKey || e.metaKey ? 'copy' : 'move',
+          })
+          // Activity bar is hovered while dragging — clear any pairing
+          // hover state that might be stale from a prior frame.
+          setActivityHover(null)
+          setActivityHoverPos(null)
+        }
+      }
+      if (useCrewScheduleStore.getState().activityDragState) {
+        const dragging = useCrewScheduleStore.getState().activityDragState!
+        const cell = resolveCellAt(p.x, p.y)
+        const ctrlOrMeta = e.ctrlKey || e.metaKey
+        const mode: 'move' | 'copy' = ctrlOrMeta ? 'copy' : 'move'
+        let dropLegality: 'legal' | 'illegal' | null = null
+        let dropReason = ''
+        let dropCrewId: string | null = null
+        let dropDateIso: string | null = null
+        if (cell) {
+          dropCrewId = cell.crewId
+          dropDateIso = cell.dateIso
+          // Self-cell on move = no-op (illegal so the cursor reads it).
+          if (mode === 'move' && cell.crewId === dragging.sourceCrewId && cell.dateIso === dragging.sourceDateIso) {
+            dropLegality = 'illegal'
+            dropReason = 'Same cell'
+          } else {
+            const s = useCrewScheduleStore.getState()
+            const occupied = s.activities.some((a) => {
+              if (a._id === dragging.sourceActivityId) return false
+              const day = a.dateIso ?? a.startUtcIso.slice(0, 10)
+              return a.crewId === cell.crewId && day === cell.dateIso
+            })
+            if (occupied) {
+              dropLegality = 'illegal'
+              dropReason = 'Cell already has an activity'
+            } else {
+              // Cheap pairing-overlap probe — match the day window in
+              // the operator's local timezone (UTC midnight ± offset).
+              const offsetH = s.displayOffsetHours
+              const dayStartMs = Date.parse(`${cell.dateIso}T00:00:00Z`) - offsetH * 3_600_000
+              const dayEndMs = dayStartMs + 86_400_000
+              const overlaps = s.assignments.some((a) => {
+                if (a.crewId !== cell.crewId) return false
+                return new Date(a.startUtcIso).getTime() < dayEndMs && new Date(a.endUtcIso).getTime() > dayStartMs
+              })
+              if (overlaps) {
+                dropLegality = 'illegal'
+                dropReason = 'Pairing on target day'
+              } else {
+                dropLegality = 'legal'
+              }
+            }
+          }
+        } else {
+          dropReason = 'Release over a crew row'
+        }
+        setActivityDragState({
+          ...dragging,
+          cursorX: e.clientX,
+          cursorY: e.clientY,
+          dropCrewId,
+          dropDateIso,
+          dropLegality,
+          dropReason,
+          mode,
+        })
+        container.style.cursor = dropLegality === 'illegal' ? 'not-allowed' : mode === 'copy' ? 'copy' : 'grabbing'
         return
       }
 
@@ -1158,7 +1331,16 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
       setPositioningHover(null)
       container.style.cursor = e.shiftKey ? 'crosshair' : 'default'
     },
-    [layout, pointerToContent, resolveCellAt, setHover, setActivityHover, setRangeSelection, setDragState],
+    [
+      layout,
+      pointerToContent,
+      resolveCellAt,
+      setHover,
+      setActivityHover,
+      setRangeSelection,
+      setDragState,
+      setActivityDragState,
+    ],
   )
 
   const onClick = useCallback(
@@ -1509,9 +1691,12 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
           user is dragging a pairing. Rendered outside the scroll div so
           scroll-wheel events while dragging still reach the canvas. */}
       <DragGhost />
+      <ActivityDragGhost />
       <CapacityErrorDialog />
       {hoveredActivityId &&
         activityHoverPos &&
+        !activityDragState &&
+        !dragState &&
         (() => {
           const act = activities.find((a) => a._id === hoveredActivityId)
           if (!act) return null
@@ -1528,6 +1713,7 @@ export function CrewScheduleCanvas({ layout }: CrewScheduleCanvasProps) {
       {hoveredAssignmentId &&
         pairingHoverPos &&
         !dragState &&
+        !activityDragState &&
         (() => {
           const store = useCrewScheduleStore.getState()
           const assign = store.assignments.find((a) => a._id === hoveredAssignmentId)
@@ -1724,6 +1910,48 @@ function DragGhost() {
           style={{ backgroundColor: badgeColor }}
         >
           {dragState.mode === 'copy' ? 'Copy' : 'Move'} · {dragState.dropReason}
+        </div>
+      )}
+    </div>,
+    document.body,
+  )
+}
+
+/** Floating overlay for an active activity drag. Mirrors `DragGhost`
+ *  but uses the activity-code's own fill colour so the ghost reads as
+ *  the same code being dragged. Status pill underneath shows mode +
+ *  drop reason (target row tint isn't drawn — too noisy when most
+ *  drops land on a row that already has activity bars). */
+function ActivityDragGhost() {
+  const drag = useCrewScheduleStore((s) => s.activityDragState)
+  if (!drag || typeof document === 'undefined') return null
+  const illegal = drag.dropLegality === 'illegal'
+  const badgeColor = illegal ? '#E63535' : '#06C270'
+  return createPortal(
+    <div
+      className="pointer-events-none"
+      style={{
+        position: 'fixed',
+        left: drag.cursorX,
+        top: drag.cursorY,
+        transform: 'translate(10px, 10px)',
+        zIndex: 10000,
+      }}
+    >
+      <div
+        className="rounded-md px-2 py-1 text-[11px] font-semibold text-white shadow-lg"
+        style={{ backgroundColor: drag.ghostColor, opacity: 0.9 }}
+      >
+        {drag.mode === 'copy' ? '+ ' : ''}
+        {drag.ghostLabel}
+      </div>
+      {drag.dropCrewId && (
+        <div
+          className="mt-1 inline-block px-2 py-0.5 rounded text-[11px] font-medium text-white shadow"
+          style={{ backgroundColor: badgeColor }}
+        >
+          {drag.mode === 'copy' ? 'Copy' : 'Move'}
+          {illegal && drag.dropReason ? ` · ${drag.dropReason}` : ''}
         </div>
       )}
     </div>,

@@ -4,6 +4,7 @@ import { useRef, useState, type ElementType, type RefObject } from 'react'
 import {
   Tag,
   Binary,
+  Clock,
   Route as RouteIcon,
   Maximize2,
   Minimize2,
@@ -70,6 +71,8 @@ export function CrewScheduleRibbonToolbar({
   const smartFilter = useCrewScheduleStore((s) => s.smartFilter)
   const smartActive = isSmartFilterActive(smartFilter)
   const cycleLabelMode = useCrewScheduleStore((s) => s.cycleLabelMode)
+  const timeMode = useCrewScheduleStore((s) => s.timeMode)
+  const toggleTimeMode = useCrewScheduleStore((s) => s.toggleTimeMode)
   const rightPanelOpen = useCrewScheduleStore((s) => s.rightPanelOpen)
   const setRightPanelOpen = useCrewScheduleStore((s) => s.setRightPanelOpen)
   const uncrewedTrayVisible = useCrewScheduleStore((s) => s.uncrewedTrayVisible)
@@ -227,6 +230,16 @@ export function CrewScheduleRibbonToolbar({
               hoverBg={hoverBg}
               activeBg={activeBg}
               tooltip="Row height · Range · Refresh interval"
+            />
+            <RibbonBtn
+              icon={Clock}
+              label={timeMode === 'utc' ? 'UTC' : 'Local'}
+              onClick={toggleTimeMode}
+              active={timeMode === 'utc'}
+              isDark={isDark}
+              hoverBg={hoverBg}
+              activeBg={activeBg}
+              tooltip="Choose the desired time mode to be displayed"
             />
           </RibbonSection>
           <RibbonDivider isDark={isDark} />

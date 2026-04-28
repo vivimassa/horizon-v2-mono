@@ -602,10 +602,10 @@ export function FlightBookingDrawer({ existing, leg, positioning, onClosed }: Pr
                       key={p}
                       type="button"
                       onClick={() => setGendecPosition(p)}
-                      className={`h-10 w-full rounded-lg text-[13px] font-semibold transition-colors ${
+                      className={`h-10 w-full rounded-lg text-[13px] font-semibold transition-colors border ${
                         gendecPosition === p
-                          ? 'bg-module-accent text-white'
-                          : 'bg-hz-border/30 text-hz-text hover:bg-hz-border/50'
+                          ? 'bg-module-accent/10 text-module-accent border-module-accent/30'
+                          : 'bg-transparent text-hz-text-secondary border-hz-border hover:bg-hz-border/20'
                       }`}
                     >
                       {GENDEC_LABELS[p]}
@@ -687,7 +687,7 @@ export function FlightBookingDrawer({ existing, leg, positioning, onClosed }: Pr
             disabled={busy !== null || (method === 'ticket' && !carrierOk)}
             className="h-9 px-4 rounded-lg text-[13px] font-semibold bg-module-accent text-white hover:opacity-90 disabled:opacity-50 transition-opacity inline-flex items-center gap-1.5"
           >
-            <Save className="h-3.5 w-3.5" /> {busy === 'save' ? 'Saving…' : bookingId ? 'Save changes' : 'Save booking'}
+            <Save className="h-3.5 w-3.5" /> {busy === 'save' ? 'Saving…' : 'Save'}
           </button>
         </footer>
       </aside>
@@ -1128,8 +1128,10 @@ function SegBtn({ active, onClick, children }: { active: boolean; onClick: () =>
     <button
       type="button"
       onClick={onClick}
-      className={`px-3 h-10 rounded-lg text-[13px] font-semibold transition-colors ${
-        active ? 'bg-module-accent text-white' : 'bg-hz-border/30 text-hz-text hover:bg-hz-border/50'
+      className={`px-3 h-10 rounded-lg text-[13px] font-semibold transition-colors border ${
+        active
+          ? 'bg-module-accent/10 text-module-accent border-module-accent/30'
+          : 'bg-transparent text-hz-text-secondary border-hz-border hover:bg-hz-border/20'
       }`}
     >
       {children}

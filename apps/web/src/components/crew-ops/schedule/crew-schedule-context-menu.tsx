@@ -8,7 +8,6 @@ import {
   CalendarCheck,
   CalendarDays,
   CalendarRange,
-  ClipboardList,
   ClipboardPaste,
   Copy,
   CopyPlus,
@@ -59,7 +58,6 @@ export function CrewScheduleContextMenu({ onAfterMutate }: Props) {
   const selectAssignment = useCrewScheduleStore((s) => s.selectAssignment)
   const selectActivity = useCrewScheduleStore((s) => s.selectActivity)
   const selectCrew = useCrewScheduleStore((s) => s.selectCrew)
-  const selectDateCell = useCrewScheduleStore((s) => s.selectDateCell)
   const setInspectorTab = useCrewScheduleStore((s) => s.setInspectorTab)
   const setRightPanelOpen = useCrewScheduleStore((s) => s.setRightPanelOpen)
   const excludeCrew = useCrewScheduleStore((s) => s.excludeCrew)
@@ -82,13 +80,75 @@ export function CrewScheduleContextMenu({ onAfterMutate }: Props) {
   useEffect(() => {
     if (!menu) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeContextMenu()
+      if (e.key === 'Escape') {
+        closeContextMenu()
+        return
+      }
+      // Empty-cell shortcuts. Captured at document level so they fire
+      // even though no menu item has DOM focus, and overrides browser
+      // defaults (Ctrl+R reload, Ctrl+O open, Ctrl+1 first-tab).
+      if (menu.kind !== 'empty-cell') return
+      if (!(e.ctrlKey || e.metaKey)) return
+      const { crewId, dateIso } = menu
+      const store = useCrewScheduleStore.getState()
+      const k = e.key.toLowerCase()
+      if (k === 'r') {
+        e.preventDefault()
+        e.stopPropagation()
+        setBusy(true)
+        ;(async () => {
+          try {
+            const prev = new Date(new Date(dateIso + 'T00:00:00Z').getTime() - 86_400_000).toISOString().slice(0, 10)
+            const source = store.activities.find(
+              (a) =>
+                a.crewId === crewId &&
+                ((a.dateIso && a.dateIso === prev) || (!a.dateIso && a.startUtcIso.slice(0, 10) === prev)),
+            )
+            if (!source) {
+              console.warn('Copy previous day: no activity found for', crewId, prev)
+              return
+            }
+            const created = await api.createCrewActivity({
+              crewId,
+              activityCodeId: source.activityCodeId,
+              dateIso,
+              notes: source.notes ?? null,
+            })
+            store.mergeActivities([created as unknown as { _id: string }])
+            void store.reconcileCrew([crewId])
+            onAfterMutate()
+          } finally {
+            setBusy(false)
+            closeContextMenu()
+          }
+        })()
+        return
+      }
+      if (k === 'o') {
+        e.preventDefault()
+        e.stopPropagation()
+        store.openDialogFor({ kind: 'assign-series', fromIso: dateIso, toIso: dateIso, crewId })
+        return
+      }
+      if (k === 'm') {
+        e.preventDefault()
+        e.stopPropagation()
+        openMemoOverlay({ scope: 'day', crewId, dateIso })
+        closeContextMenu()
+        return
+      }
+      if (k === '1') {
+        e.preventDefault()
+        e.stopPropagation()
+        store.openLegalityCheck({ kind: 'crew', crewId })
+        return
+      }
     }
     document.addEventListener('keydown', onKey)
     return () => {
       document.removeEventListener('keydown', onKey)
     }
-  }, [menu, closeContextMenu])
+  }, [menu, closeContextMenu, openMemoOverlay, onAfterMutate])
 
   const items = useMemo<Section[] | null>(() => {
     if (!menu) return null
@@ -103,23 +163,6 @@ export function CrewScheduleContextMenu({ onAfterMutate }: Props) {
       return [
         [
           {
-            icon: Activity,
-            label: 'Assign activity…',
-            shortcut: 'A',
-            onClick: () => {
-              selectDateCell(crewId, dateIso)
-              openInspectorOnTab('assign')
-            },
-          },
-          {
-            icon: ClipboardList,
-            label: 'Assign pairing…',
-            shortcut: 'P',
-            onClick: () => {
-              useCrewScheduleStore.getState().openDialogFor({ kind: 'assign-pairing', crewId, dateIso })
-            },
-          },
-          {
             icon: ClipboardPaste,
             label: clip ? `Paste ${clip.codeLabel}` : 'Paste',
             shortcut: 'Ctrl+V',
@@ -131,6 +174,7 @@ export function CrewScheduleContextMenu({ onAfterMutate }: Props) {
           {
             icon: Copy,
             label: 'Copy previous day',
+            shortcut: 'Ctrl+R',
             onClick: async () => {
               setBusy(true)
               try {
@@ -165,6 +209,7 @@ export function CrewScheduleContextMenu({ onAfterMutate }: Props) {
           {
             icon: CalendarRange,
             label: 'Assign series of duties…',
+            shortcut: 'Ctrl+O',
             onClick: () => {
               useCrewScheduleStore.getState().openDialogFor({
                 kind: 'assign-series',
@@ -179,7 +224,7 @@ export function CrewScheduleContextMenu({ onAfterMutate }: Props) {
           {
             icon: StickyNote,
             label: 'View / edit day memo',
-            shortcut: 'M',
+            shortcut: 'Ctrl+M',
             onClick: () => {
               openMemoOverlay({ scope: 'day', crewId, dateIso })
               closeContextMenu()
@@ -188,7 +233,7 @@ export function CrewScheduleContextMenu({ onAfterMutate }: Props) {
           {
             icon: Scale,
             label: 'Legality Check',
-            shortcut: 'L',
+            shortcut: 'Ctrl+1',
             onClick: () => {
               useCrewScheduleStore.getState().openLegalityCheck({ kind: 'crew', crewId })
             },
@@ -874,7 +919,6 @@ export function CrewScheduleContextMenu({ onAfterMutate }: Props) {
     selectActivity,
     selectAssignment,
     selectCrew,
-    selectDateCell,
     setInspectorTab,
     setRightPanelOpen,
     clearRangeSelection,

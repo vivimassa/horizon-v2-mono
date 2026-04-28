@@ -58,6 +58,11 @@ export async function runCrewSync(opts: SyncOptions): Promise<void> {
       }
     },
     sendCreatedAsUpdated: true,
-    migrationsEnabledAtVersion: 1,
+    // Schema started at v1 and the SQLiteAdapter has no migrations
+    // registered. Setting `migrationsEnabledAtVersion` requires a
+    // migrations array on the adapter; without it, synchronize() throws
+    // "Migration syncs cannot be enabled on a database that does not
+    // support migrations" before any data is applied. Drop until/unless
+    // we bump schema version and wire migrations.
   })
 }

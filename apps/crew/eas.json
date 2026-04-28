@@ -20,7 +20,7 @@
         "simulator": false
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://regulatory-knee-rogers-earnings.trycloudflare.com"
+        "EXPO_PUBLIC_API_URL": "https://skyhub-server.onrender.com"
       }
     },
     "production": {

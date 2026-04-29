@@ -1,0 +1,20 @@
+name: Keep Render Warm
+
+on:
+  schedule:
+    # Every 10min during 2300z-1659z (skip 1700z-2259z sleep window)
+    - cron: '*/10 0-16,23 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Random jitter
+        run: sleep $((RANDOM % 180))
+
+      - name: Ping /health
+        run: |
+          curl -fsS -m 120 -w "\nHTTP %{http_code} in %{time_total}s\n" \
+            https://skyhub-server.onrender.com/health
